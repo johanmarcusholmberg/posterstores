@@ -3,5 +3,6 @@ export * from "./posterSizes";
 export * from "./cart";
 export * from "./favorites";
 export * from "./orders";
+export * from "./orderItems";
 export * from "./newsletter";
 export * from "./mockups";

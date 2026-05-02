@@ -18,6 +18,8 @@ import type {
 
 import type {
   AddCartItemBody,
+  AdminListOrdersParams,
+  AdminOrderListResponse,
   Cart,
   CreateOrderBody,
   CreatePosterBody,
@@ -35,6 +37,7 @@ import type {
   NewsletterBody,
   NewsletterResponse,
   Order,
+  OrderError,
   Poster,
   PosterListResponse,
   PosterSize,
@@ -43,6 +46,7 @@ import type {
   SavePosterSizesParams,
   StoreStats,
   UpdateCartItemBody,
+  UpdateOrderStatusBody,
   UpdatePosterBody,
   UpdatePosterParams,
 } from "./api.schemas";
@@ -1472,7 +1476,7 @@ export const useRemoveFavorite = <
 };
 
 /**
- * @summary Place an order
+ * @summary Create an order draft from cart (server-side price calculation)
  */
 export const getCreateOrderUrl = () => {
   return `/api/orders`;
@@ -1491,7 +1495,7 @@ export const createOrder = async (
 };
 
 export const getCreateOrderMutationOptions = <
-  TError = ErrorType<unknown>,
+  TError = ErrorType<OrderError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -1532,13 +1536,13 @@ export type CreateOrderMutationResult = NonNullable<
   Awaited<ReturnType<typeof createOrder>>
 >;
 export type CreateOrderMutationBody = BodyType<CreateOrderBody>;
-export type CreateOrderMutationError = ErrorType<unknown>;
+export type CreateOrderMutationError = ErrorType<OrderError>;
 
 /**
- * @summary Place an order
+ * @summary Create an order draft from cart (server-side price calculation)
  */
 export const useCreateOrder = <
-  TError = ErrorType<unknown>,
+  TError = ErrorType<OrderError>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -1580,7 +1584,7 @@ export const getGetOrderQueryKey = (id: number) => {
 
 export const getGetOrderQueryOptions = <
   TData = Awaited<ReturnType<typeof getOrder>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<void>,
 >(
   id: number,
   options?: {
@@ -1613,7 +1617,7 @@ export const getGetOrderQueryOptions = <
 export type GetOrderQueryResult = NonNullable<
   Awaited<ReturnType<typeof getOrder>>
 >;
-export type GetOrderQueryError = ErrorType<unknown>;
+export type GetOrderQueryError = ErrorType<void>;
 
 /**
  * @summary Get order by ID
@@ -1621,7 +1625,7 @@ export type GetOrderQueryError = ErrorType<unknown>;
 
 export function useGetOrder<
   TData = Awaited<ReturnType<typeof getOrder>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<void>,
 >(
   id: number,
   options?: {
@@ -1641,6 +1645,275 @@ export function useGetOrder<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary List orders for a store (admin only)
+ */
+export const getAdminListOrdersUrl = (params?: AdminListOrdersParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/admin/orders?${stringifiedParams}`
+    : `/api/admin/orders`;
+};
+
+export const adminListOrders = async (
+  params?: AdminListOrdersParams,
+  options?: RequestInit,
+): Promise<AdminOrderListResponse> => {
+  return customFetch<AdminOrderListResponse>(getAdminListOrdersUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getAdminListOrdersQueryKey = (params?: AdminListOrdersParams) => {
+  return [`/api/admin/orders`, ...(params ? [params] : [])] as const;
+};
+
+export const getAdminListOrdersQueryOptions = <
+  TData = Awaited<ReturnType<typeof adminListOrders>>,
+  TError = ErrorType<void>,
+>(
+  params?: AdminListOrdersParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof adminListOrders>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getAdminListOrdersQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof adminListOrders>>> = ({
+    signal,
+  }) => adminListOrders(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof adminListOrders>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type AdminListOrdersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminListOrders>>
+>;
+export type AdminListOrdersQueryError = ErrorType<void>;
+
+/**
+ * @summary List orders for a store (admin only)
+ */
+
+export function useAdminListOrders<
+  TData = Awaited<ReturnType<typeof adminListOrders>>,
+  TError = ErrorType<void>,
+>(
+  params?: AdminListOrdersParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof adminListOrders>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getAdminListOrdersQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get order detail (admin only)
+ */
+export const getAdminGetOrderUrl = (id: number) => {
+  return `/api/admin/orders/${id}`;
+};
+
+export const adminGetOrder = async (
+  id: number,
+  options?: RequestInit,
+): Promise<Order> => {
+  return customFetch<Order>(getAdminGetOrderUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getAdminGetOrderQueryKey = (id: number) => {
+  return [`/api/admin/orders/${id}`] as const;
+};
+
+export const getAdminGetOrderQueryOptions = <
+  TData = Awaited<ReturnType<typeof adminGetOrder>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof adminGetOrder>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getAdminGetOrderQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof adminGetOrder>>> = ({
+    signal,
+  }) => adminGetOrder(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof adminGetOrder>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type AdminGetOrderQueryResult = NonNullable<
+  Awaited<ReturnType<typeof adminGetOrder>>
+>;
+export type AdminGetOrderQueryError = ErrorType<void>;
+
+/**
+ * @summary Get order detail (admin only)
+ */
+
+export function useAdminGetOrder<
+  TData = Awaited<ReturnType<typeof adminGetOrder>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof adminGetOrder>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getAdminGetOrderQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update order status (admin only)
+ */
+export const getAdminUpdateOrderStatusUrl = (id: number) => {
+  return `/api/admin/orders/${id}/status`;
+};
+
+export const adminUpdateOrderStatus = async (
+  id: number,
+  updateOrderStatusBody: UpdateOrderStatusBody,
+  options?: RequestInit,
+): Promise<Order> => {
+  return customFetch<Order>(getAdminUpdateOrderStatusUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateOrderStatusBody),
+  });
+};
+
+export const getAdminUpdateOrderStatusMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminUpdateOrderStatus>>,
+    TError,
+    { id: number; data: BodyType<UpdateOrderStatusBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof adminUpdateOrderStatus>>,
+  TError,
+  { id: number; data: BodyType<UpdateOrderStatusBody> },
+  TContext
+> => {
+  const mutationKey = ["adminUpdateOrderStatus"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof adminUpdateOrderStatus>>,
+    { id: number; data: BodyType<UpdateOrderStatusBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return adminUpdateOrderStatus(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AdminUpdateOrderStatusMutationResult = NonNullable<
+  Awaited<ReturnType<typeof adminUpdateOrderStatus>>
+>;
+export type AdminUpdateOrderStatusMutationBody =
+  BodyType<UpdateOrderStatusBody>;
+export type AdminUpdateOrderStatusMutationError = ErrorType<void>;
+
+/**
+ * @summary Update order status (admin only)
+ */
+export const useAdminUpdateOrderStatus = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof adminUpdateOrderStatus>>,
+    TError,
+    { id: number; data: BodyType<UpdateOrderStatusBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof adminUpdateOrderStatus>>,
+  TError,
+  { id: number; data: BodyType<UpdateOrderStatusBody> },
+  TContext
+> => {
+  return useMutation(getAdminUpdateOrderStatusMutationOptions(options));
+};
 
 /**
  * @summary Subscribe to newsletter

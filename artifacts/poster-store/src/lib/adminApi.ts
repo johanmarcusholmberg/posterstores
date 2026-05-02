@@ -1,6 +1,16 @@
 const BASE = "/api";
 
 export type PosterStatus = "draft" | "published" | "archived";
+export type OrderStatus = "draft" | "pending_payment" | "paid" | "processing" | "shipped" | "cancelled";
+
+export const ORDER_STATUSES: { value: OrderStatus; label: string }[] = [
+  { value: "draft", label: "Draft" },
+  { value: "pending_payment", label: "Pending Payment" },
+  { value: "paid", label: "Paid" },
+  { value: "processing", label: "Processing" },
+  { value: "shipped", label: "Shipped" },
+  { value: "cancelled", label: "Cancelled" },
+];
 
 export interface AdminPosterSize {
   id: number;
@@ -20,6 +30,8 @@ export interface AdminPoster {
   title: string;
   description?: string | null;
   imageUrl: string;
+  masterPrintImageUrl?: string | null;
+  previewImageUrl?: string | null;
   region?: string | null;
   city?: string | null;
   category: string;
@@ -56,6 +68,53 @@ export type CreatePosterPayload = Omit<AdminPoster, "id" | "createdAt" | "poster
 export type UpdatePosterPayload = Partial<Omit<AdminPoster, "id" | "createdAt" | "storeKey" | "posterSizes" | "lowestActivePrice">> & {
   posterSizes?: PosterSizePayload[];
 };
+
+export interface AdminOrderItem {
+  id: number;
+  orderId: number;
+  posterId: number;
+  posterSizeId?: number | null;
+  posterTitleSnapshot: string;
+  sizeLabelSnapshot?: string | null;
+  widthCmSnapshot?: number | null;
+  heightCmSnapshot?: number | null;
+  unitPrice: number;
+  currency: string;
+  quantity: number;
+  totalPrice: number;
+  masterPrintImageUrlSnapshot?: string | null;
+  previewImageUrlSnapshot?: string | null;
+  createdAt: string;
+}
+
+export interface AdminOrder {
+  id: number;
+  storeKey: string;
+  customerEmail: string;
+  status: OrderStatus;
+  subtotal: number;
+  shippingCost: number;
+  total: number;
+  currency: string;
+  shippingName: string;
+  shippingAddressLine1: string;
+  shippingAddressLine2?: string | null;
+  shippingPostalCode: string;
+  shippingCity: string;
+  shippingRegion?: string | null;
+  shippingCountry: string;
+  customerNotes?: string | null;
+  items: AdminOrderItem[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminOrderListResponse {
+  orders: AdminOrder[];
+  total: number;
+  offset: number;
+  limit: number;
+}
 
 function headers(token: string): HeadersInit {
   return {
@@ -169,4 +228,45 @@ export async function adminGetStats(token: string, storeKey: string) {
     featuredCount: number;
     newArrivalsCount: number;
   }>;
+}
+
+export async function adminListOrders(
+  token: string,
+  storeKey: string,
+  params: { status?: string; limit?: number; offset?: number } = {}
+): Promise<AdminOrderListResponse> {
+  const qs = new URLSearchParams();
+  if (storeKey) qs.set("storeKey", storeKey);
+  if (params.status) qs.set("status", params.status);
+  if (params.limit !== undefined) qs.set("limit", String(params.limit));
+  if (params.offset !== undefined) qs.set("offset", String(params.offset));
+
+  const res = await fetch(`${BASE}/admin/orders?${qs}`, { headers: headers(token) });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(extractErrorMessage(body));
+  }
+  return res.json();
+}
+
+export async function adminGetOrder(token: string, id: number): Promise<AdminOrder> {
+  const res = await fetch(`${BASE}/admin/orders/${id}`, { headers: headers(token) });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(extractErrorMessage(body));
+  }
+  return res.json();
+}
+
+export async function adminUpdateOrderStatus(token: string, id: number, status: string): Promise<AdminOrder> {
+  const res = await fetch(`${BASE}/admin/orders/${id}/status`, {
+    method: "PATCH",
+    headers: headers(token),
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(extractErrorMessage(body));
+  }
+  return res.json();
 }

@@ -58,6 +58,8 @@ export interface Poster {
   title: string;
   description?: string;
   imageUrl: string;
+  masterPrintImageUrl?: string | null;
+  previewImageUrl?: string | null;
   region?: string;
   city?: string;
   category: string;
@@ -94,6 +96,8 @@ export interface CreatePosterBody {
   title: string;
   description?: string;
   imageUrl: string;
+  masterPrintImageUrl?: string;
+  previewImageUrl?: string;
   region?: string;
   city?: string;
   category: string;
@@ -120,6 +124,8 @@ export interface UpdatePosterBody {
   title?: string;
   description?: string;
   imageUrl?: string;
+  masterPrintImageUrl?: string;
+  previewImageUrl?: string;
   region?: string;
   city?: string;
   category?: string;
@@ -174,41 +180,103 @@ export interface FavoriteBody {
 }
 
 export interface OrderItem {
+  id: number;
+  orderId: number;
   posterId: number;
-  posterSizeId?: number;
-  quantity: number;
-  size?: string;
-  posterTitleSnapshot?: string;
-  sizeLabelSnapshot?: string;
+  posterSizeId?: number | null;
+  posterTitleSnapshot: string;
+  sizeLabelSnapshot?: string | null;
   widthCmSnapshot?: number | null;
   heightCmSnapshot?: number | null;
   unitPrice: number;
   currency: string;
+  quantity: number;
   totalPrice: number;
+  masterPrintImageUrlSnapshot?: string | null;
+  previewImageUrlSnapshot?: string | null;
+  createdAt: string;
 }
+
+export type OrderStatus = (typeof OrderStatus)[keyof typeof OrderStatus];
+
+export const OrderStatus = {
+  draft: "draft",
+  pending_payment: "pending_payment",
+  paid: "paid",
+  processing: "processing",
+  shipped: "shipped",
+  cancelled: "cancelled",
+} as const;
 
 export interface Order {
   id: number;
   storeKey: string;
-  customerName?: string;
   customerEmail: string;
-  shippingAddress?: string;
-  items: OrderItem[];
+  status: OrderStatus;
+  subtotal: number;
+  shippingCost: number;
   total: number;
   currency: string;
-  status: string;
+  shippingName: string;
+  shippingAddressLine1: string;
+  shippingAddressLine2?: string | null;
+  shippingPostalCode: string;
+  shippingCity: string;
+  shippingRegion?: string | null;
+  shippingCountry: string;
+  customerNotes?: string | null;
+  items: OrderItem[];
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface CreateOrderBody {
   storeKey: string;
-  sessionId?: string;
-  customerName?: string;
+  sessionId: string;
   customerEmail: string;
-  shippingAddress?: string;
-  items: OrderItem[];
+  shippingName: string;
+  shippingAddressLine1: string;
+  shippingAddressLine2?: string;
+  shippingPostalCode: string;
+  shippingCity: string;
+  shippingRegion?: string;
+  shippingCountry: string;
+  customerNotes?: string;
+  newsletterOptIn?: boolean;
+  currency?: string;
+}
+
+export type UpdateOrderStatusBodyStatus =
+  (typeof UpdateOrderStatusBodyStatus)[keyof typeof UpdateOrderStatusBodyStatus];
+
+export const UpdateOrderStatusBodyStatus = {
+  draft: "draft",
+  pending_payment: "pending_payment",
+  paid: "paid",
+  processing: "processing",
+  shipped: "shipped",
+  cancelled: "cancelled",
+} as const;
+
+export interface UpdateOrderStatusBody {
+  status: UpdateOrderStatusBodyStatus;
+}
+
+export type OrderErrorInvalidItemsItem = {
+  posterId: number;
+  reason: string;
+};
+
+export interface OrderError {
+  error: string;
+  invalidItems?: OrderErrorInvalidItemsItem[];
+}
+
+export interface AdminOrderListResponse {
+  orders: Order[];
   total: number;
-  currency: string;
+  offset: number;
+  limit: number;
 }
 
 export interface NewsletterBody {
@@ -297,6 +365,13 @@ export type RemoveFavoriteParams = {
   sessionId: string;
   posterId: number;
   storeKey: string;
+};
+
+export type AdminListOrdersParams = {
+  storeKey?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
 };
 
 export type GetStoreStatsParams = {

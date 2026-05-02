@@ -19,6 +19,8 @@ tags:
     description: Favorites management
   - name: orders
     description: Order operations
+  - name: adminOrders
+    description: Admin order operations
   - name: newsletter
     description: Newsletter subscription
   - name: stats
@@ -435,7 +437,7 @@ paths:
     post:
       operationId: createOrder
       tags: [orders]
-      summary: Place an order
+      summary: Create an order draft from cart (server-side price calculation)
       requestBody:
         required: true
         content:
@@ -449,6 +451,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Order"
+        "400":
+          description: Validation error (empty cart, invalid size, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderError"
 
   /orders/{id}:
     get:
@@ -468,6 +476,92 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Order"
+        "404":
+          description: Not found
+
+  /admin/orders:
+    get:
+      operationId: adminListOrders
+      tags: [adminOrders]
+      summary: List orders for a store (admin only)
+      parameters:
+        - name: storeKey
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Paginated order list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOrderListResponse"
+        "401":
+          description: Unauthorized
+
+  /admin/orders/{id}:
+    get:
+      operationId: adminGetOrder
+      tags: [adminOrders]
+      summary: Get order detail (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Order detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
+
+  /admin/orders/{id}/status:
+    patch:
+      operationId: adminUpdateOrderStatus
+      tags: [adminOrders]
+      summary: Update order status (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrderStatusBody"
+      responses:
+        "200":
+          description: Updated order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not found
 
   /newsletter:
     post:
@@ -648,6 +742,12 @@ components:
           type: string
         imageUrl:
           type: string
+        masterPrintImageUrl:
+          type: string
+          nullable: true
+        previewImageUrl:
+          type: string
+          nullable: true
         region:
           type: string
         city:
@@ -710,6 +810,10 @@ components:
           type: string
         imageUrl:
           type: string
+        masterPrintImageUrl:
+          type: string
+        previewImageUrl:
+          type: string
         region:
           type: string
         city:
@@ -749,6 +853,10 @@ components:
         description:
           type: string
         imageUrl:
+          type: string
+        masterPrintImageUrl:
+          type: string
+        previewImageUrl:
           type: string
         region:
           type: string
@@ -861,18 +969,20 @@ components:
     OrderItem:
       type: object
       properties:
+        id:
+          type: integer
+        orderId:
+          type: integer
         posterId:
           type: integer
         posterSizeId:
           type: integer
-        quantity:
-          type: integer
-        size:
-          type: string
+          nullable: true
         posterTitleSnapshot:
           type: string
         sizeLabelSnapshot:
           type: string
+          nullable: true
         widthCmSnapshot:
           type: number
           nullable: true
@@ -883,9 +993,19 @@ components:
           type: number
         currency:
           type: string
+        quantity:
+          type: integer
         totalPrice:
           type: number
-      required: [posterId, quantity, unitPrice, currency, totalPrice]
+        masterPrintImageUrlSnapshot:
+          type: string
+          nullable: true
+        previewImageUrlSnapshot:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required: [id, orderId, posterId, posterTitleSnapshot, unitPrice, currency, quantity, totalPrice, createdAt]
 
     Order:
       type: object
@@ -894,25 +1014,47 @@ components:
           type: integer
         storeKey:
           type: string
-        customerName:
-          type: string
         customerEmail:
           type: string
-        shippingAddress:
+        status:
           type: string
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/OrderItem"
+          enum: [draft, pending_payment, paid, processing, shipped, cancelled]
+        subtotal:
+          type: number
+        shippingCost:
+          type: number
         total:
           type: number
         currency:
           type: string
-        status:
+        shippingName:
           type: string
+        shippingAddressLine1:
+          type: string
+        shippingAddressLine2:
+          type: string
+          nullable: true
+        shippingPostalCode:
+          type: string
+        shippingCity:
+          type: string
+        shippingRegion:
+          type: string
+          nullable: true
+        shippingCountry:
+          type: string
+        customerNotes:
+          type: string
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"
         createdAt:
           type: string
-      required: [id, storeKey, customerEmail, items, total, currency, status, createdAt]
+        updatedAt:
+          type: string
+      required: [id, storeKey, customerEmail, status, subtotal, shippingCost, total, currency, shippingName, shippingAddressLine1, shippingPostalCode, shippingCity, shippingCountry, items, createdAt, updatedAt]
 
     CreateOrderBody:
       type: object
@@ -921,21 +1063,69 @@ components:
           type: string
         sessionId:
           type: string
-        customerName:
-          type: string
         customerEmail:
           type: string
-        shippingAddress:
+        shippingName:
           type: string
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/OrderItem"
-        total:
-          type: number
+        shippingAddressLine1:
+          type: string
+        shippingAddressLine2:
+          type: string
+        shippingPostalCode:
+          type: string
+        shippingCity:
+          type: string
+        shippingRegion:
+          type: string
+        shippingCountry:
+          type: string
+        customerNotes:
+          type: string
+        newsletterOptIn:
+          type: boolean
         currency:
           type: string
-      required: [storeKey, customerEmail, items, total, currency]
+      required: [storeKey, sessionId, customerEmail, shippingName, shippingAddressLine1, shippingPostalCode, shippingCity, shippingCountry]
+
+    UpdateOrderStatusBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [draft, pending_payment, paid, processing, shipped, cancelled]
+      required: [status]
+
+    OrderError:
+      type: object
+      properties:
+        error:
+          type: string
+        invalidItems:
+          type: array
+          items:
+            type: object
+            properties:
+              posterId:
+                type: integer
+              reason:
+                type: string
+            required: [posterId, reason]
+      required: [error]
+
+    AdminOrderListResponse:
+      type: object
+      properties:
+        orders:
+          type: array
+          items:
+            $ref: "#/components/schemas/Order"
+        total:
+          type: integer
+        offset:
+          type: integer
+        limit:
+          type: integer
+      required: [orders, total, offset, limit]
 
     NewsletterBody:
       type: object

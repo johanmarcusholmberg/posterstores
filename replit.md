@@ -56,8 +56,11 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 - `GET /api/favorites` — favorites by sessionId (returns plain array of posters, NOT `{posters:[]}`)
 - `POST /api/favorites` — add favorite
 - `DELETE /api/favorites/:posterId` — remove favorite
-- `POST /api/orders` — create order
-- `GET /api/orders/:id` — get order
+- `POST /api/orders` — create order draft (server-side price calc, validates cart, stores snapshots, clears cart on success)
+- `GET /api/orders/:id` — get order with items
+- `GET /api/admin/orders` — list orders (admin; supports storeKey, status, limit, offset filters)
+- `GET /api/admin/orders/:id` — get full order detail with items (admin)
+- `PATCH /api/admin/orders/:id/status` — update order status (admin; valid: draft, pending_payment, paid, processing, shipped, cancelled)
 - `POST /api/newsletter` — subscribe
 
 ### Mockup System API Endpoints
@@ -76,7 +79,7 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 - `artifacts/poster-store/src/lib/session.ts` — `getSessionId()` generates/retrieves the UUID
 
 ### Admin System
-- **Routes**: `/admin`, `/admin/posters`, `/admin/posters/new`, `/admin/posters/:id`, `/admin/mockups`, `/admin/posters/:id/mockups`
+- **Routes**: `/admin`, `/admin/posters`, `/admin/posters/new`, `/admin/posters/:id`, `/admin/mockups`, `/admin/posters/:id/mockups`, `/admin/orders`, `/admin/orders/:id`
 - **Token gate**: `AdminTokenGate` shows a login screen if no token in localStorage (`admin_token` key)
 - **Token storage**: Token stored in browser `localStorage` under `admin_token` key; cleared with "Clear token" button
 - **API auth**: All admin API calls send `X-Admin-Token: <token>` header via `artifacts/poster-store/src/lib/adminApi.ts` and `artifacts/poster-store/src/lib/mockupApi.ts`

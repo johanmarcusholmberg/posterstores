@@ -8,6 +8,8 @@ export const postersTable = pgTable("posters", {
   title: text("title").notNull(),
   description: text("description"),
   imageUrl: text("image_url").notNull(),
+  masterPrintImageUrl: text("master_print_image_url"),
+  previewImageUrl: text("preview_image_url"),
   region: text("region"),
   city: text("city"),
   category: text("category").notNull(),

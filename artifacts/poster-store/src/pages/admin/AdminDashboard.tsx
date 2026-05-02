@@ -67,10 +67,9 @@ export default function AdminDashboard() {
       label: "Total Orders",
       value: stats?.totalOrders,
       icon: ShoppingBag,
-      href: "#",
+      href: "/admin/orders",
       color: "text-green-600",
       bg: "bg-green-50",
-      disabled: true,
     },
   ];
 
