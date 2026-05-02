@@ -14,6 +14,12 @@ import { requireAdmin } from "../middleware/requireAdmin";
 
 const router = Router();
 
+function isAdminRequest(req: import("express").Request): boolean {
+  const token = process.env.ADMIN_API_TOKEN;
+  if (!token) return false;
+  return req.headers["x-admin-token"] === token;
+}
+
 router.get("/posters", async (req, res) => {
   const query = ListPostersQueryParams.safeParse(req.query);
   if (!query.success) {
@@ -25,8 +31,23 @@ router.get("/posters", async (req, res) => {
     return res.status(400).json({ error: "storeKey query parameter is required" });
   }
 
+  const requestedStatus = typeof req.query.status === "string" ? req.query.status : undefined;
+  const adminRequest = isAdminRequest(req);
+
+  if (requestedStatus && requestedStatus !== "published" && !adminRequest) {
+    return res.status(401).json({ error: "Unauthorized: admin token required to view non-published posters" });
+  }
+
   let conditions: ReturnType<typeof eq>[] = [];
   conditions.push(eq(postersTable.storeKey, storeKey));
+
+  if (adminRequest && requestedStatus === "all") {
+  } else if (adminRequest && requestedStatus) {
+    conditions.push(eq(postersTable.status, requestedStatus));
+  } else {
+    conditions.push(eq(postersTable.status, "published"));
+  }
+
   if (region) conditions.push(eq(postersTable.region, region));
   if (city) conditions.push(eq(postersTable.city, city));
   if (category) conditions.push(eq(postersTable.category, category));
@@ -80,10 +101,20 @@ router.get("/posters/:id", async (req, res) => {
   const storeKey = typeof req.query.storeKey === "string" ? req.query.storeKey : undefined;
   if (!storeKey) return res.status(400).json({ error: "storeKey query parameter is required" });
 
+  const adminRequest = isAdminRequest(req);
+
+  const conditions = [
+    eq(postersTable.id, params.data.id),
+    eq(postersTable.storeKey, storeKey),
+  ];
+  if (!adminRequest) {
+    conditions.push(eq(postersTable.status, "published"));
+  }
+
   const [poster] = await db
     .select()
     .from(postersTable)
-    .where(and(eq(postersTable.id, params.data.id), eq(postersTable.storeKey, storeKey)));
+    .where(and(...conditions));
 
   if (!poster) return res.status(404).json({ error: "Not found" });
   return res.json(serializePoster(poster));

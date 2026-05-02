@@ -17,6 +17,7 @@ export const postersTable = pgTable("posters", {
   sizes: text("sizes").array(),
   isFeatured: boolean("is_featured").default(false),
   isNew: boolean("is_new").default(false),
+  status: text("status").notNull().default("published"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

@@ -9,6 +9,14 @@ export interface HealthStatus {
   status: string;
 }
 
+export type PosterStatus = (typeof PosterStatus)[keyof typeof PosterStatus];
+
+export const PosterStatus = {
+  draft: "draft",
+  published: "published",
+  archived: "archived",
+} as const;
+
 export interface Poster {
   id: number;
   storeKey: string;
@@ -24,6 +32,7 @@ export interface Poster {
   sizes?: string[];
   isFeatured?: boolean;
   isNew?: boolean;
+  status?: PosterStatus;
   createdAt: string;
 }
 
@@ -33,6 +42,15 @@ export interface PosterListResponse {
   offset: number;
   limit: number;
 }
+
+export type CreatePosterBodyStatus =
+  (typeof CreatePosterBodyStatus)[keyof typeof CreatePosterBodyStatus];
+
+export const CreatePosterBodyStatus = {
+  draft: "draft",
+  published: "published",
+  archived: "archived",
+} as const;
 
 export interface CreatePosterBody {
   storeKey: string;
@@ -48,7 +66,17 @@ export interface CreatePosterBody {
   sizes?: string[];
   isFeatured?: boolean;
   isNew?: boolean;
+  status?: CreatePosterBodyStatus;
 }
+
+export type UpdatePosterBodyStatus =
+  (typeof UpdatePosterBodyStatus)[keyof typeof UpdatePosterBodyStatus];
+
+export const UpdatePosterBodyStatus = {
+  draft: "draft",
+  published: "published",
+  archived: "archived",
+} as const;
 
 export interface UpdatePosterBody {
   title?: string;
@@ -61,6 +89,7 @@ export interface UpdatePosterBody {
   price?: number;
   isFeatured?: boolean;
   isNew?: boolean;
+  status?: UpdatePosterBodyStatus;
 }
 
 export interface CartItem {
@@ -163,6 +192,10 @@ export type ListPostersParams = {
   sort?: ListPostersSort;
   limit?: number;
   offset?: number;
+  /**
+   * Filter by status (published, draft, archived, all). Non-published values require admin token.
+   */
+  status?: string;
 };
 
 export type ListPostersSort =

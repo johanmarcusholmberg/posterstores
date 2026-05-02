@@ -88,6 +88,11 @@ paths:
           in: query
           schema:
             type: integer
+        - name: status
+          in: query
+          description: Filter by status (published, draft, archived, all). Non-published values require admin token.
+          schema:
+            type: string
       responses:
         "200":
           description: List of posters
@@ -529,6 +534,9 @@ components:
           type: boolean
         isNew:
           type: boolean
+        status:
+          type: string
+          enum: [draft, published, archived]
         createdAt:
           type: string
       required: [id, storeKey, title, imageUrl, price, currency, category, createdAt]
@@ -581,6 +589,9 @@ components:
           type: boolean
         isNew:
           type: boolean
+        status:
+          type: string
+          enum: [draft, published, archived]
       required: [storeKey, title, imageUrl, price, currency, category]
 
     UpdatePosterBody:
@@ -608,6 +619,9 @@ components:
           type: boolean
         isNew:
           type: boolean
+        status:
+          type: string
+          enum: [draft, published, archived]
 
     CartItem:
       type: object

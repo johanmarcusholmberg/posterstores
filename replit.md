@@ -64,6 +64,26 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 - Sessions use a UUID stored in `localStorage` as `session_id` (no auth required)
 - `artifacts/poster-store/src/lib/session.ts` — `getSessionId()` generates/retrieves the UUID
 
+### Admin System
+- **Routes**: `/admin`, `/admin/posters`, `/admin/posters/new`, `/admin/posters/:id`
+- **Token gate**: `AdminTokenGate` shows a login screen if no token in localStorage (`admin_token` key)
+- **Token storage**: Token stored in browser `localStorage` under `admin_token` key; cleared with "Clear token" button
+- **API auth**: All admin API calls send `X-Admin-Token: <token>` header via `artifacts/poster-store/src/lib/adminApi.ts`
+- **Store selector**: Admin maintains its own active store in `localStorage` under `admin_active_store` key
+- **Context**: `AdminTokenContext` provides token + adminStoreKey to all admin components
+- **Components**: `AdminDashboardLayout`, `AdminTokenGate`, `AdminStoreSelector`, `AdminStatusBadge`, `AdminPosterList`, `AdminPosterForm`, `AdminImageFields`, `AdminSizePriceEditor`, `AdminPublishControls`
+
+### Admin API Behavior
+- `GET /api/posters` with valid `X-Admin-Token`: pass `status=all` to see all; `status=draft` for drafts; etc.
+- `GET /api/posters` without token: always filters `status=published` only
+- `GET /api/posters/:id` with valid token: sees any status; without token: published only
+- `POST /api/posters`, `PUT /api/posters/:id`, `DELETE /api/posters/:id`: require `X-Admin-Token` header
+
+### Poster Status Field
+- Added `status` column (text, default `"published"`) to `posters` table
+- Valid values: `draft`, `published`, `archived`
+- Existing posters default to `"published"` so storefront continues working
+
 ### Database
 - 12 posters seeded for postsofspain storeKey
 - Schema: `lib/db/src/schema/`
@@ -75,4 +95,5 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 - The `/api/posters` (list) endpoint returns `{posters, total, offset, limit}`
 - The `/api/cart` endpoint returns `{sessionId, items, total, itemCount}` where items may include nested `poster` object
 - vite dedupe config includes `react`, `react-dom`, and `@tanstack/react-query` to prevent duplicate instances
-- After running codegen, `lib/api-zod/src/index.ts` must be kept as a single line: `export * from "./generated/api"`
+- After running codegen, `lib/api-zod/src/index.ts` must stay as single line: `export * from "./generated/api"` (orval regenerates it with a broken api.schemas export — a stub `lib/api-zod/src/generated/api.schemas.ts` containing `export {};` prevents the typecheck error)
+- Poster `status` field defaults to `"published"` — public shop only shows published posters

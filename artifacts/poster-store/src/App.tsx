@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { StorefrontProvider } from "@/context/StorefrontContext";
+import { AdminTokenProvider } from "@/context/AdminTokenContext";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import Home from "@/pages/Home";
@@ -14,10 +15,14 @@ import Checkout from "@/pages/Checkout";
 import OrderConfirmation from "@/pages/OrderConfirmation";
 import Favorites from "@/pages/Favorites";
 import NotFound from "@/pages/not-found";
+import AdminDashboard from "@/pages/admin/AdminDashboard";
+import AdminPosters from "@/pages/admin/AdminPosters";
+import AdminPosterNew from "@/pages/admin/AdminPosterNew";
+import AdminPosterEdit from "@/pages/admin/AdminPosterEdit";
 
 const queryClient = new QueryClient();
 
-function Router() {
+function StorefrontRouter() {
   return (
     <div className="flex flex-col min-h-screen">
       <Navbar />
@@ -38,16 +43,40 @@ function Router() {
   );
 }
 
+function AdminRouter() {
+  return (
+    <Switch>
+      <Route path="/admin" component={AdminDashboard} />
+      <Route path="/admin/posters/new" component={AdminPosterNew} />
+      <Route path="/admin/posters/:id" component={AdminPosterEdit} />
+      <Route path="/admin/posters" component={AdminPosters} />
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
+
+function Router() {
+  return (
+    <Switch>
+      <Route path="/admin" component={AdminRouter} />
+      <Route path="/admin/:rest*" component={AdminRouter} />
+      <Route component={StorefrontRouter} />
+    </Switch>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <StorefrontProvider>
-        <TooltipProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <Router />
-          </WouterRouter>
-          <Toaster />
-        </TooltipProvider>
+        <AdminTokenProvider>
+          <TooltipProvider>
+            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+              <Router />
+            </WouterRouter>
+            <Toaster />
+          </TooltipProvider>
+        </AdminTokenProvider>
       </StorefrontProvider>
     </QueryClientProvider>
   );
