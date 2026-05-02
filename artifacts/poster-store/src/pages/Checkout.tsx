@@ -49,12 +49,23 @@ export default function Checkout() {
   const onSubmit = (values: z.infer<typeof checkoutSchema>) => {
     if (!cart || cart.items.length === 0) return;
 
-    const items = cart.items.map(item => ({
-      posterId: item.posterId,
-      quantity: item.quantity,
-      size: item.size,
-      price: item.poster?.price || 0,
-    }));
+    const anyCart = cart as any;
+    const cartCurrency = anyCart.currency || cart.items[0]?.poster?.currency || store.defaultCurrency;
+    const items = cart.items.map(item => {
+      const anyItem = item as any;
+      const unitPrice = anyItem.unitPrice ?? item.poster?.price ?? 0;
+      const itemCurrency = anyItem.currency ?? item.poster?.currency ?? cartCurrency;
+      return {
+        posterId: item.posterId,
+        posterSizeId: anyItem.posterSizeId ?? undefined,
+        quantity: item.quantity,
+        size: anyItem.size ?? item.size ?? undefined,
+        sizeLabelSnapshot: anyItem.size ?? item.size ?? undefined,
+        unitPrice,
+        currency: itemCurrency,
+        totalPrice: Math.round(unitPrice * item.quantity * 100) / 100,
+      };
+    });
 
     createOrder.mutate(
       {
@@ -66,7 +77,7 @@ export default function Checkout() {
           shippingAddress: values.shippingAddress,
           items,
           total: cart.total,
-          currency: cart.items[0]?.poster?.currency || store.defaultCurrency,
+          currency: (cart as any).currency || cart.items[0]?.poster?.currency || store.defaultCurrency,
         },
       },
       {
@@ -145,7 +156,7 @@ export default function Checkout() {
               </div>
 
               <Button type="submit" size="lg" className="w-full h-14 text-lg mt-8" disabled={createOrder.isPending}>
-                {createOrder.isPending ? "Processing..." : `Pay ${cart.total} ${cart.items[0]?.poster?.currency || store.defaultCurrency}`}
+                {createOrder.isPending ? "Processing..." : `Pay ${cart.total} ${(cart as any).currency || cart.items[0]?.poster?.currency || store.defaultCurrency}`}
               </Button>
             </form>
           </Form>
@@ -162,15 +173,16 @@ export default function Checkout() {
                   </div>
                   <div className="flex-1 text-sm">
                     <p className="font-medium">{item.poster?.title}</p>
+                    {(item as any).size && <p className="text-muted-foreground">Size: {(item as any).size}</p>}
                     <p className="text-muted-foreground">Qty: {item.quantity}</p>
-                    <p className="font-medium mt-1">{item.poster?.price} {item.poster?.currency}</p>
+                    <p className="font-medium mt-1">{(item as any).unitPrice ?? item.poster?.price} {(item as any).currency ?? item.poster?.currency}</p>
                   </div>
                 </div>
               ))}
             </div>
             <div className="border-t border-border pt-4 flex justify-between font-bold text-lg">
               <span>Total</span>
-              <span>{cart.total} {cart.items[0]?.poster?.currency || store.defaultCurrency}</span>
+              <span>{cart.total} {(cart as any).currency || cart.items[0]?.poster?.currency || store.defaultCurrency}</span>
             </div>
           </div>
         </div>

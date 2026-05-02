@@ -9,9 +9,25 @@ import { Button } from "@/components/ui/button";
 import { PosterCard } from "@/components/shared/PosterCard";
 import { MockupGallery } from "@/components/public/MockupGallery";
 import { ShoppingBag, ArrowLeft } from "lucide-react";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
 import { getPosterMockups, type PosterMockup } from "@/lib/mockupApi";
+
+interface PosterSizeOption {
+  id: number;
+  sizeLabel: string;
+  price: number;
+  currency: string;
+  widthCm: number | null;
+  heightCm: number | null;
+  active: boolean;
+  sortOrder: number;
+}
+
+function formatPrice(price: number, currency: string): string {
+  const symbols: Record<string, string> = { EUR: "€", SEK: "kr", USD: "$", GBP: "£" };
+  const symbol = symbols[currency] ?? currency;
+  if (currency === "SEK") return `${price.toFixed(0)} ${symbol}`;
+  return `${symbol}${price.toFixed(2)}`;
+}
 
 export default function PosterDetail() {
   const { id } = useParams();
@@ -21,7 +37,7 @@ export default function PosterDetail() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const [selectedSize, setSelectedSize] = useState<string>("");
+  const [selectedSizeId, setSelectedSizeId] = useState<number | null>(null);
   const [mockups, setMockups] = useState<PosterMockup[] | null>(null);
 
   const { data: poster, isLoading } = useGetPoster(
@@ -34,6 +50,14 @@ export default function PosterDetail() {
       },
     }
   );
+
+  const activeSizes: PosterSizeOption[] = ((poster as any)?.posterSizes ?? []).filter((s: PosterSizeOption) => s.active);
+
+  useEffect(() => {
+    if (activeSizes.length === 1 && selectedSizeId == null) {
+      setSelectedSizeId(activeSizes[0].id);
+    }
+  }, [activeSizes.length, selectedSizeId]);
 
   useEffect(() => {
     if (!posterId || isNaN(posterId)) return;
@@ -54,13 +78,24 @@ export default function PosterDetail() {
 
   const addCartItem = useAddCartItem();
 
+  const selectedSize = activeSizes.find(s => s.id === selectedSizeId) ?? null;
+
+  const displayedPrice = selectedSize
+    ? selectedSize.price
+    : ((poster as any)?.lowestActivePrice ?? poster?.price ?? 0);
+  const displayedCurrency = selectedSize?.currency ?? poster?.currency ?? "EUR";
+  const pricePrefix = !selectedSize && activeSizes.length > 1 ? "From " : "";
+
   const handleAddToCart = () => {
     if (!poster) return;
-    if (poster.sizes && poster.sizes.length > 0 && !selectedSize) {
-      toast({
-        variant: "destructive",
-        title: "Please select a size",
-      });
+
+    if (activeSizes.length === 0) {
+      toast({ variant: "destructive", title: "This poster is not currently available for purchase." });
+      return;
+    }
+
+    if (activeSizes.length > 0 && !selectedSizeId) {
+      toast({ variant: "destructive", title: "Please select a size" });
       return;
     }
 
@@ -71,15 +106,16 @@ export default function PosterDetail() {
           storeKey: store.storeKey,
           posterId: poster.id,
           quantity: 1,
-          size: selectedSize || undefined,
-        },
+          posterSizeId: selectedSizeId ?? undefined,
+          size: selectedSize?.sizeLabel ?? undefined,
+        } as any,
       },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getGetCartQueryKey({ sessionId, storeKey: store.storeKey }) });
           toast({
             title: "Added to cart",
-            description: `${poster.title} has been added to your cart.`,
+            description: `${poster.title}${selectedSize ? ` — ${selectedSize.sizeLabel}` : ""} has been added to your cart.`,
           });
         },
       }
@@ -111,6 +147,7 @@ export default function PosterDetail() {
   }
 
   const hasMockups = mockups && mockups.length > 0;
+  const noActiveSizes = activeSizes.length === 0;
 
   return (
     <div className="container mx-auto px-4 py-12">
@@ -142,38 +179,55 @@ export default function PosterDetail() {
           <div className="mb-2 text-muted-foreground text-sm font-medium tracking-wider uppercase">
             {poster.region} {poster.city && `• ${poster.city}`}
           </div>
-          <h1 className="font-serif text-4xl md:text-5xl font-bold text-foreground mb-4">
+          <h1 className="font-serif text-4xl md:text-5xl font-bold text-foreground mb-3">
             {poster.title}
           </h1>
-          <p className="text-2xl font-medium text-foreground mb-8">
-            {poster.price} {poster.currency}
+          <p className="text-2xl font-medium text-foreground mb-8" data-testid="detail-price">
+            {pricePrefix}{formatPrice(displayedPrice, displayedCurrency)}
           </p>
 
           <div className="prose prose-stone mb-10 text-muted-foreground">
             <p>{poster.description}</p>
           </div>
 
-          {poster.sizes && poster.sizes.length > 0 && (
+          {activeSizes.length > 0 && (
             <div className="mb-10">
-              <h3 className="font-medium text-foreground mb-4">Select Size</h3>
-              <RadioGroup
-                value={selectedSize}
-                onValueChange={setSelectedSize}
-                className="grid grid-cols-2 gap-4"
-              >
-                {poster.sizes.map((size) => (
-                  <div key={size}>
-                    <RadioGroupItem value={size} id={`size-${size}`} className="peer sr-only" />
-                    <Label
-                      htmlFor={`size-${size}`}
-                      className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 [&:has([data-state=checked])]:border-primary cursor-pointer"
+              <h3 className="font-medium text-foreground mb-3">Select Size</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3" data-testid="size-selector">
+                {activeSizes.map((size) => {
+                  const isSelected = selectedSizeId === size.id;
+                  return (
+                    <button
+                      key={size.id}
+                      type="button"
+                      onClick={() => setSelectedSizeId(size.id)}
+                      data-testid={`size-option-${size.id}`}
+                      className={`flex flex-col items-start rounded-md border-2 px-3 py-2.5 text-left transition-colors cursor-pointer ${
+                        isSelected
+                          ? "border-primary bg-primary/5"
+                          : "border-border bg-background hover:border-primary/50 hover:bg-accent/50"
+                      }`}
                     >
-                      {size}
-                    </Label>
-                  </div>
-                ))}
-              </RadioGroup>
+                      <span className="font-medium text-sm text-foreground">{size.sizeLabel}</span>
+                      {(size.widthCm || size.heightCm) && (
+                        <span className="text-xs text-muted-foreground mt-0.5">
+                          {size.widthCm}×{size.heightCm} cm
+                        </span>
+                      )}
+                      <span className={`text-sm mt-1 font-semibold ${isSelected ? "text-primary" : "text-foreground"}`}>
+                        {formatPrice(size.price, size.currency)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+          )}
+
+          {noActiveSizes && (
+            <p className="text-sm text-muted-foreground italic mb-8 border border-border rounded-md px-4 py-3 bg-muted/30">
+              This poster is not currently available for purchase.
+            </p>
           )}
 
           <div className="flex gap-4 mt-auto">
@@ -181,7 +235,7 @@ export default function PosterDetail() {
               size="lg"
               className="flex-1 text-lg h-14"
               onClick={handleAddToCart}
-              disabled={addCartItem.isPending}
+              disabled={addCartItem.isPending || noActiveSizes || (activeSizes.length > 0 && !selectedSizeId)}
               data-testid="btn-add-to-cart"
             >
               {addCartItem.isPending ? "Adding..." : (

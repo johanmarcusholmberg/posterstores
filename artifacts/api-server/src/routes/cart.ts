@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { cartItemsTable, postersTable } from "@workspace/db";
+import { cartItemsTable, postersTable, posterSizesTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import {
   GetCartQueryParams,
@@ -12,6 +12,17 @@ import {
 
 const router = Router();
 
+function serializePosterSize(s: typeof posterSizesTable.$inferSelect) {
+  return {
+    ...s,
+    price: Number(s.price),
+    widthCm: s.widthCm != null ? Number(s.widthCm) : null,
+    heightCm: s.heightCm != null ? Number(s.heightCm) : null,
+    createdAt: s.createdAt.toISOString(),
+    updatedAt: s.updatedAt.toISOString(),
+  };
+}
+
 async function getCartForSession(sessionId: string, storeKey: string) {
   const items = await db
     .select()
@@ -22,21 +33,53 @@ async function getCartForSession(sessionId: string, storeKey: string) {
       eq(cartItemsTable.storeKey, storeKey),
     ));
 
-  const cartItems = items.map(row => ({
-    id: row.cart_items.id,
-    posterId: row.cart_items.posterId,
-    quantity: row.cart_items.quantity,
-    size: row.cart_items.size,
-    poster: row.posters ? {
-      ...row.posters,
-      price: Number(row.posters.price),
-      createdAt: row.posters.createdAt.toISOString(),
-    } : undefined,
-  }));
+  const posterSizeIds = items
+    .map(row => row.cart_items.posterSizeId)
+    .filter((id): id is number => id != null);
+
+  const sizeMap = new Map<number, typeof posterSizesTable.$inferSelect>();
+  if (posterSizeIds.length > 0) {
+    for (const sizeId of posterSizeIds) {
+      const [size] = await db.select().from(posterSizesTable).where(eq(posterSizesTable.id, sizeId));
+      if (size) sizeMap.set(size.id, size);
+    }
+  }
+
+  const cartItems = items.map(row => {
+    const posterSize = row.cart_items.posterSizeId != null
+      ? sizeMap.get(row.cart_items.posterSizeId)
+      : undefined;
+
+    const unitPrice = posterSize
+      ? Number(posterSize.price)
+      : (row.posters ? Number(row.posters.price) : 0);
+
+    const currency = posterSize
+      ? posterSize.currency
+      : (row.posters?.currency ?? "EUR");
+
+    return {
+      id: row.cart_items.id,
+      posterId: row.cart_items.posterId,
+      posterSizeId: row.cart_items.posterSizeId ?? null,
+      quantity: row.cart_items.quantity,
+      size: posterSize ? posterSize.sizeLabel : (row.cart_items.size ?? null),
+      unitPrice,
+      currency,
+      posterSize: posterSize ? serializePosterSize(posterSize) : undefined,
+      poster: row.posters ? {
+        ...row.posters,
+        price: Number(row.posters.price),
+        createdAt: row.posters.createdAt.toISOString(),
+      } : undefined,
+    };
+  });
 
   const total = cartItems.reduce((sum, item) => {
-    return sum + (item.poster?.price ?? 0) * item.quantity;
+    return sum + item.unitPrice * item.quantity;
   }, 0);
+
+  const currency = cartItems[0]?.currency ?? "EUR";
 
   return {
     sessionId,
@@ -44,6 +87,7 @@ async function getCartForSession(sessionId: string, storeKey: string) {
     items: cartItems,
     total: Math.round(total * 100) / 100,
     itemCount: cartItems.reduce((sum, item) => sum + item.quantity, 0),
+    currency,
   };
 }
 
@@ -59,9 +103,9 @@ router.post("/cart/items", async (req, res) => {
   const body = AddCartItemBody.safeParse(req.body);
   if (!body.success) return res.status(400).json({ error: body.error.flatten() });
 
-  const { sessionId, storeKey, posterId, quantity, size } = body.data;
+  const { sessionId, storeKey, posterId, quantity, size, posterSizeId } = body.data as any;
 
-  const existing = await db
+  const existingItems = await db
     .select()
     .from(cartItemsTable)
     .where(and(
@@ -70,13 +114,32 @@ router.post("/cart/items", async (req, res) => {
       eq(cartItemsTable.posterId, posterId),
     ));
 
-  if (existing.length > 0) {
+  const sizeIdToUse = posterSizeId ?? null;
+
+  const matchingItem = existingItems.find(item =>
+    (sizeIdToUse != null ? item.posterSizeId === sizeIdToUse : item.posterSizeId == null) &&
+    (size ? item.size === size : true)
+  );
+
+  if (matchingItem) {
     await db
       .update(cartItemsTable)
-      .set({ quantity: existing[0].quantity + quantity })
-      .where(eq(cartItemsTable.id, existing[0].id));
+      .set({ quantity: matchingItem.quantity + quantity })
+      .where(eq(cartItemsTable.id, matchingItem.id));
   } else {
-    await db.insert(cartItemsTable).values({ sessionId, storeKey, posterId, quantity, size: size ?? null });
+    let sizeLabel = size ?? null;
+    if (sizeIdToUse && !sizeLabel) {
+      const [sizeRow] = await db.select().from(posterSizesTable).where(eq(posterSizesTable.id, sizeIdToUse));
+      if (sizeRow) sizeLabel = sizeRow.sizeLabel;
+    }
+    await db.insert(cartItemsTable).values({
+      sessionId,
+      storeKey,
+      posterId,
+      posterSizeId: sizeIdToUse,
+      quantity,
+      size: sizeLabel,
+    });
   }
 
   const cart = await getCartForSession(sessionId, storeKey);

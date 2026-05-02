@@ -10,16 +10,14 @@ import {
   type PosterStatus,
 } from "@/lib/adminApi";
 import { AdminImageFields } from "./AdminImageFields";
-import { AdminSizePriceEditor } from "./AdminSizePriceEditor";
+import { AdminSizePriceEditor, type SizeRow, buildDefaultSizeRows } from "./AdminSizePriceEditor";
 import { AdminPublishControls } from "./AdminPublishControls";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { storefronts } from "@/config/storefronts";
 import { Save, ArrowLeft, Loader2 } from "lucide-react";
@@ -28,19 +26,56 @@ interface AdminPosterFormProps {
   existing?: AdminPoster;
 }
 
+function validateSizes(sizes: SizeRow[], status: PosterStatus): string[] {
+  const errors: string[] = [];
+  const activeSizes = sizes.filter(s => s.active);
+
+  if (status === "published" && activeSizes.length === 0) {
+    errors.push("At least one active size is required to publish");
+  }
+
+  activeSizes.forEach((s, i) => {
+    const idx = sizes.indexOf(s);
+    if (!s.sizeLabel.trim()) errors.push(`Size ${idx + 1}: label is required`);
+    if (s.price == null || s.price <= 0) errors.push(`Size ${idx + 1} (${s.sizeLabel || "unnamed"}): price must be positive`);
+    if (!s.currency) errors.push(`Size ${idx + 1}: currency is required`);
+  });
+
+  return errors;
+}
+
 function buildPublishBlockReasons(fields: {
   title: string;
   imageUrl: string;
   category: string;
-  price: string;
+  sizes: SizeRow[];
 }): string[] {
   const reasons: string[] = [];
   if (!fields.title.trim()) reasons.push("Title is required");
   if (!fields.imageUrl.trim()) reasons.push("Image URL is required");
   if (!fields.category.trim()) reasons.push("Category is required");
-  if (!fields.price || isNaN(Number(fields.price)) || Number(fields.price) <= 0)
-    reasons.push("A valid price is required");
+  const activeSizes = fields.sizes.filter(s => s.active);
+  if (activeSizes.length === 0) reasons.push("At least one active size with price is required");
+  else {
+    const invalidActive = activeSizes.some(s => !s.sizeLabel.trim() || s.price == null || s.price <= 0);
+    if (invalidActive) reasons.push("All active sizes must have a label and positive price");
+  }
   return reasons;
+}
+
+function posterSizesToSizeRows(poster: AdminPoster, defaultCurrency: string): SizeRow[] {
+  if (poster.posterSizes && poster.posterSizes.length > 0) {
+    return poster.posterSizes.map((s, idx) => ({
+      sizeLabel: s.sizeLabel,
+      widthCm: s.widthCm ?? null,
+      heightCm: s.heightCm ?? null,
+      price: s.price,
+      currency: s.currency,
+      active: s.active,
+      sortOrder: s.sortOrder ?? idx,
+    }));
+  }
+  return [];
 }
 
 export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
@@ -49,6 +84,7 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
   const { toast } = useToast();
 
   const activeStore = storefronts[adminStoreKey] ?? storefronts["postsofspain"];
+  const defaultCurrency = activeStore.defaultCurrency ?? "EUR";
 
   const [storeKey] = useState(existing?.storeKey ?? adminStoreKey);
   const [title, setTitle] = useState(existing?.title ?? "");
@@ -58,16 +94,19 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
   const [region, setRegion] = useState(existing?.region ?? "");
   const [city, setCity] = useState(existing?.city ?? "");
   const [tagsInput, setTagsInput] = useState((existing?.tags ?? []).join(", "));
-  const [price, setPrice] = useState(String(existing?.price ?? ""));
-  const [currency, setCurrency] = useState(existing?.currency ?? activeStore.defaultCurrency ?? "EUR");
-  const [sizes, setSizes] = useState<string[]>(existing?.sizes ?? []);
   const [status, setStatus] = useState<PosterStatus>((existing?.status as PosterStatus) ?? "draft");
   const [isFeatured, setIsFeatured] = useState(existing?.isFeatured ?? false);
   const [isNew, setIsNew] = useState(existing?.isNew ?? false);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [sizeErrors, setSizeErrors] = useState<string[]>([]);
 
-  const publishBlockReasons = buildPublishBlockReasons({ title, imageUrl, category, price });
+  const [sizes, setSizes] = useState<SizeRow[]>(() => {
+    if (existing) return posterSizesToSizeRows(existing, defaultCurrency);
+    return buildDefaultSizeRows(defaultCurrency);
+  });
+
+  const publishBlockReasons = buildPublishBlockReasons({ title, imageUrl, category, sizes });
   const canPublish = publishBlockReasons.length === 0;
 
   const validate = () => {
@@ -75,7 +114,10 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
     if (!title.trim()) errs.title = "Title is required";
     if (!imageUrl.trim()) errs.imageUrl = "Image URL is required";
     if (!category.trim()) errs.category = "Category is required";
-    if (!price || isNaN(Number(price)) || Number(price) <= 0) errs.price = "Valid price is required";
+
+    const sizeErrs = validateSizes(sizes, status);
+    setSizeErrors(sizeErrs);
+
     if (status === "published" && !canPublish) {
       errs.status = "Cannot publish: fix the above errors first";
     }
@@ -86,7 +128,9 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
     e.preventDefault();
     const errs = validate();
     setErrors(errs);
-    if (Object.keys(errs).length > 0) return;
+    const currentSizeErrors = validateSizes(sizes, status);
+    setSizeErrors(currentSizeErrors);
+    if (Object.keys(errs).length > 0 || currentSizeErrors.length > 0) return;
     if (!token) return;
 
     setSaving(true);
@@ -94,6 +138,21 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
       .split(",")
       .map(t => t.trim())
       .filter(Boolean);
+
+    const lowestActiveSize = sizes.filter(s => s.active && s.price != null).sort((a, b) => (a.price ?? 0) - (b.price ?? 0))[0];
+    const legacyPrice = lowestActiveSize?.price ?? 0;
+    const legacyCurrency = lowestActiveSize?.currency ?? defaultCurrency;
+    const legacySizes = sizes.map(s => s.sizeLabel).filter(Boolean);
+
+    const posterSizesPayload = sizes.map((s, idx) => ({
+      sizeLabel: s.sizeLabel,
+      widthCm: s.widthCm,
+      heightCm: s.heightCm,
+      price: s.price ?? 0,
+      currency: s.currency,
+      active: s.active,
+      sortOrder: idx,
+    }));
 
     try {
       if (existing) {
@@ -105,9 +164,10 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
           region: region || undefined,
           city: city || undefined,
           tags: tags.length ? tags : undefined,
-          price: Number(price),
-          currency,
-          sizes: sizes.length ? sizes : undefined,
+          price: legacyPrice,
+          currency: legacyCurrency,
+          sizes: legacySizes.length ? legacySizes : undefined,
+          posterSizes: posterSizesPayload,
           status,
           isFeatured,
           isNew,
@@ -124,9 +184,10 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
           region: region || undefined,
           city: city || undefined,
           tags: tags.length ? tags : undefined,
-          price: Number(price),
-          currency,
-          sizes: sizes.length ? sizes : undefined,
+          price: legacyPrice,
+          currency: legacyCurrency,
+          sizes: legacySizes.length ? legacySizes : undefined,
+          posterSizes: posterSizesPayload,
           status,
           isFeatured,
           isNew,
@@ -317,38 +378,6 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
                   />
                 )}
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="price">Price <span className="text-destructive">*</span></Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={price}
-                    onChange={e => { setPrice(e.target.value); setErrors(p => ({ ...p, price: "" })); }}
-                    placeholder="0.00"
-                    data-testid="field-price"
-                  />
-                  {errors.price && <p className="text-xs text-destructive">{errors.price}</p>}
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label>Currency</Label>
-                  <Select value={currency} onValueChange={setCurrency}>
-                    <SelectTrigger data-testid="field-currency">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="EUR">EUR</SelectItem>
-                      <SelectItem value="SEK">SEK</SelectItem>
-                      <SelectItem value="USD">USD</SelectItem>
-                      <SelectItem value="GBP">GBP</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
             </CardContent>
           </Card>
 
@@ -364,10 +393,18 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Sizes</CardTitle>
+              <CardTitle className="text-base">Sizes &amp; Pricing</CardTitle>
             </CardHeader>
             <CardContent>
-              <AdminSizePriceEditor sizes={sizes} onSizesChange={setSizes} />
+              <AdminSizePriceEditor
+                sizes={sizes}
+                defaultCurrency={defaultCurrency}
+                onSizesChange={newSizes => {
+                  setSizes(newSizes);
+                  setSizeErrors([]);
+                }}
+                errors={sizeErrors}
+              />
             </CardContent>
           </Card>
         </div>
@@ -391,6 +428,24 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
               {errors.status && <p className="text-xs text-destructive mt-2">{errors.status}</p>}
             </CardContent>
           </Card>
+
+          {sizes.filter(s => s.active).length > 0 && (
+            <Card className="border-muted">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-muted-foreground">Active sizes preview</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1">
+                {sizes.filter(s => s.active).map((s, i) => (
+                  <div key={i} className="flex justify-between text-sm">
+                    <span className="text-foreground">{s.sizeLabel || "—"}</span>
+                    <span className="font-medium text-foreground">
+                      {s.price != null ? `${s.price.toFixed(2)} ${s.currency}` : <span className="text-muted-foreground text-xs">no price</span>}
+                    </span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
 
           <div className="sticky top-20">
             <Button

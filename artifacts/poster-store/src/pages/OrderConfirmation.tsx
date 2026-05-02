@@ -39,7 +39,7 @@ export default function OrderConfirmation() {
                 <p className="font-medium">Poster #{item.posterId} {item.size && `(${item.size})`}</p>
                 <p className="text-sm text-muted-foreground">Qty: {item.quantity}</p>
               </div>
-              <p className="font-medium">{item.price} {order.currency}</p>
+              <p className="font-medium">{(item as any).unitPrice ?? (item as any).totalPrice} {order.currency}</p>
             </div>
           ))}
           <div className="border-t border-border pt-4 flex justify-between text-xl font-bold">

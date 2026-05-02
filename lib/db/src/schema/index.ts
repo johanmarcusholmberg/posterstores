@@ -1,4 +1,5 @@
 export * from "./posters";
+export * from "./posterSizes";
 export * from "./cart";
 export * from "./favorites";
 export * from "./orders";

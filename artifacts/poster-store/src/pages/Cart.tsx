@@ -7,6 +7,13 @@ import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Trash2, Plus, Minus, ShoppingBag, ArrowRight } from "lucide-react";
 
+function formatPrice(price: number, currency: string): string {
+  const symbols: Record<string, string> = { EUR: "€", SEK: "kr", USD: "$", GBP: "£" };
+  const symbol = symbols[currency] ?? currency;
+  if (currency === "SEK") return `${price.toFixed(0)} ${symbol}`;
+  return `${symbol}${price.toFixed(2)}`;
+}
+
 export default function Cart() {
   const sessionId = getSessionId();
   const store = useStorefront();
@@ -69,6 +76,8 @@ export default function Cart() {
     );
   }
 
+  const cartCurrency = (cart as any).currency ?? store.defaultCurrency ?? "EUR";
+
   return (
     <div className="container mx-auto px-4 py-12 max-w-5xl">
       <h1 className="font-serif text-4xl font-bold mb-10">Your Cart</h1>
@@ -76,68 +85,87 @@ export default function Cart() {
       <div className="flex flex-col lg:flex-row gap-12">
         <div className="flex-1">
           <div className="space-y-6">
-            {cart.items.map((item) => (
-              <div key={item.id} className="flex gap-6 py-6 border-b border-border">
-                <Link href={`/poster/${item.posterId}`} className="shrink-0">
-                  <div className="w-24 md:w-32 aspect-[3/4] bg-muted rounded overflow-hidden">
-                    <img
-                      src={item.poster?.imageUrl}
-                      alt={item.poster?.title}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                </Link>
+            {cart.items.map((item) => {
+              const anyItem = item as any;
+              const unitPrice = anyItem.unitPrice ?? item.poster?.price ?? 0;
+              const itemCurrency = anyItem.currency ?? item.poster?.currency ?? cartCurrency;
+              const sizeLabel = anyItem.size ?? item.size ?? null;
+              const subtotal = unitPrice * item.quantity;
 
-                <div className="flex-1 flex flex-col">
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <Link href={`/poster/${item.posterId}`}>
-                        <h3 className="font-serif font-bold text-lg hover:text-primary transition-colors">
-                          {item.poster?.title}
-                        </h3>
-                      </Link>
-                      <p className="text-sm text-muted-foreground">{item.poster?.region}</p>
-                      {item.size && <p className="text-sm text-muted-foreground mt-1">Size: {item.size}</p>}
+              return (
+                <div key={item.id} className="flex gap-6 py-6 border-b border-border">
+                  <Link href={`/poster/${item.posterId}`} className="shrink-0">
+                    <div className="w-24 md:w-32 aspect-[3/4] bg-muted rounded overflow-hidden">
+                      <img
+                        src={item.poster?.imageUrl}
+                        alt={item.poster?.title}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
-                    <p className="font-medium">{item.poster?.price} {item.poster?.currency}</p>
-                  </div>
+                  </Link>
 
-                  <div className="flex items-center justify-between mt-auto">
-                    <div className="flex items-center border border-border rounded-md">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 rounded-none rounded-l-md"
-                        onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
-                        disabled={item.quantity <= 1 || updateCartItem.isPending}
-                      >
-                        <Minus className="h-3 w-3" />
-                      </Button>
-                      <span className="w-10 text-center text-sm font-medium">{item.quantity}</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 rounded-none rounded-r-md"
-                        onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
-                        disabled={updateCartItem.isPending}
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
+                  <div className="flex-1 flex flex-col">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <Link href={`/poster/${item.posterId}`}>
+                          <h3 className="font-serif font-bold text-lg hover:text-primary transition-colors">
+                            {item.poster?.title}
+                          </h3>
+                        </Link>
+                        <p className="text-sm text-muted-foreground">{item.poster?.region}</p>
+                        {sizeLabel && (
+                          <p className="text-sm text-muted-foreground mt-1" data-testid={`cart-size-${item.id}`}>
+                            Size: {sizeLabel}
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right ml-4">
+                        <p className="font-medium">{formatPrice(unitPrice, itemCurrency)}</p>
+                        {item.quantity > 1 && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Subtotal: {formatPrice(subtotal, itemCurrency)}
+                          </p>
+                        )}
+                      </div>
                     </div>
 
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => handleRemove(item.id)}
-                      disabled={removeCartItem.isPending}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" /> Remove
-                    </Button>
+                    <div className="flex items-center justify-between mt-auto">
+                      <div className="flex items-center border border-border rounded-md">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 rounded-none rounded-l-md"
+                          onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
+                          disabled={item.quantity <= 1 || updateCartItem.isPending}
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        <span className="w-10 text-center text-sm font-medium">{item.quantity}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 rounded-none rounded-r-md"
+                          onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
+                          disabled={updateCartItem.isPending}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => handleRemove(item.id)}
+                        disabled={removeCartItem.isPending}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" /> Remove
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -148,7 +176,7 @@ export default function Cart() {
             <div className="space-y-4 mb-6 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Subtotal ({cart.itemCount} items)</span>
-                <span className="font-medium">{cart.total} {cart.items[0]?.poster?.currency || store.defaultCurrency}</span>
+                <span className="font-medium">{formatPrice(cart.total, cartCurrency)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Shipping</span>
@@ -159,7 +187,7 @@ export default function Cart() {
             <div className="border-t border-border pt-4 mb-8">
               <div className="flex justify-between items-end">
                 <span className="font-medium">Estimated Total</span>
-                <span className="text-2xl font-bold">{cart.total} {cart.items[0]?.poster?.currency || store.defaultCurrency}</span>
+                <span className="text-2xl font-bold">{formatPrice(cart.total, cartCurrency)}</span>
               </div>
             </div>
 

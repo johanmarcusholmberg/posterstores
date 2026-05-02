@@ -4,6 +4,7 @@ import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { seedMockupTemplates } from "./routes/mockups";
+import { migrateExistingPosterSizes } from "./lib/migrateExistingPosterSizes";
 
 const app: Express = express();
 
@@ -34,6 +35,10 @@ app.use("/api", router);
 
 seedMockupTemplates().catch((err) =>
   logger.error(err, "Failed to seed mockup templates")
+);
+
+migrateExistingPosterSizes().catch((err) =>
+  logger.error(err, "Failed to migrate existing poster sizes")
 );
 
 export default app;

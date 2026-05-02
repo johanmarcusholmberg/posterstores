@@ -9,6 +9,35 @@ export interface HealthStatus {
   status: string;
 }
 
+export interface PosterSize {
+  id: number;
+  posterId: number;
+  sizeLabel: string;
+  widthCm?: number | null;
+  heightCm?: number | null;
+  price: number;
+  currency: string;
+  active: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PosterSizeInput {
+  sizeLabel: string;
+  widthCm?: number | null;
+  heightCm?: number | null;
+  price: number;
+  currency: string;
+  active?: boolean;
+  sortOrder?: number;
+}
+
+export interface SavePosterSizesBody {
+  sizes: PosterSizeInput[];
+  storeKey?: string;
+}
+
 export type PosterStatus = (typeof PosterStatus)[keyof typeof PosterStatus];
 
 export const PosterStatus = {
@@ -30,6 +59,8 @@ export interface Poster {
   price: number;
   currency: string;
   sizes?: string[];
+  posterSizes?: PosterSize[];
+  lowestActivePrice?: number | null;
   isFeatured?: boolean;
   isNew?: boolean;
   status?: PosterStatus;
@@ -64,6 +95,7 @@ export interface CreatePosterBody {
   price: number;
   currency: string;
   sizes?: string[];
+  posterSizes?: PosterSizeInput[];
   isFeatured?: boolean;
   isNew?: boolean;
   status?: CreatePosterBodyStatus;
@@ -87,6 +119,9 @@ export interface UpdatePosterBody {
   category?: string;
   tags?: string[];
   price?: number;
+  currency?: string;
+  sizes?: string[];
+  posterSizes?: PosterSizeInput[];
   isFeatured?: boolean;
   isNew?: boolean;
   status?: UpdatePosterBodyStatus;
@@ -95,9 +130,13 @@ export interface UpdatePosterBody {
 export interface CartItem {
   id: number;
   posterId: number;
+  posterSizeId?: number | null;
   poster?: Poster;
+  posterSize?: PosterSize;
   quantity: number;
   size?: string;
+  unitPrice?: number;
+  currency?: string;
 }
 
 export interface Cart {
@@ -106,12 +145,14 @@ export interface Cart {
   items: CartItem[];
   total: number;
   itemCount: number;
+  currency?: string;
 }
 
 export interface AddCartItemBody {
   sessionId: string;
   storeKey: string;
   posterId: number;
+  posterSizeId?: number;
   quantity: number;
   size?: string;
 }
@@ -128,9 +169,16 @@ export interface FavoriteBody {
 
 export interface OrderItem {
   posterId: number;
+  posterSizeId?: number;
   quantity: number;
   size?: string;
-  price: number;
+  posterTitleSnapshot?: string;
+  sizeLabelSnapshot?: string;
+  widthCmSnapshot?: number | null;
+  heightCmSnapshot?: number | null;
+  unitPrice: number;
+  currency: string;
+  totalPrice: number;
 }
 
 export interface Order {
@@ -217,6 +265,15 @@ export type UpdatePosterParams = {
 };
 
 export type DeletePosterParams = {
+  storeKey?: string;
+};
+
+export type GetPosterSizesParams = {
+  storeKey: string;
+  activeOnly?: boolean;
+};
+
+export type SavePosterSizesParams = {
   storeKey?: string;
 };
 

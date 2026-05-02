@@ -11,6 +11,8 @@ tags:
     description: Health operations
   - name: posters
     description: Poster product operations
+  - name: posterSizes
+    description: Poster size/variant operations
   - name: cart
     description: Shopping cart operations
   - name: favorites
@@ -202,6 +204,70 @@ paths:
           description: Unauthorized
         "403":
           description: storeKey mismatch
+
+  /posters/{id}/sizes:
+    get:
+      operationId: getPosterSizes
+      tags: [posterSizes]
+      summary: Get sizes for a poster
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: storeKey
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: activeOnly
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: List of poster sizes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PosterSize"
+        "404":
+          description: Not found
+
+    put:
+      operationId: savePosterSizes
+      tags: [posterSizes]
+      summary: Replace all sizes for a poster (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: storeKey
+          in: query
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SavePosterSizesBody"
+      responses:
+        "200":
+          description: Updated sizes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PosterSize"
+        "401":
+          description: Unauthorized
 
   /cart:
     get:
@@ -499,6 +565,67 @@ components:
           type: string
       required: [status]
 
+    PosterSize:
+      type: object
+      properties:
+        id:
+          type: integer
+        posterId:
+          type: integer
+        sizeLabel:
+          type: string
+        widthCm:
+          type: number
+          nullable: true
+        heightCm:
+          type: number
+          nullable: true
+        price:
+          type: number
+        currency:
+          type: string
+        active:
+          type: boolean
+        sortOrder:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required: [id, posterId, sizeLabel, price, currency, active, sortOrder, createdAt, updatedAt]
+
+    PosterSizeInput:
+      type: object
+      properties:
+        sizeLabel:
+          type: string
+        widthCm:
+          type: number
+          nullable: true
+        heightCm:
+          type: number
+          nullable: true
+        price:
+          type: number
+        currency:
+          type: string
+        active:
+          type: boolean
+        sortOrder:
+          type: integer
+      required: [sizeLabel, price, currency]
+
+    SavePosterSizesBody:
+      type: object
+      properties:
+        sizes:
+          type: array
+          items:
+            $ref: "#/components/schemas/PosterSizeInput"
+        storeKey:
+          type: string
+      required: [sizes]
+
     Poster:
       type: object
       properties:
@@ -530,6 +657,13 @@ components:
           type: array
           items:
             type: string
+        posterSizes:
+          type: array
+          items:
+            $ref: "#/components/schemas/PosterSize"
+        lowestActivePrice:
+          type: number
+          nullable: true
         isFeatured:
           type: boolean
         isNew:
@@ -585,6 +719,10 @@ components:
           type: array
           items:
             type: string
+        posterSizes:
+          type: array
+          items:
+            $ref: "#/components/schemas/PosterSizeInput"
         isFeatured:
           type: boolean
         isNew:
@@ -615,6 +753,16 @@ components:
             type: string
         price:
           type: number
+        currency:
+          type: string
+        sizes:
+          type: array
+          items:
+            type: string
+        posterSizes:
+          type: array
+          items:
+            $ref: "#/components/schemas/PosterSizeInput"
         isFeatured:
           type: boolean
         isNew:
@@ -630,11 +778,20 @@ components:
           type: integer
         posterId:
           type: integer
+        posterSizeId:
+          type: integer
+          nullable: true
         poster:
           $ref: "#/components/schemas/Poster"
+        posterSize:
+          $ref: "#/components/schemas/PosterSize"
         quantity:
           type: integer
         size:
+          type: string
+        unitPrice:
+          type: number
+        currency:
           type: string
       required: [id, posterId, quantity]
 
@@ -653,6 +810,8 @@ components:
           type: number
         itemCount:
           type: integer
+        currency:
+          type: string
       required: [sessionId, storeKey, items, total, itemCount]
 
     AddCartItemBody:
@@ -663,6 +822,8 @@ components:
         storeKey:
           type: string
         posterId:
+          type: integer
+        posterSizeId:
           type: integer
         quantity:
           type: integer
@@ -693,13 +854,29 @@ components:
       properties:
         posterId:
           type: integer
+        posterSizeId:
+          type: integer
         quantity:
           type: integer
         size:
           type: string
-        price:
+        posterTitleSnapshot:
+          type: string
+        sizeLabelSnapshot:
+          type: string
+        widthCmSnapshot:
           type: number
-      required: [posterId, quantity, price]
+          nullable: true
+        heightCmSnapshot:
+          type: number
+          nullable: true
+        unitPrice:
+          type: number
+        currency:
+          type: string
+        totalPrice:
+          type: number
+      required: [posterId, quantity, unitPrice, currency, totalPrice]
 
     Order:
       type: object

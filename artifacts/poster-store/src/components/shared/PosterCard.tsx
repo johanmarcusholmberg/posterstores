@@ -14,6 +14,13 @@ interface PosterCardProps {
   poster: Poster;
 }
 
+function formatPrice(price: number, currency: string): string {
+  const symbols: Record<string, string> = { EUR: "€", SEK: "kr", USD: "$", GBP: "£" };
+  const symbol = symbols[currency] ?? currency;
+  if (currency === "SEK") return `${price.toFixed(0)} ${symbol}`;
+  return `${symbol}${price.toFixed(2)}`;
+}
+
 export const PosterCard = ({ poster }: PosterCardProps) => {
   const sessionId = getSessionId();
   const store = useStorefront();
@@ -71,6 +78,14 @@ export const PosterCard = ({ poster }: PosterCardProps) => {
     }
   };
 
+  const activeSizes = (poster as any).posterSizes?.filter((s: any) => s.active) ?? [];
+  const lowestPrice = (poster as any).lowestActivePrice;
+  const displayPrice = lowestPrice != null ? lowestPrice : poster.price;
+  const displayCurrency = activeSizes[0]?.currency ?? poster.currency;
+  const priceLabel = activeSizes.length > 1
+    ? `From ${formatPrice(displayPrice, displayCurrency)}`
+    : formatPrice(displayPrice, displayCurrency);
+
   return (
     <Link href={`/poster/${poster.id}`} className="group block" data-testid={`link-poster-${poster.id}`}>
       <div className="relative aspect-[3/4] overflow-hidden bg-muted rounded-md mb-4 shadow-sm group-hover:shadow-md transition-shadow">
@@ -105,8 +120,8 @@ export const PosterCard = ({ poster }: PosterCardProps) => {
           <h3 className="font-serif font-semibold text-lg text-foreground line-clamp-1">{poster.title}</h3>
           <p className="text-sm text-muted-foreground">{poster.city || poster.region}</p>
         </div>
-        <p className="font-medium text-foreground">
-          {poster.price} {poster.currency}
+        <p className="font-medium text-foreground text-sm whitespace-nowrap ml-2">
+          {priceLabel}
         </p>
       </div>
     </Link>

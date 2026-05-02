@@ -28,6 +28,7 @@ import type {
   GetFeaturedPostersParams,
   GetNewArrivalsParams,
   GetPosterParams,
+  GetPosterSizesParams,
   GetStoreStatsParams,
   HealthStatus,
   ListPostersParams,
@@ -36,7 +37,10 @@ import type {
   Order,
   Poster,
   PosterListResponse,
+  PosterSize,
   RemoveFavoriteParams,
+  SavePosterSizesBody,
+  SavePosterSizesParams,
   StoreStats,
   UpdateCartItemBody,
   UpdatePosterBody,
@@ -614,6 +618,238 @@ export const useDeletePoster = <
   TContext
 > => {
   return useMutation(getDeletePosterMutationOptions(options));
+};
+
+/**
+ * @summary Get sizes for a poster
+ */
+export const getGetPosterSizesUrl = (
+  id: number,
+  params: GetPosterSizesParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/posters/${id}/sizes?${stringifiedParams}`
+    : `/api/posters/${id}/sizes`;
+};
+
+export const getPosterSizes = async (
+  id: number,
+  params: GetPosterSizesParams,
+  options?: RequestInit,
+): Promise<PosterSize[]> => {
+  return customFetch<PosterSize[]>(getGetPosterSizesUrl(id, params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPosterSizesQueryKey = (
+  id: number,
+  params?: GetPosterSizesParams,
+) => {
+  return [`/api/posters/${id}/sizes`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetPosterSizesQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPosterSizes>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  params: GetPosterSizesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPosterSizes>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetPosterSizesQueryKey(id, params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getPosterSizes>>> = ({
+    signal,
+  }) => getPosterSizes(id, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPosterSizes>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPosterSizesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPosterSizes>>
+>;
+export type GetPosterSizesQueryError = ErrorType<void>;
+
+/**
+ * @summary Get sizes for a poster
+ */
+
+export function useGetPosterSizes<
+  TData = Awaited<ReturnType<typeof getPosterSizes>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  params: GetPosterSizesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPosterSizes>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPosterSizesQueryOptions(id, params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Replace all sizes for a poster (admin only)
+ */
+export const getSavePosterSizesUrl = (
+  id: number,
+  params?: SavePosterSizesParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/posters/${id}/sizes?${stringifiedParams}`
+    : `/api/posters/${id}/sizes`;
+};
+
+export const savePosterSizes = async (
+  id: number,
+  savePosterSizesBody: SavePosterSizesBody,
+  params?: SavePosterSizesParams,
+  options?: RequestInit,
+): Promise<PosterSize[]> => {
+  return customFetch<PosterSize[]>(getSavePosterSizesUrl(id, params), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(savePosterSizesBody),
+  });
+};
+
+export const getSavePosterSizesMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof savePosterSizes>>,
+    TError,
+    {
+      id: number;
+      data: BodyType<SavePosterSizesBody>;
+      params?: SavePosterSizesParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof savePosterSizes>>,
+  TError,
+  {
+    id: number;
+    data: BodyType<SavePosterSizesBody>;
+    params?: SavePosterSizesParams;
+  },
+  TContext
+> => {
+  const mutationKey = ["savePosterSizes"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof savePosterSizes>>,
+    {
+      id: number;
+      data: BodyType<SavePosterSizesBody>;
+      params?: SavePosterSizesParams;
+    }
+  > = (props) => {
+    const { id, data, params } = props ?? {};
+
+    return savePosterSizes(id, data, params, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SavePosterSizesMutationResult = NonNullable<
+  Awaited<ReturnType<typeof savePosterSizes>>
+>;
+export type SavePosterSizesMutationBody = BodyType<SavePosterSizesBody>;
+export type SavePosterSizesMutationError = ErrorType<void>;
+
+/**
+ * @summary Replace all sizes for a poster (admin only)
+ */
+export const useSavePosterSizes = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof savePosterSizes>>,
+    TError,
+    {
+      id: number;
+      data: BodyType<SavePosterSizesBody>;
+      params?: SavePosterSizesParams;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof savePosterSizes>>,
+  TError,
+  {
+    id: number;
+    data: BodyType<SavePosterSizesBody>;
+    params?: SavePosterSizesParams;
+  },
+  TContext
+> => {
+  return useMutation(getSavePosterSizesMutationOptions(options));
 };
 
 /**

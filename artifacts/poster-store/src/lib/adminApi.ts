@@ -2,6 +2,20 @@ const BASE = "/api";
 
 export type PosterStatus = "draft" | "published" | "archived";
 
+export interface AdminPosterSize {
+  id: number;
+  posterId: number;
+  sizeLabel: string;
+  widthCm: number | null;
+  heightCm: number | null;
+  price: number;
+  currency: string;
+  active: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AdminPoster {
   id: number;
   storeKey: string;
@@ -15,6 +29,8 @@ export interface AdminPoster {
   price: number;
   currency: string;
   sizes?: string[] | null;
+  posterSizes?: AdminPosterSize[] | null;
+  lowestActivePrice?: number | null;
   isFeatured?: boolean | null;
   isNew?: boolean | null;
   status: PosterStatus;
@@ -28,8 +44,22 @@ export interface AdminPosterListResponse {
   limit: number;
 }
 
-export type CreatePosterPayload = Omit<AdminPoster, "id" | "createdAt">;
-export type UpdatePosterPayload = Partial<Omit<AdminPoster, "id" | "createdAt" | "storeKey">>;
+export interface PosterSizePayload {
+  sizeLabel: string;
+  widthCm?: number | null;
+  heightCm?: number | null;
+  price: number;
+  currency: string;
+  active?: boolean;
+  sortOrder?: number;
+}
+
+export type CreatePosterPayload = Omit<AdminPoster, "id" | "createdAt" | "posterSizes" | "lowestActivePrice"> & {
+  posterSizes?: PosterSizePayload[];
+};
+export type UpdatePosterPayload = Partial<Omit<AdminPoster, "id" | "createdAt" | "storeKey" | "posterSizes" | "lowestActivePrice">> & {
+  posterSizes?: PosterSizePayload[];
+};
 
 function headers(token: string): HeadersInit {
   return {

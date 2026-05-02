@@ -52,6 +52,24 @@ export const ListPostersResponse = zod.object({
       price: zod.number(),
       currency: zod.string(),
       sizes: zod.array(zod.string()).optional(),
+      posterSizes: zod
+        .array(
+          zod.object({
+            id: zod.number(),
+            posterId: zod.number(),
+            sizeLabel: zod.string(),
+            widthCm: zod.number().nullish(),
+            heightCm: zod.number().nullish(),
+            price: zod.number(),
+            currency: zod.string(),
+            active: zod.boolean(),
+            sortOrder: zod.number(),
+            createdAt: zod.string(),
+            updatedAt: zod.string(),
+          }),
+        )
+        .optional(),
+      lowestActivePrice: zod.number().nullish(),
       isFeatured: zod.boolean().optional(),
       isNew: zod.boolean().optional(),
       status: zod.enum(["draft", "published", "archived"]).optional(),
@@ -78,6 +96,19 @@ export const CreatePosterBody = zod.object({
   price: zod.number(),
   currency: zod.string(),
   sizes: zod.array(zod.string()).optional(),
+  posterSizes: zod
+    .array(
+      zod.object({
+        sizeLabel: zod.string(),
+        widthCm: zod.number().nullish(),
+        heightCm: zod.number().nullish(),
+        price: zod.number(),
+        currency: zod.string(),
+        active: zod.boolean().optional(),
+        sortOrder: zod.number().optional(),
+      }),
+    )
+    .optional(),
   isFeatured: zod.boolean().optional(),
   isNew: zod.boolean().optional(),
   status: zod.enum(["draft", "published", "archived"]).optional(),
@@ -107,6 +138,24 @@ export const GetPosterResponse = zod.object({
   price: zod.number(),
   currency: zod.string(),
   sizes: zod.array(zod.string()).optional(),
+  posterSizes: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        posterId: zod.number(),
+        sizeLabel: zod.string(),
+        widthCm: zod.number().nullish(),
+        heightCm: zod.number().nullish(),
+        price: zod.number(),
+        currency: zod.string(),
+        active: zod.boolean(),
+        sortOrder: zod.number(),
+        createdAt: zod.string(),
+        updatedAt: zod.string(),
+      }),
+    )
+    .optional(),
+  lowestActivePrice: zod.number().nullish(),
   isFeatured: zod.boolean().optional(),
   isNew: zod.boolean().optional(),
   status: zod.enum(["draft", "published", "archived"]).optional(),
@@ -133,6 +182,21 @@ export const UpdatePosterBody = zod.object({
   category: zod.string().optional(),
   tags: zod.array(zod.string()).optional(),
   price: zod.number().optional(),
+  currency: zod.string().optional(),
+  sizes: zod.array(zod.string()).optional(),
+  posterSizes: zod
+    .array(
+      zod.object({
+        sizeLabel: zod.string(),
+        widthCm: zod.number().nullish(),
+        heightCm: zod.number().nullish(),
+        price: zod.number(),
+        currency: zod.string(),
+        active: zod.boolean().optional(),
+        sortOrder: zod.number().optional(),
+      }),
+    )
+    .optional(),
   isFeatured: zod.boolean().optional(),
   isNew: zod.boolean().optional(),
   status: zod.enum(["draft", "published", "archived"]).optional(),
@@ -151,6 +215,24 @@ export const UpdatePosterResponse = zod.object({
   price: zod.number(),
   currency: zod.string(),
   sizes: zod.array(zod.string()).optional(),
+  posterSizes: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        posterId: zod.number(),
+        sizeLabel: zod.string(),
+        widthCm: zod.number().nullish(),
+        heightCm: zod.number().nullish(),
+        price: zod.number(),
+        currency: zod.string(),
+        active: zod.boolean(),
+        sortOrder: zod.number(),
+        createdAt: zod.string(),
+        updatedAt: zod.string(),
+      }),
+    )
+    .optional(),
+  lowestActivePrice: zod.number().nullish(),
   isFeatured: zod.boolean().optional(),
   isNew: zod.boolean().optional(),
   status: zod.enum(["draft", "published", "archived"]).optional(),
@@ -169,6 +251,74 @@ export const DeletePosterQueryParams = zod.object({
 });
 
 /**
+ * @summary Get sizes for a poster
+ */
+export const GetPosterSizesParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetPosterSizesQueryParams = zod.object({
+  storeKey: zod.coerce.string(),
+  activeOnly: zod.coerce.boolean().optional(),
+});
+
+export const GetPosterSizesResponseItem = zod.object({
+  id: zod.number(),
+  posterId: zod.number(),
+  sizeLabel: zod.string(),
+  widthCm: zod.number().nullish(),
+  heightCm: zod.number().nullish(),
+  price: zod.number(),
+  currency: zod.string(),
+  active: zod.boolean(),
+  sortOrder: zod.number(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+export const GetPosterSizesResponse = zod.array(GetPosterSizesResponseItem);
+
+/**
+ * @summary Replace all sizes for a poster (admin only)
+ */
+export const SavePosterSizesParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const SavePosterSizesQueryParams = zod.object({
+  storeKey: zod.coerce.string().optional(),
+});
+
+export const SavePosterSizesBody = zod.object({
+  sizes: zod.array(
+    zod.object({
+      sizeLabel: zod.string(),
+      widthCm: zod.number().nullish(),
+      heightCm: zod.number().nullish(),
+      price: zod.number(),
+      currency: zod.string(),
+      active: zod.boolean().optional(),
+      sortOrder: zod.number().optional(),
+    }),
+  ),
+  storeKey: zod.string().optional(),
+});
+
+export const SavePosterSizesResponseItem = zod.object({
+  id: zod.number(),
+  posterId: zod.number(),
+  sizeLabel: zod.string(),
+  widthCm: zod.number().nullish(),
+  heightCm: zod.number().nullish(),
+  price: zod.number(),
+  currency: zod.string(),
+  active: zod.boolean(),
+  sortOrder: zod.number(),
+  createdAt: zod.string(),
+  updatedAt: zod.string(),
+});
+export const SavePosterSizesResponse = zod.array(SavePosterSizesResponseItem);
+
+/**
  * @summary Get current cart for a session and store
  */
 export const GetCartQueryParams = zod.object({
@@ -183,6 +333,7 @@ export const GetCartResponse = zod.object({
     zod.object({
       id: zod.number(),
       posterId: zod.number(),
+      posterSizeId: zod.number().nullish(),
       poster: zod
         .object({
           id: zod.number(),
@@ -197,18 +348,54 @@ export const GetCartResponse = zod.object({
           price: zod.number(),
           currency: zod.string(),
           sizes: zod.array(zod.string()).optional(),
+          posterSizes: zod
+            .array(
+              zod.object({
+                id: zod.number(),
+                posterId: zod.number(),
+                sizeLabel: zod.string(),
+                widthCm: zod.number().nullish(),
+                heightCm: zod.number().nullish(),
+                price: zod.number(),
+                currency: zod.string(),
+                active: zod.boolean(),
+                sortOrder: zod.number(),
+                createdAt: zod.string(),
+                updatedAt: zod.string(),
+              }),
+            )
+            .optional(),
+          lowestActivePrice: zod.number().nullish(),
           isFeatured: zod.boolean().optional(),
           isNew: zod.boolean().optional(),
           status: zod.enum(["draft", "published", "archived"]).optional(),
           createdAt: zod.string(),
         })
         .optional(),
+      posterSize: zod
+        .object({
+          id: zod.number(),
+          posterId: zod.number(),
+          sizeLabel: zod.string(),
+          widthCm: zod.number().nullish(),
+          heightCm: zod.number().nullish(),
+          price: zod.number(),
+          currency: zod.string(),
+          active: zod.boolean(),
+          sortOrder: zod.number(),
+          createdAt: zod.string(),
+          updatedAt: zod.string(),
+        })
+        .optional(),
       quantity: zod.number(),
       size: zod.string().optional(),
+      unitPrice: zod.number().optional(),
+      currency: zod.string().optional(),
     }),
   ),
   total: zod.number(),
   itemCount: zod.number(),
+  currency: zod.string().optional(),
 });
 
 /**
@@ -218,6 +405,7 @@ export const AddCartItemBody = zod.object({
   sessionId: zod.string(),
   storeKey: zod.string(),
   posterId: zod.number(),
+  posterSizeId: zod.number().optional(),
   quantity: zod.number(),
   size: zod.string().optional(),
 });
@@ -229,6 +417,7 @@ export const AddCartItemResponse = zod.object({
     zod.object({
       id: zod.number(),
       posterId: zod.number(),
+      posterSizeId: zod.number().nullish(),
       poster: zod
         .object({
           id: zod.number(),
@@ -243,18 +432,54 @@ export const AddCartItemResponse = zod.object({
           price: zod.number(),
           currency: zod.string(),
           sizes: zod.array(zod.string()).optional(),
+          posterSizes: zod
+            .array(
+              zod.object({
+                id: zod.number(),
+                posterId: zod.number(),
+                sizeLabel: zod.string(),
+                widthCm: zod.number().nullish(),
+                heightCm: zod.number().nullish(),
+                price: zod.number(),
+                currency: zod.string(),
+                active: zod.boolean(),
+                sortOrder: zod.number(),
+                createdAt: zod.string(),
+                updatedAt: zod.string(),
+              }),
+            )
+            .optional(),
+          lowestActivePrice: zod.number().nullish(),
           isFeatured: zod.boolean().optional(),
           isNew: zod.boolean().optional(),
           status: zod.enum(["draft", "published", "archived"]).optional(),
           createdAt: zod.string(),
         })
         .optional(),
+      posterSize: zod
+        .object({
+          id: zod.number(),
+          posterId: zod.number(),
+          sizeLabel: zod.string(),
+          widthCm: zod.number().nullish(),
+          heightCm: zod.number().nullish(),
+          price: zod.number(),
+          currency: zod.string(),
+          active: zod.boolean(),
+          sortOrder: zod.number(),
+          createdAt: zod.string(),
+          updatedAt: zod.string(),
+        })
+        .optional(),
       quantity: zod.number(),
       size: zod.string().optional(),
+      unitPrice: zod.number().optional(),
+      currency: zod.string().optional(),
     }),
   ),
   total: zod.number(),
   itemCount: zod.number(),
+  currency: zod.string().optional(),
 });
 
 /**
@@ -275,6 +500,7 @@ export const UpdateCartItemResponse = zod.object({
     zod.object({
       id: zod.number(),
       posterId: zod.number(),
+      posterSizeId: zod.number().nullish(),
       poster: zod
         .object({
           id: zod.number(),
@@ -289,18 +515,54 @@ export const UpdateCartItemResponse = zod.object({
           price: zod.number(),
           currency: zod.string(),
           sizes: zod.array(zod.string()).optional(),
+          posterSizes: zod
+            .array(
+              zod.object({
+                id: zod.number(),
+                posterId: zod.number(),
+                sizeLabel: zod.string(),
+                widthCm: zod.number().nullish(),
+                heightCm: zod.number().nullish(),
+                price: zod.number(),
+                currency: zod.string(),
+                active: zod.boolean(),
+                sortOrder: zod.number(),
+                createdAt: zod.string(),
+                updatedAt: zod.string(),
+              }),
+            )
+            .optional(),
+          lowestActivePrice: zod.number().nullish(),
           isFeatured: zod.boolean().optional(),
           isNew: zod.boolean().optional(),
           status: zod.enum(["draft", "published", "archived"]).optional(),
           createdAt: zod.string(),
         })
         .optional(),
+      posterSize: zod
+        .object({
+          id: zod.number(),
+          posterId: zod.number(),
+          sizeLabel: zod.string(),
+          widthCm: zod.number().nullish(),
+          heightCm: zod.number().nullish(),
+          price: zod.number(),
+          currency: zod.string(),
+          active: zod.boolean(),
+          sortOrder: zod.number(),
+          createdAt: zod.string(),
+          updatedAt: zod.string(),
+        })
+        .optional(),
       quantity: zod.number(),
       size: zod.string().optional(),
+      unitPrice: zod.number().optional(),
+      currency: zod.string().optional(),
     }),
   ),
   total: zod.number(),
   itemCount: zod.number(),
+  currency: zod.string().optional(),
 });
 
 /**
@@ -317,6 +579,7 @@ export const RemoveCartItemResponse = zod.object({
     zod.object({
       id: zod.number(),
       posterId: zod.number(),
+      posterSizeId: zod.number().nullish(),
       poster: zod
         .object({
           id: zod.number(),
@@ -331,18 +594,54 @@ export const RemoveCartItemResponse = zod.object({
           price: zod.number(),
           currency: zod.string(),
           sizes: zod.array(zod.string()).optional(),
+          posterSizes: zod
+            .array(
+              zod.object({
+                id: zod.number(),
+                posterId: zod.number(),
+                sizeLabel: zod.string(),
+                widthCm: zod.number().nullish(),
+                heightCm: zod.number().nullish(),
+                price: zod.number(),
+                currency: zod.string(),
+                active: zod.boolean(),
+                sortOrder: zod.number(),
+                createdAt: zod.string(),
+                updatedAt: zod.string(),
+              }),
+            )
+            .optional(),
+          lowestActivePrice: zod.number().nullish(),
           isFeatured: zod.boolean().optional(),
           isNew: zod.boolean().optional(),
           status: zod.enum(["draft", "published", "archived"]).optional(),
           createdAt: zod.string(),
         })
         .optional(),
+      posterSize: zod
+        .object({
+          id: zod.number(),
+          posterId: zod.number(),
+          sizeLabel: zod.string(),
+          widthCm: zod.number().nullish(),
+          heightCm: zod.number().nullish(),
+          price: zod.number(),
+          currency: zod.string(),
+          active: zod.boolean(),
+          sortOrder: zod.number(),
+          createdAt: zod.string(),
+          updatedAt: zod.string(),
+        })
+        .optional(),
       quantity: zod.number(),
       size: zod.string().optional(),
+      unitPrice: zod.number().optional(),
+      currency: zod.string().optional(),
     }),
   ),
   total: zod.number(),
   itemCount: zod.number(),
+  currency: zod.string().optional(),
 });
 
 /**
@@ -366,6 +665,24 @@ export const GetFavoritesResponseItem = zod.object({
   price: zod.number(),
   currency: zod.string(),
   sizes: zod.array(zod.string()).optional(),
+  posterSizes: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        posterId: zod.number(),
+        sizeLabel: zod.string(),
+        widthCm: zod.number().nullish(),
+        heightCm: zod.number().nullish(),
+        price: zod.number(),
+        currency: zod.string(),
+        active: zod.boolean(),
+        sortOrder: zod.number(),
+        createdAt: zod.string(),
+        updatedAt: zod.string(),
+      }),
+    )
+    .optional(),
+  lowestActivePrice: zod.number().nullish(),
   isFeatured: zod.boolean().optional(),
   isNew: zod.boolean().optional(),
   status: zod.enum(["draft", "published", "archived"]).optional(),
@@ -395,6 +712,24 @@ export const AddFavoriteResponseItem = zod.object({
   price: zod.number(),
   currency: zod.string(),
   sizes: zod.array(zod.string()).optional(),
+  posterSizes: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        posterId: zod.number(),
+        sizeLabel: zod.string(),
+        widthCm: zod.number().nullish(),
+        heightCm: zod.number().nullish(),
+        price: zod.number(),
+        currency: zod.string(),
+        active: zod.boolean(),
+        sortOrder: zod.number(),
+        createdAt: zod.string(),
+        updatedAt: zod.string(),
+      }),
+    )
+    .optional(),
+  lowestActivePrice: zod.number().nullish(),
   isFeatured: zod.boolean().optional(),
   isNew: zod.boolean().optional(),
   status: zod.enum(["draft", "published", "archived"]).optional(),
@@ -424,6 +759,24 @@ export const RemoveFavoriteResponseItem = zod.object({
   price: zod.number(),
   currency: zod.string(),
   sizes: zod.array(zod.string()).optional(),
+  posterSizes: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        posterId: zod.number(),
+        sizeLabel: zod.string(),
+        widthCm: zod.number().nullish(),
+        heightCm: zod.number().nullish(),
+        price: zod.number(),
+        currency: zod.string(),
+        active: zod.boolean(),
+        sortOrder: zod.number(),
+        createdAt: zod.string(),
+        updatedAt: zod.string(),
+      }),
+    )
+    .optional(),
+  lowestActivePrice: zod.number().nullish(),
   isFeatured: zod.boolean().optional(),
   isNew: zod.boolean().optional(),
   status: zod.enum(["draft", "published", "archived"]).optional(),
@@ -443,9 +796,16 @@ export const CreateOrderBody = zod.object({
   items: zod.array(
     zod.object({
       posterId: zod.number(),
+      posterSizeId: zod.number().optional(),
       quantity: zod.number(),
       size: zod.string().optional(),
-      price: zod.number(),
+      posterTitleSnapshot: zod.string().optional(),
+      sizeLabelSnapshot: zod.string().optional(),
+      widthCmSnapshot: zod.number().nullish(),
+      heightCmSnapshot: zod.number().nullish(),
+      unitPrice: zod.number(),
+      currency: zod.string(),
+      totalPrice: zod.number(),
     }),
   ),
   total: zod.number(),
@@ -468,9 +828,16 @@ export const GetOrderResponse = zod.object({
   items: zod.array(
     zod.object({
       posterId: zod.number(),
+      posterSizeId: zod.number().optional(),
       quantity: zod.number(),
       size: zod.string().optional(),
-      price: zod.number(),
+      posterTitleSnapshot: zod.string().optional(),
+      sizeLabelSnapshot: zod.string().optional(),
+      widthCmSnapshot: zod.number().nullish(),
+      heightCmSnapshot: zod.number().nullish(),
+      unitPrice: zod.number(),
+      currency: zod.string(),
+      totalPrice: zod.number(),
     }),
   ),
   total: zod.number(),
@@ -533,6 +900,24 @@ export const GetFeaturedPostersResponseItem = zod.object({
   price: zod.number(),
   currency: zod.string(),
   sizes: zod.array(zod.string()).optional(),
+  posterSizes: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        posterId: zod.number(),
+        sizeLabel: zod.string(),
+        widthCm: zod.number().nullish(),
+        heightCm: zod.number().nullish(),
+        price: zod.number(),
+        currency: zod.string(),
+        active: zod.boolean(),
+        sortOrder: zod.number(),
+        createdAt: zod.string(),
+        updatedAt: zod.string(),
+      }),
+    )
+    .optional(),
+  lowestActivePrice: zod.number().nullish(),
   isFeatured: zod.boolean().optional(),
   isNew: zod.boolean().optional(),
   status: zod.enum(["draft", "published", "archived"]).optional(),
@@ -563,6 +948,24 @@ export const GetNewArrivalsResponseItem = zod.object({
   price: zod.number(),
   currency: zod.string(),
   sizes: zod.array(zod.string()).optional(),
+  posterSizes: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        posterId: zod.number(),
+        sizeLabel: zod.string(),
+        widthCm: zod.number().nullish(),
+        heightCm: zod.number().nullish(),
+        price: zod.number(),
+        currency: zod.string(),
+        active: zod.boolean(),
+        sortOrder: zod.number(),
+        createdAt: zod.string(),
+        updatedAt: zod.string(),
+      }),
+    )
+    .optional(),
+  lowestActivePrice: zod.number().nullish(),
   isFeatured: zod.boolean().optional(),
   isNew: zod.boolean().optional(),
   status: zod.enum(["draft", "published", "archived"]).optional(),

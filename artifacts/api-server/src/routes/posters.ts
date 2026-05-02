@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { postersTable, insertPosterSchema } from "@workspace/db";
-import { eq, and, ilike, gte, lte, desc, asc, sql } from "drizzle-orm";
+import { postersTable, posterSizesTable } from "@workspace/db";
+import { eq, and, ilike, gte, lte, desc, asc, sql, inArray } from "drizzle-orm";
 import {
   ListPostersQueryParams,
   CreatePosterBody,
@@ -18,6 +18,81 @@ function isAdminRequest(req: import("express").Request): boolean {
   const token = process.env.ADMIN_API_TOKEN;
   if (!token) return false;
   return req.headers["x-admin-token"] === token;
+}
+
+function serializePosterSize(s: typeof posterSizesTable.$inferSelect) {
+  return {
+    ...s,
+    price: Number(s.price),
+    widthCm: s.widthCm != null ? Number(s.widthCm) : null,
+    heightCm: s.heightCm != null ? Number(s.heightCm) : null,
+    createdAt: s.createdAt.toISOString(),
+    updatedAt: s.updatedAt.toISOString(),
+  };
+}
+
+async function attachSizesToPosters(
+  posters: (typeof postersTable.$inferSelect)[],
+  adminRequest: boolean
+) {
+  if (posters.length === 0) return [];
+
+  const ids = posters.map(p => p.id);
+  const allSizes = ids.length > 0
+    ? await db.select().from(posterSizesTable).where(inArray(posterSizesTable.posterId, ids)).orderBy(asc(posterSizesTable.sortOrder))
+    : [];
+
+  const sizeMap = new Map<number, (typeof allSizes[0])[]>();
+  for (const s of allSizes) {
+    const arr = sizeMap.get(s.posterId) ?? [];
+    arr.push(s);
+    sizeMap.set(s.posterId, arr);
+  }
+
+  return posters.map(p => {
+    const rawSizes = sizeMap.get(p.id) ?? [];
+    const posterSizes = adminRequest ? rawSizes : rawSizes.filter(s => s.active);
+    const activePrices = rawSizes.filter(s => s.active).map(s => Number(s.price));
+    const lowestActivePrice = activePrices.length > 0 ? Math.min(...activePrices) : null;
+
+    return {
+      ...p,
+      price: Number(p.price),
+      createdAt: p.createdAt.toISOString(),
+      posterSizes: posterSizes.map(serializePosterSize),
+      lowestActivePrice,
+    };
+  });
+}
+
+async function savePosterSizes(
+  posterId: number,
+  sizesInput: Array<{
+    sizeLabel: string;
+    widthCm?: number | null;
+    heightCm?: number | null;
+    price: number;
+    currency: string;
+    active?: boolean;
+    sortOrder?: number;
+  }>,
+  defaultCurrency = "EUR"
+) {
+  await db.delete(posterSizesTable).where(eq(posterSizesTable.posterId, posterId));
+  if (sizesInput.length > 0) {
+    await db.insert(posterSizesTable).values(
+      sizesInput.map((s, idx) => ({
+        posterId,
+        sizeLabel: s.sizeLabel,
+        widthCm: s.widthCm != null ? String(s.widthCm) : null,
+        heightCm: s.heightCm != null ? String(s.heightCm) : null,
+        price: String(s.price),
+        currency: s.currency ?? defaultCurrency,
+        active: s.active ?? true,
+        sortOrder: s.sortOrder ?? idx,
+      }))
+    );
+  }
 }
 
 router.get("/posters", async (req, res) => {
@@ -70,13 +145,19 @@ router.get("/posters", async (req, res) => {
     db.select({ count: sql<number>`count(*)` }).from(postersTable).where(whereClause),
   ]);
 
+  let result = posters;
   if (tag) {
-    const filtered = posters.filter(p => p.tags?.includes(tag));
-    return res.json({ posters: filtered.map(serializePoster), total: filtered.length, offset, limit });
+    result = posters.filter(p => p.tags?.includes(tag));
+  }
+
+  const withSizes = await attachSizesToPosters(result, adminRequest);
+
+  if (tag) {
+    return res.json({ posters: withSizes, total: withSizes.length, offset, limit });
   }
 
   return res.json({
-    posters: posters.map(serializePoster),
+    posters: withSizes,
     total: Number(countResult[0]?.count ?? 0),
     offset,
     limit,
@@ -87,12 +168,18 @@ router.post("/posters", requireAdmin, async (req, res) => {
   const body = CreatePosterBody.safeParse(req.body);
   if (!body.success) return res.status(400).json({ error: body.error.flatten() });
 
-  const { price, ...rest } = body.data;
+  const { price, posterSizes: posterSizesInput, ...rest } = body.data;
   const [poster] = await db
     .insert(postersTable)
     .values({ ...rest, price: String(price) })
     .returning();
-  return res.status(201).json(serializePoster(poster));
+
+  if (posterSizesInput && posterSizesInput.length > 0) {
+    await savePosterSizes(poster.id, posterSizesInput as any, rest.currency ?? "EUR");
+  }
+
+  const [withSizes] = await attachSizesToPosters([poster], true);
+  return res.status(201).json(withSizes);
 });
 
 router.get("/posters/:id", async (req, res) => {
@@ -118,7 +205,9 @@ router.get("/posters/:id", async (req, res) => {
     .where(and(...conditions));
 
   if (!poster) return res.status(404).json({ error: "Not found" });
-  return res.json(serializePoster(poster));
+
+  const [withSizes] = await attachSizesToPosters([poster], adminRequest);
+  return res.json(withSizes);
 });
 
 router.put("/posters/:id", requireAdmin, async (req, res) => {
@@ -136,7 +225,7 @@ router.put("/posters/:id", requireAdmin, async (req, res) => {
     return res.status(403).json({ error: "storeKey mismatch: cannot edit poster from another store" });
   }
 
-  const { price, ...rest } = body.data;
+  const { price, posterSizes: posterSizesInput, ...rest } = body.data;
   const updateData = price !== undefined
     ? { ...rest, price: String(price) }
     : rest;
@@ -147,7 +236,12 @@ router.put("/posters/:id", requireAdmin, async (req, res) => {
     .where(eq(postersTable.id, params.data.id))
     .returning();
 
-  return res.json(serializePoster(poster));
+  if (posterSizesInput !== undefined) {
+    await savePosterSizes(poster.id, posterSizesInput as any, poster.currency ?? "EUR");
+  }
+
+  const [withSizes] = await attachSizesToPosters([poster], true);
+  return res.json(withSizes);
 });
 
 router.delete("/posters/:id", requireAdmin, async (req, res) => {
@@ -165,13 +259,5 @@ router.delete("/posters/:id", requireAdmin, async (req, res) => {
   await db.delete(postersTable).where(eq(postersTable.id, params.data.id));
   return res.status(204).send();
 });
-
-function serializePoster(p: typeof postersTable.$inferSelect) {
-  return {
-    ...p,
-    price: Number(p.price),
-    createdAt: p.createdAt.toISOString(),
-  };
-}
 
 export default router;
