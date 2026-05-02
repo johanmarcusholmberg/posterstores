@@ -1,6 +1,5 @@
 import React from "react";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -8,8 +7,6 @@ import { Plus, X, GripVertical, AlertCircle } from "lucide-react";
 
 export interface SizeRow {
   sizeLabel: string;
-  widthCm: number | null;
-  heightCm: number | null;
   price: number | null;
   currency: string;
   active: boolean;
@@ -23,21 +20,14 @@ interface AdminSizePriceEditorProps {
   errors?: string[];
 }
 
-const QUICK_SIZES: { label: string; widthCm: number; heightCm: number }[] = [
-  { label: "A4", widthCm: 21, heightCm: 29.7 },
-  { label: "A3", widthCm: 29.7, heightCm: 42 },
-  { label: "A2", widthCm: 42, heightCm: 59.4 },
-  { label: "30x40", widthCm: 30, heightCm: 40 },
-  { label: "50x70", widthCm: 50, heightCm: 70 },
-];
-
+const QUICK_SIZES = ["A4", "A3", "A2", "30x40", "50x70", "70x100"];
 const CURRENCIES = ["EUR", "SEK", "USD", "GBP"];
 
 export function buildDefaultSizeRows(currency = "EUR"): SizeRow[] {
   return [
-    { sizeLabel: "A4", widthCm: 21, heightCm: 29.7, price: null, currency, active: true, sortOrder: 0 },
-    { sizeLabel: "A3", widthCm: 29.7, heightCm: 42, price: null, currency, active: true, sortOrder: 1 },
-    { sizeLabel: "50x70", widthCm: 50, heightCm: 70, price: null, currency, active: true, sortOrder: 2 },
+    { sizeLabel: "A4", price: null, currency, active: true, sortOrder: 0 },
+    { sizeLabel: "A3", price: null, currency, active: true, sortOrder: 1 },
+    { sizeLabel: "50x70", price: null, currency, active: true, sortOrder: 2 },
   ];
 }
 
@@ -60,32 +50,15 @@ export const AdminSizePriceEditor = ({
   const addBlank = () => {
     onSizesChange([
       ...sizes,
-      {
-        sizeLabel: "",
-        widthCm: null,
-        heightCm: null,
-        price: null,
-        currency: defaultCurrency,
-        active: true,
-        sortOrder: sizes.length,
-      },
+      { sizeLabel: "", price: null, currency: defaultCurrency, active: true, sortOrder: sizes.length },
     ]);
   };
 
-  const addQuick = (qs: typeof QUICK_SIZES[0]) => {
-    const alreadyExists = sizes.some(s => s.sizeLabel === qs.label);
-    if (alreadyExists) return;
+  const addQuick = (label: string) => {
+    if (sizes.some(s => s.sizeLabel === label)) return;
     onSizesChange([
       ...sizes,
-      {
-        sizeLabel: qs.label,
-        widthCm: qs.widthCm,
-        heightCm: qs.heightCm,
-        price: null,
-        currency: defaultCurrency,
-        active: true,
-        sortOrder: sizes.length,
-      },
+      { sizeLabel: label, price: null, currency: defaultCurrency, active: true, sortOrder: sizes.length },
     ]);
   };
 
@@ -102,20 +75,20 @@ export const AdminSizePriceEditor = ({
 
       <div className="flex flex-wrap gap-1.5 items-center">
         <span className="text-xs text-muted-foreground font-medium mr-1">Quick add:</span>
-        {QUICK_SIZES.map(qs => {
-          const exists = sizes.some(s => s.sizeLabel === qs.label);
+        {QUICK_SIZES.map(label => {
+          const exists = sizes.some(s => s.sizeLabel === label);
           return (
             <Button
-              key={qs.label}
+              key={label}
               type="button"
               variant="outline"
               size="sm"
               className="h-7 text-xs px-2 gap-1"
-              onClick={() => addQuick(qs)}
+              onClick={() => addQuick(label)}
               disabled={exists}
             >
               <Plus className="w-3 h-3" />
-              {qs.label}
+              {label}
             </Button>
           );
         })}
@@ -123,11 +96,9 @@ export const AdminSizePriceEditor = ({
 
       {sizes.length > 0 && (
         <div className="space-y-2">
-          <div className="grid grid-cols-[20px_1fr_80px_80px_100px_80px_50px_30px] gap-2 items-center text-xs text-muted-foreground font-medium px-1">
+          <div className="grid grid-cols-[20px_1fr_110px_80px_50px_30px] gap-2 items-center text-xs text-muted-foreground font-medium px-1">
             <span></span>
             <span>Label <span className="text-destructive">*</span></span>
-            <span>W (cm)</span>
-            <span>H (cm)</span>
             <span>Price <span className="text-destructive">*</span></span>
             <span>Currency</span>
             <span>Active</span>
@@ -137,7 +108,7 @@ export const AdminSizePriceEditor = ({
           {sizes.map((row, i) => (
             <div
               key={i}
-              className={`grid grid-cols-[20px_1fr_80px_80px_100px_80px_50px_30px] gap-2 items-center rounded-md border px-2 py-2 ${
+              className={`grid grid-cols-[20px_1fr_110px_80px_50px_30px] gap-2 items-center rounded-md border px-2 py-2 ${
                 row.active ? "border-border bg-background" : "border-border/50 bg-muted/30 opacity-70"
               }`}
             >
@@ -149,26 +120,6 @@ export const AdminSizePriceEditor = ({
                 placeholder="e.g. A3"
                 className="h-8 text-sm"
                 data-testid={`size-label-${i}`}
-              />
-
-              <Input
-                type="number"
-                min="0"
-                step="0.1"
-                value={row.widthCm ?? ""}
-                onChange={e => update(i, { widthCm: e.target.value === "" ? null : Number(e.target.value) })}
-                placeholder="—"
-                className="h-8 text-sm"
-              />
-
-              <Input
-                type="number"
-                min="0"
-                step="0.1"
-                value={row.heightCm ?? ""}
-                onChange={e => update(i, { heightCm: e.target.value === "" ? null : Number(e.target.value) })}
-                placeholder="—"
-                className="h-8 text-sm"
               />
 
               <Input

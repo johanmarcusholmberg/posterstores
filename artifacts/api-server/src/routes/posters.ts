@@ -24,8 +24,6 @@ function serializePosterSize(s: typeof posterSizesTable.$inferSelect) {
   return {
     ...s,
     price: Number(s.price),
-    widthCm: s.widthCm != null ? Number(s.widthCm) : null,
-    heightCm: s.heightCm != null ? Number(s.heightCm) : null,
     createdAt: s.createdAt.toISOString(),
     updatedAt: s.updatedAt.toISOString(),
   };
@@ -69,8 +67,6 @@ async function savePosterSizes(
   posterId: number,
   sizesInput: Array<{
     sizeLabel: string;
-    widthCm?: number | null;
-    heightCm?: number | null;
     price: number;
     currency: string;
     active?: boolean;
@@ -84,8 +80,6 @@ async function savePosterSizes(
       sizesInput.map((s, idx) => ({
         posterId,
         sizeLabel: s.sizeLabel,
-        widthCm: s.widthCm != null ? String(s.widthCm) : null,
-        heightCm: s.heightCm != null ? String(s.heightCm) : null,
         price: String(s.price),
         currency: s.currency ?? defaultCurrency,
         active: s.active ?? true,

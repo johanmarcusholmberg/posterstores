@@ -16,8 +16,6 @@ interface PosterSizeOption {
   sizeLabel: string;
   price: number;
   currency: string;
-  widthCm: number | null;
-  heightCm: number | null;
   active: boolean;
   sortOrder: number;
 }
@@ -209,11 +207,6 @@ export default function PosterDetail() {
                       }`}
                     >
                       <span className="font-medium text-sm text-foreground">{size.sizeLabel}</span>
-                      {(size.widthCm || size.heightCm) && (
-                        <span className="text-xs text-muted-foreground mt-0.5">
-                          {size.widthCm}×{size.heightCm} cm
-                        </span>
-                      )}
                       <span className={`text-sm mt-1 font-semibold ${isSelected ? "text-primary" : "text-foreground"}`}>
                         {formatPrice(size.price, size.currency)}
                       </span>

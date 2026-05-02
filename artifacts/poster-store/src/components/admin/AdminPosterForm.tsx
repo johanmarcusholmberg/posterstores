@@ -9,8 +9,10 @@ import {
   type UpdatePosterPayload,
   type PosterStatus,
 } from "@/lib/adminApi";
+import { getPosterMockups, type PosterMockup } from "@/lib/mockupApi";
 import { AdminImageFields } from "./AdminImageFields";
 import { AdminSizePriceEditor, type SizeRow, buildDefaultSizeRows } from "./AdminSizePriceEditor";
+import { AdminMockupEditor } from "./AdminMockupEditor";
 import { AdminPublishControls } from "./AdminPublishControls";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,8 +69,6 @@ function posterSizesToSizeRows(poster: AdminPoster, defaultCurrency: string): Si
   if (poster.posterSizes && poster.posterSizes.length > 0) {
     return poster.posterSizes.map((s, idx) => ({
       sizeLabel: s.sizeLabel,
-      widthCm: s.widthCm ?? null,
-      heightCm: s.heightCm ?? null,
       price: s.price,
       currency: s.currency,
       active: s.active,
@@ -100,11 +100,19 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [sizeErrors, setSizeErrors] = useState<string[]>([]);
+  const [mockups, setMockups] = useState<PosterMockup[]>([]);
 
   const [sizes, setSizes] = useState<SizeRow[]>(() => {
     if (existing) return posterSizesToSizeRows(existing, defaultCurrency);
     return buildDefaultSizeRows(defaultCurrency);
   });
+
+  useEffect(() => {
+    if (!existing || !token) return;
+    getPosterMockups(existing.id, existing.storeKey)
+      .then(setMockups)
+      .catch(() => setMockups([]));
+  }, [existing?.id]);
 
   const publishBlockReasons = buildPublishBlockReasons({ title, imageUrl, category, sizes });
   const canPublish = publishBlockReasons.length === 0;
@@ -146,8 +154,6 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
 
     const posterSizesPayload = sizes.map((s, idx) => ({
       sizeLabel: s.sizeLabel,
-      widthCm: s.widthCm,
-      heightCm: s.heightCm,
       price: s.price ?? 0,
       currency: s.currency,
       active: s.active,
@@ -383,11 +389,32 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Images</CardTitle>
+              <CardTitle className="text-base">Poster image</CardTitle>
             </CardHeader>
             <CardContent>
               <AdminImageFields imageUrl={imageUrl} onImageUrlChange={v => { setImageUrl(v); setErrors(p => ({ ...p, imageUrl: "" })); }} />
               {errors.imageUrl && <p className="text-xs text-destructive mt-1">{errors.imageUrl}</p>}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Mockup images</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {existing && token ? (
+                <AdminMockupEditor
+                  posterId={existing.id}
+                  storeKey={existing.storeKey}
+                  token={token}
+                  mockups={mockups}
+                  onMockupsChange={setMockups}
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground italic">
+                  Save the poster first, then you can add mockup images.
+                </p>
+              )}
             </CardContent>
           </Card>
 

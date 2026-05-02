@@ -574,12 +574,6 @@ components:
           type: integer
         sizeLabel:
           type: string
-        widthCm:
-          type: number
-          nullable: true
-        heightCm:
-          type: number
-          nullable: true
         price:
           type: number
         currency:
@@ -599,12 +593,6 @@ components:
       properties:
         sizeLabel:
           type: string
-        widthCm:
-          type: number
-          nullable: true
-        heightCm:
-          type: number
-          nullable: true
         price:
           type: number
         currency:
@@ -614,6 +602,27 @@ components:
         sortOrder:
           type: integer
       required: [sizeLabel, price, currency]
+
+    PosterMockup:
+      type: object
+      properties:
+        id:
+          type: integer
+        posterId:
+          type: integer
+        mockupTemplateId:
+          type: integer
+          nullable: true
+        mockupImageUrl:
+          type: string
+          nullable: true
+        sortOrder:
+          type: integer
+        isPrimary:
+          type: boolean
+        createdAt:
+          type: string
+      required: [id, posterId, sortOrder, isPrimary, createdAt]
 
     SavePosterSizesBody:
       type: object

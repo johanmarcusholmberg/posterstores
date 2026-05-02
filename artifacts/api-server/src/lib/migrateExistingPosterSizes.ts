@@ -3,23 +3,7 @@ import { postersTable, posterSizesTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { logger } from "./logger";
 
-const KNOWN_SIZE_DIMENSIONS: Record<string, { widthCm: number; heightCm: number }> = {
-  "A4": { widthCm: 21, heightCm: 29.7 },
-  "A3": { widthCm: 29.7, heightCm: 42 },
-  "A2": { widthCm: 42, heightCm: 59.4 },
-  "30x40": { widthCm: 30, heightCm: 40 },
-  "30x40 cm": { widthCm: 30, heightCm: 40 },
-  "50x70": { widthCm: 50, heightCm: 70 },
-  "50x70 cm": { widthCm: 50, heightCm: 70 },
-  "50×70": { widthCm: 50, heightCm: 70 },
-  "50×70 cm": { widthCm: 50, heightCm: 70 },
-};
-
-const DEFAULT_SIZES = [
-  { sizeLabel: "A4", widthCm: 21, heightCm: 29.7 },
-  { sizeLabel: "A3", widthCm: 29.7, heightCm: 42 },
-  { sizeLabel: "50x70", widthCm: 50, heightCm: 70 },
-];
+const DEFAULT_SIZES = ["A4", "A3", "50x70"];
 
 export async function migrateExistingPosterSizes(): Promise<void> {
   try {
@@ -35,37 +19,21 @@ export async function migrateExistingPosterSizes(): Promise<void> {
       const count = Number(existingSizes[0]?.count ?? 0);
       if (count > 0) continue;
 
-      const price = Number(poster.price);
+      const price = String(Number(poster.price));
       const currency = poster.currency ?? "EUR";
 
-      if (poster.sizes && poster.sizes.length > 0) {
-        const sizeRows = poster.sizes.map((label, idx) => {
-          const dims = KNOWN_SIZE_DIMENSIONS[label] ?? null;
-          return {
-            posterId: poster.id,
-            sizeLabel: label,
-            widthCm: dims ? String(dims.widthCm) : null,
-            heightCm: dims ? String(dims.heightCm) : null,
-            price: String(price),
-            currency,
-            active: true,
-            sortOrder: idx,
-          };
-        });
-        await db.insert(posterSizesTable).values(sizeRows);
-      } else {
-        const sizeRows = DEFAULT_SIZES.map((s, idx) => ({
+      const labels = poster.sizes && poster.sizes.length > 0 ? poster.sizes : DEFAULT_SIZES;
+
+      await db.insert(posterSizesTable).values(
+        labels.map((sizeLabel, idx) => ({
           posterId: poster.id,
-          sizeLabel: s.sizeLabel,
-          widthCm: String(s.widthCm),
-          heightCm: String(s.heightCm),
-          price: String(price),
+          sizeLabel,
+          price,
           currency,
           active: true,
           sortOrder: idx,
-        }));
-        await db.insert(posterSizesTable).values(sizeRows);
-      }
+        }))
+      );
       migrated++;
     }
 

@@ -6,8 +6,6 @@ export interface AdminPosterSize {
   id: number;
   posterId: number;
   sizeLabel: string;
-  widthCm: number | null;
-  heightCm: number | null;
   price: number;
   currency: string;
   active: boolean;
@@ -46,8 +44,6 @@ export interface AdminPosterListResponse {
 
 export interface PosterSizePayload {
   sizeLabel: string;
-  widthCm?: number | null;
-  heightCm?: number | null;
   price: number;
   currency: string;
   active?: boolean;

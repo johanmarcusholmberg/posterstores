@@ -9,8 +9,6 @@ export const posterSizesTable = pgTable("poster_sizes", {
     .notNull()
     .references(() => postersTable.id, { onDelete: "cascade" }),
   sizeLabel: text("size_label").notNull(),
-  widthCm: numeric("width_cm", { precision: 8, scale: 2 }),
-  heightCm: numeric("height_cm", { precision: 8, scale: 2 }),
   price: numeric("price", { precision: 10, scale: 2 }).notNull(),
   currency: text("currency").notNull().default("EUR"),
   active: boolean("active").notNull().default(true),

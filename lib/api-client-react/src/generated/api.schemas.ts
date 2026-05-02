@@ -13,8 +13,6 @@ export interface PosterSize {
   id: number;
   posterId: number;
   sizeLabel: string;
-  widthCm?: number | null;
-  heightCm?: number | null;
   price: number;
   currency: string;
   active: boolean;
@@ -25,12 +23,20 @@ export interface PosterSize {
 
 export interface PosterSizeInput {
   sizeLabel: string;
-  widthCm?: number | null;
-  heightCm?: number | null;
   price: number;
   currency: string;
   active?: boolean;
   sortOrder?: number;
+}
+
+export interface PosterMockup {
+  id: number;
+  posterId: number;
+  mockupTemplateId?: number | null;
+  mockupImageUrl?: string | null;
+  sortOrder: number;
+  isPrimary: boolean;
+  createdAt: string;
 }
 
 export interface SavePosterSizesBody {

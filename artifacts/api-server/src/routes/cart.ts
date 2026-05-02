@@ -16,8 +16,6 @@ function serializePosterSize(s: typeof posterSizesTable.$inferSelect) {
   return {
     ...s,
     price: Number(s.price),
-    widthCm: s.widthCm != null ? Number(s.widthCm) : null,
-    heightCm: s.heightCm != null ? Number(s.heightCm) : null,
     createdAt: s.createdAt.toISOString(),
     updatedAt: s.updatedAt.toISOString(),
   };

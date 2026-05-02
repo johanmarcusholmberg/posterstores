@@ -16,8 +16,6 @@ export function serializePosterSize(s: typeof posterSizesTable.$inferSelect) {
   return {
     ...s,
     price: Number(s.price),
-    widthCm: s.widthCm != null ? Number(s.widthCm) : null,
-    heightCm: s.heightCm != null ? Number(s.heightCm) : null,
     createdAt: s.createdAt.toISOString(),
     updatedAt: s.updatedAt.toISOString(),
   };
@@ -56,8 +54,6 @@ router.put("/posters/:id/sizes", requireAdmin, async (req, res) => {
   const { sizes } = req.body as {
     sizes: Array<{
       sizeLabel: string;
-      widthCm?: number | null;
-      heightCm?: number | null;
       price: number;
       currency: string;
       active?: boolean;
@@ -81,8 +77,6 @@ router.put("/posters/:id/sizes", requireAdmin, async (req, res) => {
       sizes.map((s, idx) => ({
         posterId,
         sizeLabel: s.sizeLabel,
-        widthCm: s.widthCm != null ? String(s.widthCm) : null,
-        heightCm: s.heightCm != null ? String(s.heightCm) : null,
         price: String(s.price),
         currency: s.currency ?? "EUR",
         active: s.active ?? true,
