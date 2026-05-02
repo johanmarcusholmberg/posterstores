@@ -1,0 +1,189 @@
+Continue building the reusable multi-store poster webstore.
+
+CURRENT STATUS:
+- Multi-store architecture is in place.
+- PostsofSpain is the default active store.
+- Store-scoped APIs are fixed and tested.
+- Homepage works.
+- Shop works.
+- Poster detail works.
+- Cart works.
+- Favorites work.
+- Poster write endpoints are protected with ADMIN_API_TOKEN through X-Admin-Token.
+- All tests passed after the multi-store hardening cleanup.
+
+NEXT GOAL:
+Create the admin poster management UI and connect it to the existing protected poster APIs.
+
+Important:
+- Do not rewrite the working storefront.
+- Do not change existing public API response shapes unless absolutely necessary.
+- Do not build Stripe/payment yet.
+- Do not build advanced mockup template assignment yet.
+- Do not add slug routing yet.
+- Build only the admin poster management foundation in this step.
+
+Admin area:
+Create protected admin routes/pages:
+
+- /admin
+- /admin/posters
+- /admin/posters/new
+- /admin/posters/:id
+- /admin/taxonomy if simple enough, otherwise prepare placeholder link only
+
+Admin access:
+Since proper login-based admin auth is not built yet, use the existing ADMIN_API_TOKEN protection.
+
+For MVP admin UI:
+- Create a simple admin token entry screen if no token is stored locally.
+- Store the admin token in browser localStorage for local/admin use only.
+- Use the token only when calling protected admin endpoints.
+- Send the token as:
+  X-Admin-Token: <token>
+- Do not expose ADMIN_API_TOKEN in frontend code.
+- Do not hard-code the token.
+- Add a “Clear admin token / Log out admin” action.
+
+Important security note:
+This token-based admin UI is acceptable only as an MVP/internal admin tool.
+Structure it so it can later be replaced with proper user-role authentication.
+
+Admin layout:
+Create:
+- AdminDashboardLayout
+- AdminSidebar or AdminTopNav
+- AdminStoreSelector
+- AdminTokenGate
+- AdminStatusBadge
+
+Admin dashboard /admin:
+Show simple cards:
+- Posters
+- Orders placeholder
+- Mockups placeholder
+- Taxonomy placeholder
+- Newsletter placeholder
+
+Admin poster list /admin/posters:
+Show posters for the selected active store only.
+
+List should include:
+- Preview image
+- Title
+- ID
+- Store key
+- Category
+- Region
+- City
+- Status
+- Featured
+- New arrival
+- Best seller
+- Updated date
+- Edit button
+
+Add actions:
+- Create new poster
+- Filter by status
+- Search by title
+- Quick status badges
+
+Admin poster form:
+Use for both:
+/admin/posters/new
+/admin/posters/:id
+
+Fields:
+- Store key, default activeStore.storeKey
+- Title
+- Description
+- Category
+- Region
+- City
+- Tags
+- Orientation
+- Status: draft/published/archived
+- Is featured
+- Is new arrival
+- Is best seller
+- Master printable image URL
+- Preview image URL
+
+Important:
+If real file upload/storage is already available, use it.
+If not, use URL input fields for this phase and prepare uploader placeholders.
+Do not overbuild storage in this step if storage is not already configured.
+
+Sizes/prices:
+Add an editable size/price section if the current API/data model supports poster sizes.
+
+Allow multiple rows:
+- Size label, for example A4, A3, A2, 30x40, 50x70
+- Width cm
+- Height cm
+- Price
+- Currency
+- Active toggle
+
+If poster sizes are not yet supported by existing APIs:
+- Create the UI section as a disabled/placeholder panel.
+- Do not break the poster create/update flow.
+
+Validation:
+A poster cannot be published unless it has:
+- Title
+- Store key
+- Main/master image or preview image
+- Category
+- Region/city where relevant
+- At least one price or a valid current price field, depending on current schema
+
+If the current schema has simpler fields than the ideal model, adapt to the current schema and clearly document what remains.
+
+Store scoping:
+- Admin poster list must pass activeStore.storeKey.
+- New posters must be created with activeStore.storeKey.
+- Edit poster must load using id + activeStore.storeKey.
+- Update/delete must include matching storeKey.
+- Do not allow editing/deleting a poster from another store.
+
+Components to create:
+- AdminDashboardLayout
+- AdminTokenGate
+- AdminStoreSelector
+- AdminPosterList
+- AdminPosterForm
+- AdminImageFields
+- AdminSizePriceEditor or placeholder
+- AdminPublishControls
+- AdminStatusBadge
+
+UX:
+- Keep admin practical and clean.
+- Make it quick to create/edit a poster.
+- Show clear save success/error messages.
+- Show validation messages before submitting.
+- Show whether the poster is draft/published/archived.
+- Show a clear warning that master printable image is the production file, while preview/mockup images are presentation assets.
+
+Testing:
+Add or update tests for:
+- Admin token is required before accessing admin actions.
+- Admin poster list loads posters for active store.
+- Create poster sends X-Admin-Token.
+- Create poster includes storeKey.
+- Edit poster loads with storeKey.
+- Update poster sends X-Admin-Token and storeKey.
+- Public shop still only shows published posters.
+- Existing homepage/shop/detail/cart/favorites tests still pass.
+
+At the end, summarize:
+1. Admin routes created.
+2. How admin token access works.
+3. How selected store works in admin.
+4. How poster create/edit works.
+5. Which fields are supported by the current schema.
+6. Which fields are placeholders for later.
+7. Which tests were added/updated.
+8. What I should manually test before continuing.
