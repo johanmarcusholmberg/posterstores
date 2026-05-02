@@ -236,12 +236,12 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
                 <div className="space-y-1.5">
                   <Label>Region</Label>
                   {regions.length > 0 ? (
-                    <Select value={region} onValueChange={setRegion}>
+                    <Select value={region || "__none__"} onValueChange={v => setRegion(v === "__none__" ? "" : v)}>
                       <SelectTrigger data-testid="field-region">
                         <SelectValue placeholder="Select region" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">— None —</SelectItem>
+                        <SelectItem value="__none__">— None —</SelectItem>
                         {regions.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
                       </SelectContent>
                     </Select>
@@ -253,12 +253,12 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
                 <div className="space-y-1.5">
                   <Label>City</Label>
                   {cities.length > 0 ? (
-                    <Select value={city} onValueChange={setCity}>
+                    <Select value={city || "__none__"} onValueChange={v => setCity(v === "__none__" ? "" : v)}>
                       <SelectTrigger data-testid="field-city">
                         <SelectValue placeholder="Select city" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">— None —</SelectItem>
+                        <SelectItem value="__none__">— None —</SelectItem>
                         {cities.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                       </SelectContent>
                     </Select>

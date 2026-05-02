@@ -22,45 +22,35 @@ import AdminPosterEdit from "@/pages/admin/AdminPosterEdit";
 
 const queryClient = new QueryClient();
 
-function StorefrontRouter() {
-  return (
-    <div className="flex flex-col min-h-screen">
-      <Navbar />
-      <main className="flex-1">
-        <Switch>
-          <Route path="/" component={Home} />
-          <Route path="/shop" component={Shop} />
-          <Route path="/poster/:id" component={PosterDetail} />
-          <Route path="/cart" component={Cart} />
-          <Route path="/checkout" component={Checkout} />
-          <Route path="/order/:id" component={OrderConfirmation} />
-          <Route path="/favorites" component={Favorites} />
-          <Route component={NotFound} />
-        </Switch>
-      </main>
-      <Footer />
-    </div>
-  );
-}
-
-function AdminRouter() {
-  return (
-    <Switch>
-      <Route path="/admin" component={AdminDashboard} />
-      <Route path="/admin/posters/new" component={AdminPosterNew} />
-      <Route path="/admin/posters/:id" component={AdminPosterEdit} />
-      <Route path="/admin/posters" component={AdminPosters} />
-      <Route component={NotFound} />
-    </Switch>
-  );
-}
-
 function Router() {
   return (
     <Switch>
-      <Route path="/admin" component={AdminRouter} />
-      <Route path="/admin/:rest*" component={AdminRouter} />
-      <Route component={StorefrontRouter} />
+      {/* Admin routes — most specific first so /admin/posters/new is never
+          swallowed by /admin/posters/:id or the /admin prefix */}
+      <Route path="/admin/posters/new" component={AdminPosterNew} />
+      <Route path="/admin/posters/:id" component={AdminPosterEdit} />
+      <Route path="/admin/posters" component={AdminPosters} />
+      <Route path="/admin" component={AdminDashboard} />
+
+      {/* Storefront — catch-all with Navbar + Footer layout */}
+      <Route>
+        <div className="flex flex-col min-h-screen">
+          <Navbar />
+          <main className="flex-1">
+            <Switch>
+              <Route path="/" component={Home} />
+              <Route path="/shop" component={Shop} />
+              <Route path="/poster/:id" component={PosterDetail} />
+              <Route path="/cart" component={Cart} />
+              <Route path="/checkout" component={Checkout} />
+              <Route path="/order/:id" component={OrderConfirmation} />
+              <Route path="/favorites" component={Favorites} />
+              <Route component={NotFound} />
+            </Switch>
+          </main>
+          <Footer />
+        </div>
+      </Route>
     </Switch>
   );
 }

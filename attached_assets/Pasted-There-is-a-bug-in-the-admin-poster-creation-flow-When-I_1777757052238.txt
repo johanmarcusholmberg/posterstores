@@ -1,0 +1,56 @@
+There is a bug in the admin poster creation flow.
+
+When I click/create a new poster, the app shows:
+
+404 Page Not Found
+“Did you forget to add the page to the router?”
+
+The expected route is:
+
+/admin/posters/new
+
+Current status:
+- /admin works.
+- /admin/posters works.
+- /admin/posters/:id works.
+- Creating a new poster should open the create form.
+- The route appears to be missing or not correctly registered.
+
+GOAL:
+Fix the route for creating a new poster.
+
+Important:
+- Do not rewrite the admin system.
+- Do not change the protected API logic.
+- Do not change the multi-store architecture.
+- Do not break /admin, /admin/posters or /admin/posters/:id.
+- Only fix the routing and any route-link mismatch needed for the new poster page.
+
+Please inspect:
+1. The router configuration.
+2. The admin poster list “New poster” button/link.
+3. The route/component for AdminPosterNew.
+4. Whether /admin/posters/new is registered.
+5. Whether /admin/posters/:id is catching "new" before the static route.
+6. Whether the app uses file-based routing, TanStack Router, React Router or another routing setup.
+
+Required behavior:
+- Navigating to /admin/posters/new should show the AdminPosterNew create form.
+- The “New poster” button on /admin/posters should navigate to /admin/posters/new.
+- /admin/posters/:id should still work for numeric poster IDs.
+- If the router has a dynamic /admin/posters/:id route, make sure /admin/posters/new is defined before it or handled as a static route depending on the router.
+- If using TanStack Router, make sure the route tree includes the new route.
+- If using file-based routing, make sure the file path matches the route.
+- If using React Router, make sure the Route for “new” exists before “:id” if ordering matters.
+
+Also add a small regression test:
+- Open /admin/posters/new with a valid admin token.
+- Confirm the create poster form is visible.
+- Confirm /admin/posters still works.
+- Confirm /admin/posters/:id still works for an existing poster.
+
+At the end, summarize:
+1. What caused the 404.
+2. Which route file/config was fixed.
+3. Whether /admin/posters/new now loads.
+4. Whether existing admin routes still pass.
