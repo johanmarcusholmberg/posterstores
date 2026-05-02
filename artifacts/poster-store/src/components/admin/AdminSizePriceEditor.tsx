@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -31,6 +31,39 @@ export function buildDefaultSizeRows(currency = "EUR"): SizeRow[] {
   ];
 }
 
+function LabelInput({
+  value,
+  onCommit,
+}: {
+  value: string;
+  onCommit: (label: string) => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    ref.current?.focus();
+  }, []);
+
+  const commit = () => {
+    const trimmed = ref.current?.value.trim() ?? "";
+    onCommit(trimmed);
+  };
+
+  return (
+    <Input
+      ref={ref}
+      defaultValue={value}
+      placeholder="e.g. 60x80"
+      className="h-8 text-sm w-full"
+      onBlur={commit}
+      onKeyDown={e => {
+        if (e.key === "Enter") { e.preventDefault(); commit(); }
+        if (e.key === "Escape") onCommit(value);
+      }}
+    />
+  );
+}
+
 export const AdminSizePriceEditor = ({
   sizes,
   defaultCurrency = "EUR",
@@ -47,18 +80,18 @@ export const AdminSizePriceEditor = ({
     onSizesChange(sizes.filter((_, idx) => idx !== i));
   };
 
-  const addBlank = () => {
-    onSizesChange([
-      ...sizes,
-      { sizeLabel: "", price: null, currency: defaultCurrency, active: true, sortOrder: sizes.length },
-    ]);
-  };
-
   const addQuick = (label: string) => {
     if (sizes.some(s => s.sizeLabel === label)) return;
     onSizesChange([
       ...sizes,
       { sizeLabel: label, price: null, currency: defaultCurrency, active: true, sortOrder: sizes.length },
+    ]);
+  };
+
+  const addCustom = () => {
+    onSizesChange([
+      ...sizes,
+      { sizeLabel: "", price: null, currency: defaultCurrency, active: true, sortOrder: sizes.length },
     ]);
   };
 
@@ -98,7 +131,7 @@ export const AdminSizePriceEditor = ({
         <div className="space-y-2">
           <div className="grid grid-cols-[20px_1fr_110px_80px_50px_30px] gap-2 items-center text-xs text-muted-foreground font-medium px-1">
             <span></span>
-            <span>Label <span className="text-destructive">*</span></span>
+            <span>Size</span>
             <span>Price <span className="text-destructive">*</span></span>
             <span>Currency</span>
             <span>Active</span>
@@ -114,13 +147,25 @@ export const AdminSizePriceEditor = ({
             >
               <GripVertical className="w-4 h-4 text-muted-foreground/50 cursor-grab" />
 
-              <Input
-                value={row.sizeLabel}
-                onChange={e => update(i, { sizeLabel: e.target.value })}
-                placeholder="e.g. A3"
-                className="h-8 text-sm"
-                data-testid={`size-label-${i}`}
-              />
+              {row.sizeLabel === "" ? (
+                <LabelInput
+                  value=""
+                  onCommit={label => {
+                    if (label) {
+                      update(i, { sizeLabel: label });
+                    } else {
+                      remove(i);
+                    }
+                  }}
+                />
+              ) : (
+                <span
+                  className="inline-flex items-center px-2.5 py-1 rounded-md bg-muted text-sm font-medium text-foreground select-none w-fit"
+                  data-testid={`size-label-${i}`}
+                >
+                  {row.sizeLabel}
+                </span>
+              )}
 
               <Input
                 type="number"
@@ -174,7 +219,7 @@ export const AdminSizePriceEditor = ({
         variant="outline"
         size="sm"
         className="gap-1 text-xs h-8"
-        onClick={addBlank}
+        onClick={addCustom}
         data-testid="add-custom-size-btn"
       >
         <Plus className="w-3.5 h-3.5" />
