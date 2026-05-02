@@ -17,6 +17,7 @@ const SEED_TEMPLATES = [
     frameType: "black",
     supportedOrientation: "portrait",
     description: "Clean white wall background with a sleek black frame",
+    previewThumbnailUrl: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80",
     sortOrder: 1,
   },
   {
@@ -25,6 +26,7 @@ const SEED_TEMPLATES = [
     frameType: "oak",
     supportedOrientation: "portrait",
     description: "Warm beige wall paired with a natural oak wooden frame",
+    previewThumbnailUrl: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=600&q=80",
     sortOrder: 2,
   },
   {
@@ -33,6 +35,7 @@ const SEED_TEMPLATES = [
     frameType: "black",
     supportedOrientation: "portrait",
     description: "Rich terracotta textured wall with a bold black frame",
+    previewThumbnailUrl: "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=600&q=80",
     sortOrder: 3,
   },
   {
@@ -41,6 +44,7 @@ const SEED_TEMPLATES = [
     frameType: "none",
     supportedOrientation: "any",
     description: "Sun-drenched Mediterranean style living room setting",
+    previewThumbnailUrl: "https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?w=600&q=80",
     sortOrder: 4,
   },
   {
@@ -49,6 +53,7 @@ const SEED_TEMPLATES = [
     frameType: "none",
     supportedOrientation: "portrait",
     description: "Flat lay on a café wooden table with coffee accessories",
+    previewThumbnailUrl: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=600&q=80",
     sortOrder: 5,
   },
   {
@@ -57,6 +62,7 @@ const SEED_TEMPLATES = [
     frameType: "black",
     supportedOrientation: "portrait",
     description: "Modern kitchen wall display between cabinets",
+    previewThumbnailUrl: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=600&q=80",
     sortOrder: 6,
   },
   {
@@ -65,6 +71,7 @@ const SEED_TEMPLATES = [
     frameType: "mixed",
     supportedOrientation: "any",
     description: "Multi-frame gallery wall arrangement",
+    previewThumbnailUrl: "https://images.unsplash.com/photo-1513519245088-0e12902e5a38?w=600&q=80",
     sortOrder: 7,
   },
   {
@@ -73,6 +80,7 @@ const SEED_TEMPLATES = [
     frameType: "white",
     supportedOrientation: "portrait",
     description: "Minimalist Scandinavian bedroom above the headboard",
+    previewThumbnailUrl: "https://images.unsplash.com/photo-1616594039964-ae9021a400a0?w=600&q=80",
     sortOrder: 8,
   },
   {
@@ -81,6 +89,7 @@ const SEED_TEMPLATES = [
     frameType: "black",
     supportedOrientation: "portrait",
     description: "Macro close-up showing frame quality and print texture",
+    previewThumbnailUrl: "https://images.unsplash.com/photo-1582738411706-bfc8e691d1c2?w=600&q=80",
     sortOrder: 9,
   },
   {
@@ -89,6 +98,7 @@ const SEED_TEMPLATES = [
     frameType: "none",
     supportedOrientation: "portrait",
     description: "Wall display with a person for scale reference",
+    previewThumbnailUrl: "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=600&q=80",
     sortOrder: 10,
   },
 ];
@@ -107,6 +117,7 @@ export async function seedMockupTemplates() {
 }
 
 router.get("/mockup-templates", async (req, res) => {
+  res.set("Cache-Control", "no-store");
   const storeKey =
     typeof req.query.storeKey === "string" ? req.query.storeKey : null;
 
@@ -183,6 +194,7 @@ router.delete("/mockup-templates/:id", requireAdmin, async (req, res) => {
 });
 
 router.get("/posters/:id/mockups", async (req, res) => {
+  res.set("Cache-Control", "no-store");
   const posterId = Number(req.params.id);
   if (isNaN(posterId)) return res.status(400).json({ error: "Invalid id" });
 
