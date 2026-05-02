@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -31,38 +31,6 @@ export function buildDefaultSizeRows(currency = "EUR"): SizeRow[] {
   ];
 }
 
-function LabelInput({
-  value,
-  onCommit,
-}: {
-  value: string;
-  onCommit: (label: string) => void;
-}) {
-  const ref = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    ref.current?.focus();
-  }, []);
-
-  const commit = () => {
-    const trimmed = ref.current?.value.trim() ?? "";
-    onCommit(trimmed);
-  };
-
-  return (
-    <Input
-      ref={ref}
-      defaultValue={value}
-      placeholder="e.g. 60x80"
-      className="h-8 text-sm w-full"
-      onBlur={commit}
-      onKeyDown={e => {
-        if (e.key === "Enter") { e.preventDefault(); commit(); }
-        if (e.key === "Escape") onCommit(value);
-      }}
-    />
-  );
-}
 
 export const AdminSizePriceEditor = ({
   sizes,
@@ -88,12 +56,6 @@ export const AdminSizePriceEditor = ({
     ]);
   };
 
-  const addCustom = () => {
-    onSizesChange([
-      ...sizes,
-      { sizeLabel: "", price: null, currency: defaultCurrency, active: true, sortOrder: sizes.length },
-    ]);
-  };
 
   return (
     <div className="space-y-4">
@@ -147,25 +109,12 @@ export const AdminSizePriceEditor = ({
             >
               <GripVertical className="w-4 h-4 text-muted-foreground/50 cursor-grab" />
 
-              {row.sizeLabel === "" ? (
-                <LabelInput
-                  value=""
-                  onCommit={label => {
-                    if (label) {
-                      update(i, { sizeLabel: label });
-                    } else {
-                      remove(i);
-                    }
-                  }}
-                />
-              ) : (
-                <span
-                  className="inline-flex items-center px-2.5 py-1 rounded-md bg-muted text-sm font-medium text-foreground select-none w-fit"
-                  data-testid={`size-label-${i}`}
-                >
-                  {row.sizeLabel}
-                </span>
-              )}
+              <span
+                className="inline-flex items-center px-2.5 py-1 rounded-md bg-muted text-sm font-medium text-foreground select-none w-fit"
+                data-testid={`size-label-${i}`}
+              >
+                {row.sizeLabel}
+              </span>
 
               <Input
                 type="number"
@@ -211,20 +160,8 @@ export const AdminSizePriceEditor = ({
       )}
 
       {sizes.length === 0 && (
-        <p className="text-xs text-muted-foreground italic">No sizes yet. Use quick-add buttons or add a custom size.</p>
+        <p className="text-xs text-muted-foreground italic">No sizes yet. Use the quick-add buttons above.</p>
       )}
-
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="gap-1 text-xs h-8"
-        onClick={addCustom}
-        data-testid="add-custom-size-btn"
-      >
-        <Plus className="w-3.5 h-3.5" />
-        Add custom size
-      </Button>
     </div>
   );
 };
