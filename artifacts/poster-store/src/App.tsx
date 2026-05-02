@@ -19,6 +19,8 @@ import AdminDashboard from "@/pages/admin/AdminDashboard";
 import AdminPosters from "@/pages/admin/AdminPosters";
 import AdminPosterNew from "@/pages/admin/AdminPosterNew";
 import AdminPosterEdit from "@/pages/admin/AdminPosterEdit";
+import AdminMockups from "@/pages/admin/AdminMockups";
+import AdminPosterMockups from "@/pages/admin/AdminPosterMockups";
 
 const queryClient = new QueryClient();
 
@@ -28,8 +30,10 @@ function Router() {
       {/* Admin routes — most specific first so /admin/posters/new is never
           swallowed by /admin/posters/:id or the /admin prefix */}
       <Route path="/admin/posters/new" component={AdminPosterNew} />
+      <Route path="/admin/posters/:id/mockups" component={AdminPosterMockups} />
       <Route path="/admin/posters/:id" component={AdminPosterEdit} />
       <Route path="/admin/posters" component={AdminPosters} />
+      <Route path="/admin/mockups" component={AdminMockups} />
       <Route path="/admin" component={AdminDashboard} />
 
       {/* Storefront — catch-all with Navbar + Footer layout */}

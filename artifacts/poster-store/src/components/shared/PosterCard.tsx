@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { Poster } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { useStorefront } from "@/context/StorefrontContext";
 import { useAddFavorite, useRemoveFavorite, useGetFavorites, getGetFavoritesQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { getPosterMockups, resolvePosterDisplayImage, type PosterMockup } from "@/lib/mockupApi";
 
 interface PosterCardProps {
   poster: Poster;
@@ -18,6 +19,19 @@ export const PosterCard = ({ poster }: PosterCardProps) => {
   const store = useStorefront();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [displayImage, setDisplayImage] = useState<string>(poster.imageUrl);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPosterMockups(poster.id, store.storeKey)
+      .then((mockups: PosterMockup[]) => {
+        if (!cancelled) {
+          setDisplayImage(resolvePosterDisplayImage(mockups, poster.imageUrl));
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [poster.id, poster.imageUrl, store.storeKey]);
 
   const favoritesParams = { sessionId, storeKey: store.storeKey };
 
@@ -61,10 +75,13 @@ export const PosterCard = ({ poster }: PosterCardProps) => {
     <Link href={`/poster/${poster.id}`} className="group block" data-testid={`link-poster-${poster.id}`}>
       <div className="relative aspect-[3/4] overflow-hidden bg-muted rounded-md mb-4 shadow-sm group-hover:shadow-md transition-shadow">
         <img
-          src={poster.imageUrl}
+          src={displayImage}
           alt={poster.title}
           className="object-cover w-full h-full transition-transform duration-500 group-hover:scale-105"
           data-testid={`img-poster-${poster.id}`}
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = poster.imageUrl;
+          }}
         />
         {poster.isNew && (
           <div className="absolute top-2 left-2 bg-secondary text-secondary-foreground text-xs font-bold px-2 py-1 rounded">

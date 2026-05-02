@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { useParams } from "wouter";
+import { useParams, Link } from "wouter";
 import { AdminDashboardLayout } from "@/components/admin/AdminDashboardLayout";
 import { AdminPosterForm } from "@/components/admin/AdminPosterForm";
 import { useAdminToken } from "@/context/AdminTokenContext";
 import { adminGetPoster, type AdminPoster } from "@/lib/adminApi";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Link } from "wouter";
+import { LayoutTemplate } from "lucide-react";
 
 export default function AdminPosterEdit() {
   const params = useParams<{ id: string }>();
@@ -74,7 +74,22 @@ export default function AdminPosterEdit() {
         { label: poster.title },
       ]}
     >
-      <AdminPosterForm existing={poster} />
+      <div className="space-y-4">
+        <div className="flex justify-end">
+          <Link href={`/admin/posters/${poster.id}/mockups`}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              data-testid="manage-mockups-btn"
+            >
+              <LayoutTemplate className="w-4 h-4" />
+              Manage mockups
+            </Button>
+          </Link>
+        </div>
+        <AdminPosterForm existing={poster} />
+      </div>
     </AdminDashboardLayout>
   );
 }

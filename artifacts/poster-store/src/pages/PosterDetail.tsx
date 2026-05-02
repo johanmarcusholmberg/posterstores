@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useGetPoster, getGetPosterQueryKey, useListPosters, getListPostersQueryKey, useAddCartItem, getGetCartQueryKey } from "@workspace/api-client-react";
 import { useStorefront } from "@/context/StorefrontContext";
@@ -7,9 +7,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { PosterCard } from "@/components/shared/PosterCard";
+import { MockupGallery } from "@/components/public/MockupGallery";
 import { ShoppingBag, ArrowLeft } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { getPosterMockups, type PosterMockup } from "@/lib/mockupApi";
 
 export default function PosterDetail() {
   const { id } = useParams();
@@ -20,6 +22,7 @@ export default function PosterDetail() {
   const { toast } = useToast();
 
   const [selectedSize, setSelectedSize] = useState<string>("");
+  const [mockups, setMockups] = useState<PosterMockup[] | null>(null);
 
   const { data: poster, isLoading } = useGetPoster(
     posterId,
@@ -31,6 +34,13 @@ export default function PosterDetail() {
       },
     }
   );
+
+  useEffect(() => {
+    if (!posterId || isNaN(posterId)) return;
+    getPosterMockups(posterId, store.storeKey)
+      .then(setMockups)
+      .catch(() => setMockups([]));
+  }, [posterId, store.storeKey]);
 
   const { data: relatedPosters } = useListPosters(
     { storeKey: store.storeKey, region: poster?.region, limit: 4 },
@@ -100,6 +110,8 @@ export default function PosterDetail() {
     );
   }
 
+  const hasMockups = mockups && mockups.length > 0;
+
   return (
     <div className="container mx-auto px-4 py-12">
       <Link href="/shop" className="inline-flex items-center text-muted-foreground hover:text-foreground mb-8">
@@ -107,13 +119,23 @@ export default function PosterDetail() {
       </Link>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-24 mb-24">
-        <div className="relative aspect-[3/4] bg-muted rounded-lg overflow-hidden shadow-lg">
-          <img
-            src={poster.imageUrl}
-            alt={poster.title}
-            className="w-full h-full object-cover"
-            data-testid={`img-detail-${poster.id}`}
-          />
+        <div>
+          {hasMockups ? (
+            <MockupGallery
+              mockups={mockups}
+              fallbackImageUrl={poster.imageUrl}
+              alt={poster.title}
+            />
+          ) : (
+            <div className="relative aspect-[3/4] bg-muted rounded-lg overflow-hidden shadow-lg">
+              <img
+                src={poster.imageUrl}
+                alt={poster.title}
+                className="w-full h-full object-cover"
+                data-testid={`img-detail-${poster.id}`}
+              />
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col">
