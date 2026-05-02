@@ -12,12 +12,15 @@ import {
 
 const router = Router();
 
-async function getCartForSession(sessionId: string) {
+async function getCartForSession(sessionId: string, storeKey: string) {
   const items = await db
     .select()
     .from(cartItemsTable)
     .leftJoin(postersTable, eq(cartItemsTable.posterId, postersTable.id))
-    .where(eq(cartItemsTable.sessionId, sessionId));
+    .where(and(
+      eq(cartItemsTable.sessionId, sessionId),
+      eq(cartItemsTable.storeKey, storeKey),
+    ));
 
   const cartItems = items.map(row => ({
     id: row.cart_items.id,
@@ -37,6 +40,7 @@ async function getCartForSession(sessionId: string) {
 
   return {
     sessionId,
+    storeKey,
     items: cartItems,
     total: Math.round(total * 100) / 100,
     itemCount: cartItems.reduce((sum, item) => sum + item.quantity, 0),
@@ -47,7 +51,7 @@ router.get("/cart", async (req, res) => {
   const query = GetCartQueryParams.safeParse(req.query);
   if (!query.success) return res.status(400).json({ error: query.error.flatten() });
 
-  const cart = await getCartForSession(query.data.sessionId);
+  const cart = await getCartForSession(query.data.sessionId, query.data.storeKey);
   return res.json(cart);
 });
 
@@ -55,13 +59,14 @@ router.post("/cart/items", async (req, res) => {
   const body = AddCartItemBody.safeParse(req.body);
   if (!body.success) return res.status(400).json({ error: body.error.flatten() });
 
-  const { sessionId, posterId, quantity, size } = body.data;
+  const { sessionId, storeKey, posterId, quantity, size } = body.data;
 
   const existing = await db
     .select()
     .from(cartItemsTable)
     .where(and(
       eq(cartItemsTable.sessionId, sessionId),
+      eq(cartItemsTable.storeKey, storeKey),
       eq(cartItemsTable.posterId, posterId),
     ));
 
@@ -71,10 +76,10 @@ router.post("/cart/items", async (req, res) => {
       .set({ quantity: existing[0].quantity + quantity })
       .where(eq(cartItemsTable.id, existing[0].id));
   } else {
-    await db.insert(cartItemsTable).values({ sessionId, posterId, quantity, size: size ?? null });
+    await db.insert(cartItemsTable).values({ sessionId, storeKey, posterId, quantity, size: size ?? null });
   }
 
-  const cart = await getCartForSession(sessionId);
+  const cart = await getCartForSession(sessionId, storeKey);
   return res.json(cart);
 });
 
@@ -93,7 +98,7 @@ router.put("/cart/items/:cartItemId", async (req, res) => {
 
   if (!item) return res.status(404).json({ error: "Not found" });
 
-  const cart = await getCartForSession(item.sessionId);
+  const cart = await getCartForSession(item.sessionId, item.storeKey);
   return res.json(cart);
 });
 
@@ -106,7 +111,7 @@ router.delete("/cart/items/:cartItemId", async (req, res) => {
 
   await db.delete(cartItemsTable).where(eq(cartItemsTable.id, params.data.cartItemId));
 
-  const cart = await getCartForSession(item.sessionId);
+  const cart = await getCartForSession(item.sessionId, item.storeKey);
   return res.json(cart);
 });
 

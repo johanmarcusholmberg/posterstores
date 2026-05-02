@@ -18,7 +18,7 @@ export const HealthCheckResponse = zod.object({
  * @summary List all posters with optional filters
  */
 export const ListPostersQueryParams = zod.object({
-  storeKey: zod.coerce.string().optional(),
+  storeKey: zod.coerce.string(),
   region: zod.coerce.string().optional(),
   city: zod.coerce.string().optional(),
   category: zod.coerce.string().optional(),
@@ -57,7 +57,7 @@ export const ListPostersResponse = zod.object({
 });
 
 /**
- * @summary Create a new poster
+ * @summary Create a new poster (admin only)
  */
 export const CreatePosterBody = zod.object({
   storeKey: zod.string(),
@@ -76,10 +76,14 @@ export const CreatePosterBody = zod.object({
 });
 
 /**
- * @summary Get a single poster by ID
+ * @summary Get a single poster by ID, scoped to a store
  */
 export const GetPosterParams = zod.object({
   id: zod.coerce.number(),
+});
+
+export const GetPosterQueryParams = zod.object({
+  storeKey: zod.coerce.string(),
 });
 
 export const GetPosterResponse = zod.object({
@@ -101,10 +105,14 @@ export const GetPosterResponse = zod.object({
 });
 
 /**
- * @summary Update a poster
+ * @summary Update a poster (admin only)
  */
 export const UpdatePosterParams = zod.object({
   id: zod.coerce.number(),
+});
+
+export const UpdatePosterQueryParams = zod.object({
+  storeKey: zod.coerce.string().optional(),
 });
 
 export const UpdatePosterBody = zod.object({
@@ -139,21 +147,27 @@ export const UpdatePosterResponse = zod.object({
 });
 
 /**
- * @summary Delete a poster
+ * @summary Delete a poster (admin only)
  */
 export const DeletePosterParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const DeletePosterQueryParams = zod.object({
+  storeKey: zod.coerce.string().optional(),
+});
+
 /**
- * @summary Get current cart
+ * @summary Get current cart for a session and store
  */
 export const GetCartQueryParams = zod.object({
   sessionId: zod.coerce.string(),
+  storeKey: zod.coerce.string(),
 });
 
 export const GetCartResponse = zod.object({
   sessionId: zod.string(),
+  storeKey: zod.string(),
   items: zod.array(
     zod.object({
       id: zod.number(),
@@ -190,6 +204,7 @@ export const GetCartResponse = zod.object({
  */
 export const AddCartItemBody = zod.object({
   sessionId: zod.string(),
+  storeKey: zod.string(),
   posterId: zod.number(),
   quantity: zod.number(),
   size: zod.string().optional(),
@@ -197,6 +212,7 @@ export const AddCartItemBody = zod.object({
 
 export const AddCartItemResponse = zod.object({
   sessionId: zod.string(),
+  storeKey: zod.string(),
   items: zod.array(
     zod.object({
       id: zod.number(),
@@ -241,6 +257,7 @@ export const UpdateCartItemBody = zod.object({
 
 export const UpdateCartItemResponse = zod.object({
   sessionId: zod.string(),
+  storeKey: zod.string(),
   items: zod.array(
     zod.object({
       id: zod.number(),
@@ -281,6 +298,7 @@ export const RemoveCartItemParams = zod.object({
 
 export const RemoveCartItemResponse = zod.object({
   sessionId: zod.string(),
+  storeKey: zod.string(),
   items: zod.array(
     zod.object({
       id: zod.number(),
@@ -313,10 +331,11 @@ export const RemoveCartItemResponse = zod.object({
 });
 
 /**
- * @summary Get favorites for a session
+ * @summary Get favorites for a session, scoped to a store
  */
 export const GetFavoritesQueryParams = zod.object({
   sessionId: zod.coerce.string(),
+  storeKey: zod.coerce.string(),
 });
 
 export const GetFavoritesResponseItem = zod.object({
@@ -343,6 +362,7 @@ export const GetFavoritesResponse = zod.array(GetFavoritesResponseItem);
  */
 export const AddFavoriteBody = zod.object({
   sessionId: zod.string(),
+  storeKey: zod.string(),
   posterId: zod.number(),
 });
 
@@ -371,6 +391,7 @@ export const AddFavoriteResponse = zod.array(AddFavoriteResponseItem);
 export const RemoveFavoriteQueryParams = zod.object({
   sessionId: zod.coerce.string(),
   posterId: zod.coerce.number(),
+  storeKey: zod.coerce.string(),
 });
 
 export const RemoveFavoriteResponseItem = zod.object({
@@ -477,7 +498,7 @@ export const GetStoreStatsResponse = zod.object({
  * @summary Get featured/popular posters for homepage
  */
 export const GetFeaturedPostersQueryParams = zod.object({
-  storeKey: zod.coerce.string().optional(),
+  storeKey: zod.coerce.string(),
   limit: zod.coerce.number().optional(),
 });
 
@@ -506,7 +527,7 @@ export const GetFeaturedPostersResponse = zod.array(
  * @summary Get newest poster arrivals
  */
 export const GetNewArrivalsQueryParams = zod.object({
-  storeKey: zod.coerce.string().optional(),
+  storeKey: zod.coerce.string(),
   limit: zod.coerce.number().optional(),
 });
 

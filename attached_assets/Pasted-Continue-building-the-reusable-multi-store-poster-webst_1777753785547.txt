@@ -1,0 +1,170 @@
+Continue building the reusable multi-store poster webstore.
+
+CURRENT STATUS:
+The app works with:
+- Homepage
+- Shop
+- Poster detail
+- Cart
+- Favorites
+- PostsofSpain active storefront config
+- Real poster data
+
+A multi-store audit was completed. The app is partially multi-store-ready, but there are some store leakage risks.
+
+GOAL OF THIS STEP:
+Fix multi-store leakage and secure existing poster write endpoints.
+
+Important:
+- Do not build the admin UI yet.
+- Do not add slugs yet.
+- Do not replace the current working frontend.
+- Do not change API response shapes unless absolutely necessary.
+- Preserve endpoints that currently return plain arrays.
+- Keep all currently passing e2e tests working.
+- Add tests for the fixes below.
+
+Current default active store:
+postsofspain
+
+FIX 1 — Require/enforce storeKey on public poster list endpoint
+
+Current issue:
+GET /api/posters accepts storeKey but does not require it. If omitted, it returns posters from all stores.
+
+Required behavior:
+- Public poster list queries must always be scoped to one store.
+- GET /api/posters should require storeKey query param.
+- If storeKey is missing, either:
+  Option A: return 400 with clear error, or
+  Option B: default safely to ACTIVE_STORE_KEY/postsofspain server-side.
+- Prefer Option A if frontend already always sends storeKey.
+- Make sure frontend always passes activeStore.storeKey.
+
+Important:
+Do not break existing shop behavior.
+
+FIX 2 — Scope poster detail endpoint by storeKey
+
+Current issue:
+GET /api/posters/:id looks up by numeric ID only and ignores storeKey.
+
+Required behavior:
+- GET /api/posters/:id should require storeKey query param.
+- Query must use both:
+  - postersTable.id = id
+  - postersTable.storeKey = storeKey
+- If poster does not belong to the requested store, return 404.
+- Update frontend poster detail calls to pass activeStore.storeKey.
+
+Do not add slug routing in this step.
+
+FIX 3 — Fix featured and new arrivals store filtering
+
+Current issue:
+Featured and new arrivals endpoints parse storeKey but do not use it in DB WHERE clause.
+
+Required behavior:
+- Featured endpoint must filter:
+  isFeatured = true AND storeKey = requested storeKey
+- New arrivals endpoint must filter:
+  isNew = true AND storeKey = requested storeKey
+- Store stats counts must also be store-scoped:
+  featuredCount only for requested store
+  newArrivalsCount only for requested store
+- Require storeKey or safely default server-side, consistent with FIX 1.
+- Do not change return shape.
+
+FIX 4 — Scope favorites by active store
+
+Current issue:
+GET /api/favorites returns all favorited posters for a session regardless of poster store.
+
+Required behavior:
+- GET /api/favorites should require storeKey query param.
+- Favorites query should join posters and filter:
+  favorites.sessionId = sessionId
+  AND posters.storeKey = storeKey
+- Favorite status checks should also be store-aware where relevant.
+- Add/remove favorite should either:
+  - validate that the poster belongs to the requested storeKey, or
+  - receive storeKey and reject if poster does not belong to that store.
+- Update frontend favorite calls to pass activeStore.storeKey.
+- Favorites page must only show favorites from the active store.
+
+FIX 5 — Make cart store-aware
+
+Current issue:
+cart_items has no storeKey and cart reads all items for a session.
+
+Required behavior:
+- Add storeKey to cartItemsTable if safe.
+- New cart items must store activeStore.storeKey.
+- Cart reads must filter by sessionId AND storeKey.
+- Cart should not mix items from different stores.
+- Add-to-cart should pass activeStore.storeKey.
+- Existing cart behavior should continue to work for PostsofSpain.
+- If migration requires a default, use postsofspain for existing rows.
+
+FIX 6 — Protect poster write endpoints
+
+Current issue:
+POST /api/posters, PUT /api/posters/:id and DELETE /api/posters/:id are unprotected.
+
+Required behavior:
+- Add a basic admin protection layer to mutating poster endpoints.
+- Do not build admin UI yet.
+- Create a clear helper/middleware such as requireAdmin.
+- Use the project’s existing auth/session system if available.
+- If no real auth exists yet, implement a temporary development-safe admin guard using an environment variable, for example ADMIN_API_TOKEN.
+- Mutating endpoints should require the admin token/header.
+- Public GET endpoints must remain public.
+- Document the required header/env variable.
+- Do not expose the admin token in frontend public code.
+
+Required protected endpoints:
+- POST /api/posters
+- PUT /api/posters/:id
+- DELETE /api/posters/:id
+
+Also make PUT/DELETE store-safe:
+- PUT /api/posters/:id should not allow editing a poster in another store unless the request includes matching storeKey.
+- DELETE /api/posters/:id should not allow deleting a poster in another store unless the request includes matching storeKey.
+
+FIX 7 — Tests
+
+Add or update tests verifying:
+
+Store scoping:
+- GET /api/posters without storeKey is rejected or safely defaults according to chosen strategy.
+- GET /api/posters?storeKey=postsofspain only returns PostsofSpain posters.
+- Featured endpoint only returns posters for requested store.
+- New arrivals endpoint only returns posters for requested store.
+- Store stats counts are store-scoped.
+- GET /api/posters/:id?storeKey=wrongstore returns 404.
+- Favorites page/API only returns favorites for active store.
+- Cart only returns items for active store.
+
+Security:
+- POST /api/posters without admin authorization is rejected.
+- PUT /api/posters/:id without admin authorization is rejected.
+- DELETE /api/posters/:id without admin authorization is rejected.
+- Authorized admin request still works.
+
+Regression:
+- Homepage still loads.
+- Shop still loads all PostsofSpain posters.
+- Poster detail still works.
+- Add to cart still works.
+- Favorites still work.
+- Existing e2e tests still pass.
+
+At the end, summarize:
+1. Which leakage issues were fixed.
+2. Which endpoints now require storeKey.
+3. How cart is now store-aware.
+4. How favorites are now store-aware.
+5. How poster write endpoints are protected.
+6. Which tests were added/updated.
+7. Any environment variables needed.
+8. What I should manually test before continuing.

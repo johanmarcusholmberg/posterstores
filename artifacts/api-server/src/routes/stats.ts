@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { postersTable, ordersTable } from "@workspace/db";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import {
   GetStoreStatsQueryParams,
   GetFeaturedPostersQueryParams,
@@ -43,11 +43,11 @@ router.get("/stats/store", async (req, res) => {
     db
       .select({ count: sql<number>`count(*)` })
       .from(postersTable)
-      .where(eq(postersTable.isFeatured, true)),
+      .where(and(eq(postersTable.isFeatured, true), eq(postersTable.storeKey, storeKey))),
     db
       .select({ count: sql<number>`count(*)` })
       .from(postersTable)
-      .where(eq(postersTable.isNew, true)),
+      .where(and(eq(postersTable.isNew, true), eq(postersTable.storeKey, storeKey))),
   ]);
 
   return res.json({
@@ -69,7 +69,7 @@ router.get("/stats/featured", async (req, res) => {
   const posters = await db
     .select()
     .from(postersTable)
-    .where(eq(postersTable.isFeatured, true))
+    .where(and(eq(postersTable.isFeatured, true), eq(postersTable.storeKey, storeKey)))
     .orderBy(desc(postersTable.createdAt))
     .limit(limit);
 
@@ -86,7 +86,7 @@ router.get("/stats/new-arrivals", async (req, res) => {
   const posters = await db
     .select()
     .from(postersTable)
-    .where(eq(postersTable.isNew, true))
+    .where(and(eq(postersTable.isNew, true), eq(postersTable.storeKey, storeKey)))
     .orderBy(desc(postersTable.createdAt))
     .limit(limit);
 

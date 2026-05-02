@@ -10,6 +10,7 @@ import {
   UpdatePosterParams,
   DeletePosterParams,
 } from "@workspace/api-zod";
+import { requireAdmin } from "../middleware/requireAdmin";
 
 const router = Router();
 
@@ -20,8 +21,12 @@ router.get("/posters", async (req, res) => {
   }
   const { storeKey, region, city, category, tag, search, minPrice, maxPrice, sort, limit = 24, offset = 0 } = query.data;
 
+  if (!storeKey) {
+    return res.status(400).json({ error: "storeKey query parameter is required" });
+  }
+
   let conditions: ReturnType<typeof eq>[] = [];
-  if (storeKey) conditions.push(eq(postersTable.storeKey, storeKey));
+  conditions.push(eq(postersTable.storeKey, storeKey));
   if (region) conditions.push(eq(postersTable.region, region));
   if (city) conditions.push(eq(postersTable.city, city));
   if (category) conditions.push(eq(postersTable.category, category));
@@ -37,7 +42,7 @@ router.get("/posters", async (req, res) => {
     default: orderBy = desc(postersTable.createdAt);
   }
 
-  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+  const whereClause = and(...conditions);
 
   const [posters, countResult] = await Promise.all([
     db.select().from(postersTable).where(whereClause).orderBy(orderBy).limit(limit).offset(offset),
@@ -57,7 +62,7 @@ router.get("/posters", async (req, res) => {
   });
 });
 
-router.post("/posters", async (req, res) => {
+router.post("/posters", requireAdmin, async (req, res) => {
   const body = CreatePosterBody.safeParse(req.body);
   if (!body.success) return res.status(400).json({ error: body.error.flatten() });
 
@@ -72,30 +77,53 @@ router.get("/posters/:id", async (req, res) => {
   const params = GetPosterParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) return res.status(400).json({ error: "Invalid id" });
 
-  const [poster] = await db.select().from(postersTable).where(eq(postersTable.id, params.data.id));
+  const storeKey = typeof req.query.storeKey === "string" ? req.query.storeKey : undefined;
+  if (!storeKey) return res.status(400).json({ error: "storeKey query parameter is required" });
+
+  const [poster] = await db
+    .select()
+    .from(postersTable)
+    .where(and(eq(postersTable.id, params.data.id), eq(postersTable.storeKey, storeKey)));
+
   if (!poster) return res.status(404).json({ error: "Not found" });
   return res.json(serializePoster(poster));
 });
 
-router.put("/posters/:id", async (req, res) => {
+router.put("/posters/:id", requireAdmin, async (req, res) => {
   const params = UpdatePosterParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) return res.status(400).json({ error: "Invalid id" });
 
   const body = UpdatePosterBody.safeParse(req.body);
   if (!body.success) return res.status(400).json({ error: body.error.flatten() });
 
+  const [existing] = await db.select().from(postersTable).where(eq(postersTable.id, params.data.id));
+  if (!existing) return res.status(404).json({ error: "Not found" });
+
+  const requestedStoreKey = typeof req.query.storeKey === "string" ? req.query.storeKey : undefined;
+  if (requestedStoreKey && requestedStoreKey !== existing.storeKey) {
+    return res.status(403).json({ error: "storeKey mismatch: cannot edit poster from another store" });
+  }
+
   const [poster] = await db
     .update(postersTable)
     .set(body.data as Partial<typeof postersTable.$inferInsert>)
     .where(eq(postersTable.id, params.data.id))
     .returning();
-  if (!poster) return res.status(404).json({ error: "Not found" });
+
   return res.json(serializePoster(poster));
 });
 
-router.delete("/posters/:id", async (req, res) => {
+router.delete("/posters/:id", requireAdmin, async (req, res) => {
   const params = DeletePosterParams.safeParse({ id: Number(req.params.id) });
   if (!params.success) return res.status(400).json({ error: "Invalid id" });
+
+  const [existing] = await db.select().from(postersTable).where(eq(postersTable.id, params.data.id));
+  if (!existing) return res.status(404).json({ error: "Not found" });
+
+  const requestedStoreKey = typeof req.query.storeKey === "string" ? req.query.storeKey : undefined;
+  if (requestedStoreKey && requestedStoreKey !== existing.storeKey) {
+    return res.status(403).json({ error: "storeKey mismatch: cannot delete poster from another store" });
+  }
 
   await db.delete(postersTable).where(eq(postersTable.id, params.data.id));
   return res.status(204).send();

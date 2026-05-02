@@ -2,18 +2,21 @@ import React from "react";
 import { Link } from "wouter";
 import { useStorefront } from "@/context/StorefrontContext";
 import { ShoppingBag, Heart, Menu } from "lucide-react";
-import { useGetCart } from "@workspace/api-client-react";
+import { useGetCart, getGetCartQueryKey } from "@workspace/api-client-react";
 import { getSessionId } from "@/lib/session";
 import { Button } from "@/components/ui/button";
 
 export const Navbar = () => {
   const store = useStorefront();
   const sessionId = getSessionId();
-  const { data: cart } = useGetCart({ sessionId }, {
+
+  const cartParams = { sessionId, storeKey: store.storeKey };
+
+  const { data: cart } = useGetCart(cartParams, {
     query: {
       enabled: !!sessionId,
-      queryKey: ["/api/cart", { sessionId }]
-    }
+      queryKey: getGetCartQueryKey(cartParams),
+    },
   });
 
   const itemCount = cart?.itemCount || 0;

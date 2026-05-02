@@ -1,6 +1,7 @@
 import React from "react";
 import { useGetCart, getGetCartQueryKey, useUpdateCartItem, useRemoveCartItem } from "@workspace/api-client-react";
 import { getSessionId } from "@/lib/session";
+import { useStorefront } from "@/context/StorefrontContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -8,14 +9,17 @@ import { Trash2, Plus, Minus, ShoppingBag, ArrowRight } from "lucide-react";
 
 export default function Cart() {
   const sessionId = getSessionId();
+  const store = useStorefront();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
 
-  const { data: cart, isLoading } = useGetCart({ sessionId }, {
+  const cartParams = { sessionId, storeKey: store.storeKey };
+
+  const { data: cart, isLoading } = useGetCart(cartParams, {
     query: {
       enabled: !!sessionId,
-      queryKey: getGetCartQueryKey({ sessionId })
-    }
+      queryKey: getGetCartQueryKey(cartParams),
+    },
   });
 
   const updateCartItem = useUpdateCartItem();
@@ -27,8 +31,8 @@ export default function Cart() {
       { cartItemId, data: { quantity: newQuantity } },
       {
         onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getGetCartQueryKey({ sessionId }) });
-        }
+          queryClient.invalidateQueries({ queryKey: getGetCartQueryKey(cartParams) });
+        },
       }
     );
   };
@@ -38,8 +42,8 @@ export default function Cart() {
       { cartItemId },
       {
         onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getGetCartQueryKey({ sessionId }) });
-        }
+          queryClient.invalidateQueries({ queryKey: getGetCartQueryKey(cartParams) });
+        },
       }
     );
   };
@@ -76,14 +80,14 @@ export default function Cart() {
               <div key={item.id} className="flex gap-6 py-6 border-b border-border">
                 <Link href={`/poster/${item.posterId}`} className="shrink-0">
                   <div className="w-24 md:w-32 aspect-[3/4] bg-muted rounded overflow-hidden">
-                    <img 
-                      src={item.poster?.imageUrl} 
-                      alt={item.poster?.title} 
+                    <img
+                      src={item.poster?.imageUrl}
+                      alt={item.poster?.title}
                       className="w-full h-full object-cover"
                     />
                   </div>
                 </Link>
-                
+
                 <div className="flex-1 flex flex-col">
                   <div className="flex justify-between items-start mb-2">
                     <div>
@@ -97,12 +101,12 @@ export default function Cart() {
                     </div>
                     <p className="font-medium">{item.poster?.price} {item.poster?.currency}</p>
                   </div>
-                  
+
                   <div className="flex items-center justify-between mt-auto">
                     <div className="flex items-center border border-border rounded-md">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="h-8 w-8 rounded-none rounded-l-md"
                         onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
                         disabled={item.quantity <= 1 || updateCartItem.isPending}
@@ -110,9 +114,9 @@ export default function Cart() {
                         <Minus className="h-3 w-3" />
                       </Button>
                       <span className="w-10 text-center text-sm font-medium">{item.quantity}</span>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="h-8 w-8 rounded-none rounded-r-md"
                         onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
                         disabled={updateCartItem.isPending}
@@ -120,10 +124,10 @@ export default function Cart() {
                         <Plus className="h-3 w-3" />
                       </Button>
                     </div>
-                    
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                       onClick={() => handleRemove(item.id)}
                       disabled={removeCartItem.isPending}
@@ -140,27 +144,27 @@ export default function Cart() {
         <div className="w-full lg:w-80 shrink-0">
           <div className="bg-sand/30 p-6 rounded-lg sticky top-24">
             <h2 className="font-serif text-xl font-bold mb-6">Order Summary</h2>
-            
+
             <div className="space-y-4 mb-6 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Subtotal ({cart.itemCount} items)</span>
-                <span className="font-medium">{cart.total} {cart.items[0]?.poster?.currency || "EUR"}</span>
+                <span className="font-medium">{cart.total} {cart.items[0]?.poster?.currency || store.defaultCurrency}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Shipping</span>
                 <span className="font-medium">Calculated at checkout</span>
               </div>
             </div>
-            
+
             <div className="border-t border-border pt-4 mb-8">
               <div className="flex justify-between items-end">
                 <span className="font-medium">Estimated Total</span>
-                <span className="text-2xl font-bold">{cart.total} {cart.items[0]?.poster?.currency || "EUR"}</span>
+                <span className="text-2xl font-bold">{cart.total} {cart.items[0]?.poster?.currency || store.defaultCurrency}</span>
               </div>
             </div>
-            
-            <Button 
-              size="lg" 
+
+            <Button
+              size="lg"
               className="w-full h-14 text-lg"
               onClick={() => setLocation("/checkout")}
             >

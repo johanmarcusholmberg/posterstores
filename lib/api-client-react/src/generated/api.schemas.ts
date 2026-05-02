@@ -73,6 +73,7 @@ export interface CartItem {
 
 export interface Cart {
   sessionId: string;
+  storeKey: string;
   items: CartItem[];
   total: number;
   itemCount: number;
@@ -80,6 +81,7 @@ export interface Cart {
 
 export interface AddCartItemBody {
   sessionId: string;
+  storeKey: string;
   posterId: number;
   quantity: number;
   size?: string;
@@ -91,6 +93,7 @@ export interface UpdateCartItemBody {
 
 export interface FavoriteBody {
   sessionId: string;
+  storeKey: string;
   posterId: number;
 }
 
@@ -149,7 +152,7 @@ export interface StoreStats {
 }
 
 export type ListPostersParams = {
-  storeKey?: string;
+  storeKey: string;
   region?: string;
   city?: string;
   category?: string;
@@ -172,17 +175,32 @@ export const ListPostersSort = {
   popular: "popular",
 } as const;
 
+export type GetPosterParams = {
+  storeKey: string;
+};
+
+export type UpdatePosterParams = {
+  storeKey?: string;
+};
+
+export type DeletePosterParams = {
+  storeKey?: string;
+};
+
 export type GetCartParams = {
   sessionId: string;
+  storeKey: string;
 };
 
 export type GetFavoritesParams = {
   sessionId: string;
+  storeKey: string;
 };
 
 export type RemoveFavoriteParams = {
   sessionId: string;
   posterId: number;
+  storeKey: string;
 };
 
 export type GetStoreStatsParams = {
@@ -190,11 +208,11 @@ export type GetStoreStatsParams = {
 };
 
 export type GetFeaturedPostersParams = {
-  storeKey?: string;
+  storeKey: string;
   limit?: number;
 };
 
 export type GetNewArrivalsParams = {
-  storeKey?: string;
+  storeKey: string;
   limit?: number;
 };

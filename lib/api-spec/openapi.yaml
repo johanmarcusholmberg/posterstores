@@ -44,6 +44,7 @@ paths:
       parameters:
         - name: storeKey
           in: query
+          required: true
           schema:
             type: string
         - name: region
@@ -94,11 +95,13 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PosterListResponse"
+        "400":
+          description: Missing required storeKey
 
     post:
       operationId: createPoster
       tags: [posters]
-      summary: Create a new poster
+      summary: Create a new poster (admin only)
       requestBody:
         required: true
         content:
@@ -112,18 +115,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Poster"
+        "401":
+          description: Unauthorized
 
   /posters/{id}:
     get:
       operationId: getPoster
       tags: [posters]
-      summary: Get a single poster by ID
+      summary: Get a single poster by ID, scoped to a store
       parameters:
         - name: id
           in: path
           required: true
           schema:
             type: integer
+        - name: storeKey
+          in: query
+          required: true
+          schema:
+            type: string
       responses:
         "200":
           description: Poster detail
@@ -137,13 +147,17 @@ paths:
     put:
       operationId: updatePoster
       tags: [posters]
-      summary: Update a poster
+      summary: Update a poster (admin only)
       parameters:
         - name: id
           in: path
           required: true
           schema:
             type: integer
+        - name: storeKey
+          in: query
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -157,28 +171,45 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Poster"
+        "401":
+          description: Unauthorized
+        "403":
+          description: storeKey mismatch
 
     delete:
       operationId: deletePoster
       tags: [posters]
-      summary: Delete a poster
+      summary: Delete a poster (admin only)
       parameters:
         - name: id
           in: path
           required: true
           schema:
             type: integer
+        - name: storeKey
+          in: query
+          schema:
+            type: string
       responses:
         "204":
           description: Deleted
+        "401":
+          description: Unauthorized
+        "403":
+          description: storeKey mismatch
 
   /cart:
     get:
       operationId: getCart
       tags: [cart]
-      summary: Get current cart
+      summary: Get current cart for a session and store
       parameters:
         - name: sessionId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: storeKey
           in: query
           required: true
           schema:
@@ -257,9 +288,14 @@ paths:
     get:
       operationId: getFavorites
       tags: [favorites]
-      summary: Get favorites for a session
+      summary: Get favorites for a session, scoped to a store
       parameters:
         - name: sessionId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: storeKey
           in: query
           required: true
           schema:
@@ -309,6 +345,11 @@ paths:
           required: true
           schema:
             type: integer
+        - name: storeKey
+          in: query
+          required: true
+          schema:
+            type: string
       responses:
         "200":
           description: Updated favorites
@@ -402,6 +443,7 @@ paths:
       parameters:
         - name: storeKey
           in: query
+          required: true
           schema:
             type: string
         - name: limit
@@ -426,6 +468,7 @@ paths:
       parameters:
         - name: storeKey
           in: query
+          required: true
           schema:
             type: string
         - name: limit
@@ -586,6 +629,8 @@ components:
       properties:
         sessionId:
           type: string
+        storeKey:
+          type: string
         items:
           type: array
           items:
@@ -594,12 +639,14 @@ components:
           type: number
         itemCount:
           type: integer
-      required: [sessionId, items, total, itemCount]
+      required: [sessionId, storeKey, items, total, itemCount]
 
     AddCartItemBody:
       type: object
       properties:
         sessionId:
+          type: string
+        storeKey:
           type: string
         posterId:
           type: integer
@@ -607,7 +654,7 @@ components:
           type: integer
         size:
           type: string
-      required: [sessionId, posterId, quantity]
+      required: [sessionId, storeKey, posterId, quantity]
 
     UpdateCartItemBody:
       type: object
@@ -621,9 +668,11 @@ components:
       properties:
         sessionId:
           type: string
+        storeKey:
+          type: string
         posterId:
           type: integer
-      required: [sessionId, posterId]
+      required: [sessionId, storeKey, posterId]
 
     OrderItem:
       type: object

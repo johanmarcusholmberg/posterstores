@@ -4,6 +4,7 @@ import { Poster } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Heart } from "lucide-react";
 import { getSessionId } from "@/lib/session";
+import { useStorefront } from "@/context/StorefrontContext";
 import { useAddFavorite, useRemoveFavorite, useGetFavorites, getGetFavoritesQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -14,18 +15,18 @@ interface PosterCardProps {
 
 export const PosterCard = ({ poster }: PosterCardProps) => {
   const sessionId = getSessionId();
+  const store = useStorefront();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: favorites } = useGetFavorites(
-    { sessionId },
-    {
-      query: {
-        enabled: !!sessionId,
-        queryKey: getGetFavoritesQueryKey({ sessionId }),
-      },
-    }
-  );
+  const favoritesParams = { sessionId, storeKey: store.storeKey };
+
+  const { data: favorites } = useGetFavorites(favoritesParams, {
+    query: {
+      enabled: !!sessionId,
+      queryKey: getGetFavoritesQueryKey(favoritesParams),
+    },
+  });
 
   const isFavorite = Array.isArray(favorites) ? favorites.some((p) => p.id === poster.id) : false;
 
@@ -33,22 +34,22 @@ export const PosterCard = ({ poster }: PosterCardProps) => {
   const removeFavorite = useRemoveFavorite();
 
   const toggleFavorite = (e: React.MouseEvent) => {
-    e.preventDefault(); // prevent link navigation
+    e.preventDefault();
     if (isFavorite) {
       removeFavorite.mutate(
-        { posterId: poster.id, sessionId },
+        { params: { posterId: poster.id, sessionId, storeKey: store.storeKey } },
         {
           onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: getGetFavoritesQueryKey({ sessionId }) });
+            queryClient.invalidateQueries({ queryKey: getGetFavoritesQueryKey(favoritesParams) });
           },
         }
       );
     } else {
       addFavorite.mutate(
-        { data: { posterId: poster.id, sessionId } },
+        { data: { posterId: poster.id, sessionId, storeKey: store.storeKey } },
         {
           onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: getGetFavoritesQueryKey({ sessionId }) });
+            queryClient.invalidateQueries({ queryKey: getGetFavoritesQueryKey(favoritesParams) });
             toast({ title: "Added to favorites" });
           },
         }

@@ -21,11 +21,13 @@ import type {
   Cart,
   CreateOrderBody,
   CreatePosterBody,
+  DeletePosterParams,
   FavoriteBody,
   GetCartParams,
   GetFavoritesParams,
   GetFeaturedPostersParams,
   GetNewArrivalsParams,
+  GetPosterParams,
   GetStoreStatsParams,
   HealthStatus,
   ListPostersParams,
@@ -38,6 +40,7 @@ import type {
   StoreStats,
   UpdateCartItemBody,
   UpdatePosterBody,
+  UpdatePosterParams,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -127,7 +130,7 @@ export function useHealthCheck<
 /**
  * @summary List all posters with optional filters
  */
-export const getListPostersUrl = (params?: ListPostersParams) => {
+export const getListPostersUrl = (params: ListPostersParams) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -144,7 +147,7 @@ export const getListPostersUrl = (params?: ListPostersParams) => {
 };
 
 export const listPosters = async (
-  params?: ListPostersParams,
+  params: ListPostersParams,
   options?: RequestInit,
 ): Promise<PosterListResponse> => {
   return customFetch<PosterListResponse>(getListPostersUrl(params), {
@@ -159,9 +162,9 @@ export const getListPostersQueryKey = (params?: ListPostersParams) => {
 
 export const getListPostersQueryOptions = <
   TData = Awaited<ReturnType<typeof listPosters>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<void>,
 >(
-  params?: ListPostersParams,
+  params: ListPostersParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof listPosters>>,
@@ -189,7 +192,7 @@ export const getListPostersQueryOptions = <
 export type ListPostersQueryResult = NonNullable<
   Awaited<ReturnType<typeof listPosters>>
 >;
-export type ListPostersQueryError = ErrorType<unknown>;
+export type ListPostersQueryError = ErrorType<void>;
 
 /**
  * @summary List all posters with optional filters
@@ -197,9 +200,9 @@ export type ListPostersQueryError = ErrorType<unknown>;
 
 export function useListPosters<
   TData = Awaited<ReturnType<typeof listPosters>>,
-  TError = ErrorType<unknown>,
+  TError = ErrorType<void>,
 >(
-  params?: ListPostersParams,
+  params: ListPostersParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof listPosters>>,
@@ -219,7 +222,7 @@ export function useListPosters<
 }
 
 /**
- * @summary Create a new poster
+ * @summary Create a new poster (admin only)
  */
 export const getCreatePosterUrl = () => {
   return `/api/posters`;
@@ -238,7 +241,7 @@ export const createPoster = async (
 };
 
 export const getCreatePosterMutationOptions = <
-  TError = ErrorType<unknown>,
+  TError = ErrorType<void>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -279,13 +282,13 @@ export type CreatePosterMutationResult = NonNullable<
   Awaited<ReturnType<typeof createPoster>>
 >;
 export type CreatePosterMutationBody = BodyType<CreatePosterBody>;
-export type CreatePosterMutationError = ErrorType<unknown>;
+export type CreatePosterMutationError = ErrorType<void>;
 
 /**
- * @summary Create a new poster
+ * @summary Create a new poster (admin only)
  */
 export const useCreatePoster = <
-  TError = ErrorType<unknown>,
+  TError = ErrorType<void>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -305,24 +308,37 @@ export const useCreatePoster = <
 };
 
 /**
- * @summary Get a single poster by ID
+ * @summary Get a single poster by ID, scoped to a store
  */
-export const getGetPosterUrl = (id: number) => {
-  return `/api/posters/${id}`;
+export const getGetPosterUrl = (id: number, params: GetPosterParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/posters/${id}?${stringifiedParams}`
+    : `/api/posters/${id}`;
 };
 
 export const getPoster = async (
   id: number,
+  params: GetPosterParams,
   options?: RequestInit,
 ): Promise<Poster> => {
-  return customFetch<Poster>(getGetPosterUrl(id), {
+  return customFetch<Poster>(getGetPosterUrl(id, params), {
     ...options,
     method: "GET",
   });
 };
 
-export const getGetPosterQueryKey = (id: number) => {
-  return [`/api/posters/${id}`] as const;
+export const getGetPosterQueryKey = (id: number, params?: GetPosterParams) => {
+  return [`/api/posters/${id}`, ...(params ? [params] : [])] as const;
 };
 
 export const getGetPosterQueryOptions = <
@@ -330,6 +346,7 @@ export const getGetPosterQueryOptions = <
   TError = ErrorType<void>,
 >(
   id: number,
+  params: GetPosterParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof getPoster>>,
@@ -341,11 +358,11 @@ export const getGetPosterQueryOptions = <
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetPosterQueryKey(id);
+  const queryKey = queryOptions?.queryKey ?? getGetPosterQueryKey(id, params);
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof getPoster>>> = ({
     signal,
-  }) => getPoster(id, { signal, ...requestOptions });
+  }) => getPoster(id, params, { signal, ...requestOptions });
 
   return {
     queryKey,
@@ -363,7 +380,7 @@ export type GetPosterQueryResult = NonNullable<
 export type GetPosterQueryError = ErrorType<void>;
 
 /**
- * @summary Get a single poster by ID
+ * @summary Get a single poster by ID, scoped to a store
  */
 
 export function useGetPoster<
@@ -371,6 +388,7 @@ export function useGetPoster<
   TError = ErrorType<void>,
 >(
   id: number,
+  params: GetPosterParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof getPoster>>,
@@ -380,7 +398,7 @@ export function useGetPoster<
     request?: SecondParameter<typeof customFetch>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetPosterQueryOptions(id, options);
+  const queryOptions = getGetPosterQueryOptions(id, params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
@@ -390,18 +408,31 @@ export function useGetPoster<
 }
 
 /**
- * @summary Update a poster
+ * @summary Update a poster (admin only)
  */
-export const getUpdatePosterUrl = (id: number) => {
-  return `/api/posters/${id}`;
+export const getUpdatePosterUrl = (id: number, params?: UpdatePosterParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/posters/${id}?${stringifiedParams}`
+    : `/api/posters/${id}`;
 };
 
 export const updatePoster = async (
   id: number,
   updatePosterBody: UpdatePosterBody,
+  params?: UpdatePosterParams,
   options?: RequestInit,
 ): Promise<Poster> => {
-  return customFetch<Poster>(getUpdatePosterUrl(id), {
+  return customFetch<Poster>(getUpdatePosterUrl(id, params), {
     ...options,
     method: "PUT",
     headers: { "Content-Type": "application/json", ...options?.headers },
@@ -410,20 +441,24 @@ export const updatePoster = async (
 };
 
 export const getUpdatePosterMutationOptions = <
-  TError = ErrorType<unknown>,
+  TError = ErrorType<void>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof updatePoster>>,
     TError,
-    { id: number; data: BodyType<UpdatePosterBody> },
+    {
+      id: number;
+      data: BodyType<UpdatePosterBody>;
+      params?: UpdatePosterParams;
+    },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof updatePoster>>,
   TError,
-  { id: number; data: BodyType<UpdatePosterBody> },
+  { id: number; data: BodyType<UpdatePosterBody>; params?: UpdatePosterParams },
   TContext
 > => {
   const mutationKey = ["updatePoster"];
@@ -437,11 +472,15 @@ export const getUpdatePosterMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof updatePoster>>,
-    { id: number; data: BodyType<UpdatePosterBody> }
+    {
+      id: number;
+      data: BodyType<UpdatePosterBody>;
+      params?: UpdatePosterParams;
+    }
   > = (props) => {
-    const { id, data } = props ?? {};
+    const { id, data, params } = props ?? {};
 
-    return updatePoster(id, data, requestOptions);
+    return updatePoster(id, data, params, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -451,63 +490,80 @@ export type UpdatePosterMutationResult = NonNullable<
   Awaited<ReturnType<typeof updatePoster>>
 >;
 export type UpdatePosterMutationBody = BodyType<UpdatePosterBody>;
-export type UpdatePosterMutationError = ErrorType<unknown>;
+export type UpdatePosterMutationError = ErrorType<void>;
 
 /**
- * @summary Update a poster
+ * @summary Update a poster (admin only)
  */
 export const useUpdatePoster = <
-  TError = ErrorType<unknown>,
+  TError = ErrorType<void>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof updatePoster>>,
     TError,
-    { id: number; data: BodyType<UpdatePosterBody> },
+    {
+      id: number;
+      data: BodyType<UpdatePosterBody>;
+      params?: UpdatePosterParams;
+    },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof updatePoster>>,
   TError,
-  { id: number; data: BodyType<UpdatePosterBody> },
+  { id: number; data: BodyType<UpdatePosterBody>; params?: UpdatePosterParams },
   TContext
 > => {
   return useMutation(getUpdatePosterMutationOptions(options));
 };
 
 /**
- * @summary Delete a poster
+ * @summary Delete a poster (admin only)
  */
-export const getDeletePosterUrl = (id: number) => {
-  return `/api/posters/${id}`;
+export const getDeletePosterUrl = (id: number, params?: DeletePosterParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/posters/${id}?${stringifiedParams}`
+    : `/api/posters/${id}`;
 };
 
 export const deletePoster = async (
   id: number,
+  params?: DeletePosterParams,
   options?: RequestInit,
 ): Promise<void> => {
-  return customFetch<void>(getDeletePosterUrl(id), {
+  return customFetch<void>(getDeletePosterUrl(id, params), {
     ...options,
     method: "DELETE",
   });
 };
 
 export const getDeletePosterMutationOptions = <
-  TError = ErrorType<unknown>,
+  TError = ErrorType<void>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof deletePoster>>,
     TError,
-    { id: number },
+    { id: number; params?: DeletePosterParams },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof deletePoster>>,
   TError,
-  { id: number },
+  { id: number; params?: DeletePosterParams },
   TContext
 > => {
   const mutationKey = ["deletePoster"];
@@ -521,11 +577,11 @@ export const getDeletePosterMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof deletePoster>>,
-    { id: number }
+    { id: number; params?: DeletePosterParams }
   > = (props) => {
-    const { id } = props ?? {};
+    const { id, params } = props ?? {};
 
-    return deletePoster(id, requestOptions);
+    return deletePoster(id, params, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -535,33 +591,33 @@ export type DeletePosterMutationResult = NonNullable<
   Awaited<ReturnType<typeof deletePoster>>
 >;
 
-export type DeletePosterMutationError = ErrorType<unknown>;
+export type DeletePosterMutationError = ErrorType<void>;
 
 /**
- * @summary Delete a poster
+ * @summary Delete a poster (admin only)
  */
 export const useDeletePoster = <
-  TError = ErrorType<unknown>,
+  TError = ErrorType<void>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof deletePoster>>,
     TError,
-    { id: number },
+    { id: number; params?: DeletePosterParams },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof deletePoster>>,
   TError,
-  { id: number },
+  { id: number; params?: DeletePosterParams },
   TContext
 > => {
   return useMutation(getDeletePosterMutationOptions(options));
 };
 
 /**
- * @summary Get current cart
+ * @summary Get current cart for a session and store
  */
 export const getGetCartUrl = (params: GetCartParams) => {
   const normalizedParams = new URLSearchParams();
@@ -624,7 +680,7 @@ export type GetCartQueryResult = NonNullable<
 export type GetCartQueryError = ErrorType<unknown>;
 
 /**
- * @summary Get current cart
+ * @summary Get current cart for a session and store
  */
 
 export function useGetCart<
@@ -904,7 +960,7 @@ export const useRemoveCartItem = <
 };
 
 /**
- * @summary Get favorites for a session
+ * @summary Get favorites for a session, scoped to a store
  */
 export const getGetFavoritesUrl = (params: GetFavoritesParams) => {
   const normalizedParams = new URLSearchParams();
@@ -971,7 +1027,7 @@ export type GetFavoritesQueryResult = NonNullable<
 export type GetFavoritesQueryError = ErrorType<unknown>;
 
 /**
- * @summary Get favorites for a session
+ * @summary Get favorites for a session, scoped to a store
  */
 
 export function useGetFavorites<
@@ -1533,7 +1589,7 @@ export function useGetStoreStats<
 /**
  * @summary Get featured/popular posters for homepage
  */
-export const getGetFeaturedPostersUrl = (params?: GetFeaturedPostersParams) => {
+export const getGetFeaturedPostersUrl = (params: GetFeaturedPostersParams) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -1550,7 +1606,7 @@ export const getGetFeaturedPostersUrl = (params?: GetFeaturedPostersParams) => {
 };
 
 export const getFeaturedPosters = async (
-  params?: GetFeaturedPostersParams,
+  params: GetFeaturedPostersParams,
   options?: RequestInit,
 ): Promise<Poster[]> => {
   return customFetch<Poster[]>(getGetFeaturedPostersUrl(params), {
@@ -1569,7 +1625,7 @@ export const getGetFeaturedPostersQueryOptions = <
   TData = Awaited<ReturnType<typeof getFeaturedPosters>>,
   TError = ErrorType<unknown>,
 >(
-  params?: GetFeaturedPostersParams,
+  params: GetFeaturedPostersParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof getFeaturedPosters>>,
@@ -1608,7 +1664,7 @@ export function useGetFeaturedPosters<
   TData = Awaited<ReturnType<typeof getFeaturedPosters>>,
   TError = ErrorType<unknown>,
 >(
-  params?: GetFeaturedPostersParams,
+  params: GetFeaturedPostersParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof getFeaturedPosters>>,
@@ -1630,7 +1686,7 @@ export function useGetFeaturedPosters<
 /**
  * @summary Get newest poster arrivals
  */
-export const getGetNewArrivalsUrl = (params?: GetNewArrivalsParams) => {
+export const getGetNewArrivalsUrl = (params: GetNewArrivalsParams) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -1647,7 +1703,7 @@ export const getGetNewArrivalsUrl = (params?: GetNewArrivalsParams) => {
 };
 
 export const getNewArrivals = async (
-  params?: GetNewArrivalsParams,
+  params: GetNewArrivalsParams,
   options?: RequestInit,
 ): Promise<Poster[]> => {
   return customFetch<Poster[]>(getGetNewArrivalsUrl(params), {
@@ -1664,7 +1720,7 @@ export const getGetNewArrivalsQueryOptions = <
   TData = Awaited<ReturnType<typeof getNewArrivals>>,
   TError = ErrorType<unknown>,
 >(
-  params?: GetNewArrivalsParams,
+  params: GetNewArrivalsParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof getNewArrivals>>,
@@ -1702,7 +1758,7 @@ export function useGetNewArrivals<
   TData = Awaited<ReturnType<typeof getNewArrivals>>,
   TError = ErrorType<unknown>,
 >(
-  params?: GetNewArrivalsParams,
+  params: GetNewArrivalsParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof getNewArrivals>>,

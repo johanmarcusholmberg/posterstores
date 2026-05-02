@@ -26,11 +26,13 @@ export default function Checkout() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: cart, isLoading: cartLoading } = useGetCart({ sessionId }, {
+  const cartParams = { sessionId, storeKey: store.storeKey };
+
+  const { data: cart, isLoading: cartLoading } = useGetCart(cartParams, {
     query: {
       enabled: !!sessionId,
-      queryKey: getGetCartQueryKey({ sessionId })
-    }
+      queryKey: getGetCartQueryKey(cartParams),
+    },
   });
 
   const createOrder = useCreateOrder();
@@ -65,17 +67,17 @@ export default function Checkout() {
           items,
           total: cart.total,
           currency: cart.items[0]?.poster?.currency || store.defaultCurrency,
-        }
+        },
       },
       {
         onSuccess: (order) => {
-          queryClient.invalidateQueries({ queryKey: getGetCartQueryKey({ sessionId }) });
+          queryClient.invalidateQueries({ queryKey: getGetCartQueryKey(cartParams) });
           toast({ title: "Order placed successfully!" });
           setLocation(`/order/${order.id}`);
         },
         onError: () => {
           toast({ variant: "destructive", title: "Failed to place order" });
-        }
+        },
       }
     );
   };

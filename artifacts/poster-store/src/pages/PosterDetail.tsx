@@ -1,13 +1,13 @@
 import React, { useState } from "react";
 import { useParams, Link } from "wouter";
-import { useGetPoster, getGetPosterQueryKey, useListPosters, getListPostersQueryKey, useAddCartItem, useGetCart, getGetCartQueryKey } from "@workspace/api-client-react";
+import { useGetPoster, getGetPosterQueryKey, useListPosters, getListPostersQueryKey, useAddCartItem, getGetCartQueryKey } from "@workspace/api-client-react";
 import { useStorefront } from "@/context/StorefrontContext";
 import { getSessionId } from "@/lib/session";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { PosterCard } from "@/components/shared/PosterCard";
-import { Heart, ShoppingBag, ArrowLeft } from "lucide-react";
+import { ShoppingBag, ArrowLeft } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 
@@ -21,12 +21,16 @@ export default function PosterDetail() {
 
   const [selectedSize, setSelectedSize] = useState<string>("");
 
-  const { data: poster, isLoading } = useGetPoster(posterId, {
-    query: {
-      enabled: !!posterId && !isNaN(posterId),
-      queryKey: getGetPosterQueryKey(posterId),
+  const { data: poster, isLoading } = useGetPoster(
+    posterId,
+    { storeKey: store.storeKey },
+    {
+      query: {
+        enabled: !!posterId && !isNaN(posterId),
+        queryKey: getGetPosterQueryKey(posterId, { storeKey: store.storeKey }),
+      },
     }
-  });
+  );
 
   const { data: relatedPosters } = useListPosters(
     { storeKey: store.storeKey, region: poster?.region, limit: 4 },
@@ -34,7 +38,7 @@ export default function PosterDetail() {
       query: {
         enabled: !!poster?.region,
         queryKey: getListPostersQueryKey({ storeKey: store.storeKey, region: poster?.region, limit: 4 }),
-      }
+      },
     }
   );
 
@@ -54,19 +58,20 @@ export default function PosterDetail() {
       {
         data: {
           sessionId,
+          storeKey: store.storeKey,
           posterId: poster.id,
           quantity: 1,
           size: selectedSize || undefined,
-        }
+        },
       },
       {
         onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getGetCartQueryKey({ sessionId }) });
+          queryClient.invalidateQueries({ queryKey: getGetCartQueryKey({ sessionId, storeKey: store.storeKey }) });
           toast({
             title: "Added to cart",
             description: `${poster.title} has been added to your cart.`,
           });
-        }
+        },
       }
     );
   };
@@ -102,17 +107,15 @@ export default function PosterDetail() {
       </Link>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-24 mb-24">
-        {/* Image */}
         <div className="relative aspect-[3/4] bg-muted rounded-lg overflow-hidden shadow-lg">
-          <img 
-            src={poster.imageUrl} 
-            alt={poster.title} 
+          <img
+            src={poster.imageUrl}
+            alt={poster.title}
             className="w-full h-full object-cover"
             data-testid={`img-detail-${poster.id}`}
           />
         </div>
 
-        {/* Details */}
         <div className="flex flex-col">
           <div className="mb-2 text-muted-foreground text-sm font-medium tracking-wider uppercase">
             {poster.region} {poster.city && `• ${poster.city}`}
@@ -131,8 +134,8 @@ export default function PosterDetail() {
           {poster.sizes && poster.sizes.length > 0 && (
             <div className="mb-10">
               <h3 className="font-medium text-foreground mb-4">Select Size</h3>
-              <RadioGroup 
-                value={selectedSize} 
+              <RadioGroup
+                value={selectedSize}
                 onValueChange={setSelectedSize}
                 className="grid grid-cols-2 gap-4"
               >
@@ -152,9 +155,9 @@ export default function PosterDetail() {
           )}
 
           <div className="flex gap-4 mt-auto">
-            <Button 
-              size="lg" 
-              className="flex-1 text-lg h-14" 
+            <Button
+              size="lg"
+              className="flex-1 text-lg h-14"
               onClick={handleAddToCart}
               disabled={addCartItem.isPending}
               data-testid="btn-add-to-cart"
@@ -166,7 +169,7 @@ export default function PosterDetail() {
               )}
             </Button>
           </div>
-          
+
           {poster.tags && poster.tags.length > 0 && (
             <div className="mt-12 flex flex-wrap gap-2">
               {poster.tags.map(tag => (
@@ -181,7 +184,6 @@ export default function PosterDetail() {
         </div>
       </div>
 
-      {/* Related Posters */}
       {relatedPosters && relatedPosters.posters.length > 1 && (
         <section className="border-t border-border pt-16">
           <h2 className="font-serif text-3xl font-bold text-foreground mb-8">More from {poster.region}</h2>
@@ -191,7 +193,7 @@ export default function PosterDetail() {
               .slice(0, 4)
               .map(p => (
                 <PosterCard key={p.id} poster={p} />
-            ))}
+              ))}
           </div>
         </section>
       )}

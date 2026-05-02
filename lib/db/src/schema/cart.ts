@@ -5,6 +5,7 @@ import { postersTable } from "./posters";
 
 export const cartItemsTable = pgTable("cart_items", {
   id: serial("id").primaryKey(),
+  storeKey: text("store_key").notNull().default("postsofspain"),
   sessionId: text("session_id").notNull(),
   posterId: integer("poster_id").notNull().references(() => postersTable.id, { onDelete: "cascade" }),
   quantity: integer("quantity").notNull().default(1),

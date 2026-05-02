@@ -1,6 +1,7 @@
 import React from "react";
 import { useGetFavorites, getGetFavoritesQueryKey } from "@workspace/api-client-react";
 import { getSessionId } from "@/lib/session";
+import { useStorefront } from "@/context/StorefrontContext";
 import { PosterCard } from "@/components/shared/PosterCard";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -8,12 +9,15 @@ import { Heart } from "lucide-react";
 
 export default function Favorites() {
   const sessionId = getSessionId();
+  const store = useStorefront();
 
-  const { data: favorites, isLoading } = useGetFavorites({ sessionId }, {
+  const favoritesParams = { sessionId, storeKey: store.storeKey };
+
+  const { data: favorites, isLoading } = useGetFavorites(favoritesParams, {
     query: {
       enabled: !!sessionId,
-      queryKey: getGetFavoritesQueryKey({ sessionId })
-    }
+      queryKey: getGetFavoritesQueryKey(favoritesParams),
+    },
   });
 
   return (
