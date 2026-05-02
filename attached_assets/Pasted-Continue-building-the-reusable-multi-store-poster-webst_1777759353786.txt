@@ -1,0 +1,303 @@
+Continue building the reusable multi-store poster webstore.
+
+CURRENT STATUS:
+- /admin works.
+- /admin/posters works.
+- /admin/posters/new works.
+- /admin/posters/:id works.
+- Admin can create draft posters.
+- Draft posters do not show in /shop.
+- Published posters do show in /shop.
+- Switching admin store to PostsofSweden hides PostsofSpain posters.
+- Store separation has been manually verified.
+- Store-scoped APIs are fixed and tested.
+- Homepage works.
+- Shop works.
+- Poster detail works.
+- Cart works.
+- Favorites work.
+- Admin token gate exists.
+- Admin poster list/create/edit/delete exists.
+- Admin can create draft/published/archived posters.
+- Admin store selector exists.
+
+NEXT GOAL:
+Create the mockup template system and poster mockup assignment workflow.
+
+This is a key feature:
+I want to upload/store the full printable poster image and then select several mockup templates to use for that specific poster, so product presentation can vary and not feel repetitive.
+
+Important:
+- Do not rewrite the working storefront.
+- Do not break admin poster CRUD.
+- Do not change the multi-store architecture.
+- Do not build AI mockup generation in this step.
+- Do not connect external mockup APIs in this step.
+- Do not build Stripe/payment in this step.
+- Do not add slug routing in this step.
+- Use the existing admin token system for protected actions.
+- Keep everything store-scoped.
+- Preserve existing public API response shapes unless absolutely necessary.
+- Make sure all existing tests still pass.
+
+ASSET PRINCIPLE:
+Even though the current schema only has one imageUrl field, structure the mockup system with this distinction in mind:
+
+1. Master printable image
+- The production-quality poster image.
+- Used for print/fulfillment later.
+- Currently represented by imageUrl until separate master/preview fields are added.
+
+2. Preview image
+- Used in store cards and product galleries.
+- Currently also represented by imageUrl.
+
+3. Mockup images
+- Presentation assets only.
+- Used to show poster in frames/interiors/lifestyle scenes.
+- Must not replace the printable production image.
+
+DATA MODEL
+
+Create these tables/models if they do not already exist:
+
+mockup_templates:
+- id
+- store_key nullable
+- name
+- description
+- template_key
+- background_image_url nullable
+- frame_type
+- supported_orientation nullable
+- supported_aspect_ratio nullable
+- preview_thumbnail_url nullable
+- active boolean
+- sort_order integer
+- created_at
+- updated_at
+
+poster_mockups:
+- id
+- poster_id
+- mockup_template_id nullable
+- mockup_image_url nullable
+- sort_order integer
+- is_primary boolean
+- created_at
+- updated_at
+
+Rules:
+- mockup_templates.store_key can be null for global templates.
+- If store_key is null, the template can be used by all stores.
+- If store_key is set, the template is only available for that store.
+- poster_mockups belong to a poster.
+- A poster can have multiple poster_mockups.
+- Only one poster_mockup should be primary per poster.
+- If one mockup is marked primary, all other mockups for that poster should be set to non-primary.
+- Poster mockup mutations must verify that the poster belongs to the requested storeKey.
+
+INITIAL MOCKUP TEMPLATES
+
+Seed these as global templates unless store-specific handling already exists:
+
+1. Simple white wall with black frame
+2. Warm beige wall with oak frame
+3. Terracotta wall with black frame
+4. Mediterranean living room
+5. Café table flat lay
+6. Kitchen wall
+7. Gallery wall
+8. Minimal bedroom
+9. Close-up frame detail
+10. Size comparison wall
+
+For now, these can use placeholder thumbnails/backgrounds if no actual images exist.
+The important part is the data structure and assignment workflow.
+
+ADMIN ROUTES
+
+Add admin routes:
+
+- /admin/mockups
+- /admin/posters/:id/mockups
+
+/admin/mockups:
+Create a basic mockup template management page:
+- List global templates and selected-store templates.
+- Show name, frame type, active status, store/global label, sort order.
+- Allow creating/editing simple template records if reasonable.
+- If full CRUD is too much for this step, at minimum show seeded templates and active status.
+- Keep the page protected by the existing admin token gate.
+
+/admin/posters/:id/mockups:
+Create the poster mockup assignment page.
+
+Admin should be able to:
+- View the selected poster.
+- View the poster image.
+- View available mockup templates:
+  - global templates
+  - templates for selected admin store
+- Select multiple templates for this poster.
+- Save selected templates.
+- Reorder selected mockups.
+- Mark one mockup as primary.
+- Remove a mockup from the poster.
+- Add/paste a custom manual mockup image URL if needed.
+- Show preview behavior.
+
+Also add a link/button from AdminPosterEdit to:
+- Manage mockups
+
+ADMIN API
+
+Create protected endpoints or server actions for:
+
+Mockup templates:
+- GET available mockup templates for storeKey
+- POST create mockup template
+- PUT update mockup template
+- DELETE or deactivate mockup template
+
+Poster mockups:
+- GET poster mockups for posterId + storeKey
+- POST/PUT save poster mockup assignments
+- PATCH reorder poster mockups
+- PATCH set primary mockup
+- DELETE remove poster mockup
+
+Security:
+- Mutating mockup endpoints require X-Admin-Token.
+- Poster mockup mutations must verify that the poster belongs to the requested storeKey.
+- Public reads should only expose active templates/mockups as needed.
+- Admin reads should include global templates and selected-store templates.
+- A poster from PostsofSpain must not be editable from the PostsofSweden admin context.
+
+FRONTEND STOREFRONT BEHAVIOR
+
+Update public storefront display:
+
+Poster cards:
+- If the poster has a primary mockup, use that image/preview.
+- Else fall back to poster.imageUrl.
+
+Poster detail page:
+- Show mockup gallery if poster has mockups.
+- If no mockups exist, show the main poster image.
+- Make it clear internally that mockups are presentation assets only.
+
+If exact visual compositing is complex:
+- Use mockup_image_url if provided.
+- Otherwise show template thumbnail/placeholder preview with poster image overlaid only if simple to implement.
+- Do not overbuild the renderer in this step.
+- Prioritize assignment workflow and data model.
+
+Recommended fallback logic:
+1. primary poster_mockup.mockup_image_url
+2. primary mockup template preview_thumbnail_url
+3. poster.imageUrl
+4. generic placeholder
+
+COMPONENTS TO CREATE
+
+Admin:
+- AdminMockupTemplateList
+- AdminMockupTemplateForm
+- AdminPosterMockupManager
+- AdminMockupSelector
+- AdminMockupPreview
+- MockupReorderControls
+- PrimaryMockupBadge
+
+Public:
+- MockupGallery
+- PosterDisplayImage helper/logic
+
+UX REQUIREMENTS
+
+/admin/mockups:
+- Clear title: “Mockup templates”
+- Explain that templates can be global or store-specific.
+- Show active/inactive status.
+- Show global/store-specific badge.
+
+/admin/posters/:id/mockups:
+- Clear title: “Manage mockups”
+- Show poster title and image.
+- Show selected store.
+- Show available templates as cards.
+- Show selected mockups as a sortable list or ordered cards.
+- Make primary selection obvious.
+- Show success/error toasts.
+- Add a back link to poster edit.
+
+Public:
+- Poster cards should not become cluttered.
+- Poster detail gallery should remain fast and mobile-friendly.
+- If mockup data is missing, fallback gracefully.
+
+TESTING
+
+Add or update tests for:
+
+Data/API:
+- Available mockup templates include global templates and selected-store templates.
+- Poster mockup assignments require admin token.
+- Poster mockup assignments reject wrong storeKey.
+- A poster can have multiple mockups.
+- Only one primary mockup is allowed per poster.
+
+Admin UI:
+- /admin/mockups loads after token gate.
+- /admin/posters/:id/mockups loads for a poster in selected store.
+- Admin can select multiple mockup templates.
+- Admin can mark one as primary.
+- Admin can remove a mockup.
+- Admin can navigate from poster edit to manage mockups.
+
+Public storefront:
+- Poster card uses primary mockup if available.
+- Poster card falls back to imageUrl if no mockup exists.
+- Poster detail page shows mockup gallery if available.
+- Poster detail falls back to imageUrl if no mockup exists.
+
+Regression:
+- Homepage still loads.
+- Shop still loads.
+- Poster detail still loads.
+- Cart still works.
+- Favorites still work.
+- Admin poster CRUD still works.
+- Store switcher still hides PostsofSpain posters when PostsofSweden is selected.
+
+MANUAL TEST CHECKLIST AFTER IMPLEMENTATION
+
+After implementation, I should be able to test:
+
+1. Open /admin/mockups.
+2. Confirm seeded mockup templates exist.
+3. Open an existing poster in admin.
+4. Click Manage mockups.
+5. Select 3–5 templates.
+6. Save.
+7. Mark one as primary.
+8. Open /shop.
+9. Confirm the poster card uses the primary mockup if available.
+10. Open poster detail.
+11. Confirm mockup gallery appears.
+12. Remove all mockups.
+13. Confirm poster falls back to the normal poster image.
+14. Switch admin store to PostsofSweden.
+15. Confirm PostsofSpain poster mockups cannot be edited in the Sweden context.
+
+At the end, summarize:
+1. Tables/models created.
+2. Mockup templates seeded.
+3. Admin routes created.
+4. Admin mockup workflow.
+5. Public storefront mockup behavior.
+6. How primary mockup selection works.
+7. What is placeholder vs fully implemented.
+8. Tests added/updated.
+9. What I should manually test before continuing.
