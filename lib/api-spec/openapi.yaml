@@ -1,22 +1,33 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Poster Webstore API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: posters
+    description: Poster product operations
+  - name: cart
+    description: Shopping cart operations
+  - name: favorites
+    description: Favorites management
+  - name: orders
+    description: Order operations
+  - name: newsletter
+    description: Newsletter subscription
+  - name: stats
+    description: Store statistics
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +35,413 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /posters:
+    get:
+      operationId: listPosters
+      tags: [posters]
+      summary: List all posters with optional filters
+      parameters:
+        - name: storeKey
+          in: query
+          schema:
+            type: string
+        - name: region
+          in: query
+          schema:
+            type: string
+        - name: city
+          in: query
+          schema:
+            type: string
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: tag
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: minPrice
+          in: query
+          schema:
+            type: number
+        - name: maxPrice
+          in: query
+          schema:
+            type: number
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [newest, price_asc, price_desc, popular]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of posters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PosterListResponse"
+
+    post:
+      operationId: createPoster
+      tags: [posters]
+      summary: Create a new poster
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePosterBody"
+      responses:
+        "201":
+          description: Created poster
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Poster"
+
+  /posters/{id}:
+    get:
+      operationId: getPoster
+      tags: [posters]
+      summary: Get a single poster by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Poster detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Poster"
+        "404":
+          description: Not found
+
+    put:
+      operationId: updatePoster
+      tags: [posters]
+      summary: Update a poster
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePosterBody"
+      responses:
+        "200":
+          description: Updated poster
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Poster"
+
+    delete:
+      operationId: deletePoster
+      tags: [posters]
+      summary: Delete a poster
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /cart:
+    get:
+      operationId: getCart
+      tags: [cart]
+      summary: Get current cart
+      parameters:
+        - name: sessionId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Cart contents
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+
+  /cart/items:
+    post:
+      operationId: addCartItem
+      tags: [cart]
+      summary: Add item to cart
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddCartItemBody"
+      responses:
+        "200":
+          description: Updated cart
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+
+  /cart/items/{cartItemId}:
+    put:
+      operationId: updateCartItem
+      tags: [cart]
+      summary: Update cart item quantity
+      parameters:
+        - name: cartItemId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCartItemBody"
+      responses:
+        "200":
+          description: Updated cart
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+
+    delete:
+      operationId: removeCartItem
+      tags: [cart]
+      summary: Remove item from cart
+      parameters:
+        - name: cartItemId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated cart
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+
+  /favorites:
+    get:
+      operationId: getFavorites
+      tags: [favorites]
+      summary: Get favorites for a session
+      parameters:
+        - name: sessionId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of favorited posters
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Poster"
+
+    post:
+      operationId: addFavorite
+      tags: [favorites]
+      summary: Add a poster to favorites
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FavoriteBody"
+      responses:
+        "200":
+          description: Updated favorites
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Poster"
+
+    delete:
+      operationId: removeFavorite
+      tags: [favorites]
+      summary: Remove a poster from favorites
+      parameters:
+        - name: sessionId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: posterId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated favorites
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Poster"
+
+  /orders:
+    post:
+      operationId: createOrder
+      tags: [orders]
+      summary: Place an order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderBody"
+      responses:
+        "201":
+          description: Created order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      tags: [orders]
+      summary: Get order by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Order details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+
+  /newsletter:
+    post:
+      operationId: subscribeNewsletter
+      tags: [newsletter]
+      summary: Subscribe to newsletter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewsletterBody"
+      responses:
+        "200":
+          description: Subscription confirmed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NewsletterResponse"
+
+  /stats/store:
+    get:
+      operationId: getStoreStats
+      tags: [stats]
+      summary: Get store overview stats (total posters, orders, top categories)
+      parameters:
+        - name: storeKey
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Store statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoreStats"
+
+  /stats/featured:
+    get:
+      operationId: getFeaturedPosters
+      tags: [stats]
+      summary: Get featured/popular posters for homepage
+      parameters:
+        - name: storeKey
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Featured posters
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Poster"
+
+  /stats/new-arrivals:
+    get:
+      operationId: getNewArrivals
+      tags: [stats]
+      summary: Get newest poster arrivals
+      parameters:
+        - name: storeKey
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: New arrivals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Poster"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +449,285 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    Poster:
+      type: object
+      properties:
+        id:
+          type: integer
+        storeKey:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        imageUrl:
+          type: string
+        region:
+          type: string
+        city:
+          type: string
+        category:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        price:
+          type: number
+        currency:
+          type: string
+        sizes:
+          type: array
+          items:
+            type: string
+        isFeatured:
+          type: boolean
+        isNew:
+          type: boolean
+        createdAt:
+          type: string
+      required: [id, storeKey, title, imageUrl, price, currency, category, createdAt]
+
+    PosterListResponse:
+      type: object
+      properties:
+        posters:
+          type: array
+          items:
+            $ref: "#/components/schemas/Poster"
+        total:
+          type: integer
+        offset:
+          type: integer
+        limit:
+          type: integer
+      required: [posters, total, offset, limit]
+
+    CreatePosterBody:
+      type: object
+      properties:
+        storeKey:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        imageUrl:
+          type: string
+        region:
+          type: string
+        city:
+          type: string
+        category:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        price:
+          type: number
+        currency:
+          type: string
+        sizes:
+          type: array
+          items:
+            type: string
+        isFeatured:
+          type: boolean
+        isNew:
+          type: boolean
+      required: [storeKey, title, imageUrl, price, currency, category]
+
+    UpdatePosterBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        imageUrl:
+          type: string
+        region:
+          type: string
+        city:
+          type: string
+        category:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        price:
+          type: number
+        isFeatured:
+          type: boolean
+        isNew:
+          type: boolean
+
+    CartItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        posterId:
+          type: integer
+        poster:
+          $ref: "#/components/schemas/Poster"
+        quantity:
+          type: integer
+        size:
+          type: string
+      required: [id, posterId, quantity]
+
+    Cart:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CartItem"
+        total:
+          type: number
+        itemCount:
+          type: integer
+      required: [sessionId, items, total, itemCount]
+
+    AddCartItemBody:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        posterId:
+          type: integer
+        quantity:
+          type: integer
+        size:
+          type: string
+      required: [sessionId, posterId, quantity]
+
+    UpdateCartItemBody:
+      type: object
+      properties:
+        quantity:
+          type: integer
+      required: [quantity]
+
+    FavoriteBody:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        posterId:
+          type: integer
+      required: [sessionId, posterId]
+
+    OrderItem:
+      type: object
+      properties:
+        posterId:
+          type: integer
+        quantity:
+          type: integer
+        size:
+          type: string
+        price:
+          type: number
+      required: [posterId, quantity, price]
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: integer
+        storeKey:
+          type: string
+        customerName:
+          type: string
+        customerEmail:
+          type: string
+        shippingAddress:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"
+        total:
+          type: number
+        currency:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+      required: [id, storeKey, customerEmail, items, total, currency, status, createdAt]
+
+    CreateOrderBody:
+      type: object
+      properties:
+        storeKey:
+          type: string
+        sessionId:
+          type: string
+        customerName:
+          type: string
+        customerEmail:
+          type: string
+        shippingAddress:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"
+        total:
+          type: number
+        currency:
+          type: string
+      required: [storeKey, customerEmail, items, total, currency]
+
+    NewsletterBody:
+      type: object
+      properties:
+        email:
+          type: string
+        storeKey:
+          type: string
+      required: [email, storeKey]
+
+    NewsletterResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+      required: [success, message]
+
+    CategoryCount:
+      type: object
+      properties:
+        category:
+          type: string
+        count:
+          type: integer
+      required: [category, count]
+
+    StoreStats:
+      type: object
+      properties:
+        totalPosters:
+          type: integer
+        totalOrders:
+          type: integer
+        topCategories:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategoryCount"
+        featuredCount:
+          type: integer
+        newArrivalsCount:
+          type: integer
+      required: [totalPosters, totalOrders, topCategories, featuredCount, newArrivalsCount]

@@ -1,0 +1,230 @@
+building the poster webstore project.
+
+STEP 1 GOAL:
+Create a reusable multi-store architecture/config layer before building the homepage.
+
+Important:
+Do not build this as a hard-coded PostsofSpain-only website.
+
+Build it as a reusable multi-store poster webstore platform where PostsofSpain is the first active storefront.
+
+Future storefronts should be possible, for example:
+- PostsofSpain
+- PostsofSweden
+- PostsofItaly
+- PostsofPortugal
+
+All stores should reuse the same:
+- Homepage layout
+- Shop page
+- Poster detail page
+- Product cards
+- Filters
+- Favorites
+- Cart
+- Checkout/order flow
+- Newsletter signup
+- Admin poster upload
+- Mockup template system
+
+Only store-specific content should change:
+- Store name
+- Theme colors
+- Homepage text
+- Country focus
+- Regions
+- Cities
+- Categories
+- Tags
+- Currency
+- Language
+- SEO metadata
+- Footer links
+- Newsletter copy
+
+Create a storefront configuration layer.
+
+Create a file/module such as:
+
+src/config/storefronts.ts
+
+Add a store config type/interface with:
+
+- storeKey
+- storeName
+- countryFocus
+- defaultCurrency
+- defaultLanguage
+- theme
+  - background
+  - surface
+  - sand
+  - primary
+  - secondary
+  - text
+  - muted
+  - border
+- homepage
+  - heroTitle
+  - heroSubtitle
+  - primaryCta
+  - secondaryCta
+  - newsletterTitle
+  - newsletterSubtitle
+- seo
+  - defaultTitle
+  - defaultDescription
+- navigation
+  - mainLinks
+  - footerLinks
+- taxonomy
+  - regions
+  - cities
+  - categories
+  - tags
+
+Create the first active config:
+
+PostsofSpain:
+- storeKey: postsofspain
+- storeName: PostsofSpain
+- countryFocus: Spain
+- defaultCurrency: EUR
+- defaultLanguage: en
+
+Theme:
+- background: #FAF6EF
+- surface: #FFFFFF
+- sand: #E8D8C3
+- primary: #2F80A8
+- secondary: #C86B4A
+- text: #1F2A33
+- muted: #8A9A5B
+- border: #E4DDD3
+
+Homepage:
+- heroTitle: Posters inspired by Spain
+- heroSubtitle: Mediterranean places, colors and moments — printed for your home.
+- primaryCta: Browse posters
+- secondaryCta: Explore regions
+- newsletterTitle: Get new Spanish poster releases in your inbox
+- newsletterSubtitle: Be the first to see new collections, city drops and seasonal releases.
+
+Regions:
+- Valencia
+- Andalusia
+- Catalonia
+- Madrid
+- Balearic Islands
+- Basque Country
+- Galicia
+- Canary Islands
+
+Cities:
+- Valencia
+- Barcelona
+- Madrid
+- Sevilla
+- Málaga
+- Alicante
+- Granada
+- Bilbao
+- Cádiz
+- Palma
+
+Categories:
+- Spanish Cities
+- Coastal Posters
+- Food & Drinks
+- Architecture
+- Botanical
+- Travel Posters
+- Minimal Posters
+- Vintage Posters
+- Café Posters
+
+Tags:
+- Mediterranean
+- Café
+- Orange
+- Architecture
+- Beach
+- Summer
+- Kitchen
+- Gallery wall
+- Botanical
+- Vintage
+- Minimal
+- Terracotta
+- Blue
+- Coastal
+
+Also create a second inactive/example config for future use:
+
+PostsofSweden:
+- storeKey: postsofsweden
+- storeName: PostsofSweden
+- countryFocus: Sweden
+- defaultCurrency: SEK
+- defaultLanguage: en
+
+Homepage:
+- heroTitle: Posters inspired by Sweden
+- heroSubtitle: Nordic places, seasons and quiet moments — printed for your home.
+- primaryCta: Browse posters
+- secondaryCta: Explore regions
+- newsletterTitle: Get new Swedish poster releases in your inbox
+- newsletterSubtitle: Be the first to see new collections, city drops and seasonal releases.
+
+Example regions:
+- Stockholm
+- Västra Götaland
+- Skåne
+- Jämtland
+- Gotland
+- Dalarna
+- Lapland
+
+Example cities:
+- Stockholm
+- Göteborg
+- Malmö
+- Östersund
+- Visby
+- Uppsala
+- Kiruna
+
+Example categories:
+- Swedish Cities
+- Nordic Nature
+- Archipelago Posters
+- Fika Posters
+- Winter Posters
+- Minimal Nordic Posters
+- Travel Posters
+
+Create an active store resolver.
+
+For MVP:
+- activeStoreKey should default to postsofspain.
+
+Prepare the resolver so it can later support:
+- domain-based resolution, for example postsofspain.com or postsofsweden.com
+- route-based resolution, for example /spain or /sweden
+
+Create a StorefrontProvider or equivalent context/hook:
+
+- getActiveStore()
+- useStorefront()
+- activeStore.theme
+- activeStore.homepage
+- activeStore.taxonomy
+
+Do not build the full homepage yet unless needed for testing.
+This step is mainly about creating the reusable architecture.
+
+At the end, summarize:
+1. Which store config files were created.
+2. How PostsofSpain is selected as the default active store.
+3. How components can access the active store.
+4. How PostsofSweden can later be activated.
