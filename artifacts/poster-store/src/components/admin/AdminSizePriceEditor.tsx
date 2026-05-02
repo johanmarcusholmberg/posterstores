@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, X, GripVertical, AlertCircle } from "lucide-react";
+import { Plus, X, AlertCircle } from "lucide-react";
 
 export interface SizeRow {
   sizeLabel: string;
@@ -91,8 +91,7 @@ export const AdminSizePriceEditor = ({
 
       {sizes.length > 0 && (
         <div className="space-y-2">
-          <div className="grid grid-cols-[20px_1fr_110px_80px_50px_30px] gap-2 items-center text-xs text-muted-foreground font-medium px-1">
-            <span></span>
+          <div className="grid grid-cols-[1fr_110px_80px_50px_30px] gap-2 items-center text-xs text-muted-foreground font-medium px-1">
             <span>Size</span>
             <span>Price <span className="text-destructive">*</span></span>
             <span>Currency</span>
@@ -103,12 +102,10 @@ export const AdminSizePriceEditor = ({
           {sizes.map((row, i) => (
             <div
               key={i}
-              className={`grid grid-cols-[20px_1fr_110px_80px_50px_30px] gap-2 items-center rounded-md border px-2 py-2 ${
+              className={`grid grid-cols-[1fr_110px_80px_50px_30px] gap-2 items-center rounded-md border px-2 py-2 ${
                 row.active ? "border-border bg-background" : "border-border/50 bg-muted/30 opacity-70"
               }`}
             >
-              <GripVertical className="w-4 h-4 text-muted-foreground/50 cursor-grab" />
-
               <span
                 className="inline-flex items-center px-2.5 py-1 rounded-md bg-muted text-sm font-medium text-foreground select-none w-fit"
                 data-testid={`size-label-${i}`}
