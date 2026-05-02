@@ -87,10 +87,11 @@ router.post("/posters", requireAdmin, async (req, res) => {
   const body = CreatePosterBody.safeParse(req.body);
   if (!body.success) return res.status(400).json({ error: body.error.flatten() });
 
-  const parsed = insertPosterSchema.safeParse(body.data);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-
-  const [poster] = await db.insert(postersTable).values(parsed.data).returning();
+  const { price, ...rest } = body.data;
+  const [poster] = await db
+    .insert(postersTable)
+    .values({ ...rest, price: String(price) })
+    .returning();
   return res.status(201).json(serializePoster(poster));
 });
 
@@ -135,9 +136,14 @@ router.put("/posters/:id", requireAdmin, async (req, res) => {
     return res.status(403).json({ error: "storeKey mismatch: cannot edit poster from another store" });
   }
 
+  const { price, ...rest } = body.data;
+  const updateData = price !== undefined
+    ? { ...rest, price: String(price) }
+    : rest;
+
   const [poster] = await db
     .update(postersTable)
-    .set(body.data as Partial<typeof postersTable.$inferInsert>)
+    .set(updateData as Partial<typeof postersTable.$inferInsert>)
     .where(eq(postersTable.id, params.data.id))
     .returning();
 
