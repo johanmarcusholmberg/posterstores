@@ -1,0 +1,258 @@
+Continue building the reusable multi-store poster webstore.
+
+CURRENT STATUS:
+- Reusable multi-store platform works.
+- PostsofSpain is the default active storefront.
+- Homepage, shop, poster detail, cart and favorites work.
+- Admin token gate works.
+- Admin poster CRUD works.
+- Store separation is verified.
+- Mockup template system works.
+- Poster asset separation is implemented:
+  - masterPrintImageUrl
+  - previewImageUrl
+  - legacy imageUrl fallback
+- Structured poster sizes/prices are implemented.
+- Cart uses selected poster size.
+- Existing tests pass.
+
+NEXT GOAL:
+Harden checkout and order draft creation before adding Stripe.
+
+Important:
+- Do not build Stripe/payment yet.
+- Do not connect e-mail sending yet.
+- Do not connect print providers yet.
+- Do not rewrite existing storefront.
+- Do not break admin poster CRUD.
+- Do not break mockups.
+- Keep everything store-scoped.
+- Keep all existing tests passing.
+
+WHY THIS MATTERS:
+Before real payment is added, orders must reliably store:
+- store
+- customer details
+- selected poster
+- selected size
+- exact price snapshot
+- currency
+- quantity
+- production image reference
+- status
+
+ORDER MODEL
+
+Review and update orders/order_items if needed.
+
+orders should support:
+- id
+- store_key
+- user_id nullable
+- email
+- status: draft / pending_payment / paid / processing / shipped / cancelled
+- subtotal
+- shipping_cost
+- total
+- currency
+- shipping_name
+- shipping_address_line1
+- shipping_address_line2 nullable
+- shipping_postal_code
+- shipping_city
+- shipping_region nullable
+- shipping_country
+- customer_notes nullable
+- created_at
+- updated_at
+
+order_items should support:
+- id
+- order_id
+- poster_id
+- poster_size_id
+- poster_title_snapshot
+- size_label_snapshot
+- width_cm_snapshot nullable
+- height_cm_snapshot nullable
+- unit_price
+- currency
+- quantity
+- total_price
+- master_print_image_url_snapshot nullable
+- preview_image_url_snapshot nullable
+- created_at
+
+Important:
+Order items must store snapshots.
+If the poster title, price, image, or size changes later, old orders should still show what the customer bought at the time.
+
+CHECKOUT PAGE
+
+Update checkout form to collect:
+
+Customer:
+- email
+- name
+
+Shipping:
+- address line 1
+- address line 2 optional
+- postal code
+- city
+- region/state optional
+- country
+
+Order:
+- customer notes optional
+- newsletter opt-in optional if existing newsletter system supports it
+
+Validation:
+- email required and valid
+- name required
+- address line 1 required
+- postal code required
+- city required
+- country required
+- cart cannot be empty
+- every cart item must have valid active poster size
+- every cart item must belong to active store
+
+ORDER CREATION
+
+When creating an order draft:
+- Read cart items server-side.
+- Validate storeKey.
+- Validate posters are still published.
+- Validate selected poster sizes are still active.
+- Calculate prices server-side, not from frontend values.
+- Create order with status pending_payment or draft.
+- Create order_items with snapshots.
+- Do not mark as paid.
+- Clear cart only if order draft creation succeeds.
+- Show clear order confirmation/pending page.
+
+If a cart item has become invalid:
+- Return a clear error.
+- Frontend should show which item needs attention if possible.
+
+ORDER CONFIRMATION PAGE
+
+Create/update:
+- /order-confirmation/:orderId
+
+Show:
+- Order number/id
+- Status: pending payment / draft
+- Customer email
+- Items
+- Size
+- Quantity
+- Total
+- Message:
+  “Your order has been created but payment is not connected yet.”
+
+Make it clear this is not paid yet.
+
+ADMIN ORDER VIEW
+
+Create or improve:
+- /admin/orders
+- /admin/orders/:id
+
+Admin order list should show:
+- order id
+- store
+- customer email
+- status
+- total
+- currency
+- created date
+
+Admin order detail should show:
+- customer details
+- shipping details
+- item snapshots
+- poster title snapshot
+- size snapshot
+- quantity
+- unit price
+- total price
+- master print image snapshot/link
+- current poster link if still available
+- order status selector
+
+Admin should be able to manually update order status:
+- draft
+- pending_payment
+- paid
+- processing
+- shipped
+- cancelled
+
+Use existing admin token protection.
+
+STORE SCOPING
+
+All order and checkout logic must be store-scoped:
+- cart read uses active store
+- order created with active store
+- admin order list filtered by selected admin store
+- user should not see orders from another store
+
+SECURITY
+
+- Do not trust frontend prices.
+- Calculate totals server-side.
+- Do not trust frontend poster title/size labels.
+- Snapshot values server-side from database.
+- Admin order routes require admin token.
+- Public order confirmation should not expose other customers’ orders without a safe lookup strategy.
+
+If no user auth-based order history exists yet:
+- Keep order confirmation accessible only immediately after checkout or use an order id plus lightweight access token if feasible.
+- Do not overbuild customer account order history in this step.
+
+TESTING
+
+Add or update tests for:
+
+Checkout:
+- Empty cart cannot create order.
+- Invalid shipping form shows validation errors.
+- Valid cart creates order draft/pending_payment.
+- Cart is cleared after successful order creation.
+- Invalid inactive size blocks order creation.
+- Price is calculated server-side.
+
+Order snapshots:
+- order_items store title snapshot.
+- order_items store size snapshot.
+- order_items store unit price and currency.
+- order_items store image snapshot if supported.
+
+Admin:
+- /admin/orders requires admin token.
+- Admin order list shows orders for selected store only.
+- Admin order detail shows item snapshots.
+- Admin can update order status.
+
+Regression:
+- Homepage still loads.
+- Shop still loads.
+- Poster detail still loads.
+- Cart still works with selected size.
+- Favorites still work.
+- Admin poster CRUD still works.
+- Mockup assignment still works.
+- Store switching still works.
+
+At the end, summarize:
+1. Order model changes.
+2. Checkout validation.
+3. Server-side order calculation.
+4. Snapshot behavior.
+5. Admin order pages.
+6. Store scoping.
+7. Tests added/updated.
+8. What I should manually test before continuing.
