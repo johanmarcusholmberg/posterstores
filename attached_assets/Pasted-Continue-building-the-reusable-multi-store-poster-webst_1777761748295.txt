@@ -1,0 +1,235 @@
+Continue building the reusable multi-store poster webstore.
+
+CURRENT STATUS:
+- Reusable multi-store platform works.
+- PostsofSpain is the default active storefront.
+- Homepage, shop, poster detail, cart and favorites work.
+- Admin token gate works.
+- Admin poster CRUD works.
+- Store separation is verified.
+- Mockup template system works.
+- Poster mockups can be assigned, reordered and marked primary.
+- Public poster cards and detail pages can use primary mockups.
+- Poster asset separation is now implemented:
+  - masterPrintImageUrl
+  - previewImageUrl
+  - legacy imageUrl fallback
+- Existing posters still work.
+
+NEXT GOAL:
+Implement structured poster size and price variants.
+
+Important:
+- Do not rewrite the storefront.
+- Do not break existing posters.
+- Do not break admin poster CRUD.
+- Do not break mockup assignment.
+- Do not build Stripe/payment yet.
+- Do not connect print providers yet.
+- Keep everything store-scoped.
+- Keep all existing tests passing.
+
+WHY THIS MATTERS:
+A poster store needs exact purchasable variants.
+A user should not just buy “a poster”; they should buy:
+- poster
+- selected size
+- exact price
+- currency
+- quantity
+
+Orders must later store a snapshot of the selected title, size and price.
+
+DATA MODEL
+
+Create or update poster size/variant model:
+
+poster_sizes:
+- id
+- poster_id
+- size_label
+- width_cm
+- height_cm
+- price
+- currency
+- active
+- sort_order
+- created_at
+- updated_at
+
+Rules:
+- A poster can have multiple sizes.
+- Only active sizes are shown publicly.
+- Admin can create inactive sizes.
+- Price must be positive for active sizes.
+- Currency should default from the active store, for example EUR for PostsofSpain.
+- Sizes belong to a poster, and the poster belongs to a store.
+- Public queries must never expose sizes for posters outside active store.
+
+MIGRATION / BACKWARD COMPATIBILITY
+
+Current schema has partial size support as text labels and/or a simple price field.
+
+Do not remove old fields in this step if they are needed for backward compatibility.
+
+For existing posters:
+- If no poster_sizes rows exist, create default poster_sizes from existing fields.
+- Use existing price as the price for default sizes.
+- Use existing currency if available, otherwise active store currency.
+- If existing sizes are only text labels, create rows from those labels.
+- Suggested defaults if dimensions are unknown:
+  - A4 = 21 x 29.7
+  - A3 = 29.7 x 42
+  - A2 = 42 x 59.4
+  - 30x40 = 30 x 40
+  - 50x70 = 50 x 70
+- If a label is unknown, allow null dimensions or use 0 only if the schema requires a number. Prefer nullable dimensions if possible.
+
+ADMIN UI
+
+Update AdminPosterForm with a real “Sizes & pricing” section.
+
+Admin should be able to:
+- Add size row
+- Remove size row
+- Reorder size rows
+- Edit size label
+- Edit width cm
+- Edit height cm
+- Edit price
+- Edit currency
+- Toggle active/inactive
+
+Validation:
+- Poster cannot be published without at least one active size.
+- Every active size must have:
+  - size label
+  - positive price
+  - currency
+- Width/height should be optional if not known, but recommended.
+- Show validation messages clearly.
+
+Useful default size buttons:
+Add quick buttons:
+- Add A4
+- Add A3
+- Add A2
+- Add 30x40
+- Add 50x70
+
+Default suggested size rows for new posters:
+- A4
+- A3
+- 50x70
+
+Use active store default currency.
+
+PUBLIC STOREFRONT
+
+Poster card:
+- Show “From €X” using the lowest active size price.
+- If no active size exists, fall back to legacy price but avoid showing invalid prices.
+
+Poster detail:
+- Replace old/simple size selector with structured size selector.
+- Show all active poster_sizes.
+- Selecting a size updates displayed price.
+- Add to cart requires selected active size.
+- If only one active size exists, select it by default.
+- If no active size exists, disable add to cart and show:
+  “This poster is not currently available for purchase.”
+
+CART
+
+Update cart to use poster_size_id where possible.
+
+Cart item should store:
+- poster_id
+- poster_size_id
+- quantity
+- store_key
+
+Cart display should show:
+- poster title
+- selected size label
+- price
+- currency
+- quantity
+- subtotal
+
+If old cart items exist without poster_size_id:
+- Handle gracefully.
+- Prefer clearing invalid old cart items or showing a message.
+
+ORDER PREPARATION
+
+Update order item creation logic so it snapshots:
+
+order_items:
+- poster_id
+- poster_size_id
+- poster_title_snapshot
+- size_label_snapshot
+- width_cm_snapshot if supported
+- height_cm_snapshot if supported
+- unit_price
+- currency
+- quantity
+- total_price
+
+Do not build Stripe yet.
+Just make order drafts use the structured selected size and price.
+
+API / TYPES / CODEGEN
+
+Update API schemas/OpenAPI/codegen as needed.
+
+Add endpoints or extend existing endpoints to include poster sizes:
+- Public poster list should include lowest active price, or enough size data to compute it.
+- Poster detail should include active sizes.
+- Admin poster detail should include all sizes, active and inactive.
+- Admin create/update should support saving poster sizes.
+
+Keep API response shapes stable where possible, but update generated types if needed.
+
+TESTING
+
+Add or update tests for:
+
+Admin:
+- Admin can add/edit/remove size rows.
+- Admin can add default A4/A3/50x70 size rows.
+- Admin cannot publish poster without active valid size.
+- Active size requires label, price and currency.
+- Existing posters migrated from old price/sizes still load.
+
+Public:
+- Poster card shows lowest active price.
+- Poster detail shows structured size selector.
+- Selecting size changes price.
+- Add to cart requires selected size.
+- Poster with no active sizes cannot be added to cart.
+
+Cart/order:
+- Cart item includes selected size.
+- Cart total uses selected size price.
+- Order draft stores size and price snapshots.
+
+Regression:
+- Homepage still loads.
+- Shop still loads.
+- Poster detail still loads.
+- Cart still works.
+- Favorites still work.
+- Admin poster CRUD still works.
+- Mockup assignment still works.
+- Store switching still works.
+
+At the end, summarize:
+1. Data/model changes.
+2. Migration/backward compatibility behavior.
+3. Admin size/pricing UI.
+4. Public size selector behavior.
+5. Cart/order changes.
+6. Tests added/updated.
+7. What I should manually test before continuing.
