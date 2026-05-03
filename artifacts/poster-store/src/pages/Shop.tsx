@@ -59,6 +59,7 @@ export default function Shop() {
       params.delete(key);
     }
     setLocation(`/shop?${params.toString()}`);
+    window.scrollTo({ top: 0, behavior: "instant" });
   };
 
   return (
