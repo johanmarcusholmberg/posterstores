@@ -89,6 +89,21 @@ async function savePosterSizes(
   }
 }
 
+router.get("/admin/poster-meta", requireAdmin, async (req, res) => {
+  const storeKey = typeof req.query.storeKey === "string" ? req.query.storeKey : undefined;
+  if (!storeKey) return res.status(400).json({ error: "storeKey is required" });
+
+  const rows = await db
+    .select({ category: postersTable.category, region: postersTable.region })
+    .from(postersTable)
+    .where(eq(postersTable.storeKey, storeKey));
+
+  const categories = [...new Set(rows.map(r => r.category).filter((v): v is string => !!v))].sort();
+  const regions = [...new Set(rows.map(r => r.region).filter((v): v is string => !!v))].sort();
+
+  return res.json({ categories, regions });
+});
+
 router.get("/posters", async (req, res) => {
   const query = ListPostersQueryParams.safeParse(req.query);
   if (!query.success) {

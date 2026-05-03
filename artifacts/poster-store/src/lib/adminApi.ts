@@ -176,15 +176,30 @@ function extractErrorMessage(body: unknown): string {
 export async function adminListPosters(
   token: string,
   storeKey: string,
-  params: { status?: string; search?: string; limit?: number; offset?: number } = {}
+  params: { status?: string; search?: string; category?: string; region?: string; limit?: number; offset?: number } = {}
 ): Promise<AdminPosterListResponse> {
   const qs = new URLSearchParams({ storeKey });
   if (params.status) qs.set("status", params.status);
   if (params.search) qs.set("search", params.search);
+  if (params.category) qs.set("category", params.category);
+  if (params.region) qs.set("region", params.region);
   if (params.limit !== undefined) qs.set("limit", String(params.limit));
   if (params.offset !== undefined) qs.set("offset", String(params.offset));
 
   const res = await fetch(`${BASE}/posters?${qs}`, { headers: headers(token) });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(extractErrorMessage(body));
+  }
+  return res.json();
+}
+
+export async function adminGetPosterMeta(
+  token: string,
+  storeKey: string
+): Promise<{ categories: string[]; regions: string[] }> {
+  const qs = new URLSearchParams({ storeKey });
+  const res = await fetch(`${BASE}/admin/poster-meta?${qs}`, { headers: headers(token) });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(extractErrorMessage(body));

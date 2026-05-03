@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Link } from "wouter";
 import { useAdminToken } from "@/context/AdminTokenContext";
-import { adminListPosters, adminDeletePoster, type AdminPoster } from "@/lib/adminApi";
+import { adminListPosters, adminDeletePoster, adminGetPosterMeta, type AdminPoster } from "@/lib/adminApi";
 import { AdminStatusBadge } from "./AdminStatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,7 +36,21 @@ export const AdminPosterList = () => {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [regionFilter, setRegionFilter] = useState("all");
   const [searchInput, setSearchInput] = useState("");
+  const [categories, setCategories] = useState<string[]>([]);
+  const [regions, setRegions] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!token || !adminStoreKey) return;
+    adminGetPosterMeta(token, adminStoreKey)
+      .then(meta => {
+        setCategories(meta.categories);
+        setRegions(meta.regions);
+      })
+      .catch(() => {});
+  }, [token, adminStoreKey]);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -46,6 +60,8 @@ export const AdminPosterList = () => {
       const data = await adminListPosters(token, adminStoreKey, {
         status: statusFilter === "all" ? "all" : statusFilter,
         search: search || undefined,
+        category: categoryFilter === "all" ? undefined : categoryFilter,
+        region: regionFilter === "all" ? undefined : regionFilter,
         limit: LIMIT,
         offset,
       });
@@ -56,11 +72,11 @@ export const AdminPosterList = () => {
     } finally {
       setLoading(false);
     }
-  }, [token, adminStoreKey, statusFilter, search, offset]);
+  }, [token, adminStoreKey, statusFilter, categoryFilter, regionFilter, search, offset]);
 
   useEffect(() => {
     setOffset(0);
-  }, [adminStoreKey, statusFilter, search]);
+  }, [adminStoreKey, statusFilter, categoryFilter, regionFilter, search]);
 
   useEffect(() => {
     load();
@@ -111,6 +127,34 @@ export const AdminPosterList = () => {
               <SelectItem value="archived">Archived</SelectItem>
             </SelectContent>
           </Select>
+
+          {categories.length > 0 && (
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="h-8 w-36 text-sm" data-testid="category-filter">
+                <SelectValue placeholder="All categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All categories</SelectItem>
+                {categories.map(c => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {regions.length > 0 && (
+            <Select value={regionFilter} onValueChange={setRegionFilter}>
+              <SelectTrigger className="h-8 w-36 text-sm" data-testid="region-filter">
+                <SelectValue placeholder="All regions" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All regions</SelectItem>
+                {regions.map(r => (
+                  <SelectItem key={r} value={r}>{r}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
 
           <Button variant="ghost" size="sm" className="h-8 gap-1" onClick={load}>
             <RefreshCw className="w-3.5 h-3.5" />
