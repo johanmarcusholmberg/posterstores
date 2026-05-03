@@ -344,18 +344,32 @@ export function resolvePosterDisplayImage(
   fallbackImageUrl: string
 ): string {
   if (!mockups || mockups.length === 0) return fallbackImageUrl;
-  const validMockups = mockups.filter(
-    (m) =>
+
+  // Filter to only active mockups that have a displayable image
+  const activeMockups = mockups.filter((m) => {
+    // Custom image URLs with no template are always active
+    if (!m.mockupTemplateId) return !!m.mockupImageUrl;
+    // If template is present, it must be active
+    if (m.template && m.template.active === false) return false;
+    // Must have some displayable URL
+    return !!(
       m.mockupImageUrl ||
       m.template?.previewThumbnailUrl ||
       m.template?.backgroundImageUrl
-  );
-  if (validMockups.length === 0) return fallbackImageUrl;
-  const primary = validMockups.find((m) => m.isPrimary) ?? validMockups[0];
-  if (primary.mockupImageUrl) return primary.mockupImageUrl;
-  if (primary.template?.previewThumbnailUrl)
-    return primary.template.previewThumbnailUrl;
-  if (primary.template?.backgroundImageUrl)
-    return primary.template.backgroundImageUrl;
+    );
+  });
+
+  if (activeMockups.length === 0) return fallbackImageUrl;
+
+  // Priority: featured+primary > featured > primary > first active
+  const pick =
+    activeMockups.find((m) => m.isPrimary && m.template?.isFeatured) ??
+    activeMockups.find((m) => m.template?.isFeatured) ??
+    activeMockups.find((m) => m.isPrimary) ??
+    activeMockups[0];
+
+  if (pick.mockupImageUrl) return pick.mockupImageUrl;
+  if (pick.template?.previewThumbnailUrl) return pick.template.previewThumbnailUrl;
+  if (pick.template?.backgroundImageUrl) return pick.template.backgroundImageUrl;
   return fallbackImageUrl;
 }

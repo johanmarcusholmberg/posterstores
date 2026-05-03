@@ -44,7 +44,13 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
     getPosterMockups(poster.id, store.storeKey)
       .then((mockups: PosterMockup[]) => {
         if (!cancelled) {
-          setDisplayImage(resolvePosterDisplayImage(mockups, poster.imageUrl));
+          // Filter out inactive template mockups before resolving the display image
+          const activeMockups = mockups.filter((m) => {
+            if (!m.mockupTemplateId) return !!m.mockupImageUrl;
+            if (m.template && m.template.active === false) return false;
+            return !!(m.mockupImageUrl || m.template?.previewThumbnailUrl || m.template?.backgroundImageUrl);
+          });
+          setDisplayImage(resolvePosterDisplayImage(activeMockups, poster.imageUrl));
         }
       })
       .catch(() => {});

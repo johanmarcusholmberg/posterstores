@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { MockupGallery } from "@/components/public/MockupGallery";
 import { PosterCard } from "@/components/shared/PosterCard";
 import { LoginPromptModal } from "@/components/shared/LoginPromptModal";
-import { ShoppingBag, ArrowLeft, Heart } from "lucide-react";
+import { ShoppingBag, ArrowLeft, Heart, ChevronDown, ChevronUp, Shield, Truck, Package, Sparkles } from "lucide-react";
 import { getPosterMockups, type PosterMockup } from "@/lib/mockupApi";
 import { useAddCartItem, getGetCartQueryKey, useListPosters, getListPostersQueryKey } from "@workspace/api-client-react";
 import { addFavorite, removeFavorite, getFavoriteIds } from "@/lib/favoritesApi";
@@ -49,6 +49,28 @@ function formatPrice(price: number, currency: string): string {
   const symbol = symbols[currency] ?? currency;
   if (currency === "SEK") return `${price.toFixed(0)} ${symbol}`;
   return `${symbol}${price.toFixed(2)}`;
+}
+
+function CollapsibleSection({ title, children }: { title: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="border-b border-border last:border-0">
+      <button
+        type="button"
+        className="flex items-center justify-between w-full py-4 text-sm font-medium text-foreground hover:text-primary transition-colors"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+      >
+        {title}
+        {open ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+      </button>
+      {open && (
+        <div className="pb-4 text-sm text-muted-foreground space-y-1 leading-relaxed">
+          {children}
+        </div>
+      )}
+    </div>
+  );
 }
 
 async function fetchPosterBySlug(storeKey: string, slug: string): Promise<PosterData | null> {
@@ -245,6 +267,7 @@ export default function PosterBySlug() {
             mockups={mockups ?? []}
             fallbackImageUrl={poster.imageUrl}
             alt={poster.title}
+            isLoading={mockups === null}
           />
         </div>
 

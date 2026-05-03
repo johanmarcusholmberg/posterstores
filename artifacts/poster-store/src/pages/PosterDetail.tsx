@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { PosterCard } from "@/components/shared/PosterCard";
 import { MockupGallery } from "@/components/public/MockupGallery";
 import { LoginPromptModal } from "@/components/shared/LoginPromptModal";
-import { ShoppingBag, ArrowLeft, Heart, ChevronDown, ChevronUp, Shield, Truck, Package, Sparkles } from "lucide-react";
+import { ShoppingBag, ArrowLeft, Heart, ChevronDown, ChevronUp, Shield, Truck, Package, Sparkles, Star } from "lucide-react";
 import { getPosterMockups, type PosterMockup } from "@/lib/mockupApi";
 import { addFavorite, removeFavorite, getFavoriteIds } from "@/lib/favoritesApi";
 
@@ -229,6 +229,7 @@ export default function PosterDetail() {
             mockups={mockups ?? []}
             fallbackImageUrl={poster.imageUrl}
             alt={poster.title}
+            isLoading={mockups === null}
           />
         </div>
 
