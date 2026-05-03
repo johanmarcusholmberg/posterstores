@@ -60,7 +60,7 @@ router.get("/admin/content", requireAdmin, async (req, res) => {
 
 router.get("/admin/content/:pageKey", requireAdmin, async (req, res) => {
   const storeKey = req.query.storeKey ? String(req.query.storeKey) : null;
-  const { pageKey } = req.params;
+  const pageKey = String(req.params.pageKey);
 
   if (!storeKey) {
     return res.status(400).json({ error: "storeKey query parameter is required" });
@@ -91,7 +91,7 @@ router.get("/admin/content/:pageKey", requireAdmin, async (req, res) => {
 
 router.put("/admin/content/:pageKey", requireAdmin, async (req, res) => {
   const storeKey = req.query.storeKey ? String(req.query.storeKey) : null;
-  const { pageKey } = req.params;
+  const pageKey = String(req.params.pageKey);
 
   if (!storeKey) {
     return res.status(400).json({ error: "storeKey query parameter is required" });
