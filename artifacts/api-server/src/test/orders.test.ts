@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, beforeAll } from "vitest";
 import request from "supertest";
 import app from "../app";
-import { db } from "@workspace/db";
+import { db, pool } from "@workspace/db";
 import {
   ordersTable,
   orderItemsTable,
@@ -512,12 +512,29 @@ describe("Regression: existing endpoints still work", () => {
     await db.delete(cartItemsTable).where(eq(cartItemsTable.sessionId, sessionId));
   });
 
-  it("GET /api/favorites returns list for session", async () => {
-    const res = await request(app).get(
-      `/api/favorites?sessionId=regression-fav-${Date.now()}&storeKey=${TEST_STORE_KEY}`
-    );
+  it("GET /api/user/favorites returns list for authenticated user", async () => {
+    // Favorites require a logged-in user (storeKey-scoped); register a temp user to get the session cookie
+    const favEmail = `fav-regression-${Date.now()}@example.com`;
+    const registerRes = await request(app)
+      .post("/api/auth/register")
+      .send({ email: favEmail, password: "test-password-123" });
+    expect(registerRes.status).toBe(201);
+
+    const cookie = registerRes.headers["set-cookie"] as string | string[];
+
+    const res = await request(app)
+      .get(`/api/user/favorites?storeKey=${TEST_STORE_KEY}`)
+      .set("Cookie", Array.isArray(cookie) ? cookie.join("; ") : cookie);
+
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
+
+    // Clean up temp user and their session
+    await pool.query(
+      "DELETE FROM user_sessions WHERE user_id = (SELECT id FROM users WHERE email = $1)",
+      [favEmail]
+    );
+    await pool.query("DELETE FROM users WHERE email = $1", [favEmail]);
   });
 
   it("Admin poster CRUD still works (list)", async () => {
