@@ -1,0 +1,62 @@
+All 58 tests pass. Here's a complete summary of what was built:
+
+Email Infrastructure Summary
+1. Email Service Structure
+Created artifacts/api-server/src/email/emailService.ts — a dedicated email layer with three exported functions:
+
+sendPaymentConfirmedEmail(order, items) — customer confirmation on payment
+sendAdminNewOrderEmail(order, items) — admin alert on new paid order
+sendOrderCreatedEmail(order, items) — stub (skipped by design, pending-payment email not sent)
+2. Provider Abstraction
+The service reads EMAIL_PROVIDER at runtime and routes to the appropriate sender:
+
+resend → calls the Resend API using RESEND_API_KEY
+anything else / unset → mock sender that logs the full email payload server-side and does not crash
+If RESEND_API_KEY is missing even when EMAIL_PROVIDER=resend, it falls back to mock safely.
+
+3. Environment Variables
+Variable	Purpose
+EMAIL_PROVIDER	resend for real sending; omit for mock/dev
+EMAIL_FROM	Sender address (e.g. orders@postsofspain.com)
+RESEND_API_KEY	Required only when EMAIL_PROVIDER=resend
+ADMIN_ORDER_NOTIFICATION_EMAIL	Where admin alerts go; skipped if not set
+APP_BASE_URL	Used for "View in Admin" link in the admin email
+4. Which Emails Are Sent and When
+Email	Trigger
+Customer payment confirmation	Stripe checkout.session.completed webhook (payment_status=paid)
+Admin new order notification	Same webhook, immediately after customer email
+Both also fire via the verify-payment fallback route if webhook hasn't delivered yet	
+5. Idempotency
+Two new timestamp columns added to the orders table:
+
+customer_confirmation_sent_at — set after successful customer email
+admin_notification_sent_at — set after successful admin email
+Before sending, the webhook checks these columns. If already set → skips silently with a log. Duplicate webhook deliveries cannot cause duplicate emails.
+
+6. Admin Email Status Display
+The admin order detail page now shows an Email Notifications panel with:
+
+✅ Green checkmark + timestamp when sent
+✗ Grey icon when not yet sent
+Separate rows for customer confirmation and admin notification
+7. Tests Added (11 new, all passing — 58 total)
+Mock sender does not throw when no provider configured
+Admin notification skipped when ADMIN_ORDER_NOTIFICATION_EMAIL not set
+Email uses store name in subject (PostsofSpain)
+Webhook sets customerConfirmationSentAt after first delivery
+Duplicate webhook does not send duplicate emails (idempotency)
+Order remains paid even if email sending throws
+Admin notification sets adminNotificationSentAt when email is configured
+Admin order API returns email timestamp fields
+API returns null for timestamps when emails not sent
+Regression: webhook still marks order paid after refactor
+Regression: missing EMAIL_PROVIDER does not crash checkout
+8. To Enable Real Email Sending
+Set these secrets/environment variables:
+
+EMAIL_PROVIDER=resend
+RESEND_API_KEY=re_your_key_here
+EMAIL_FROM=orders@yourdomain.com
+ADMIN_ORDER_NOTIFICATION_EMAIL=you@yourdomain.com
+
+No code changes needed — the provider switch is entirely configuration-driven.
