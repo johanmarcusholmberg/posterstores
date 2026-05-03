@@ -682,10 +682,13 @@ export default function Checkout() {
                     </div>
                   )}
 
-                  <div className="border border-border rounded-lg overflow-hidden">
-                    <div className="flex items-center gap-3 bg-muted/20 px-4 py-3 border-b border-border">
-                      <Shield className="h-4 w-4 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground">You will be redirected to Stripe's secure payment page</p>
+                  <div className="border border-border rounded-lg overflow-hidden" data-testid="checkout-payment-block">
+                    <div className="px-4 py-3 border-b border-border bg-muted/20 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-4 w-4 text-primary/70 shrink-0" />
+                        <p className="text-sm font-medium text-foreground">Secure payment handled by Stripe</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground pl-6">We never store your card details. You'll be redirected to Stripe's secure checkout page.</p>
                     </div>
                     <div className="p-4">
                       <Button

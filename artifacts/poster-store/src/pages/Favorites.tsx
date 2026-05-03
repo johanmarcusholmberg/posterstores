@@ -24,7 +24,7 @@ export default function Favorites() {
       const data = await getFavorites(store.storeKey);
       setFavorites(data);
     } catch {
-      setError("Could not load your wishlist.");
+      setError("Could not load your saved posters. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -41,7 +41,7 @@ export default function Favorites() {
       await removeFavorite(posterId, store.storeKey);
     } catch {
       setFavorites(prev);
-      toast({ variant: "destructive", title: "Could not remove poster. Please try again." });
+      toast({ variant: "destructive", title: "Could not remove poster", description: "Please try again." });
     }
   };
 
@@ -59,15 +59,24 @@ export default function Favorites() {
 
   if (!user) {
     return (
-      <div className="container mx-auto px-4 py-32 text-center">
-        <Heart className="h-16 w-16 text-muted-foreground mx-auto mb-6" />
-        <h2 className="font-serif text-2xl font-bold mb-4">Log in to see your saved posters</h2>
-        <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-          Create an account to keep your favorite posters across devices.
+      <div className="container mx-auto px-4 py-32 text-center" data-testid="favorites-logged-out">
+        <div className="mx-auto mb-6 w-20 h-20 rounded-full bg-secondary/10 flex items-center justify-center">
+          <Heart className="h-10 w-10 text-secondary" />
+        </div>
+        <h2 className="font-serif text-3xl font-bold mb-3">Save posters you love</h2>
+        <p className="text-muted-foreground mb-8 max-w-md mx-auto leading-relaxed">
+          Create a free account to keep a personal favorite list across devices.
         </p>
-        <div className="flex gap-3 justify-center">
-          <Link href="/login"><Button size="lg">Log in</Button></Link>
-          <Link href="/register"><Button size="lg" variant="outline">Create account</Button></Link>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Link href="/register">
+            <Button size="lg" className="w-full sm:w-auto" data-testid="btn-favorites-register">Create account</Button>
+          </Link>
+          <Link href="/login">
+            <Button size="lg" variant="outline" className="w-full sm:w-auto" data-testid="btn-favorites-login">Log in</Button>
+          </Link>
+          <Link href="/shop">
+            <Button size="lg" variant="ghost" className="w-full sm:w-auto text-muted-foreground">Continue browsing</Button>
+          </Link>
         </div>
       </div>
     );
@@ -91,14 +100,14 @@ export default function Favorites() {
           ))}
         </div>
       ) : !error && favorites.length === 0 ? (
-        <div className="text-center py-32 bg-sand/30 rounded-xl">
+        <div className="text-center py-32 bg-sand/30 rounded-xl" data-testid="favorites-empty">
           <Heart className="h-16 w-16 text-muted-foreground mx-auto mb-6" />
-          <h2 className="font-serif text-2xl font-bold mb-4">You haven't saved any posters yet</h2>
+          <h2 className="font-serif text-2xl font-bold mb-3">No saved posters yet</h2>
           <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-            Browse posters and tap the heart icon to save your favorites.
+            Browse the collection and tap the heart icon on any poster to save it here.
           </p>
           <Link href="/shop">
-            <Button size="lg">Browse Gallery</Button>
+            <Button size="lg">Browse the collection</Button>
           </Link>
         </div>
       ) : (
@@ -117,7 +126,7 @@ export default function Favorites() {
                     <button
                       onClick={(e) => { e.preventDefault(); handleRemove(poster.id); }}
                       className="absolute top-2 right-2 bg-white/70 backdrop-blur hover:bg-white/90 rounded-full p-2 transition-colors"
-                      aria-label="Remove from wishlist"
+                      aria-label="Remove from saved"
                     >
                       <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
                     </button>

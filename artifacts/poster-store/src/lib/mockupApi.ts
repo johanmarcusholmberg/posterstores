@@ -172,7 +172,11 @@ export function resolvePosterDisplayImage(
   fallbackImageUrl: string
 ): string {
   if (!mockups || mockups.length === 0) return fallbackImageUrl;
-  const primary = mockups.find((m) => m.isPrimary) ?? mockups[0];
+  const validMockups = mockups.filter(
+    (m) => m.mockupImageUrl || m.template?.previewThumbnailUrl
+  );
+  if (validMockups.length === 0) return fallbackImageUrl;
+  const primary = validMockups.find((m) => m.isPrimary) ?? validMockups[0];
   if (primary.mockupImageUrl) return primary.mockupImageUrl;
   if (primary.template?.previewThumbnailUrl)
     return primary.template.previewThumbnailUrl;

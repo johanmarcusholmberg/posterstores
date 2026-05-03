@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { PosterCard } from "@/components/shared/PosterCard";
 import { MockupGallery } from "@/components/public/MockupGallery";
 import { LoginPromptModal } from "@/components/shared/LoginPromptModal";
-import { ShoppingBag, ArrowLeft, Heart } from "lucide-react";
+import { ShoppingBag, ArrowLeft, Heart, ChevronDown, ChevronUp, Shield, Truck, Package, Sparkles } from "lucide-react";
 import { getPosterMockups, type PosterMockup } from "@/lib/mockupApi";
 import { addFavorite, removeFavorite, getFavoriteIds } from "@/lib/favoritesApi";
 
@@ -28,6 +28,28 @@ function formatPrice(price: number, currency: string): string {
   const symbol = symbols[currency] ?? currency;
   if (currency === "SEK") return `${price.toFixed(0)} ${symbol}`;
   return `${symbol}${price.toFixed(2)}`;
+}
+
+function CollapsibleSection({ title, children }: { title: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="border-b border-border last:border-0">
+      <button
+        type="button"
+        className="flex items-center justify-between w-full py-4 text-sm font-medium text-foreground hover:text-primary transition-colors"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+      >
+        {title}
+        {open ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+      </button>
+      {open && (
+        <div className="pb-4 text-sm text-muted-foreground space-y-1 leading-relaxed">
+          {children}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function PosterDetail() {
@@ -113,11 +135,11 @@ export default function PosterDetail() {
   const handleAddToCart = () => {
     if (!poster) return;
     if (activeSizes.length === 0) {
-      toast({ variant: "destructive", title: "This poster is not currently available for purchase." });
+      toast({ variant: "destructive", title: "Not available", description: "This poster is not currently available for purchase." });
       return;
     }
     if (activeSizes.length > 0 && !selectedSizeId) {
-      toast({ variant: "destructive", title: "Please select a size" });
+      toast({ variant: "destructive", title: "Select a size", description: "Please choose a size before adding to cart." });
       return;
     }
     addCartItem.mutate(
@@ -136,8 +158,11 @@ export default function PosterDetail() {
           queryClient.invalidateQueries({ queryKey: getGetCartQueryKey({ sessionId, storeKey: store.storeKey }) });
           toast({
             title: "Added to cart",
-            description: `${poster.title}${selectedSize ? ` — ${selectedSize.sizeLabel}` : ""} has been added to your cart.`,
+            description: `${poster.title}${selectedSize ? ` — ${selectedSize.sizeLabel}` : ""} is in your cart.`,
           });
+        },
+        onError: () => {
+          toast({ variant: "destructive", title: "Could not add to cart", description: "Please try again." });
         },
       }
     );
@@ -155,13 +180,14 @@ export default function PosterDetail() {
     try {
       if (next) {
         await addFavorite(poster.id, store.storeKey);
-        toast({ title: "Added to saved posters" });
+        toast({ title: "Saved", description: "Added to your saved posters." });
       } else {
         await removeFavorite(poster.id, store.storeKey);
+        toast({ title: "Removed", description: "Removed from your saved posters." });
       }
     } catch {
       setIsFavorite(!next);
-      toast({ variant: "destructive", title: "Could not save poster. Please try again." });
+      toast({ variant: "destructive", title: "Could not save poster", description: "Please try again." });
     } finally {
       setFavoritesPending(false);
     }
@@ -274,14 +300,58 @@ export default function PosterDetail() {
               className="h-14 px-4"
               onClick={handleToggleFavorite}
               disabled={favoritesPending}
-              aria-label={isFavorite ? "Remove from wishlist" : "Add to wishlist"}
+              aria-label={isFavorite ? "Remove from wishlist" : "Save to wishlist"}
             >
               <Heart className={`h-5 w-5 ${isFavorite ? "fill-secondary text-secondary" : ""}`} />
             </Button>
           </div>
 
+          {/* Trust block */}
+          <div className="mt-8 rounded-lg border border-border bg-muted/20 px-4 py-4" data-testid="trust-block">
+            <ul className="space-y-2.5">
+              <li className="flex items-center gap-2.5 text-sm text-muted-foreground">
+                <Sparkles className="h-4 w-4 shrink-0 text-primary/70" />
+                Printed on demand — each poster is made fresh for your order
+              </li>
+              <li className="flex items-center gap-2.5 text-sm text-muted-foreground">
+                <Shield className="h-4 w-4 shrink-0 text-primary/70" />
+                Secure payment with Stripe — we never store your card details
+              </li>
+              <li className="flex items-center gap-2.5 text-sm text-muted-foreground">
+                <Package className="h-4 w-4 shrink-0 text-primary/70" />
+                Carefully packed and protected for shipping
+              </li>
+              <li className="flex items-center gap-2.5 text-sm text-muted-foreground">
+                <Truck className="h-4 w-4 shrink-0 text-primary/70" />
+                High-resolution print file prepared for professional production
+              </li>
+            </ul>
+          </div>
+
+          {/* Collapsible info sections */}
+          <div className="mt-6 border border-border rounded-lg divide-y divide-border overflow-hidden" data-testid="poster-info-sections">
+            <CollapsibleSection title="Print details">
+              <p>All posters are produced at professional print studios using archival-quality paper and inks.</p>
+              <p className="mt-2">Files are prepared at full resolution and reviewed before production to ensure the best possible result.</p>
+            </CollapsibleSection>
+            <CollapsibleSection title="Shipping & delivery">
+              <p>Shipping options and delivery estimates are shown at checkout based on your location.</p>
+              <p className="mt-2">Orders are typically dispatched within 2–5 business days after payment confirmation.</p>
+              <p className="mt-2">
+                <Link href="/shipping" className="text-primary hover:underline">Full shipping information →</Link>
+              </p>
+            </CollapsibleSection>
+            <CollapsibleSection title="Returns & damaged items">
+              <p>We accept returns within 14 days for items that arrive damaged or with a production defect.</p>
+              <p className="mt-2">Please photograph the issue and contact us — we'll arrange a reprint or refund promptly.</p>
+              <p className="mt-2">
+                <Link href="/returns" className="text-primary hover:underline">Returns policy →</Link>
+              </p>
+            </CollapsibleSection>
+          </div>
+
           {poster.tags && poster.tags.length > 0 && (
-            <div className="mt-12 flex flex-wrap gap-2">
+            <div className="mt-8 flex flex-wrap gap-2">
               {poster.tags.map(tag => (
                 <Link key={tag} href={`/shop?tag=${encodeURIComponent(tag)}`}>
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer">

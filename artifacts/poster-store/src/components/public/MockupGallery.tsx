@@ -9,10 +9,10 @@ interface MockupGalleryProps {
   alt: string;
 }
 
-function getDisplayUrl(m: PosterMockup, fallback: string): string {
+function getDisplayUrl(m: PosterMockup): string | null {
   if (m.mockupImageUrl) return m.mockupImageUrl;
   if (m.template?.previewThumbnailUrl) return m.template.previewThumbnailUrl;
-  return fallback;
+  return null;
 }
 
 export const MockupGallery = ({
@@ -20,17 +20,22 @@ export const MockupGallery = ({
   fallbackImageUrl,
   alt,
 }: MockupGalleryProps) => {
+  const primaryMockup = mockups.find((m) => m.isPrimary) ?? null;
+
   const allImages = [
     { url: fallbackImageUrl, label: "Original" },
-    ...mockups.map((m) => ({
-      url: getDisplayUrl(m, fallbackImageUrl),
-      label: m.template?.name ?? "Custom",
-    })),
+    ...mockups
+      .filter(m => getDisplayUrl(m) !== null)
+      .map((m) => ({
+        url: getDisplayUrl(m) as string,
+        label: m.template?.name ?? "Custom",
+      })),
   ].filter((img, idx, arr) => arr.findIndex((x) => x.url === img.url) === idx);
 
-  const primaryMockup = mockups.find((m) => m.isPrimary) ?? mockups[0] ?? null;
-  const primaryUrl = primaryMockup ? getDisplayUrl(primaryMockup, fallbackImageUrl) : fallbackImageUrl;
-  const primaryIdx = allImages.findIndex((i) => i.url === primaryUrl);
+  const primaryDisplayUrl = primaryMockup ? getDisplayUrl(primaryMockup) : null;
+  const primaryIdx = primaryDisplayUrl
+    ? allImages.findIndex((i) => i.url === primaryDisplayUrl)
+    : 0;
 
   const [activeIdx, setActiveIdx] = useState(primaryIdx >= 0 ? primaryIdx : 0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -151,7 +156,6 @@ export const MockupGallery = ({
                 }}
               />
 
-              {/* Prev / Next arrows */}
               {allImages.length > 1 && (
                 <>
                   <button

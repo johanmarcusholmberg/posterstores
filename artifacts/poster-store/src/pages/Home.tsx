@@ -9,6 +9,25 @@ import {
 } from "@workspace/api-client-react";
 import { PosterCard } from "@/components/shared/PosterCard";
 import { Button } from "@/components/ui/button";
+import { MapPin, Home as HomeIcon, ShoppingBag } from "lucide-react";
+
+const DEFAULT_VALUE_CARDS = [
+  {
+    icon: MapPin,
+    title: "Inspired by real places",
+    description: "Every poster in the collection is rooted in a real city, landscape or moment — not a studio concept.",
+  },
+  {
+    icon: HomeIcon,
+    title: "Printed for modern homes",
+    description: "Produced on archival-quality paper with professional inks, designed to look beautiful on your wall.",
+  },
+  {
+    icon: ShoppingBag,
+    title: "Easy ordering, secure payment",
+    description: "Choose your size, check out in minutes, and your order ships straight to your door.",
+  },
+];
 
 export default function Home() {
   const store = useStorefront();
@@ -32,6 +51,9 @@ export default function Home() {
   );
 
   const heroPosters = featured?.slice(0, 4) ?? [];
+
+  const brandStory = (store as any).homepage?.brandStory ?? "A curated poster collection inspired by cities, landscapes, food, architecture and everyday moments.";
+  const valueCards = (store as any).homepage?.valueCards ?? DEFAULT_VALUE_CARDS;
 
   return (
     <div className="min-h-screen pb-16">
@@ -77,11 +99,10 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Right: Staggered poster collage — clips intentionally at top/bottom */}
+            {/* Right: Staggered poster collage */}
             <div className="order-1 lg:order-2 h-full flex items-center overflow-hidden">
               {heroPosters.length > 0 ? (
                 <div className="grid grid-cols-2 gap-3 lg:gap-4 w-full h-full">
-                  {/* Column 1 */}
                   <div className="flex flex-col gap-3 lg:gap-4 pt-4">
                     {heroPosters.slice(0, 2).map((poster) => (
                       <Link
@@ -99,7 +120,6 @@ export default function Home() {
                       </Link>
                     ))}
                   </div>
-                  {/* Column 2 */}
                   <div className="flex flex-col gap-3 lg:gap-4 pt-4">
                     {heroPosters.slice(2, 4).map((poster) => (
                       <Link
@@ -119,7 +139,6 @@ export default function Home() {
                   </div>
                 </div>
               ) : (
-                /* Skeleton while loading */
                 <div className="grid grid-cols-2 gap-3 lg:gap-4 w-full h-[110%]">
                   <div className="flex flex-col gap-3 lg:gap-4 -mt-[8%]">
                     <div className="flex-1 bg-muted/60 animate-pulse rounded-xl" />
@@ -137,8 +156,31 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Brand story + Value section */}
+      <section className="container mx-auto px-4 py-20" data-testid="brand-story-section">
+        <div className="max-w-2xl mx-auto text-center mb-14">
+          <p className="font-serif text-xl md:text-2xl text-foreground/80 leading-relaxed italic">
+            "{brandStory}"
+          </p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+          {valueCards.map((card: typeof DEFAULT_VALUE_CARDS[0], i: number) => {
+            const Icon = card.icon;
+            return (
+              <div key={i} className="text-center px-4" data-testid={`value-card-${i}`}>
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                  <Icon className="h-5 w-5 text-primary" />
+                </div>
+                <h3 className="font-serif font-bold text-lg mb-2">{card.title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{card.description}</p>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
       {/* Featured Collection */}
-      <section className="container mx-auto px-4 py-20">
+      <section className="container mx-auto px-4 py-20 border-t border-border">
         <div className="flex items-center justify-between mb-10">
           <h2 className="font-serif text-3xl font-bold text-foreground">Featured Gallery</h2>
           <Link href="/shop" className="text-primary font-medium hover:underline">

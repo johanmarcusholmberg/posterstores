@@ -24,6 +24,7 @@ export interface StorefrontConfig {
     secondaryCta?: string;
     newsletterTitle?: string;
     newsletterSubtitle?: string;
+    brandStory?: string;
   };
   regions: string[];
   cities: string[];
