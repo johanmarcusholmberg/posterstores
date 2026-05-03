@@ -1,0 +1,262 @@
+Continue building the reusable multi-store poster webstore.
+
+CURRENT STATUS:
+- Reusable multi-store platform works.
+- PostsofSpain is the default active storefront.
+- Homepage, shop, poster detail, cart and favorites work.
+- Admin poster CRUD works.
+- Mockup assignment works.
+- Asset separation works.
+- Structured sizes/prices work.
+- Checkout/order creation is hardened.
+- Stripe payment works.
+- Transactional e-mails work.
+- Fulfillment workflow works.
+- CSV fulfillment export works.
+- SEO-friendly poster slugs work.
+- Public poster URLs now use /posters/:slug.
+- ID-based poster route still works for backward compatibility.
+- Store separation is verified.
+- Admin store selector already exists.
+- 105 tests pass.
+
+NEXT GOAL:
+Create admin store management so I can create and manage new webstores such as PostsofSweden, PostsofItaly, PostsofPortugal, etc. without duplicating the app.
+
+Important:
+- Do not create a separate app.
+- Do not duplicate the codebase.
+- Do not break PostsofSpain.
+- Do not break poster slugs.
+- Do not break checkout, Stripe, e-mail, fulfillment, mockups or admin poster CRUD.
+- Keep all existing tests passing.
+- Keep everything store-scoped.
+
+WHY THIS MATTERS:
+I want one shared poster commerce engine, where each webstore has its own:
+- store name
+- store key
+- country focus
+- currency
+- language
+- theme colors
+- homepage copy
+- regions
+- cities
+- categories
+- tags
+- posters
+- orders
+- newsletter subscribers
+
+DATA MODEL
+
+Create or update stores table/model if needed.
+
+stores should support:
+- id
+- store_key
+- name
+- country_focus
+- default_currency
+- default_language
+- active boolean
+- theme_config json
+- homepage_config json
+- seo_config json nullable
+- navigation_config json nullable
+- created_at
+- updated_at
+
+Store key rules:
+- required
+- lowercase
+- URL-safe
+- unique
+- examples:
+  - postsofspain
+  - postsofsweden
+  - postsofitaly
+
+ADMIN ROUTES
+
+Create:
+
+/admin/stores
+/admin/stores/new
+/admin/stores/:storeKey
+
+/admin/stores:
+Show list of stores:
+- Store name
+- Store key
+- Country focus
+- Currency
+- Language
+- Active status
+- Poster count
+- Order count
+- Edit button
+
+/admin/stores/new:
+Create new store form.
+
+/admin/stores/:storeKey:
+Edit existing store.
+
+ADMIN STORE FORM
+
+Fields:
+
+Core:
+- Store name
+- Store key
+- Country focus
+- Default currency
+- Default language
+- Active toggle
+
+Homepage:
+- Hero title
+- Hero subtitle
+- Primary CTA
+- Secondary CTA
+- Newsletter title
+- Newsletter subtitle
+
+Theme colors:
+- background
+- surface
+- sand
+- primary
+- secondary
+- text
+- muted
+- border
+
+SEO:
+- Default SEO title
+- Default SEO description
+
+Taxonomy starter lists:
+- Regions
+- Cities
+- Categories
+- Tags
+
+The taxonomy starter lists can be edited as comma-separated values or simple repeatable rows.
+
+VALIDATION
+
+- storeKey is required.
+- storeKey must be lowercase and URL-safe.
+- storeKey must be unique.
+- Store name is required.
+- Currency is required.
+- Language is required.
+- Theme colors must be valid hex values.
+- Do not allow deleting a store that has posters/orders.
+- Prefer archive/deactivate instead of delete.
+
+STORE CONFIG BRIDGE
+
+Important:
+The app currently uses storefronts.ts/static config and/or active store config.
+
+Implement a clean bridge so stores can be loaded from the database at runtime if available.
+
+Behavior:
+- If a store exists in the database, use database config.
+- If no database store config exists, fall back to existing storefronts.ts config.
+- PostsofSpain must continue working.
+- Existing PostsofSweden example config can remain as fallback/example.
+
+ACTIVE STORE RESOLUTION
+
+Keep existing ACTIVE_STORE_KEY behavior.
+
+Prepare resolver priority:
+
+1. Explicit route/domain resolver if present later.
+2. Environment variable or existing ACTIVE_STORE_KEY.
+3. Default fallback: postsofspain.
+
+Do not fully implement custom domains yet unless already supported.
+Just prepare the architecture so domain-based routing can be added in the next phase.
+
+ADMIN STORE SELECTOR
+
+Update the admin store selector:
+- Load stores from database if available.
+- Include fallback config stores if database stores are not present.
+- Show active stores.
+- Allow selecting a newly created store immediately.
+- Persist selection in localStorage as it does today.
+- Selecting a new store should update all admin pages.
+
+TAXONOMY BEHAVIOR
+
+For now, if the project still uses config-based taxonomy:
+- Save starter taxonomy into the store homepage/config JSON or taxonomy config.
+- Use it in the storefront filters for that store.
+- Do not build a full separate taxonomy CRUD unless already simple.
+
+If taxonomy tables already exist:
+- Create initial rows scoped to the new store.
+
+Storefront behavior:
+- New store should be able to render homepage regions/categories/cities from its config.
+- Shop should be able to filter using the new store’s configured taxonomy and poster data.
+
+GLOBAL MOCKUPS
+
+Global mockup templates should be available to new stores automatically.
+Store-specific mockup templates should remain scoped to their store.
+
+TESTING
+
+Add or update tests for:
+
+Admin stores:
+- /admin/stores requires admin token.
+- Admin can create a new store.
+- Duplicate storeKey is rejected.
+- Invalid storeKey is rejected.
+- Invalid hex color is rejected.
+- Admin can edit store config.
+- Deactivated stores do not appear as active storefront options if that is intended.
+
+Store selector:
+- Newly created store appears in admin store selector.
+- Switching to the new store shows no PostsofSpain posters.
+- Creating a poster under the new store does not appear in PostsofSpain.
+
+Storefront config:
+- New store homepage uses its own hero copy.
+- New store uses its own currency.
+- New store taxonomy renders its own regions/categories/cities.
+- PostsofSpain still renders unchanged.
+
+Global mockups:
+- New store can see global mockup templates.
+
+Regression:
+- Homepage still loads.
+- Shop still loads.
+- Poster slug pages still load.
+- Cart still works.
+- Favorites still work.
+- Admin poster CRUD still works.
+- Mockup assignment still works.
+- Stripe/order/e-mail/fulfillment tests still pass.
+
+At the end, summarize:
+1. Store data model changes.
+2. Admin store routes created.
+3. Store creation/edit workflow.
+4. Store config loading behavior.
+5. Admin store selector behavior.
+6. How a new webstore is created.
+7. What remains for domain-based routing.
+8. Tests added/updated.
+9. What I should manually test before continuing.
