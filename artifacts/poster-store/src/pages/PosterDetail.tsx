@@ -159,22 +159,11 @@ export default function PosterDetail() {
 
       <div className="grid grid-cols-1 md:grid-cols-[360px_1fr] gap-10 mb-24 items-start">
         <div>
-          {hasMockups ? (
-            <MockupGallery
-              mockups={mockups}
-              fallbackImageUrl={poster.imageUrl}
-              alt={poster.title}
-            />
-          ) : (
-            <div className="relative bg-muted rounded-xl overflow-hidden shadow-md" style={{ aspectRatio: "3/4", maxHeight: "420px" }}>
-              <img
-                src={poster.imageUrl}
-                alt={poster.title}
-                className="w-full h-full object-cover"
-                data-testid={`img-detail-${poster.id}`}
-              />
-            </div>
-          )}
+          <MockupGallery
+            mockups={mockups ?? []}
+            fallbackImageUrl={poster.imageUrl}
+            alt={poster.title}
+          />
         </div>
 
         <div className="flex flex-col">
