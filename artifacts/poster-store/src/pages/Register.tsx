@@ -48,7 +48,6 @@ export default function Register() {
             <Heart className="h-8 w-8 text-secondary" />
           </div>
           <CardTitle className="font-serif text-2xl">Create an account</CardTitle>
-          <CardDescription>Save your favorite posters across devices</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
