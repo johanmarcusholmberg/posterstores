@@ -1,0 +1,64 @@
+Continue hardening the poster store before production.
+
+The previous production hardening pass is complete. Now focus only on the remaining MVP security risks without changing the hosting architecture or rebuilding the app.
+
+Current remaining risks:
+1. Admin token is stored in localStorage.
+2. previewImageUrlSnapshot can currently accept any URL for Stripe line items.
+3. Rate limiting uses in-memory storage, which is acceptable for single-instance Replit deployment but should be clearly documented.
+
+Tasks:
+
+1. Improve admin authentication storage
+- Replace the frontend localStorage admin token usage with a safer admin session approach if possible.
+- Preferred approach:
+  - Admin enters the admin token once in an admin login screen.
+  - Server validates it against ADMIN_API_TOKEN.
+  - Server sets an httpOnly, secure-in-production, sameSite=lax admin session cookie.
+  - Admin API routes validate the cookie server-side.
+  - Frontend no longer stores ADMIN_API_TOKEN or equivalent admin secret in localStorage.
+- Keep this simple and MVP-friendly.
+- Do not add Clerk, Supabase Auth, Firebase, or another auth provider.
+- Do not create a large role-management system.
+- Do not change the customer auth flow unless strictly necessary.
+
+2. Add admin logout
+- Add a logout route that clears the admin session cookie.
+- Add or update the admin UI to support logging out.
+
+3. Protect admin routes
+- Ensure all /api/admin/* routes require the new admin session cookie.
+- Keep existing rate limiting on admin routes.
+- Ensure admin auth failures return 401/403 without leaking details.
+
+4. Restrict Stripe image URLs
+- Add validation for previewImageUrlSnapshot or any image URL sent into Stripe line items.
+- Allow only known safe image host domains.
+- Read allowed image domains from an environment variable, for example ALLOWED_IMAGE_HOSTS.
+- Support comma-separated hosts.
+- In development, allow current test/mock image URLs if needed.
+- In production, reject or safely omit image URLs that are not allowlisted.
+- Do not break checkout if the image URL is missing; Stripe line item image should be optional.
+
+5. Documentation update
+- Update docs/PRODUCTION_DEPLOYMENT.md with:
+  - Admin session behavior
+  - Admin logout
+  - ALLOWED_IMAGE_HOSTS
+  - Explanation that in-memory rate limiting is acceptable for single-instance Replit deployment, but Redis-backed storage is recommended if scaling to multiple instances.
+
+Constraints:
+- Keep Replit hosting.
+- Keep Replit PostgreSQL.
+- Keep Stripe Checkout flow.
+- Keep existing API contracts where possible.
+- Avoid large rewrites.
+- Make changes minimal, focused, and production-safe.
+
+After implementation, report:
+1. What changed
+2. Which files changed
+3. Whether the admin token is still stored in localStorage anywhere
+4. How admin login/logout now works
+5. What environment variables are required
+6. Any remaining risks before publishing
