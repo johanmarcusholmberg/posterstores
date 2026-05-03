@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { storesTable, postersTable, ordersTable } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, and, ne } from "drizzle-orm";
 import { requireAdmin } from "../middleware/requireAdmin";
 import { z } from "zod";
 
@@ -9,6 +9,8 @@ const router = Router();
 
 const HEX_COLOR_RE = /^#[0-9A-Fa-f]{6}$/;
 const STORE_KEY_RE = /^[a-z][a-z0-9]*$/;
+const ROUTE_PREFIX_RE = /^[a-z][a-z0-9-]*$/;
+const DOMAIN_RE = /^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
 
 const themeConfigSchema = z
   .object({
@@ -48,6 +50,23 @@ const seoConfigSchema = z
   .nullable()
   .optional();
 
+const domainRoutingSchema = z.object({
+  primaryDomain: z
+    .string()
+    .regex(DOMAIN_RE, "Must be a valid domain (e.g. postsofspain.com)")
+    .nullable()
+    .optional(),
+  domainAliases: z
+    .array(z.string().regex(DOMAIN_RE, "Each alias must be a valid domain"))
+    .nullable()
+    .optional(),
+  routePrefix: z
+    .string()
+    .regex(ROUTE_PREFIX_RE, "Route prefix must be lowercase letters, numbers, or hyphens, starting with a letter")
+    .nullable()
+    .optional(),
+});
+
 const createStoreSchema = z.object({
   storeKey: z
     .string()
@@ -62,6 +81,7 @@ const createStoreSchema = z.object({
   homepageConfig: homepageConfigSchema,
   seoConfig: seoConfigSchema,
   navigationConfig: z.any().nullable().optional(),
+  ...domainRoutingSchema.shape,
 });
 
 const updateStoreSchema = createStoreSchema
@@ -69,6 +89,7 @@ const updateStoreSchema = createStoreSchema
   .partial()
   .extend({
     active: z.boolean().optional(),
+    ...domainRoutingSchema.shape,
   });
 
 function serializeStore(
@@ -80,9 +101,58 @@ function serializeStore(
     ...store,
     posterCount,
     orderCount,
+    domainAliases: (store.domainAliases as string[] | null) ?? null,
     createdAt: store.createdAt.toISOString(),
     updatedAt: store.updatedAt.toISOString(),
   };
+}
+
+/** Collect all domains in use by other stores (for uniqueness checks). */
+async function checkDomainAndPrefixUniqueness(
+  routePrefix: string | null | undefined,
+  primaryDomain: string | null | undefined,
+  domainAliases: string[] | null | undefined,
+  excludeStoreKey?: string
+): Promise<string | null> {
+  if (!routePrefix && !primaryDomain && (!domainAliases || domainAliases.length === 0)) {
+    return null;
+  }
+
+  const allStores = await db.select().from(storesTable);
+  const others = excludeStoreKey
+    ? allStores.filter((s) => s.storeKey !== excludeStoreKey)
+    : allStores;
+
+  if (routePrefix) {
+    const conflict = others.find((s) => s.routePrefix === routePrefix);
+    if (conflict) {
+      return `Route prefix "${routePrefix}" is already used by store "${conflict.storeKey}"`;
+    }
+  }
+
+  if (primaryDomain) {
+    const allOtherDomains = others.flatMap((s) => [
+      s.primaryDomain,
+      ...((s.domainAliases as string[] | null) ?? []),
+    ]).filter(Boolean) as string[];
+    if (allOtherDomains.includes(primaryDomain)) {
+      return `Domain "${primaryDomain}" is already used by another store`;
+    }
+  }
+
+  if (domainAliases && domainAliases.length > 0) {
+    const allOtherDomains = others.flatMap((s) => [
+      s.primaryDomain,
+      ...((s.domainAliases as string[] | null) ?? []),
+    ]).filter(Boolean) as string[];
+    for (const alias of domainAliases) {
+      if (allOtherDomains.includes(alias)) {
+        return `Domain alias "${alias}" is already used by another store`;
+      }
+    }
+  }
+
+  return null;
 }
 
 // GET /api/admin/stores — list all stores with counts
@@ -120,7 +190,7 @@ router.post("/admin/stores", requireAdmin, async (req, res) => {
     return res.status(400).json({ error: parsed.error.flatten() });
   }
 
-  const { storeKey } = parsed.data;
+  const { storeKey, routePrefix, primaryDomain, domainAliases } = parsed.data;
 
   const existing = await db
     .select({ id: storesTable.id })
@@ -130,6 +200,15 @@ router.post("/admin/stores", requireAdmin, async (req, res) => {
 
   if (existing.length > 0) {
     return res.status(409).json({ error: `Store key "${storeKey}" already exists` });
+  }
+
+  const uniquenessError = await checkDomainAndPrefixUniqueness(
+    routePrefix,
+    primaryDomain,
+    domainAliases as string[] | null | undefined
+  );
+  if (uniquenessError) {
+    return res.status(409).json({ error: uniquenessError });
   }
 
   const now = new Date();
@@ -146,6 +225,9 @@ router.post("/admin/stores", requireAdmin, async (req, res) => {
       homepageConfig: parsed.data.homepageConfig ?? null,
       seoConfig: parsed.data.seoConfig ?? null,
       navigationConfig: parsed.data.navigationConfig ?? null,
+      primaryDomain: parsed.data.primaryDomain ?? null,
+      domainAliases: (parsed.data.domainAliases as string[] | null | undefined) ?? null,
+      routePrefix: parsed.data.routePrefix ?? null,
       createdAt: now,
       updatedAt: now,
     })
@@ -201,6 +283,18 @@ router.put("/admin/stores/:storeKey", requireAdmin, async (req, res) => {
     return res.status(400).json({ error: parsed.error.flatten() });
   }
 
+  const { routePrefix, primaryDomain, domainAliases } = parsed.data;
+
+  const uniquenessError = await checkDomainAndPrefixUniqueness(
+    routePrefix,
+    primaryDomain,
+    domainAliases as string[] | null | undefined,
+    storeKey
+  );
+  if (uniquenessError) {
+    return res.status(409).json({ error: uniquenessError });
+  }
+
   const updates: Partial<typeof storesTable.$inferInsert> = {
     updatedAt: new Date(),
   };
@@ -214,6 +308,9 @@ router.put("/admin/stores/:storeKey", requireAdmin, async (req, res) => {
   if ("homepageConfig" in parsed.data) updates.homepageConfig = parsed.data.homepageConfig ?? null;
   if ("seoConfig" in parsed.data) updates.seoConfig = parsed.data.seoConfig ?? null;
   if ("navigationConfig" in parsed.data) updates.navigationConfig = parsed.data.navigationConfig ?? null;
+  if ("primaryDomain" in parsed.data) updates.primaryDomain = parsed.data.primaryDomain ?? null;
+  if ("domainAliases" in parsed.data) updates.domainAliases = (parsed.data.domainAliases as string[] | null | undefined) ?? null;
+  if ("routePrefix" in parsed.data) updates.routePrefix = parsed.data.routePrefix ?? null;
 
   const [updated] = await db
     .update(storesTable)
@@ -238,7 +335,6 @@ router.patch("/admin/stores/:storeKey/deactivate", requireAdmin, async (req, res
     return res.status(404).json({ error: "Store not found" });
   }
 
-  // Prevent deactivating a store that has posters or orders
   const [posterCountRow] = await db
     .select({ count: sql<number>`count(*)` })
     .from(postersTable)
@@ -267,7 +363,7 @@ router.patch("/admin/stores/:storeKey/deactivate", requireAdmin, async (req, res
   return res.json(serializeStore(updated));
 });
 
-// GET /api/stores — public endpoint: returns active store configs (for store selector)
+// GET /api/stores — public endpoint: returns active store configs (for store selector + resolver)
 router.get("/stores", async (_req, res) => {
   const stores = await db
     .select()
@@ -276,6 +372,47 @@ router.get("/stores", async (_req, res) => {
     .orderBy(storesTable.createdAt);
 
   return res.json(stores.map((s) => serializeStore(s)));
+});
+
+// GET /api/stores/resolve — resolve a store from domain or route prefix
+// Must come before /api/stores/:storeKey to avoid param capture
+router.get("/stores/resolve", async (req, res) => {
+  const domain = req.query.domain ? String(req.query.domain) : null;
+  const prefix = req.query.prefix ? String(req.query.prefix) : null;
+  const fallback = req.query.fallback ? String(req.query.fallback) : "postsofspain";
+
+  const stores = await db
+    .select()
+    .from(storesTable)
+    .where(eq(storesTable.active, true));
+
+  let resolved = null as typeof storesTable.$inferSelect | null;
+
+  // 1. Route prefix
+  if (prefix && !resolved) {
+    resolved = stores.find((s) => s.routePrefix === prefix) ?? null;
+  }
+
+  // 2. Domain
+  if (domain && !resolved) {
+    const cleanDomain = domain.replace(/^www\./, "").toLowerCase();
+    resolved = stores.find((s) => {
+      if (s.primaryDomain && s.primaryDomain.replace(/^www\./, "").toLowerCase() === cleanDomain) return true;
+      const aliases = (s.domainAliases as string[] | null) ?? [];
+      return aliases.some((a) => a.replace(/^www\./, "").toLowerCase() === cleanDomain);
+    }) ?? null;
+  }
+
+  // 3. Fallback
+  if (!resolved) {
+    resolved = stores.find((s) => s.storeKey === fallback) ?? stores[0] ?? null;
+  }
+
+  if (!resolved) {
+    return res.status(404).json({ error: "No matching store found" });
+  }
+
+  return res.json(serializeStore(resolved));
 });
 
 // GET /api/stores/:storeKey/config — public endpoint: merged config for a single store
@@ -303,6 +440,9 @@ router.get("/stores/:storeKey/config", async (req, res) => {
     defaultCurrency: store.defaultCurrency,
     defaultLanguage: store.defaultLanguage,
     active: store.active,
+    primaryDomain: store.primaryDomain ?? null,
+    domainAliases: (store.domainAliases as string[] | null) ?? null,
+    routePrefix: store.routePrefix ?? null,
     theme: theme ?? undefined,
     homepage: {
       heroTitle: (homepage.heroTitle as string) ?? "",

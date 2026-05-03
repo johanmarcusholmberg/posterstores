@@ -3,7 +3,7 @@ import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { StorefrontProvider } from "@/context/StorefrontContext";
+import { StorefrontProvider, useStorefront } from "@/context/StorefrontContext";
 import { AdminTokenProvider } from "@/context/AdminTokenContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { Navbar } from "@/components/layout/Navbar";
@@ -43,9 +43,58 @@ function ScrollToTop() {
   return null;
 }
 
+/** Public storefront pages — shared between prefixed and unprefixed routes. */
+function PublicRoutes() {
+  return (
+    <Switch>
+      <Route path="/" component={Home} />
+      <Route path="/shop" component={Shop} />
+      <Route path="/posters/:slug" component={PosterBySlug} />
+      <Route path="/poster/:id" component={PosterDetail} />
+      <Route path="/cart" component={Cart} />
+      <Route path="/checkout" component={Checkout} />
+      <Route path="/order/:id" component={OrderConfirmation} />
+      <Route path="/favorites" component={Favorites} />
+      <Route path="/login" component={Login} />
+      <Route path="/register" component={Register} />
+      <Route path="/account" component={Account} />
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
+
+/**
+ * Wraps the public storefront in Navbar/Footer.
+ * If a route prefix was resolved (e.g. "spain"), it mounts a nested
+ * WouterRouter so that existing routes (/shop, /posters/:slug, …) work
+ * unchanged under /spain/shop, /spain/posters/:slug, etc.
+ */
+function PublicStorefrontSection() {
+  const { resolvedRoutePrefix } = useStorefront();
+
+  const shell = (inner: React.ReactNode) => (
+    <div className="flex flex-col min-h-screen">
+      <Navbar />
+      <main className="flex-1">{inner}</main>
+      <Footer />
+    </div>
+  );
+
+  if (resolvedRoutePrefix) {
+    return shell(
+      <WouterRouter base={`/${resolvedRoutePrefix}`}>
+        <PublicRoutes />
+      </WouterRouter>
+    );
+  }
+
+  return shell(<PublicRoutes />);
+}
+
 function Router() {
   return (
     <Switch>
+      {/* Admin routes — always unaffected by store prefix */}
       <Route path="/admin/posters/new" component={AdminPosterNew} />
       <Route path="/admin/posters/:id/mockups" component={AdminPosterMockups} />
       <Route path="/admin/posters/:id" component={AdminPosterEdit} />
@@ -59,27 +108,9 @@ function Router() {
       <Route path="/admin/stores" component={AdminStores} />
       <Route path="/admin" component={AdminDashboard} />
 
+      {/* Public storefront — catch-all (handles both prefixed and unprefixed) */}
       <Route>
-        <div className="flex flex-col min-h-screen">
-          <Navbar />
-          <main className="flex-1">
-            <Switch>
-              <Route path="/" component={Home} />
-              <Route path="/shop" component={Shop} />
-              <Route path="/posters/:slug" component={PosterBySlug} />
-              <Route path="/poster/:id" component={PosterDetail} />
-              <Route path="/cart" component={Cart} />
-              <Route path="/checkout" component={Checkout} />
-              <Route path="/order/:id" component={OrderConfirmation} />
-              <Route path="/favorites" component={Favorites} />
-              <Route path="/login" component={Login} />
-              <Route path="/register" component={Register} />
-              <Route path="/account" component={Account} />
-              <Route component={NotFound} />
-            </Switch>
-          </main>
-          <Footer />
-        </div>
+        <PublicStorefrontSection />
       </Route>
     </Switch>
   );

@@ -21,6 +21,23 @@ I prefer iterative development with clear explanations for any significant chang
 ## Multi-Store System
 The platform supports multiple storefronts configured via `artifacts/poster-store/src/config/storefronts.ts` and a `stores` table in the database. Database configurations take precedence over static configurations. Each storefront can have unique themes, homepage layouts, SEO settings, and navigation. An admin interface allows for the creation, editing, and management of these stores, including activation/deactivation.
 
+### Domain & Route-Prefix Resolution
+The `stores` table now has three routing fields:
+- `primary_domain` — e.g. `postsofspain.com`
+- `domain_aliases` — JSON array, e.g. `["www.postsofspain.com"]`
+- `route_prefix` — e.g. `spain` (enables `/spain/shop`, `/spain/posters/:slug`, etc.)
+
+**Active store resolver** (frontend `StorefrontContext.tsx`) runs on every page load with this priority:
+1. **Route prefix** — first URL path segment matches a store's `routePrefix` (e.g. `/spain` → postsofspain)
+2. **Domain mapping** — `window.location.hostname` matches a store's `primaryDomain` or `domainAliases`
+3. **Env/default fallback** — `VITE_ACTIVE_STORE_KEY` env var, falling back to `postsofspain`
+
+**Route-prefix routing** (`App.tsx`): when a prefix is resolved, public routes are served under a nested `WouterRouter` with that base path. All existing public routes (`/`, `/shop`, `/posters/:slug`, etc.) work unchanged inside the sub-router (e.g. `/spain/shop`). Admin routes are never prefixed.
+
+**Server-side resolver endpoint**: `GET /api/stores/resolve?prefix=spain` or `GET /api/stores/resolve?domain=postsofspain.com&fallback=postsofspain` — resolves and returns the matching store object.
+
+**Admin store form** has new "Domain & routing" section for configuring `primaryDomain`, `domainAliases`, and `routePrefix` per store with validation and uniqueness enforcement.
+
 ## Poster Management
 A slug system is implemented for posters, providing SEO-friendly URLs (`/posters/:slug`). Slugs are auto-generated from titles, editable, and unique per store. Posters have a `status` field (`draft`, `published`, `archived`) controlling their visibility on the public storefront.
 

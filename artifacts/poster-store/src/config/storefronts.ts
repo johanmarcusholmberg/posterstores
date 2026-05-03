@@ -4,6 +4,9 @@ export interface StorefrontConfig {
   countryFocus: string;
   defaultCurrency: string;
   defaultLanguage?: string;
+  primaryDomain?: string | null;
+  domainAliases?: string[] | null;
+  routePrefix?: string | null;
   theme?: {
     background: string;
     surface: string;

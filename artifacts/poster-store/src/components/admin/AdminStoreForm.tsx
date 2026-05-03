@@ -22,6 +22,8 @@ import { Save, ArrowLeft, Loader2 } from "lucide-react";
 
 const HEX_COLOR_RE = /^#[0-9A-Fa-f]{6}$/;
 const STORE_KEY_RE = /^[a-z][a-z0-9]*$/;
+const ROUTE_PREFIX_RE = /^[a-z][a-z0-9-]*$/;
+const DOMAIN_RE = /^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
 
 const DEFAULT_THEME: AdminStoreThemeConfig = {
   background: "#FAF6EF",
@@ -63,6 +65,11 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
   const [defaultLanguage, setDefaultLanguage] = useState(existing?.defaultLanguage ?? "en");
   const [active, setActive] = useState(existing?.active ?? true);
 
+  // Domain routing fields
+  const [primaryDomain, setPrimaryDomain] = useState(existing?.primaryDomain ?? "");
+  const [domainAliasesRaw, setDomainAliasesRaw] = useState(joinList(existing?.domainAliases ?? []));
+  const [routePrefix, setRoutePrefix] = useState(existing?.routePrefix ?? "");
+
   // Homepage fields
   const hp = existing?.homepageConfig ?? {};
   const [heroTitle, setHeroTitle] = useState(hp.heroTitle ?? "");
@@ -102,6 +109,21 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
     for (const [key, val] of Object.entries(theme)) {
       if (!HEX_COLOR_RE.test(val)) errs.push(`Theme color "${key}" must be a valid 6-digit hex (e.g. #2F80A8)`);
     }
+
+    // Domain routing validation
+    if (routePrefix && !ROUTE_PREFIX_RE.test(routePrefix)) {
+      errs.push("Route prefix must be lowercase letters, numbers, or hyphens, starting with a letter (e.g. spain)");
+    }
+    if (primaryDomain && !DOMAIN_RE.test(primaryDomain)) {
+      errs.push("Primary domain must be a valid domain (e.g. postsofspain.com)");
+    }
+    const aliases = splitList(domainAliasesRaw);
+    for (const alias of aliases) {
+      if (!DOMAIN_RE.test(alias)) {
+        errs.push(`Domain alias "${alias}" must be a valid domain (e.g. www.postsofspain.com)`);
+      }
+    }
+
     return errs;
   }
 
@@ -134,6 +156,8 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
       defaultDescription: seoDescription || undefined,
     };
 
+    const aliases = splitList(domainAliasesRaw);
+
     try {
       if (isEdit && existing) {
         const payload: UpdateStorePayload = {
@@ -145,6 +169,9 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
           themeConfig: theme,
           homepageConfig,
           seoConfig,
+          primaryDomain: primaryDomain || null,
+          domainAliases: aliases.length > 0 ? aliases : null,
+          routePrefix: routePrefix || null,
         };
         await adminUpdateStore(token, existing.storeKey, payload);
         toast({ title: "Store updated", description: `${name} has been saved.` });
@@ -160,6 +187,9 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
           themeConfig: theme,
           homepageConfig,
           seoConfig,
+          primaryDomain: primaryDomain || null,
+          domainAliases: aliases.length > 0 ? aliases : null,
+          routePrefix: routePrefix || null,
         };
         await adminCreateStore(token, payload);
         toast({ title: "Store created", description: `${name} (${storeKey}) is ready.` });
@@ -275,6 +305,57 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
             <Label htmlFor="active" className="cursor-pointer">
               Active
             </Label>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Domain & routing */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Domain &amp; routing</CardTitle>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="route-prefix">Route prefix</Label>
+            <Input
+              id="route-prefix"
+              value={routePrefix}
+              onChange={(e) => setRoutePrefix(e.target.value.toLowerCase())}
+              placeholder="spain"
+              data-testid="route-prefix-input"
+            />
+            <p className="text-xs text-muted-foreground">
+              Lowercase letters, numbers, hyphens (e.g. <code>spain</code>). Enables <code>/spain/shop</code>,{" "}
+              <code>/spain/posters/:slug</code>, etc. Must be unique across stores.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="primary-domain">Primary domain</Label>
+            <Input
+              id="primary-domain"
+              value={primaryDomain}
+              onChange={(e) => setPrimaryDomain(e.target.value.toLowerCase())}
+              placeholder="postsofspain.com"
+              data-testid="primary-domain-input"
+            />
+            <p className="text-xs text-muted-foreground">
+              The main production domain. Must be unique across stores.
+            </p>
+          </div>
+
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="domain-aliases">Domain aliases</Label>
+            <Input
+              id="domain-aliases"
+              value={domainAliasesRaw}
+              onChange={(e) => setDomainAliasesRaw(e.target.value.toLowerCase())}
+              placeholder="www.postsofspain.com, postsofspain.es"
+              data-testid="domain-aliases-input"
+            />
+            <p className="text-xs text-muted-foreground">
+              Comma-separated list of additional domains that also point to this store (e.g. www subdomain).
+            </p>
           </div>
         </CardContent>
       </Card>

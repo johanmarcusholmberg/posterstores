@@ -415,6 +415,9 @@ export interface AdminStore {
   homepageConfig: AdminStoreHomepageConfig | null;
   seoConfig: AdminStoreSeoConfig | null;
   navigationConfig: null;
+  primaryDomain: string | null;
+  domainAliases: string[] | null;
+  routePrefix: string | null;
   posterCount: number;
   orderCount: number;
   createdAt: string;
@@ -431,6 +434,9 @@ export type CreateStorePayload = {
   themeConfig?: AdminStoreThemeConfig | null;
   homepageConfig?: AdminStoreHomepageConfig | null;
   seoConfig?: AdminStoreSeoConfig | null;
+  primaryDomain?: string | null;
+  domainAliases?: string[] | null;
+  routePrefix?: string | null;
 };
 
 export type UpdateStorePayload = Partial<Omit<CreateStorePayload, "storeKey">>;

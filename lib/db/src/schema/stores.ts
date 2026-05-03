@@ -14,6 +14,9 @@ export const storesTable = pgTable("stores", {
   homepageConfig: jsonb("homepage_config"),
   seoConfig: jsonb("seo_config"),
   navigationConfig: jsonb("navigation_config"),
+  primaryDomain: text("primary_domain"),
+  domainAliases: jsonb("domain_aliases").$type<string[]>(),
+  routePrefix: text("route_prefix"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
