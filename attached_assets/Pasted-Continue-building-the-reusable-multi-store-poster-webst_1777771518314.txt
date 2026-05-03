@@ -1,0 +1,230 @@
+Continue building the reusable multi-store poster webstore.
+
+CURRENT STATUS:
+- The core store is working well.
+- Homepage loads.
+- Shop loads 13 posters cleanly.
+- Poster detail works.
+- Cart works.
+- Favorites work.
+- Mobile navigation works.
+- Admin dashboard works.
+- Admin mockups are linked correctly.
+- Admin orders are linked correctly.
+- Stripe integration typechecks cleanly with Stripe v22 and API version 2026-04-22.dahlia.
+- Transactional e-mail infrastructure works.
+- All tests/typechecks pass.
+
+NEXT GOAL:
+Prepare fulfillment workflow for paid poster orders.
+
+Important:
+- Do not connect a real print provider yet.
+- Do not rewrite checkout, Stripe, or e-mail logic.
+- Do not break the working storefront.
+- Do not break mobile navigation.
+- Do not break admin poster CRUD.
+- Do not break mockup management.
+- Keep everything store-scoped.
+- Keep all existing tests passing.
+
+WHY THIS MATTERS:
+After a customer pays, admin needs a practical way to process the order:
+- see paid orders
+- see shipping details
+- see ordered poster and size
+- access the master printable file
+- mark order as processing
+- mark order as shipped
+- store internal fulfillment notes
+- export fulfillment data for manual production or a future print provider
+
+ORDER MODEL
+
+Add fields to orders if not already present:
+
+- fulfillment_status nullable or explicit
+  Suggested values:
+  - not_started
+  - ready_for_production
+  - in_production
+  - shipped
+  - cancelled
+
+- fulfillment_notes nullable
+- shipped_at nullable
+- tracking_number nullable
+- tracking_url nullable
+- production_started_at nullable
+
+Keep concepts clear:
+- order.status = commercial/order/payment status
+- fulfillment_status = production/shipping workflow
+
+For example:
+- status = paid
+- fulfillment_status = ready_for_production
+
+ADMIN FULFILLMENT VIEW
+
+Create admin route:
+
+/admin/fulfillment
+
+This page should show orders that need production/fulfillment.
+
+Default filter:
+- paid orders
+- not shipped
+- selected admin store only
+
+Columns:
+- Order ID
+- Customer
+- Order status
+- Fulfillment status
+- Total
+- Created date
+- Shipping country/city
+- Item count
+- View/Process button
+
+Filters:
+- Fulfillment status
+- Order status
+- Store
+- Date range if simple
+
+Add a quick action link on the admin dashboard:
+- Fulfillment
+
+ADMIN ORDER DETAIL FULFILLMENT PANEL
+
+Update /admin/orders/:id with a fulfillment panel.
+
+Show:
+- Fulfillment status
+- Shipping address
+- Tracking number
+- Tracking URL
+- Fulfillment notes
+- Production started timestamp
+- Shipped timestamp
+
+Actions:
+- Mark ready for production
+- Mark in production
+- Mark shipped
+- Mark cancelled
+- Save tracking number/url
+- Save fulfillment notes
+
+When marking shipped:
+- set fulfillment_status = shipped
+- set shipped_at timestamp
+- optionally set order.status = shipped if that matches the current status system
+
+PRINT FILE ACCESS
+
+In admin order detail, each order item should show:
+
+- Poster title snapshot
+- Size label snapshot
+- Width/height snapshot
+- Quantity
+- Master printable image URL snapshot
+- Preview image URL snapshot
+- Current poster link if still available
+
+Add clear buttons/links:
+- Open master print file
+- Copy master print file URL
+- Open preview image
+- Open current poster admin page
+
+Important:
+The master printable image is the production file.
+Mockups are not production files.
+
+If master_print_image_url_snapshot is missing:
+- Fall back to current poster.masterPrintImageUrl
+- Then legacy imageUrl
+- Show warning:
+  “No dedicated master print file snapshot exists for this order.”
+
+FULFILLMENT EXPORT
+
+Add a simple admin export action:
+
+- Export fulfillment CSV for selected orders or current filtered list.
+
+CSV columns:
+- order_id
+- store_key
+- customer_email
+- shipping_name
+- shipping_address_line1
+- shipping_address_line2
+- shipping_postal_code
+- shipping_city
+- shipping_country
+- poster_title
+- size_label
+- width_cm
+- height_cm
+- quantity
+- master_print_image_url
+- tracking_number
+- fulfillment_status
+
+This is useful before connecting Printful/Gelato.
+
+SECURITY
+
+- Fulfillment routes require admin token.
+- Fulfillment data must be scoped to selected admin store.
+- Public users must not access fulfillment data.
+- Do not expose customer/shipping data publicly.
+
+TESTING
+
+Add or update tests for:
+
+Admin fulfillment:
+- /admin/fulfillment requires admin token.
+- Fulfillment list only shows selected store orders.
+- Paid pending fulfillment orders appear.
+- Shipped orders can be filtered out/in.
+- Admin can update fulfillment status.
+- Admin can save tracking number/url.
+- Admin can save fulfillment notes.
+
+Order detail:
+- Shows master print file snapshot.
+- Shows warning when no master print file exists.
+- Mark shipped sets shipped_at.
+- Mark shipped can update order.status to shipped if intended.
+
+CSV export:
+- Requires admin token.
+- Is store-scoped.
+- Includes expected columns.
+- Includes item snapshot data.
+
+Regression:
+- Checkout still creates orders.
+- Stripe webhook still marks paid.
+- E-mails still send once.
+- Admin order list still works.
+- Homepage/shop/poster/cart/favorites still pass.
+- Mobile nav still works.
+
+At the end, summarize:
+1. Fulfillment fields added.
+2. Fulfillment admin route.
+3. Order detail fulfillment panel.
+4. Print file access behavior.
+5. CSV export behavior.
+6. Security/store scoping.
+7. Tests added/updated.
+8. What I should manually test before continuing.
