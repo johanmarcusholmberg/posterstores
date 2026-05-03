@@ -1,0 +1,176 @@
+Continue building the reusable multi-store poster webstore.
+
+CURRENT STATUS:
+- Reusable multi-store platform works.
+- PostsofSpain is the default active storefront.
+- Homepage, shop, poster detail, cart and favorites work.
+- Admin poster CRUD works.
+- Mockup assignment works.
+- Asset separation works.
+- Structured sizes/prices work.
+- Checkout/order creation is hardened.
+- Stripe payment works.
+- Transactional e-mails work.
+- Fulfillment workflow works.
+- CSV fulfillment export works.
+- Admin routes are protected.
+- Store separation is verified.
+- 87 tests pass.
+
+NEXT GOAL:
+Add SEO-friendly poster slugs and public product URLs.
+
+Important:
+- Do not break existing ID-based poster routes.
+- Do not break admin poster edit routes.
+- Do not break shop/poster/detail/cart/favorites.
+- Do not break Stripe/order/e-mail/fulfillment.
+- Keep everything store-scoped.
+- Keep all existing tests passing.
+- Do not build a full SEO system yet. This step is only product slugs and safe routing.
+
+WHY THIS MATTERS:
+Public product URLs should be readable and SEO-friendly.
+
+Desired public URL examples:
+- /posters/valencia-orange-cafe-poster
+- /posters/sevilla-terracotta-arches
+- /posters/malaga-coastal-morning
+
+Current ID-based URLs should remain backward-compatible.
+
+DATA MODEL
+
+Add slug support to posters.
+
+Add field:
+- slug text nullable initially or generated for existing posters
+
+Add unique constraint/index:
+- unique(store_key, slug)
+
+Important:
+- Slug uniqueness must be scoped per store.
+- PostsofSpain and PostsofSweden should be able to use the same slug without conflict if needed.
+- A poster slug should not need to be globally unique.
+
+MIGRATION
+
+For existing posters:
+- Generate slugs from title.
+- If title is missing, use poster-{id}.
+- Ensure uniqueness per store by appending -2, -3, etc. if needed.
+- Do not overwrite an existing slug if present.
+
+Slug examples:
+- “Valencia Orange Café Poster” → valencia-orange-cafe-poster
+- “Sevilla Terracotta Arches” → sevilla-terracotta-arches
+- Missing title → poster-123
+
+ADMIN UI
+
+Update AdminPosterForm:
+- Add slug field.
+- Auto-generate slug from title for new posters.
+- Allow manual editing of slug.
+- Show helper text:
+  “Used in the public product URL. Must be unique within the selected store.”
+- Add button/action:
+  “Regenerate from title”
+- Validate:
+  - slug required before publishing
+  - slug must be lowercase URL-safe
+  - slug must be unique within selected store
+- Do not allow slug collisions within same store.
+- Allow same slug in different stores.
+
+PUBLIC ROUTING
+
+Add or update public route:
+- /posters/:slug
+
+Behavior:
+- Look up poster by active storeKey + slug.
+- Only show published posters.
+- If no matching published poster exists, show 404.
+
+BACKWARD COMPATIBILITY
+
+Keep existing ID-based route working if it exists:
+- /poster/:id or /posters/:id depending on current app
+
+Preferred behavior:
+- If an ID-based route is visited for a published poster, redirect to the slug URL.
+- If redirect is too much for this step, allow it to still render.
+- Do not break admin edit routes such as /admin/posters/:id.
+
+API
+
+Update poster detail API to support lookup by:
+- id + storeKey
+- slug + storeKey
+
+Options:
+- Add GET /api/posters/by-slug/:slug?storeKey=...
+or
+- Extend existing endpoint carefully without breaking ID usage.
+
+Public poster cards:
+- Link to slug route when slug exists.
+- Fall back to ID route only if slug missing.
+
+Related posters, favorites, cart:
+- Should continue using poster IDs internally.
+- Only public navigation should use slugs.
+
+SEO BASICS
+
+For poster detail pages, set or prepare:
+- document title: Poster title + store name
+- meta description from poster description
+- Open Graph image from primary mockup/preview image if current setup supports this
+
+Do not overbuild advanced SEO in this step.
+
+TESTING
+
+Add or update tests for:
+
+Migration:
+- Existing posters get slugs.
+- Duplicate titles in same store get unique slugs.
+- Same slug can exist in different stores.
+
+Admin:
+- New poster auto-generates slug from title.
+- Admin can edit slug.
+- Invalid slug is rejected.
+- Duplicate slug in same store is rejected.
+- Same slug in different store is allowed.
+
+Public:
+- /posters/:slug loads the correct poster for active store.
+- Wrong store slug returns 404.
+- Draft poster slug does not load publicly.
+- Poster cards link to slug URL.
+- ID route still works or redirects safely.
+
+Regression:
+- Homepage still loads.
+- Shop still loads.
+- Poster detail still loads.
+- Cart still works.
+- Favorites still work.
+- Admin poster CRUD still works.
+- Mockup assignment still works.
+- Stripe/order/e-mail/fulfillment tests still pass.
+
+At the end, summarize:
+1. Slug data/model changes.
+2. Migration behavior.
+3. Admin slug UI.
+4. Public routing behavior.
+5. Backward compatibility for ID routes.
+6. SEO basics added.
+7. Tests added/updated.
+8. What I should manually test before continuing.
