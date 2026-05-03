@@ -1,0 +1,323 @@
+Continue working on my current poster/webstore website.
+
+GOAL
+Update the current website template and store flow so basket, checkout, payments, shipping, and order handling feel professional, standardized, scalable, and ready for real print sales.
+
+Do not rebuild the whole website.
+Do not replace the current design system.
+Do not create a fake-only checkout.
+Build on the current structure, routes, components, database models, and existing basket/product logic.
+
+The result should feel like a real ecommerce flow for selling posters/prints.
+
+MAIN REQUIREMENTS
+
+1. Professional basket/cart experience
+
+Improve the current basket/cart UI and logic.
+
+The basket should clearly show:
+- Poster thumbnail
+- Poster title/name
+- Selected size
+- Selected frame option if applicable
+- Quantity selector
+- Unit price
+- Line total
+- Remove item action
+- Basket subtotal
+- Shipping estimate or “calculated at checkout”
+- Total before payment
+
+The basket should feel clean, calm, and professional, not like a temporary prototype.
+
+Add clear empty-state handling:
+- If basket is empty, show a friendly message
+- Add CTA back to posters/store
+- Do not show broken checkout buttons
+
+Add basket persistence:
+- Logged-in users: basket should preferably be stored per user
+- Guest users: basket can be stored locally/session-based
+- If a guest logs in or registers, preserve or merge the basket if possible
+
+2. Standardized checkout flow
+
+Create or improve a dedicated checkout page.
+
+Checkout should be split into clear sections:
+
+A. Contact details
+- Email
+- Phone number if needed for shipping
+- Name
+
+B. Shipping address
+- Full name
+- Street address
+- Postal code
+- City
+- Country
+- Optional apartment/extra address line
+
+C. Shipping method
+- Show available shipping options
+- Let the user choose courier/shipping method if supported
+- If courier selection cannot be fully implemented yet, create the data model and UI structure so it can be connected later
+- Shipping options should show:
+  - Courier name
+  - Delivery method
+  - Estimated delivery time
+  - Price
+  - Selected state
+
+D. Order summary
+- Basket items
+- Subtotal
+- Shipping cost
+- Taxes/VAT if applicable
+- Total
+
+E. Payment
+- Use the existing payment provider if one exists
+- If Stripe is already used or planned, standardize checkout around Stripe Checkout or Payment Intents
+- Do not hardcode payment success without real payment confirmation
+
+3. Shipping and courier handling
+
+Implement a standardized shipping abstraction.
+
+Create a shipping system that can support:
+- Manual/static shipping rules at launch
+- Future integration with print-on-demand or shipping providers
+- Courier choice where possible
+
+Suggested model:
+- ShippingProvider
+- ShippingMethod
+- CourierOption
+- ShippingRate
+- DeliveryEstimate
+
+At minimum, support a simple initial configuration such as:
+- Standard shipping
+- Express shipping
+- Local/region-specific fallback if needed
+
+Each shipping option should include:
+- id
+- courier/provider name
+- method name
+- description
+- estimated delivery range
+- price
+- supported countries/regions
+- active/inactive status
+
+If the website uses or will use print suppliers such as Printful, Gelato, Printify, or similar:
+- Do not assume courier choice is always available
+- If the supplier does not allow full courier selection, show the customer clear available shipping methods instead
+- Keep internal structure flexible enough to map supplier shipping methods to customer-facing shipping options
+
+4. Payment handling
+
+Standardize payment flow.
+
+If Stripe is already installed/configured:
+- Use Stripe properly
+- Create checkout session/payment intent from the backend/server side
+- Include line items, shipping cost, total amount, currency, and metadata
+- Store order status as pending/payment_pending before redirecting
+- Confirm payment through webhook or payment success validation
+- Update order status only after confirmed payment
+
+If Stripe is not yet configured:
+- Prepare the structure for Stripe integration
+- Add clear TODO comments where environment variables/API keys are required
+- Do not expose secret keys in frontend code
+- Do not create insecure frontend-only payment logic
+
+Order statuses should support at least:
+- basket/cart
+- checkout_started
+- payment_pending
+- paid
+- payment_failed
+- cancelled
+- fulfilled
+- shipped
+- refunded
+
+5. Order model and persistence
+
+Create or improve a proper order structure.
+
+Orders should store:
+- user_id if logged in
+- guest email if guest checkout is allowed
+- customer contact details
+- shipping address
+- selected shipping method
+- basket/order items snapshot
+- product/poster IDs
+- size/variant information
+- quantity
+- prices at time of order
+- subtotal
+- shipping cost
+- tax/VAT if applicable
+- total
+- currency
+- payment provider
+- payment session/payment intent ID
+- order status
+- created_at / updated_at
+
+Important:
+- Store a snapshot of order items and prices at purchase time.
+- Do not rely only on current product data, because prices/products may change later.
+
+6. Checkout validation
+
+Add strong validation before payment.
+
+The user should not be able to proceed to payment if:
+- Basket is empty
+- Required customer fields are missing
+- Shipping address is incomplete
+- No shipping method is selected
+- A selected item has invalid size/variant data
+- Total cannot be calculated safely
+
+Show clear inline error messages.
+
+7. Success and failure pages
+
+Create or improve:
+- Checkout success page
+- Checkout cancelled/failed page
+
+Success page should show:
+- Thank you message
+- Order number/reference
+- Order summary
+- Delivery/shipping information
+- Customer email confirmation message
+- CTA back to store or account/orders
+
+Failure/cancelled page should:
+- Explain that payment was not completed
+- Preserve basket/order where possible
+- Allow user to retry checkout
+
+8. Account/order history
+
+If user accounts already exist:
+- Add a basic “My orders” page or section
+- Users should be able to see previous orders
+- Show order status, date, total, and items
+- No advanced fulfillment tracking is required yet, but prepare the structure
+
+If accounts do not exist yet:
+- Keep the order model compatible with future user accounts
+
+9. Admin order overview
+
+Add or improve admin functionality for orders.
+
+Admin should be able to:
+- View all orders
+- See customer details
+- See ordered posters/items
+- See selected shipping method
+- See payment status
+- See fulfillment/shipping status
+- Update internal order status manually where appropriate
+
+Do not allow normal users to access admin order pages.
+
+10. UX/design requirements
+
+The basket and checkout should feel:
+- Minimalistic
+- Trustworthy
+- Professional
+- Clean
+- Mobile-friendly
+- Consistent with the current website style
+
+Use clear checkout progress indicators if useful:
+- Basket
+- Details
+- Shipping
+- Payment
+- Confirmation
+
+Add trust/support elements:
+- Secure payment message
+- Shipping information
+- Return/contact policy placeholder
+- Clear total price before payment
+
+Avoid clutter.
+Avoid too many buttons.
+Use one clear primary CTA per step.
+
+11. Mobile responsiveness
+
+Make the full basket and checkout flow work well on mobile:
+- Basket items should stack nicely
+- Order summary should remain readable
+- Checkout form should be easy to complete
+- Buttons should be large enough
+- Avoid horizontal scrolling
+
+12. Environment and security
+
+Use environment variables for all secrets.
+Do not expose payment secrets in frontend code.
+Do not store sensitive card information.
+Use backend/server-side logic for payment session creation.
+Add safe error handling and logging without exposing sensitive information.
+
+13. Implementation approach
+
+First inspect the current project structure and existing cart/checkout/payment/order code.
+
+Then implement the smallest robust version that fits the existing architecture.
+
+Prefer:
+- Reusing existing components
+- Creating shared utility functions for totals/shipping calculations
+- Creating clear types/interfaces for checkout/order/shipping
+- Keeping frontend and backend concerns separated
+
+Do not remove existing functionality unless it is clearly replaced by the improved flow.
+
+14. Deliverables
+
+When done, report back with:
+
+- Which files were changed
+- What cart/basket improvements were made
+- What checkout steps now exist
+- How shipping/courier selection works
+- How payments are handled
+- What database/schema changes were made
+- What admin/order functionality was added
+- What still needs real provider credentials or production configuration
+- Any manual setup needed, such as Stripe keys, webhook URL, shipping provider keys, or environment variables
+
+IMPORTANT ACCEPTANCE CRITERIA
+
+The implementation is successful when:
+
+- Basket looks professional and works on desktop/mobile
+- Checkout has customer, shipping, shipping method, summary, and payment sections
+- User can select a shipping option/courier method where available
+- Total price is calculated from items + shipping + tax/VAT if applicable
+- Payment flow is backend-controlled and not frontend-faked
+- Order is persisted with a snapshot of items/prices
+- Success/failure pages exist
+- Admin can view orders
+- Code is structured so future integration with Printful/Gelato/Printify/Stripe/shipping providers is straightforward
