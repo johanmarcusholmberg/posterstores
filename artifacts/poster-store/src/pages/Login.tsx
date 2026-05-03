@@ -42,7 +42,6 @@ export default function Login() {
             <Heart className="h-8 w-8 text-secondary" />
           </div>
           <CardTitle className="font-serif text-2xl">Welcome back</CardTitle>
-          <CardDescription>Log in to see your saved posters</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
