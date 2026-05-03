@@ -1,0 +1,59 @@
+Review and polish the customer-facing mockup experience.
+
+GOAL
+Make the shop/product mockup presentation feel like a polished poster store, not an admin/debug feature.
+
+Focus only on customer-facing UI. Do not rebuild the admin mockup system.
+
+CHECK AND IMPROVE
+
+1. Shop product cards
+- Use the best featured compatible mockup as the primary visual where appropriate.
+- Make sure the poster itself remains clearly visible.
+- Avoid showing too many controls on product cards.
+- Product cards should feel clean, premium, and suitable for selling prints.
+
+2. Product detail page
+- Add or polish a mockup carousel/gallery.
+- Show the actual poster image and lifestyle mockups as separate but connected views.
+- Make it easy to switch between:
+  - Poster only
+  - Wall mockup
+  - Interior mockup
+  - Frame/detail mockup
+- Do not show admin metadata, detection confidence, placement values, or internal template names to customers.
+
+3. Mockup selection logic
+- Featured compatible mockup first.
+- Then best exact format match.
+- Then orientation-compatible match.
+- Then generic fallback.
+- Hide broken or inactive mockups.
+
+4. Visual quality
+- Ensure poster placement looks natural:
+  - correct aspect ratio
+  - no stretching
+  - clean shadow
+  - subtle frame depth if already supported
+- Make sure mockups load smoothly.
+- Add skeleton/loading states.
+- Hide broken mockup images gracefully.
+
+5. Mobile polish
+- Product cards should not feel cramped.
+- Mockup carousel should be swipe-friendly.
+- CTA buttons should remain clear and not compete with the image.
+
+6. Empty/fallback states
+- If no mockup is available, show the poster-only image instead.
+- Do not show a broken placeholder.
+
+7. Final report
+After implementation, report:
+- how product cards choose mockups
+- how product detail mockup carousel works
+- whether poster-only view is preserved
+- how broken/inactive mockups are handled
+- what changed on mobile
+- any remaining UX limitations
