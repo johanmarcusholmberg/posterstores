@@ -162,6 +162,12 @@ const ALLOWED_TEMPLATE_FIELDS = [
   "rotation",
   "borderRadius",
   "shadowStrength",
+  "detectionConfidence",
+  "detectionDescription",
+  "detectionSource",
+  "detectionModel",
+  "detectedAt",
+  "placementWasManuallyAdjusted",
 ] as const;
 
 router.get("/mockup-templates", async (req, res) => {

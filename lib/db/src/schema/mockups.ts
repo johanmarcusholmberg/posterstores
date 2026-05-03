@@ -59,6 +59,12 @@ export const mockupTemplatesTable = pgTable("mockup_templates", {
   rotation: real("rotation"),
   borderRadius: real("border_radius"),
   shadowStrength: real("shadow_strength"),
+  detectionConfidence: real("detection_confidence"),
+  detectionDescription: text("detection_description"),
+  detectionSource: text("detection_source"),
+  detectionModel: text("detection_model"),
+  detectedAt: timestamp("detected_at"),
+  placementWasManuallyAdjusted: boolean("placement_was_manually_adjusted").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

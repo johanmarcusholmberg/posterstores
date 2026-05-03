@@ -25,6 +25,12 @@ export interface MockupTemplate {
   rotation: number | null;
   borderRadius: number | null;
   shadowStrength: number | null;
+  detectionConfidence: number | null;
+  detectionDescription: string | null;
+  detectionSource: string | null;
+  detectionModel: string | null;
+  detectedAt: string | null;
+  placementWasManuallyAdjusted: boolean | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -223,6 +229,7 @@ export interface PlacementAnalysis {
   detected: boolean;
   confidence: number;
   description: string;
+  model: string;
   x: number | null;
   y: number | null;
   width: number | null;
