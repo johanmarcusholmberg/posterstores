@@ -1,0 +1,236 @@
+Continue working on my poster / print webstore project.
+
+GOAL
+I want admins to be able to manage reusable mockup pictures from the admin page.
+
+Today, mockups are mainly static/frontend-defined. I want a proper admin-managed mockup system where I can add, remove, activate/deactivate, and organize mockup backgrounds that my generated/uploaded poster image can be placed into when saved or uploaded.
+
+IMPORTANT
+Do not replace the existing poster generation, upload, product, or mockup-preview architecture.
+Build on the current structure.
+Keep the existing mockup functionality working while moving the mockup source of truth toward admin-managed data.
+Do not create a separate disconnected demo system.
+Do not hardcode the final mockup list in frontend components anymore, except as fallback/seed data if needed.
+
+ADMIN MOCKUP MANAGEMENT
+
+Add a new section in the admin area called:
+
+“Mockup Pictures”
+or
+“Mockup Templates”
+
+The admin should be able to:
+
+1. Upload a new mockup background image
+   - Image file upload
+   - Supported formats: jpg, png, webp
+   - Store image in the existing file/storage system if available
+   - If no storage bucket exists yet, create a clear implementation using the project’s current storage pattern
+   - Validate file type and reasonable file size
+   - Show upload progress/loading state
+
+2. Add mockup metadata
+   Each mockup should have:
+   - Name
+   - Description/internal note
+   - Category, for example:
+     - Wall
+     - Interior
+     - Café/Table
+     - Frame
+     - Lifestyle
+     - Minimal
+     - Decorative
+   - Frame color/material, optional:
+     - Black
+     - White
+     - Light wood
+     - Dark wood
+     - Oak
+     - None
+   - Orientation:
+     - Portrait
+     - Landscape
+     - Square
+   - Supported poster formats:
+     - 30x40
+     - 50x50
+     - 50x70
+     - A4
+     - A3
+     - A2
+   - Active/inactive status
+   - Sort order
+   - Optional “featured” flag
+
+3. Remove mockup pictures
+   - Admin can delete/remove mockups
+   - Use confirmation dialog before deleting
+   - If possible, remove both database record and stored file
+   - If hard delete is risky, support archive/inactive instead
+
+4. Edit existing mockups
+   - Change name
+   - Change category
+   - Change supported formats
+   - Change active status
+   - Change sort order
+   - Replace image file if needed
+
+5. Preview mockup list
+   - Admin page should show all mockups in a clean grid/table
+   - Thumbnail preview
+   - Name
+   - Category
+   - Supported formats
+   - Active/inactive badge
+   - Edit button
+   - Delete/archive button
+
+DATABASE / BACKEND
+
+Create a proper data model for mockup templates.
+
+Suggested table name:
+mockup_templates
+
+Suggested fields:
+- id
+- name
+- description
+- image_url
+- storage_path
+- category
+- frame_material
+- orientation
+- supported_formats as array/json
+- is_active
+- is_featured
+- sort_order
+- created_at
+- updated_at
+
+If the app already has Supabase or another backend structure, use that existing pattern.
+Add Row Level Security / access rules so:
+- Public users can only read active mockup templates if needed for frontend preview
+- Admin users can create, update, delete, and manage all mockup templates
+- Regular logged-in users cannot modify mockup templates
+
+FRONTEND MOCKUP USAGE
+
+Update the poster/product/mockup preview flow so that:
+
+1. When a poster image is generated or uploaded and saved, the app can display it inside available active mockup templates.
+
+2. The frontend should fetch active mockup templates from the backend instead of relying only on hardcoded mockup assets.
+
+3. Mockups should be filterable by:
+   - Poster format
+   - Category
+   - Orientation
+   - Frame material
+
+4. If no admin-managed mockups exist yet:
+   - Keep the current default mockups as fallback
+   - Or seed the current mockups into the new mockup_templates table
+
+5. The selected/generated/uploaded poster image should be visually placed inside the mockup.
+   - Reuse the existing frontend mockup rendering approach if one exists
+   - Keep this as frontend visualization unless the current architecture already creates generated mockup files
+   - Do not create expensive AI-generated mockups automatically
+   - The mockup background is reusable; the poster image is composited/positioned into it
+
+PLACEMENT / POSTER AREA
+
+Because different mockup backgrounds need the poster to appear in the correct place, add support for defining the poster placement area.
+
+Each mockup should be able to store placement settings:
+- poster_x
+- poster_y
+- poster_width
+- poster_height
+- rotation, optional
+- border_radius, optional
+- shadow_strength, optional
+
+In the admin edit view, make this easy to manage.
+
+Minimum acceptable implementation:
+- Numeric input fields for x/y/width/height
+- Live preview showing the poster placeholder inside the mockup
+
+Better implementation if reasonable:
+- Visual drag/resize placement editor
+- Admin can drag the poster placeholder over the mockup image
+- Save the position values to the mockup template
+
+The placement settings should be used when rendering the user’s poster inside the mockup.
+
+USER / PRODUCT EXPERIENCE
+
+When a user or admin views a saved/generated/uploaded poster:
+- Show available mockup previews using active mockup templates
+- Allow switching between mockups
+- Allow filtering by format/category if many exist
+- Make the mockup preview feel polished and professional
+- Do not make the interface cluttered
+
+For product/shop pages:
+- Use featured mockups or the first active compatible mockup as the default product preview
+- Keep the actual poster image available separately
+- Mockups should help show the print in a real environment
+
+ADMIN UX
+
+The admin mockup section should feel simple and professional:
+
+Suggested layout:
+- Header: “Mockup Templates”
+- Button: “Add mockup”
+- Filters: category, format, active/inactive
+- Grid/table of existing mockups
+- Modal or dedicated page for creating/editing
+
+Add helpful empty states:
+- “No mockup templates yet. Upload your first interior/background mockup.”
+- “No active mockups match this format.”
+
+SECURITY / VALIDATION
+
+- Only admins can upload/edit/delete mockup templates
+- Validate uploaded files
+- Do not allow unsafe file types
+- Handle broken image URLs gracefully
+- Add loading/error/success states
+- Do not expose admin-only actions to normal users
+- Make sure deleting a mockup does not delete poster images or user products
+
+IMPORTANT BUSINESS LOGIC
+
+The mockup image is a reusable background/template.
+The poster image should be inserted into the defined placement area.
+One poster can be previewed in multiple mockups.
+One mockup can be reused for many posters.
+Mockups should not be treated as final generated art unless explicitly exported later.
+
+DELIVERABLES
+
+Please implement:
+1. Backend/database model for mockup templates
+2. Storage/upload handling for mockup background images
+3. Admin page for adding/editing/removing mockup templates
+4. Placement settings for where the poster should appear in the mockup
+5. Frontend fetching of active mockup templates
+6. Mockup preview rendering using the uploaded/generated poster image
+7. Fallback or seed strategy for existing mockups
+8. Admin-only access control
+9. Clean UI states for loading, errors, empty state, and successful saves
+
+After implementation, report:
+- Which files were changed
+- How mockup templates are stored
+- How the poster placement area works
+- How admins add/remove mockups
+- How normal users see mockups
+- Any limitations or recommended next steps
