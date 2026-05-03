@@ -4,6 +4,7 @@ import { db } from "@workspace/db";
 import { ordersTable, orderItemsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
+import { sendOrderConfirmationEmail } from "./stripeWebhook";
 
 const router = Router();
 
@@ -90,6 +91,66 @@ router.post("/orders/:id/create-checkout-session", async (req: Request, res: Res
   logger.info({ orderId, sessionId: session.id }, "Stripe checkout session created");
 
   return res.json({ checkoutUrl: session.url, sessionId: session.id });
+});
+
+// Fallback verification — used when webhook hasn't fired yet (e.g. dev without Stripe CLI)
+router.post("/orders/:id/verify-payment", async (req: Request, res: Response) => {
+  const orderId = Number(req.params.id);
+  if (isNaN(orderId)) return res.status(400).json({ error: "Invalid order id" });
+
+  const storeKey = typeof req.query.storeKey === "string" ? req.query.storeKey : (req.body?.storeKey as string | undefined);
+  if (!storeKey) return res.status(400).json({ error: "storeKey is required" });
+
+  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId));
+  if (!order) return res.status(404).json({ error: "Order not found" });
+  if (order.storeKey !== storeKey) return res.status(403).json({ error: "Forbidden" });
+
+  if (order.status === "paid") {
+    return res.json({ paid: true });
+  }
+
+  if (!order.stripeCheckoutSessionId) {
+    return res.json({ paid: false });
+  }
+
+  let stripe: Stripe;
+  try {
+    stripe = getStripe();
+  } catch {
+    return res.status(500).json({ error: "Stripe is not configured" });
+  }
+
+  const session = await stripe.checkout.sessions.retrieve(order.stripeCheckoutSessionId);
+
+  if (session.payment_status !== "paid") {
+    return res.json({ paid: false });
+  }
+
+  const paymentIntentId =
+    typeof session.payment_intent === "string"
+      ? session.payment_intent
+      : (session.payment_intent as Stripe.PaymentIntent | null)?.id ?? null;
+
+  await db
+    .update(ordersTable)
+    .set({
+      status: "paid",
+      paymentStatus: "paid",
+      stripePaymentIntentId: paymentIntentId,
+      paidAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(ordersTable.id, orderId));
+
+  logger.info({ orderId, paymentIntentId }, "Order marked as paid via verify-payment fallback");
+
+  const [updatedOrder] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId));
+  const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, orderId));
+  if (updatedOrder) {
+    await sendOrderConfirmationEmail(updatedOrder, items);
+  }
+
+  return res.json({ paid: true });
 });
 
 export default router;

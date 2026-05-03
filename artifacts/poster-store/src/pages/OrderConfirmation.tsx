@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState, useEffect, useRef } from "react";
 import { useParams, Link, useSearch } from "wouter";
 import { useGetOrder, getGetOrderQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,7 @@ export default function OrderConfirmation() {
   const paymentParam = params.get("payment");
   const [closeFailed, setCloseFailed] = useState(false);
 
-  const { data: order, isLoading } = useGetOrder(orderId, {
+  const { data: order, isLoading, refetch } = useGetOrder(orderId, {
     query: {
       enabled: !!orderId && !isNaN(orderId),
       queryKey: getGetOrderQueryKey(orderId),
@@ -33,6 +33,26 @@ export default function OrderConfirmation() {
       refetchIntervalInBackground: false,
     },
   });
+
+  // Fallback: if still pending after 4 s, ask server to verify directly with Stripe
+  const verifiedRef = useRef(false);
+  useEffect(() => {
+    if (paymentParam !== "success" || order?.status === "paid" || verifiedRef.current) return;
+    const timer = setTimeout(async () => {
+      if (verifiedRef.current || order?.status === "paid") return;
+      verifiedRef.current = true;
+      try {
+        await fetch(
+          `/api/orders/${orderId}/verify-payment?storeKey=${encodeURIComponent(store.storeKey)}`,
+          { method: "POST" }
+        );
+        refetch();
+      } catch {
+        // silent — webhook may still arrive
+      }
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [paymentParam, order?.status, orderId, store.storeKey, refetch]);
 
   const downloadReceipt = useCallback(() => {
     if (!order) return;
@@ -136,13 +156,6 @@ export default function OrderConfirmation() {
   return (
     <div className="container mx-auto px-4 py-16 max-w-3xl">
       <div className="text-center mb-10">
-        <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full mb-6 ${isPaid ? "bg-green-100" : statusConfig.bg}`}>
-          {isPaid ? (
-            <CheckCircle2 className="h-10 w-10 text-green-600" />
-          ) : (
-            <StatusIcon className={`h-10 w-10 ${statusConfig.color}`} />
-          )}
-        </div>
         <h1 className="font-serif text-4xl font-bold mb-3">
           {isPaid ? "Order Confirmed!" : isPendingPayment ? "Order Created" : isCancelled ? "Order Cancelled" : "Order Status"}
         </h1>

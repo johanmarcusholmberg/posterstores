@@ -11,7 +11,7 @@ function getStripe(): Stripe {
   return new Stripe(key, { apiVersion: "2025-04-30.basil" });
 }
 
-async function sendOrderConfirmationEmail(
+export async function sendOrderConfirmationEmail(
   order: typeof ordersTable.$inferSelect,
   items: (typeof orderItemsTable.$inferSelect)[]
 ) {
