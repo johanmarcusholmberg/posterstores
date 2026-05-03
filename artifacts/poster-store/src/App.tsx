@@ -19,6 +19,12 @@ import Favorites from "@/pages/Favorites";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import Account from "@/pages/Account";
+import Shipping from "@/pages/Shipping";
+import Returns from "@/pages/Returns";
+import Privacy from "@/pages/Privacy";
+import Terms from "@/pages/Terms";
+import Contact from "@/pages/Contact";
+import About from "@/pages/About";
 import NotFound from "@/pages/not-found";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import AdminPosters from "@/pages/admin/AdminPosters";
@@ -58,6 +64,12 @@ function PublicRoutes() {
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/account" component={Account} />
+      <Route path="/shipping" component={Shipping} />
+      <Route path="/returns" component={Returns} />
+      <Route path="/privacy" component={Privacy} />
+      <Route path="/terms" component={Terms} />
+      <Route path="/contact" component={Contact} />
+      <Route path="/about" component={About} />
       <Route component={NotFound} />
     </Switch>
   );

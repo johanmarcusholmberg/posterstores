@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "wouter";
 import { useStorefront } from "@/context/StorefrontContext";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -47,17 +48,26 @@ export const Footer = () => {
 
   return (
     <footer className="bg-white border-t border-border mt-16 py-12">
-      <div className="container mx-auto px-4 grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="container mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-8">
         <div>
           <h3 className="font-serif text-xl font-bold text-primary mb-4">{store.storeName}</h3>
           <p className="text-muted-foreground max-w-sm">
             {store.seo?.defaultDescription || `Art posters of ${store.countryFocus}.`}
           </p>
         </div>
+
         <div>
-          <h4 className="font-medium text-foreground mb-2">
-            {store.homepage.newsletterTitle || "Join our newsletter"}
-          </h4>
+          <h4 className="font-medium text-foreground mb-3">Information</h4>
+          <ul className="space-y-2 text-sm text-muted-foreground">
+            <li><Link href="/about" className="hover:text-primary transition-colors" data-testid="footer-link-about">About</Link></li>
+            <li><Link href="/shipping" className="hover:text-primary transition-colors" data-testid="footer-link-shipping">Shipping</Link></li>
+            <li><Link href="/returns" className="hover:text-primary transition-colors" data-testid="footer-link-returns">Returns</Link></li>
+            <li><Link href="/contact" className="hover:text-primary transition-colors" data-testid="footer-link-contact">Contact</Link></li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 className="font-medium text-foreground mb-3">Newsletter</h4>
           <p className="text-sm text-muted-foreground mb-4">
             {store.homepage.newsletterSubtitle || "Get updates on new releases."}
           </p>
@@ -82,8 +92,13 @@ export const Footer = () => {
           </Form>
         </div>
       </div>
-      <div className="container mx-auto px-4 mt-8 pt-8 border-t border-border text-center text-sm text-muted-foreground">
-        &copy; {new Date().getFullYear()} {store.storeName}. All rights reserved.
+
+      <div className="container mx-auto px-4 mt-8 pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
+        <span>&copy; {new Date().getFullYear()} {store.storeName}. All rights reserved.</span>
+        <div className="flex gap-4">
+          <Link href="/privacy" className="hover:text-primary transition-colors" data-testid="footer-link-privacy">Privacy Policy</Link>
+          <Link href="/terms" className="hover:text-primary transition-colors" data-testid="footer-link-terms">Terms &amp; Conditions</Link>
+        </div>
       </div>
     </footer>
   );
