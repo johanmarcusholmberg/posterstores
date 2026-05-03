@@ -93,7 +93,7 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
   return (
     <>
       <Link href={href} className="group block" data-testid={`link-poster-${poster.id}`}>
-        <div className="relative aspect-[3/4] overflow-hidden bg-muted rounded-md mb-2 shadow-sm group-hover:shadow-md transition-shadow">
+        <div className="relative h-[190px] sm:h-auto sm:aspect-[3/4] overflow-hidden bg-muted rounded-md mb-1.5 sm:mb-2 shadow-sm group-hover:shadow-md transition-shadow">
           <img
             src={displayImage}
             alt={poster.title}
@@ -124,8 +124,8 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
         </div>
         <div className="flex justify-between items-start">
           <div>
-            <h3 className="font-serif font-semibold text-lg text-foreground line-clamp-1">{poster.title}</h3>
-            <p className="text-sm text-muted-foreground">{poster.city || poster.region}</p>
+            <h3 className="font-serif font-semibold text-base sm:text-lg text-foreground line-clamp-1">{poster.title}</h3>
+            <p className="text-xs sm:text-sm text-muted-foreground">{poster.city || poster.region}</p>
           </div>
           <p className="font-medium text-foreground text-sm whitespace-nowrap ml-2">
             {priceLabel}
