@@ -1,0 +1,68 @@
+Continue building the reusable multi-store poster webstore.
+
+CURRENT STATUS:
+- The app is launch-ready and all major functionality works.
+- Mobile shop layout works, but poster cards feel a bit too large on small screens.
+- The current mobile layout only shows a few posters at once, which makes browsing feel slower.
+
+NEXT GOAL:
+Make the mobile shop poster grid slightly more compact while keeping the premium visual feeling.
+
+Important:
+- Do not redesign the whole shop.
+- Do not change desktop layout unless needed to keep consistency.
+- Do not change backend/API logic.
+- Do not break filters, sorting, favorites, cart, poster links or mockup image behavior.
+- Keep all tests passing.
+- This is a small mobile UX polish only.
+
+TASK:
+Adjust the mobile poster card/grid layout on /shop so users can see more posters at once.
+
+Recommended behavior:
+- Keep 2 columns on mobile.
+- Do not switch to 3 columns.
+- Reduce poster image height on mobile by approximately 15–25%.
+- Target mobile image height around 180–210px depending on screen width.
+- Keep images visually strong and premium, not tiny.
+- Keep rounded corners and clean spacing.
+
+Poster card text:
+- Title should be max 1 line with ellipsis on mobile.
+- Price should stay easy to read.
+- Region/city text should be slightly smaller and muted.
+- Keep favorite button usable.
+- Keep badges small and avoid clutter.
+- If multiple badges exist, keep the card from becoming visually crowded.
+
+Grid spacing:
+- Slightly reduce vertical spacing between cards on mobile.
+- Keep enough spacing so the grid does not feel cramped.
+- Desktop/tablet layout should remain visually unchanged unless the current component requires shared styling.
+
+Image behavior:
+- Continue using the existing display image fallback logic:
+  1. primary mockup image
+  2. primary mockup template thumbnail
+  3. preview image
+  4. imageUrl
+  5. master print image
+  6. placeholder
+- Do not show empty placeholder mockup templates publicly.
+
+Testing:
+- Verify /shop on mobile width around 390px.
+- Confirm 2-column layout remains.
+- Confirm more posters are visible vertically than before.
+- Confirm title truncation works.
+- Confirm favorite button remains tappable.
+- Confirm filters drawer still works.
+- Confirm poster card click still opens /posters/:slug.
+- Confirm desktop shop layout still looks good.
+- Run existing tests/typechecks.
+
+At the end, summarize:
+1. What mobile card/image dimensions changed.
+2. Whether desktop was affected.
+3. What manual mobile checks I should do.
+4. Final test/typecheck result.
