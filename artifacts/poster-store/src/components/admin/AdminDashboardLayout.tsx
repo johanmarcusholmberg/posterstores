@@ -16,6 +16,7 @@ import {
   LogOut,
   ChevronRight,
   Package,
+  Globe,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -24,6 +25,7 @@ const NAV_ITEMS = [
   { href: "/admin/orders", label: "Orders", icon: ShoppingBag },
   { href: "/admin/fulfillment", label: "Fulfillment", icon: Package },
   { href: "/admin/mockups", label: "Mockups", icon: LayoutTemplate },
+  { href: "/admin/stores", label: "Stores", icon: Globe },
   { href: "/admin/taxonomy", label: "Taxonomy", icon: Tag, disabled: true },
   { href: "/admin/newsletter", label: "Newsletter", icon: Mail, disabled: true },
 ];

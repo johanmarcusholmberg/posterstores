@@ -8,6 +8,7 @@ import ordersRouter from "./orders";
 import newsletterRouter from "./newsletter";
 import statsRouter from "./stats";
 import mockupsRouter from "./mockups";
+import storesRouter from "./stores";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(ordersRouter);
 router.use(newsletterRouter);
 router.use(statsRouter);
 router.use(mockupsRouter);
+router.use(storesRouter);
 
 export default router;

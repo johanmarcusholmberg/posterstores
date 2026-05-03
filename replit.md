@@ -40,9 +40,20 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 - **`lib/api-client-react`** — TanStack Query hooks generated from OpenAPI spec
 
 ### Multi-Store System
-- `artifacts/poster-store/src/config/storefronts.ts` — StorefrontConfig interface and all storefront definitions
+- `artifacts/poster-store/src/config/storefronts.ts` — StorefrontConfig interface and all storefront definitions (static fallback)
 - `artifacts/poster-store/src/config/activeStore.ts` — ACTIVE_STORE_KEY = "postsofspain"
-- `artifacts/poster-store/src/context/StorefrontContext.tsx` — React context providing active store config
+- `artifacts/poster-store/src/context/StorefrontContext.tsx` — React context: starts with static config, then fetches from DB via `GET /api/stores/:storeKey/config` and updates if found
+- `lib/db/src/schema/stores.ts` — `stores` table (id, store_key, name, country_focus, default_currency, default_language, active, theme_config jsonb, homepage_config jsonb, seo_config jsonb, navigation_config jsonb, created_at, updated_at)
+
+#### Admin Store Management
+- **Routes**: `/admin/stores`, `/admin/stores/new`, `/admin/stores/:storeKey`
+- **API**: `GET/POST /api/admin/stores`, `GET/PUT /api/admin/stores/:storeKey`, `PATCH /api/admin/stores/:storeKey/deactivate`
+- **Public API**: `GET /api/stores` (active stores list), `GET /api/stores/:storeKey/config` (merged StorefrontConfig shape)
+- **Config bridge**: DB stores take priority over static `storefronts.ts` config. If no DB record exists, static config is used as fallback.
+- **Store selector**: `AdminStoreSelector` fetches active DB stores + merges with static fallback stores; persists selection in localStorage; accepts any store key (not just static ones)
+- **Validation**: storeKey must match `/^[a-z][a-z0-9]*$/` (no hyphens/spaces), unique, required. Store name, currency, language required. Theme colors must be valid 6-digit hex values. Archive/deactivate instead of delete; blocked if store has posters or orders.
+- **Components**: `AdminStoreForm` (create/edit with theme color pickers, taxonomy comma-lists, homepage copy, SEO fields), `AdminStores` (list page), `AdminStoreNew`, `AdminStoreEdit`
+- **Domain routing**: Architecture is prepared but not yet implemented. Resolver priority: explicit domain → ACTIVE_STORE_KEY env → postsofspain fallback.
 
 ### Poster Slug System
 - `slug` column added to `posters` table (text, nullable, unique per store_key)
@@ -92,13 +103,13 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 - `artifacts/poster-store/src/lib/session.ts` — `getSessionId()` generates/retrieves the UUID
 
 ### Admin System
-- **Routes**: `/admin`, `/admin/posters`, `/admin/posters/new`, `/admin/posters/:id`, `/admin/mockups`, `/admin/posters/:id/mockups`, `/admin/orders`, `/admin/orders/:id`
+- **Routes**: `/admin`, `/admin/posters`, `/admin/posters/new`, `/admin/posters/:id`, `/admin/mockups`, `/admin/posters/:id/mockups`, `/admin/orders`, `/admin/orders/:id`, `/admin/stores`, `/admin/stores/new`, `/admin/stores/:storeKey`, `/admin/fulfillment`
 - **Token gate**: `AdminTokenGate` shows a login screen if no token in localStorage (`admin_token` key)
 - **Token storage**: Token stored in browser `localStorage` under `admin_token` key; cleared with "Clear token" button
 - **API auth**: All admin API calls send `X-Admin-Token: <token>` header via `artifacts/poster-store/src/lib/adminApi.ts` and `artifacts/poster-store/src/lib/mockupApi.ts`
-- **Store selector**: Admin maintains its own active store in `localStorage` under `admin_active_store` key
-- **Context**: `AdminTokenContext` provides token + adminStoreKey to all admin components
-- **Components**: `AdminDashboardLayout`, `AdminTokenGate`, `AdminStoreSelector`, `AdminStatusBadge`, `AdminPosterList`, `AdminPosterForm`, `AdminImageFields`, `AdminSizePriceEditor`, `AdminPublishControls`, `AdminMockupTemplateList`, `AdminPosterMockupManager`, `PrimaryMockupBadge`
+- **Store selector**: Admin maintains its own active store in `localStorage` under `admin_active_store` key; now fetches DB stores (via public `/api/stores`) merged with static fallback
+- **Context**: `AdminTokenContext` provides token + adminStoreKey (accepts any valid store key, not just static ones)
+- **Components**: `AdminDashboardLayout`, `AdminTokenGate`, `AdminStoreSelector`, `AdminStatusBadge`, `AdminPosterList`, `AdminPosterForm`, `AdminImageFields`, `AdminSizePriceEditor`, `AdminPublishControls`, `AdminMockupTemplateList`, `AdminPosterMockupManager`, `PrimaryMockupBadge`, `AdminStoreForm`
 
 ### Admin API Behavior
 - `GET /api/posters` with valid `X-Admin-Token`: pass `status=all` to see all; `status=draft` for drafts; etc.
@@ -141,7 +152,7 @@ Simple white wall with black frame, Warm beige wall with oak frame, Terracotta w
 ### Database
 - 12 posters seeded for postsofspain storeKey
 - 10 global mockup templates seeded on API startup
-- Schema: `lib/db/src/schema/`
+- Schema: `lib/db/src/schema/` — posters, posterSizes, cart, favorites, orders, orderItems, newsletter, mockups, **stores**
 
 ## Important Notes
 

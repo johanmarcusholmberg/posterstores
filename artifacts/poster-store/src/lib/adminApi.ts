@@ -371,3 +371,137 @@ export function adminFulfillmentExportUrl(
   qs.set("x-admin-token", token);
   return `${BASE}/admin/fulfillment/export.csv?${qs}`;
 }
+
+// ─── Store management ─────────────────────────────────────────────────────────
+
+export interface AdminStoreThemeConfig {
+  background: string;
+  surface: string;
+  sand: string;
+  primary: string;
+  secondary: string;
+  text: string;
+  muted: string;
+  border: string;
+}
+
+export interface AdminStoreHomepageConfig {
+  heroTitle?: string;
+  heroSubtitle?: string;
+  primaryCta?: string;
+  secondaryCta?: string;
+  newsletterTitle?: string;
+  newsletterSubtitle?: string;
+  regions?: string[];
+  cities?: string[];
+  categories?: string[];
+  tags?: string[];
+}
+
+export interface AdminStoreSeoConfig {
+  defaultTitle?: string;
+  defaultDescription?: string;
+}
+
+export interface AdminStore {
+  id: number;
+  storeKey: string;
+  name: string;
+  countryFocus: string;
+  defaultCurrency: string;
+  defaultLanguage: string;
+  active: boolean;
+  themeConfig: AdminStoreThemeConfig | null;
+  homepageConfig: AdminStoreHomepageConfig | null;
+  seoConfig: AdminStoreSeoConfig | null;
+  navigationConfig: null;
+  posterCount: number;
+  orderCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type CreateStorePayload = {
+  storeKey: string;
+  name: string;
+  countryFocus: string;
+  defaultCurrency: string;
+  defaultLanguage: string;
+  active: boolean;
+  themeConfig?: AdminStoreThemeConfig | null;
+  homepageConfig?: AdminStoreHomepageConfig | null;
+  seoConfig?: AdminStoreSeoConfig | null;
+};
+
+export type UpdateStorePayload = Partial<Omit<CreateStorePayload, "storeKey">>;
+
+export async function adminListStores(token: string): Promise<AdminStore[]> {
+  const res = await fetch(`${BASE}/admin/stores`, { headers: headers(token) });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(extractErrorMessage(body));
+  }
+  return res.json();
+}
+
+export async function adminGetStore(token: string, storeKey: string): Promise<AdminStore> {
+  const res = await fetch(`${BASE}/admin/stores/${encodeURIComponent(storeKey)}`, {
+    headers: headers(token),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(extractErrorMessage(body));
+  }
+  return res.json();
+}
+
+export async function adminCreateStore(
+  token: string,
+  payload: CreateStorePayload
+): Promise<AdminStore> {
+  const res = await fetch(`${BASE}/admin/stores`, {
+    method: "POST",
+    headers: headers(token),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(extractErrorMessage(body));
+  }
+  return res.json();
+}
+
+export async function adminUpdateStore(
+  token: string,
+  storeKey: string,
+  payload: UpdateStorePayload
+): Promise<AdminStore> {
+  const res = await fetch(`${BASE}/admin/stores/${encodeURIComponent(storeKey)}`, {
+    method: "PUT",
+    headers: headers(token),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(extractErrorMessage(body));
+  }
+  return res.json();
+}
+
+export async function adminDeactivateStore(token: string, storeKey: string): Promise<AdminStore> {
+  const res = await fetch(`${BASE}/admin/stores/${encodeURIComponent(storeKey)}/deactivate`, {
+    method: "PATCH",
+    headers: headers(token),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(extractErrorMessage(body));
+  }
+  return res.json();
+}
+
+export async function fetchPublicStores(): Promise<AdminStore[]> {
+  const res = await fetch(`${BASE}/stores`);
+  if (!res.ok) return [];
+  return res.json();
+}

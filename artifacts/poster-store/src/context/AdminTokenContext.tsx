@@ -4,6 +4,8 @@ import { storefronts } from "@/config/storefronts";
 const ADMIN_TOKEN_KEY = "admin_token";
 const ADMIN_STORE_KEY = "admin_active_store";
 
+const DEFAULT_STORE_KEY = Object.keys(storefronts)[0] ?? "postsofspain";
+
 interface AdminTokenContextValue {
   token: string | null;
   setToken: (token: string) => void;
@@ -21,8 +23,8 @@ export const AdminTokenProvider = ({ children }: { children: ReactNode }) => {
 
   const [adminStoreKey, setAdminStoreKeyState] = useState<string>(() => {
     const stored = localStorage.getItem(ADMIN_STORE_KEY);
-    const keys = Object.keys(storefronts);
-    return stored && keys.includes(stored) ? stored : keys[0] ?? "postsofspain";
+    // Accept any non-empty stored key — DB stores may not be in the static list
+    return stored && stored.length > 0 ? stored : DEFAULT_STORE_KEY;
   });
 
   const setToken = useCallback((t: string) => {
