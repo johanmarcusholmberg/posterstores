@@ -34,11 +34,6 @@ export const Navbar = () => {
               {store.storeName}
             </span>
           </Link>
-          <div className="hidden md:flex items-center gap-4">
-            <Link href="/shop" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors" data-testid="link-shop">
-              Shop
-            </Link>
-          </div>
         </div>
 
         <div className="flex items-center gap-2">
