@@ -81,8 +81,8 @@ export default function Home() {
             <div className="order-1 lg:order-2 h-full flex items-center overflow-hidden">
               {heroPosters.length > 0 ? (
                 <div className="grid grid-cols-2 gap-3 lg:gap-4 w-full h-full">
-                  {/* Column 1 — anchored at top, no upward shift */}
-                  <div className="flex flex-col gap-3 lg:gap-4 pt-6">
+                  {/* Column 1 */}
+                  <div className="flex flex-col gap-3 lg:gap-4 pt-4">
                     {heroPosters.slice(0, 2).map((poster) => (
                       <Link
                         key={poster.id}
@@ -99,8 +99,8 @@ export default function Home() {
                       </Link>
                     ))}
                   </div>
-                  {/* Column 2 — shifted down for stagger effect */}
-                  <div className="flex flex-col gap-3 lg:gap-4 mt-[14%]">
+                  {/* Column 2 */}
+                  <div className="flex flex-col gap-3 lg:gap-4 pt-4">
                     {heroPosters.slice(2, 4).map((poster) => (
                       <Link
                         key={poster.id}
