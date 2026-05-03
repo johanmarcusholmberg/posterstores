@@ -1,20 +1,53 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useAdminToken } from "@/context/AdminTokenContext";
 import {
-  listMockupTemplates,
+  adminListAllMockupTemplates,
   adminUpdateMockupTemplate,
+  adminDeleteMockupTemplate,
   type MockupTemplate,
 } from "@/lib/mockupApi";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { LayoutTemplate, Globe, Store } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { MockupTemplateForm } from "./MockupTemplateForm";
+import {
+  LayoutTemplate,
+  Globe,
+  Store,
+  Plus,
+  Pencil,
+  Trash2,
+  Star,
+  Search,
+  ImageIcon,
+  Filter,
+} from "lucide-react";
 
 interface AdminMockupTemplateListProps {
   storeKey: string;
 }
+
+const CATEGORIES = ["All", "Wall", "Interior", "Café/Table", "Frame", "Lifestyle", "Minimal", "Decorative"];
 
 export const AdminMockupTemplateList = ({
   storeKey,
@@ -24,10 +57,19 @@ export const AdminMockupTemplateList = ({
   const [templates, setTemplates] = useState<MockupTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState<number | null>(null);
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("All");
+  const [activeFilter, setActiveFilter] = useState<"all" | "active" | "inactive">("all");
 
-  const load = () => {
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editTemplate, setEditTemplate] = useState<MockupTemplate | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<MockupTemplate | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const load = useCallback(() => {
+    if (!token) return;
     setLoading(true);
-    listMockupTemplates(storeKey)
+    adminListAllMockupTemplates(token, storeKey)
       .then(setTemplates)
       .catch((e) =>
         toast({
@@ -37,11 +79,11 @@ export const AdminMockupTemplateList = ({
         })
       )
       .finally(() => setLoading(false));
-  };
+  }, [token, storeKey]);
 
   useEffect(() => {
     load();
-  }, [storeKey]);
+  }, [load]);
 
   const toggleActive = async (template: MockupTemplate) => {
     if (!token) return;
@@ -62,93 +104,352 @@ export const AdminMockupTemplateList = ({
     }
   };
 
+  const handleDelete = async () => {
+    if (!token || !deleteTarget) return;
+    setDeleting(true);
+    try {
+      await adminDeleteMockupTemplate(token, deleteTarget.id);
+      setTemplates((prev) => prev.filter((t) => t.id !== deleteTarget.id));
+      toast({ title: `"${deleteTarget.name}" deleted` });
+      setDeleteTarget(null);
+    } catch (e: any) {
+      toast({ title: "Failed to delete", description: e?.message, variant: "destructive" });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleSaved = (saved: MockupTemplate) => {
+    setTemplates((prev) => {
+      const idx = prev.findIndex((t) => t.id === saved.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = saved;
+        return next;
+      }
+      return [...prev, saved];
+    });
+    setCreateOpen(false);
+    setEditTemplate(null);
+  };
+
+  const filtered = templates.filter((t) => {
+    if (search && !t.name.toLowerCase().includes(search.toLowerCase())) return false;
+    if (categoryFilter !== "All" && t.category !== categoryFilter) return false;
+    if (activeFilter === "active" && !t.active) return false;
+    if (activeFilter === "inactive" && t.active) return false;
+    return true;
+  });
+
+  const globalTemplates = filtered.filter((t) => t.storeKey === null);
+  const storeTemplates = filtered.filter((t) => t.storeKey !== null);
+
   if (loading) {
     return (
       <div className="space-y-2">
         {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-14 w-full" />
+          <Skeleton key={i} className="h-20 w-full" />
         ))}
       </div>
     );
   }
 
-  if (templates.length === 0) {
-    return (
-      <div className="text-center py-12 text-muted-foreground">
-        <LayoutTemplate className="w-10 h-10 mx-auto mb-3 opacity-30" />
-        <p>No mockup templates found.</p>
-      </div>
-    );
-  }
-
-  const globalTemplates = templates.filter((t) => t.storeKey === null);
-  const storeTemplates = templates.filter((t) => t.storeKey !== null);
-
-  const renderGroup = (list: MockupTemplate[], label: string) => {
-    if (list.length === 0) return null;
-    return (
-      <div className="space-y-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
-          {label}
-        </h3>
-        <div className="rounded-md border divide-y">
-          {list.map((template) => (
-            <div
-              key={template.id}
-              className="flex items-center gap-3 px-4 py-3"
-              data-testid={`template-row-${template.id}`}
-            >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium text-sm">{template.name}</span>
-                  {template.storeKey === null ? (
-                    <Badge variant="secondary" className="text-[10px] gap-1">
-                      <Globe className="w-2.5 h-2.5" />
-                      Global
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline" className="text-[10px] gap-1">
-                      <Store className="w-2.5 h-2.5" />
-                      {template.storeKey}
-                    </Badge>
-                  )}
-                  <Badge variant="outline" className="text-[10px]">
-                    {template.frameType}
-                  </Badge>
-                  {!template.active && (
-                    <Badge variant="destructive" className="text-[10px]">
-                      Inactive
-                    </Badge>
-                  )}
-                </div>
-                {template.description && (
-                  <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                    {template.description}
-                  </p>
-                )}
-              </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <span className="text-xs text-muted-foreground">
-                  #{template.sortOrder}
-                </span>
-                <Switch
-                  checked={template.active}
-                  onCheckedChange={() => toggleActive(template)}
-                  disabled={toggling === template.id}
-                  aria-label={`Toggle ${template.name}`}
-                />
-              </div>
+  return (
+    <>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className="relative flex-1 max-w-64">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search templates…"
+                className="pl-8 h-9"
+              />
             </div>
+            <div className="flex gap-1">
+              {(["all", "active", "inactive"] as const).map((f) => (
+                <Button
+                  key={f}
+                  variant={activeFilter === f ? "default" : "outline"}
+                  size="sm"
+                  className="h-9 text-xs capitalize"
+                  onClick={() => setActiveFilter(f)}
+                >
+                  {f}
+                </Button>
+              ))}
+            </div>
+          </div>
+          <Button
+            onClick={() => setCreateOpen(true)}
+            className="gap-1.5 shrink-0"
+            data-testid="add-mockup-template-btn"
+          >
+            <Plus className="w-4 h-4" />
+            Add mockup
+          </Button>
+        </div>
+
+        <div className="flex gap-1.5 flex-wrap">
+          {CATEGORIES.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setCategoryFilter(c)}
+              className={`px-2.5 py-1 rounded-full border text-xs font-medium transition-colors ${
+                categoryFilter === c
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border text-muted-foreground hover:border-primary/50"
+              }`}
+            >
+              {c}
+            </button>
           ))}
         </div>
-      </div>
-    );
-  };
 
-  return (
-    <div className="space-y-6">
-      {renderGroup(globalTemplates, "Global templates")}
-      {renderGroup(storeTemplates, `Templates for ${storeKey}`)}
-    </div>
+        {filtered.length === 0 ? (
+          <div className="text-center py-16 text-muted-foreground">
+            <LayoutTemplate className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <p className="font-medium">
+              {templates.length === 0
+                ? "No mockup templates yet."
+                : "No templates match your filters."}
+            </p>
+            {templates.length === 0 && (
+              <p className="text-sm mt-1 text-muted-foreground/70">
+                Upload your first interior or background mockup.
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {renderGroup(globalTemplates, "Global templates", token!, toggleActive, toggling, setEditTemplate, setDeleteTarget)}
+            {renderGroup(storeTemplates, `Templates for ${storeKey}`, token!, toggleActive, toggling, setEditTemplate, setDeleteTarget)}
+          </div>
+        )}
+      </div>
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add mockup template</DialogTitle>
+            <DialogDescription>
+              Upload a background image and define the poster placement area.
+            </DialogDescription>
+          </DialogHeader>
+          <MockupTemplateForm
+            token={token!}
+            storeKey={storeKey}
+            onSaved={handleSaved}
+            onCancel={() => setCreateOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editTemplate} onOpenChange={(open) => { if (!open) setEditTemplate(null); }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit mockup template</DialogTitle>
+            <DialogDescription>
+              Update the template details, image, and placement area.
+            </DialogDescription>
+          </DialogHeader>
+          {editTemplate && (
+            <MockupTemplateForm
+              token={token!}
+              storeKey={storeKey}
+              template={editTemplate}
+              onSaved={handleSaved}
+              onCancel={() => setEditTemplate(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete mockup template?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete <strong>"{deleteTarget?.name}"</strong>.
+              Any posters using this template will lose their link to it, but the
+              poster images themselves won't be affected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Deleting…" : "Delete template"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 };
+
+function renderGroup(
+  list: MockupTemplate[],
+  label: string,
+  token: string,
+  toggleActive: (t: MockupTemplate) => void,
+  toggling: number | null,
+  onEdit: (t: MockupTemplate) => void,
+  onDelete: (t: MockupTemplate) => void
+) {
+  if (list.length === 0) return null;
+  return (
+    <div className="space-y-2" key={label}>
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
+        {label}
+      </h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {list.map((template) => (
+          <TemplateCard
+            key={template.id}
+            template={template}
+            toggling={toggling}
+            onToggle={toggleActive}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TemplateCard({
+  template,
+  toggling,
+  onToggle,
+  onEdit,
+  onDelete,
+}: {
+  template: MockupTemplate;
+  toggling: number | null;
+  onToggle: (t: MockupTemplate) => void;
+  onEdit: (t: MockupTemplate) => void;
+  onDelete: (t: MockupTemplate) => void;
+}) {
+  const thumbUrl = template.backgroundImageUrl || template.previewThumbnailUrl;
+
+  return (
+    <div
+      className={`rounded-lg border bg-card overflow-hidden group transition-shadow hover:shadow-md ${
+        !template.active ? "opacity-60" : ""
+      }`}
+      data-testid={`template-card-${template.id}`}
+    >
+      <div className="relative aspect-[3/2] bg-muted overflow-hidden">
+        {thumbUrl ? (
+          <img
+            src={thumbUrl}
+            alt={template.name}
+            className="w-full h-full object-cover"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <ImageIcon className="w-8 h-8 text-muted-foreground/30" />
+          </div>
+        )}
+        <div className="absolute top-2 left-2 flex gap-1 flex-wrap">
+          {template.storeKey === null ? (
+            <Badge variant="secondary" className="text-[10px] gap-1 bg-background/90">
+              <Globe className="w-2.5 h-2.5" />
+              Global
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-[10px] gap-1 bg-background/90">
+              <Store className="w-2.5 h-2.5" />
+              {template.storeKey}
+            </Badge>
+          )}
+          {template.isFeatured && (
+            <Badge className="text-[10px] gap-1 bg-amber-500 text-white">
+              <Star className="w-2.5 h-2.5" />
+              Featured
+            </Badge>
+          )}
+        </div>
+        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button
+            size="icon"
+            variant="secondary"
+            className="h-7 w-7 bg-background/90"
+            onClick={() => onEdit(template)}
+            title="Edit template"
+          >
+            <Pencil className="w-3 h-3" />
+          </Button>
+          <Button
+            size="icon"
+            variant="secondary"
+            className="h-7 w-7 bg-background/90 hover:bg-destructive hover:text-destructive-foreground"
+            onClick={() => onDelete(template)}
+            title="Delete template"
+          >
+            <Trash2 className="w-3 h-3" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="p-3 space-y-2">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-sm truncate">{template.name}</p>
+            {template.description && (
+              <p className="text-xs text-muted-foreground truncate mt-0.5">{template.description}</p>
+            )}
+          </div>
+          <Switch
+            checked={template.active}
+            onCheckedChange={() => onToggle(template)}
+            disabled={toggling === template.id}
+            aria-label={`Toggle ${template.name}`}
+            className="shrink-0"
+          />
+        </div>
+
+        <div className="flex flex-wrap gap-1">
+          {template.category && (
+            <Badge variant="outline" className="text-[10px]">{template.category}</Badge>
+          )}
+          {template.frameType && template.frameType !== "none" && (
+            <Badge variant="outline" className="text-[10px]">{template.frameType}</Badge>
+          )}
+          {template.orientation && (
+            <Badge variant="outline" className="text-[10px]">{template.orientation}</Badge>
+          )}
+          {!template.active && (
+            <Badge variant="destructive" className="text-[10px]">Inactive</Badge>
+          )}
+        </div>
+
+        {template.supportedFormats && template.supportedFormats.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {template.supportedFormats.map((f) => (
+              <span key={f} className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono">
+                {f}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {(template.posterX != null || template.posterWidth != null) && (
+          <p className="text-[10px] text-muted-foreground">
+            Placement: {template.posterX ?? "?"}%, {template.posterY ?? "?"}% •{" "}
+            {template.posterWidth ?? "?"}×{template.posterHeight ?? "?"}%
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}

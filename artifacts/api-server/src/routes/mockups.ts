@@ -5,7 +5,7 @@ import {
   posterMockupsTable,
   postersTable,
 } from "@workspace/db";
-import { eq, and, or, isNull, asc } from "drizzle-orm";
+import { eq, and, or, isNull, asc, inArray } from "drizzle-orm";
 import { requireAdmin } from "../middleware/requireAdmin";
 import { adminLimiter } from "../middleware/rateLimiter";
 
@@ -16,6 +16,8 @@ const SEED_TEMPLATES = [
     name: "Simple white wall with black frame",
     templateKey: "white-wall-black-frame",
     frameType: "black",
+    category: "Wall",
+    orientation: "portrait",
     supportedOrientation: "portrait",
     description: "Clean white wall background with a sleek black frame",
     previewThumbnailUrl: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80",
@@ -25,6 +27,8 @@ const SEED_TEMPLATES = [
     name: "Warm beige wall with oak frame",
     templateKey: "beige-wall-oak-frame",
     frameType: "oak",
+    category: "Wall",
+    orientation: "portrait",
     supportedOrientation: "portrait",
     description: "Warm beige wall paired with a natural oak wooden frame",
     previewThumbnailUrl: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=600&q=80",
@@ -34,6 +38,8 @@ const SEED_TEMPLATES = [
     name: "Terracotta wall with black frame",
     templateKey: "terracotta-wall-black-frame",
     frameType: "black",
+    category: "Wall",
+    orientation: "portrait",
     supportedOrientation: "portrait",
     description: "Rich terracotta textured wall with a bold black frame",
     previewThumbnailUrl: "https://images.unsplash.com/photo-1600210492493-0946911123ea?w=600&q=80",
@@ -43,6 +49,8 @@ const SEED_TEMPLATES = [
     name: "Mediterranean living room",
     templateKey: "mediterranean-living-room",
     frameType: "none",
+    category: "Interior",
+    orientation: "any",
     supportedOrientation: "any",
     description: "Sun-drenched Mediterranean style living room setting",
     previewThumbnailUrl: "https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?w=600&q=80",
@@ -52,6 +60,8 @@ const SEED_TEMPLATES = [
     name: "Café table flat lay",
     templateKey: "cafe-table-flat-lay",
     frameType: "none",
+    category: "Café/Table",
+    orientation: "portrait",
     supportedOrientation: "portrait",
     description: "Flat lay on a café wooden table with coffee accessories",
     previewThumbnailUrl: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=600&q=80",
@@ -61,6 +71,8 @@ const SEED_TEMPLATES = [
     name: "Kitchen wall",
     templateKey: "kitchen-wall",
     frameType: "black",
+    category: "Interior",
+    orientation: "portrait",
     supportedOrientation: "portrait",
     description: "Modern kitchen wall display between cabinets",
     previewThumbnailUrl: "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=600&q=80",
@@ -70,6 +82,8 @@ const SEED_TEMPLATES = [
     name: "Gallery wall",
     templateKey: "gallery-wall",
     frameType: "mixed",
+    category: "Decorative",
+    orientation: "any",
     supportedOrientation: "any",
     description: "Multi-frame gallery wall arrangement",
     previewThumbnailUrl: "https://images.unsplash.com/photo-1513519245088-0e12902e5a38?w=600&q=80",
@@ -79,6 +93,8 @@ const SEED_TEMPLATES = [
     name: "Minimal bedroom",
     templateKey: "minimal-bedroom",
     frameType: "white",
+    category: "Minimal",
+    orientation: "portrait",
     supportedOrientation: "portrait",
     description: "Minimalist Scandinavian bedroom above the headboard",
     previewThumbnailUrl: "https://images.unsplash.com/photo-1616594039964-ae9021a400a0?w=600&q=80",
@@ -88,15 +104,19 @@ const SEED_TEMPLATES = [
     name: "Close-up frame detail",
     templateKey: "close-up-frame-detail",
     frameType: "black",
+    category: "Frame",
+    orientation: "portrait",
     supportedOrientation: "portrait",
     description: "Macro close-up showing frame quality and print texture",
     previewThumbnailUrl: "https://images.unsplash.com/photo-1582738411706-bfc8e691d1c2?w=600&q=80",
     sortOrder: 9,
   },
   {
-    name: "Size comparison wall",
-    templateKey: "size-comparison-wall",
+    name: "Lifestyle living space",
+    templateKey: "lifestyle-living-space",
     frameType: "none",
+    category: "Lifestyle",
+    orientation: "portrait",
     supportedOrientation: "portrait",
     description: "Wall display with a person for scale reference",
     previewThumbnailUrl: "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=600&q=80",
@@ -113,11 +133,76 @@ export async function seedMockupTemplates() {
       ...t,
       storeKey: null,
       active: true,
+      isFeatured: false,
     }))
   );
 }
 
+const ALLOWED_TEMPLATE_FIELDS = [
+  "name",
+  "templateKey",
+  "frameType",
+  "description",
+  "storeKey",
+  "supportedOrientation",
+  "supportedAspectRatio",
+  "previewThumbnailUrl",
+  "backgroundImageUrl",
+  "storagePath",
+  "active",
+  "sortOrder",
+  "category",
+  "orientation",
+  "supportedFormats",
+  "isFeatured",
+  "posterX",
+  "posterY",
+  "posterWidth",
+  "posterHeight",
+  "rotation",
+  "borderRadius",
+  "shadowStrength",
+] as const;
+
 router.get("/mockup-templates", async (req, res) => {
+  res.set("Cache-Control", "no-store");
+  const storeKey =
+    typeof req.query.storeKey === "string" ? req.query.storeKey : null;
+  const category =
+    typeof req.query.category === "string" ? req.query.category : null;
+  const orientation =
+    typeof req.query.orientation === "string" ? req.query.orientation : null;
+  const activeOnly = req.query.activeOnly !== "false";
+
+  let query = db
+    .select()
+    .from(mockupTemplatesTable)
+    .where(
+      storeKey
+        ? or(isNull(mockupTemplatesTable.storeKey), eq(mockupTemplatesTable.storeKey, storeKey))
+        : isNull(mockupTemplatesTable.storeKey)
+    )
+    .orderBy(asc(mockupTemplatesTable.sortOrder), asc(mockupTemplatesTable.id));
+
+  const templates = await query;
+
+  let filtered = templates;
+  if (activeOnly && req.query.activeOnly !== "false") {
+    filtered = filtered.filter(t => t.active);
+  }
+  if (category) {
+    filtered = filtered.filter(t => t.category === category);
+  }
+  if (orientation) {
+    filtered = filtered.filter(t =>
+      !t.orientation || t.orientation === orientation || t.orientation === "any"
+    );
+  }
+
+  return res.json(filtered);
+});
+
+router.get("/mockup-templates/all", requireAdmin, async (req, res) => {
   res.set("Cache-Control", "no-store");
   const storeKey =
     typeof req.query.storeKey === "string" ? req.query.storeKey : null;
@@ -135,28 +220,55 @@ router.get("/mockup-templates", async (req, res) => {
   return res.json(templates);
 });
 
+router.get("/mockup-templates/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+
+  const [template] = await db
+    .select()
+    .from(mockupTemplatesTable)
+    .where(eq(mockupTemplatesTable.id, id));
+
+  if (!template) return res.status(404).json({ error: "Not found" });
+  return res.json(template);
+});
+
 router.post("/mockup-templates", requireAdmin, async (req, res) => {
-  const { name, templateKey, frameType, description, storeKey, supportedOrientation, supportedAspectRatio, previewThumbnailUrl, backgroundImageUrl, active, sortOrder } = req.body;
+  const { name, templateKey, ...rest } = req.body;
 
   if (!name || !templateKey) {
     return res.status(400).json({ error: "name and templateKey are required" });
   }
 
+  const values: any = {
+    name,
+    templateKey,
+    frameType: rest.frameType ?? "none",
+    description: rest.description ?? null,
+    storeKey: rest.storeKey ?? null,
+    supportedOrientation: rest.supportedOrientation ?? null,
+    supportedAspectRatio: rest.supportedAspectRatio ?? null,
+    previewThumbnailUrl: rest.previewThumbnailUrl ?? null,
+    backgroundImageUrl: rest.backgroundImageUrl ?? null,
+    storagePath: rest.storagePath ?? null,
+    active: rest.active ?? true,
+    sortOrder: rest.sortOrder ?? 0,
+    category: rest.category ?? null,
+    orientation: rest.orientation ?? null,
+    supportedFormats: rest.supportedFormats ?? null,
+    isFeatured: rest.isFeatured ?? false,
+    posterX: rest.posterX ?? null,
+    posterY: rest.posterY ?? null,
+    posterWidth: rest.posterWidth ?? null,
+    posterHeight: rest.posterHeight ?? null,
+    rotation: rest.rotation ?? null,
+    borderRadius: rest.borderRadius ?? null,
+    shadowStrength: rest.shadowStrength ?? null,
+  };
+
   const [template] = await db
     .insert(mockupTemplatesTable)
-    .values({
-      name,
-      templateKey,
-      frameType: frameType ?? "none",
-      description: description ?? null,
-      storeKey: storeKey ?? null,
-      supportedOrientation: supportedOrientation ?? null,
-      supportedAspectRatio: supportedAspectRatio ?? null,
-      previewThumbnailUrl: previewThumbnailUrl ?? null,
-      backgroundImageUrl: backgroundImageUrl ?? null,
-      active: active ?? true,
-      sortOrder: sortOrder ?? 0,
-    })
+    .values(values)
     .returning();
 
   return res.status(201).json(template);
@@ -170,8 +282,7 @@ router.put("/mockup-templates/:id", requireAdmin, async (req, res) => {
   if (!existing) return res.status(404).json({ error: "Not found" });
 
   const updates: Partial<typeof mockupTemplatesTable.$inferInsert> = {};
-  const allowed = ["name", "templateKey", "frameType", "description", "storeKey", "supportedOrientation", "supportedAspectRatio", "previewThumbnailUrl", "backgroundImageUrl", "active", "sortOrder"] as const;
-  for (const key of allowed) {
+  for (const key of ALLOWED_TEMPLATE_FIELDS) {
     if (req.body[key] !== undefined) {
       (updates as any)[key] = req.body[key];
     }
@@ -224,8 +335,19 @@ router.get("/posters/:id/mockups", async (req, res) => {
         name: mockupTemplatesTable.name,
         templateKey: mockupTemplatesTable.templateKey,
         frameType: mockupTemplatesTable.frameType,
+        category: mockupTemplatesTable.category,
+        orientation: mockupTemplatesTable.orientation,
         previewThumbnailUrl: mockupTemplatesTable.previewThumbnailUrl,
+        backgroundImageUrl: mockupTemplatesTable.backgroundImageUrl,
+        storagePath: mockupTemplatesTable.storagePath,
         storeKey: mockupTemplatesTable.storeKey,
+        posterX: mockupTemplatesTable.posterX,
+        posterY: mockupTemplatesTable.posterY,
+        posterWidth: mockupTemplatesTable.posterWidth,
+        posterHeight: mockupTemplatesTable.posterHeight,
+        rotation: mockupTemplatesTable.rotation,
+        borderRadius: mockupTemplatesTable.borderRadius,
+        shadowStrength: mockupTemplatesTable.shadowStrength,
       },
     })
     .from(posterMockupsTable)
@@ -320,8 +442,19 @@ router.put("/posters/:id/mockups/batch", requireAdmin, async (req, res) => {
         name: mockupTemplatesTable.name,
         templateKey: mockupTemplatesTable.templateKey,
         frameType: mockupTemplatesTable.frameType,
+        category: mockupTemplatesTable.category,
+        orientation: mockupTemplatesTable.orientation,
         previewThumbnailUrl: mockupTemplatesTable.previewThumbnailUrl,
+        backgroundImageUrl: mockupTemplatesTable.backgroundImageUrl,
+        storagePath: mockupTemplatesTable.storagePath,
         storeKey: mockupTemplatesTable.storeKey,
+        posterX: mockupTemplatesTable.posterX,
+        posterY: mockupTemplatesTable.posterY,
+        posterWidth: mockupTemplatesTable.posterWidth,
+        posterHeight: mockupTemplatesTable.posterHeight,
+        rotation: mockupTemplatesTable.rotation,
+        borderRadius: mockupTemplatesTable.borderRadius,
+        shadowStrength: mockupTemplatesTable.shadowStrength,
       },
     })
     .from(posterMockupsTable)

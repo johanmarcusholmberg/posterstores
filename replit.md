@@ -101,8 +101,13 @@ Each store can have editable content for six public pages: About, Shipping, Retu
 
 ## Mockup System
 - **Data Model:** `mockup_templates` (global or store-specific) and `poster_mockups` (linking posters to templates with `mockupImageUrl` and `isPrimary` flag).
-- **Seeding:** 10 global mockup templates are seeded automatically.
+- **Seeding:** 10 global mockup templates are seeded automatically on first run.
 - **Image Resolution:** Priority for displaying images on the storefront is: primary `poster_mockup.mockupImageUrl` > primary `mockup_template.previewThumbnailUrl` > `poster.imageUrl` > generic placeholder.
+- **Extended template fields:** `category`, `orientation`, `supportedFormats` (jsonb), `storagePath`, `isFeatured`, `posterX/Y/Width/Height`, `rotation`, `borderRadius`, `shadowStrength`.
+- **Compositing:** When a template has placement data (posterX/Y/Width/Height set), the public `MockupGallery` overlays the poster image on the background using CSS absolute positioning. This enables runtime composite previews without pre-rendering.
+- **Admin Template Management:** Full CRUD UI at `/admin/mockups` — admins can upload background images to object storage, define poster placement areas as % of image size, set category/frame/orientation/format filters, toggle featured/active, and scope templates as global or store-specific.
+- **File Upload:** Admin template form uploads images directly to Replit Object Storage via presigned URLs (`POST /api/storage/uploads/request-url` → PUT to GCS presigned URL). Images are served at `/api/storage/objects/*`.
+- **Object Storage:** Replit object storage is provisioned (`DEFAULT_OBJECT_STORAGE_BUCKET_ID`, `PUBLIC_OBJECT_SEARCH_PATHS`, `PRIVATE_OBJECT_DIR` env vars). Storage routes are at `/api/storage/uploads/request-url` (POST), `/api/storage/public-objects/*` (GET), `/api/storage/objects/*` (GET). `lib/object-storage-web` is the client-side library (composite lib with `composite: true`).
 
 # External Dependencies
 

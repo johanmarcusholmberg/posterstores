@@ -42,7 +42,6 @@ export const ListPostersResponse = zod.object({
     zod.object({
       id: zod.number(),
       storeKey: zod.string(),
-      slug: zod.string().nullish(),
       title: zod.string(),
       description: zod.string().optional(),
       imageUrl: zod.string(),
@@ -87,7 +86,6 @@ export const ListPostersResponse = zod.object({
  */
 export const CreatePosterBody = zod.object({
   storeKey: zod.string(),
-  slug: zod.string().optional(),
   title: zod.string(),
   description: zod.string().optional(),
   imageUrl: zod.string(),
@@ -130,7 +128,6 @@ export const GetPosterQueryParams = zod.object({
 export const GetPosterResponse = zod.object({
   id: zod.number(),
   storeKey: zod.string(),
-  slug: zod.string().nullish(),
   title: zod.string(),
   description: zod.string().optional(),
   imageUrl: zod.string(),
@@ -177,7 +174,6 @@ export const UpdatePosterQueryParams = zod.object({
 });
 
 export const UpdatePosterBody = zod.object({
-  slug: zod.string().optional(),
   title: zod.string().optional(),
   description: zod.string().optional(),
   imageUrl: zod.string().optional(),
@@ -209,7 +205,6 @@ export const UpdatePosterBody = zod.object({
 export const UpdatePosterResponse = zod.object({
   id: zod.number(),
   storeKey: zod.string(),
-  slug: zod.string().nullish(),
   title: zod.string(),
   description: zod.string().optional(),
   imageUrl: zod.string(),

@@ -75,6 +75,7 @@
     "zod": "catalog:"
   },
   "dependencies": {
+    "@workspace/object-storage-web": "workspace:*",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
     "uuid": "^14.0.0"

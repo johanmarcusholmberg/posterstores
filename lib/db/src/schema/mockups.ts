@@ -1,7 +1,38 @@
-import { pgTable, text, serial, boolean, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, boolean, timestamp, integer, jsonb, real } from "drizzle-orm/pg-core";
 import { postersTable } from "./posters";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+
+export const MOCKUP_CATEGORIES = [
+  "Wall",
+  "Interior",
+  "Café/Table",
+  "Frame",
+  "Lifestyle",
+  "Minimal",
+  "Decorative",
+] as const;
+
+export const MOCKUP_FRAME_MATERIALS = [
+  "black",
+  "white",
+  "light-wood",
+  "dark-wood",
+  "oak",
+  "none",
+  "mixed",
+] as const;
+
+export const MOCKUP_ORIENTATIONS = ["portrait", "landscape", "square", "any"] as const;
+
+export const MOCKUP_SUPPORTED_FORMATS = [
+  "30x40",
+  "50x50",
+  "50x70",
+  "A4",
+  "A3",
+  "A2",
+] as const;
 
 export const mockupTemplatesTable = pgTable("mockup_templates", {
   id: serial("id").primaryKey(),
@@ -10,12 +41,24 @@ export const mockupTemplatesTable = pgTable("mockup_templates", {
   description: text("description"),
   templateKey: text("template_key").notNull(),
   backgroundImageUrl: text("background_image_url"),
+  storagePath: text("storage_path"),
   frameType: text("frame_type").notNull().default("none"),
+  category: text("category"),
+  orientation: text("orientation"),
+  supportedFormats: jsonb("supported_formats").$type<string[]>(),
   supportedOrientation: text("supported_orientation"),
   supportedAspectRatio: text("supported_aspect_ratio"),
   previewThumbnailUrl: text("preview_thumbnail_url"),
+  isFeatured: boolean("is_featured").default(false).notNull(),
   active: boolean("active").default(true).notNull(),
   sortOrder: integer("sort_order").default(0).notNull(),
+  posterX: real("poster_x"),
+  posterY: real("poster_y"),
+  posterWidth: real("poster_width"),
+  posterHeight: real("poster_height"),
+  rotation: real("rotation"),
+  borderRadius: real("border_radius"),
+  shadowStrength: real("shadow_strength"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

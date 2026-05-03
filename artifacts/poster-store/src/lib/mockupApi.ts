@@ -7,12 +7,24 @@ export interface MockupTemplate {
   description: string | null;
   templateKey: string;
   backgroundImageUrl: string | null;
+  storagePath: string | null;
   frameType: string;
+  category: string | null;
+  orientation: string | null;
+  supportedFormats: string[] | null;
   supportedOrientation: string | null;
   supportedAspectRatio: string | null;
   previewThumbnailUrl: string | null;
+  isFeatured: boolean;
   active: boolean;
   sortOrder: number;
+  posterX: number | null;
+  posterY: number | null;
+  posterWidth: number | null;
+  posterHeight: number | null;
+  rotation: number | null;
+  borderRadius: number | null;
+  shadowStrength: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -22,8 +34,19 @@ export interface PosterMockupTemplate {
   name: string | null;
   templateKey: string | null;
   frameType: string | null;
+  category: string | null;
+  orientation: string | null;
   previewThumbnailUrl: string | null;
+  backgroundImageUrl: string | null;
+  storagePath: string | null;
   storeKey: string | null;
+  posterX: number | null;
+  posterY: number | null;
+  posterWidth: number | null;
+  posterHeight: number | null;
+  rotation: number | null;
+  borderRadius: number | null;
+  shadowStrength: number | null;
 }
 
 export interface PosterMockup {
@@ -59,10 +82,39 @@ async function handleError(res: Response): Promise<never> {
 }
 
 export async function listMockupTemplates(
+  storeKey?: string,
+  options?: { activeOnly?: boolean; category?: string; orientation?: string }
+): Promise<MockupTemplate[]> {
+  const params = new URLSearchParams();
+  if (storeKey) params.set("storeKey", storeKey);
+  if (options?.activeOnly === false) params.set("activeOnly", "false");
+  if (options?.category) params.set("category", options.category);
+  if (options?.orientation) params.set("orientation", options.orientation);
+  const qs = params.toString() ? `?${params.toString()}` : "";
+  const res = await fetch(`${BASE}/mockup-templates${qs}`);
+  if (!res.ok) await handleError(res);
+  return res.json();
+}
+
+export async function adminListAllMockupTemplates(
+  token: string,
   storeKey?: string
 ): Promise<MockupTemplate[]> {
   const qs = storeKey ? `?storeKey=${encodeURIComponent(storeKey)}` : "";
-  const res = await fetch(`${BASE}/mockup-templates${qs}`);
+  const res = await fetch(`${BASE}/mockup-templates/all${qs}`, {
+    headers: { "X-Admin-Token": token },
+  });
+  if (!res.ok) await handleError(res);
+  return res.json();
+}
+
+export async function adminGetMockupTemplate(
+  token: string,
+  id: number
+): Promise<MockupTemplate> {
+  const res = await fetch(`${BASE}/mockup-templates/${id}`, {
+    headers: { "X-Admin-Token": token },
+  });
   if (!res.ok) await handleError(res);
   return res.json();
 }
@@ -167,18 +219,49 @@ export async function adminDeletePosterMockup(
   if (!res.ok) await handleError(res);
 }
 
+export async function requestMockupImageUploadUrl(
+  token: string,
+  file: { name: string; size: number; contentType: string }
+): Promise<{ uploadURL: string; objectPath: string }> {
+  const res = await fetch(`${BASE}/storage/uploads/request-url`, {
+    method: "POST",
+    headers: headers(token),
+    body: JSON.stringify(file),
+  });
+  if (!res.ok) await handleError(res);
+  return res.json();
+}
+
+export async function uploadMockupImageFile(
+  uploadURL: string,
+  file: File
+): Promise<void> {
+  const res = await fetch(uploadURL, {
+    method: "PUT",
+    headers: { "Content-Type": file.type },
+    body: file,
+  });
+  if (!res.ok) throw new Error("Upload to storage failed");
+}
+
+export function getStorageUrl(objectPath: string): string {
+  return `/api/storage${objectPath}`;
+}
+
 export function resolvePosterDisplayImage(
   mockups: PosterMockup[] | null | undefined,
   fallbackImageUrl: string
 ): string {
   if (!mockups || mockups.length === 0) return fallbackImageUrl;
   const validMockups = mockups.filter(
-    (m) => m.mockupImageUrl || m.template?.previewThumbnailUrl
+    (m) => m.mockupImageUrl || m.template?.previewThumbnailUrl || m.template?.backgroundImageUrl
   );
   if (validMockups.length === 0) return fallbackImageUrl;
   const primary = validMockups.find((m) => m.isPrimary) ?? validMockups[0];
   if (primary.mockupImageUrl) return primary.mockupImageUrl;
   if (primary.template?.previewThumbnailUrl)
     return primary.template.previewThumbnailUrl;
+  if (primary.template?.backgroundImageUrl)
+    return primary.template.backgroundImageUrl;
   return fallbackImageUrl;
 }

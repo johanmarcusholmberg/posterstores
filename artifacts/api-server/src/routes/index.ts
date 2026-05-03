@@ -14,6 +14,7 @@ import shippingRouter from "./shipping";
 import launchChecklistRouter from "./launchChecklist";
 import stripeRouter from "./stripe";
 import contentPagesRouter from "./contentPages";
+import storageRouter from "./storage";
 
 const router: IRouter = Router();
 
@@ -32,5 +33,6 @@ router.use(shippingRouter);
 router.use(launchChecklistRouter);
 router.use(stripeRouter);
 router.use(contentPagesRouter);
+router.use(storageRouter);
 
 export default router;
