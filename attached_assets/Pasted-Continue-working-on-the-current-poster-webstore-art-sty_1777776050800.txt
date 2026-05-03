@@ -1,0 +1,309 @@
+Continue working on the current poster webstore / art-style-generator project.
+
+GOAL
+Add user registration, login, and per-user poster wishlists/favorites.
+
+A visitor should be able to browse posters freely, but saving a poster to a wishlist/favorites list must require an account. Saved posters must be stored per user and persist after logout/login.
+
+Do not rebuild the whole app.
+Do not replace the existing poster/catalog/store structure.
+Build on the current routing, database, components, and style system.
+
+------------------------------------------------------------
+CORE REQUIREMENTS
+------------------------------------------------------------
+
+1. User accounts
+
+Implement user authentication with:
+
+- Email + password registration
+- Email + password login
+- Logout
+- Persistent session handling
+- Protected user-specific wishlist/favorites data
+
+The user should be able to:
+
+- Create an account
+- Log in
+- Log out
+- Stay logged in after refresh if the session is still valid
+- See their saved posters after logging in again
+
+Use the existing backend/database stack if already present.
+If Supabase auth is already configured, use Supabase Auth.
+If another auth system already exists, reuse it.
+Do not introduce a second competing auth system.
+
+2. Auth UI
+
+Create clean, minimal auth screens/components:
+
+- Register page or modal
+- Login page or modal
+- Logout action in the user/menu area
+- Clear loading/error/success states
+
+Suggested routes:
+
+- /login
+- /register
+- /account or /profile
+- /wishlist or /favorites
+
+If the app already has a better route structure, follow the existing conventions.
+
+The UI should feel simple and calm, matching the poster store design.
+
+3. Wishlist / favorites behavior
+
+Add a heart/bookmark/favorite button to poster cards and poster detail pages.
+
+Behavior:
+
+- If the user is logged out and clicks “favorite”:
+  - Do not save locally as the final source of truth.
+  - Show a friendly login/register prompt.
+  - After login/register, the user should be able to save the poster.
+  - If practical, remember the poster they tried to save and complete the save after login.
+
+- If the user is logged in:
+  - Clicking the favorite button saves the poster to that user’s wishlist.
+  - Clicking again removes it.
+  - The UI should update optimistically but roll back on error.
+  - Favorite state should be visible on catalog cards and poster detail pages.
+
+4. Wishlist page
+
+Create a user-specific wishlist/favorites page.
+
+The page should:
+
+- Require login
+- Show only the current user’s saved posters
+- Reuse existing poster card/list components where possible
+- Allow removing posters from the wishlist
+- Show an empty state when there are no saved posters
+- Show loading and error states
+
+Suggested empty state copy:
+
+“You haven’t saved any posters yet.”
+“Browse posters and tap the heart icon to save your favorites.”
+
+5. Database / data model
+
+Add a proper per-user wishlist/favorites table.
+
+Example structure:
+
+user_favorites / wishlist_items:
+
+- id
+- user_id
+- poster_id
+- store_key if needed by the current poster architecture
+- created_at
+
+Important:
+
+- A user should not be able to save the same poster twice.
+- Add a unique constraint on user_id + poster_id, or user_id + store_key + poster_id if posters are scoped by store.
+- The table must support deleting a saved favorite.
+- The table must support fetching all saved posters for the logged-in user.
+
+6. Security
+
+This is very important.
+
+Implement row-level/user-level security so users can only:
+
+- Read their own wishlist rows
+- Insert wishlist rows for themselves
+- Delete their own wishlist rows
+- Never read or modify another user’s wishlist
+
+If using Supabase:
+
+- Enable RLS on the wishlist/favorites table.
+- Add policies using auth.uid().
+- Do not trust user_id sent from the frontend.
+- The backend/database should enforce ownership.
+
+7. API / data access
+
+Create or update the data-access layer so the frontend can:
+
+- Get current session/user
+- Register
+- Login
+- Logout
+- Fetch current user’s favorite poster IDs
+- Add poster to favorites
+- Remove poster from favorites
+- Fetch full wishlist poster data for the wishlist page
+
+Keep this logic centralized.
+Do not scatter raw database calls across many UI components if the app already has service/client utilities.
+
+8. Poster card integration
+
+Update existing poster cards to show a favorite control.
+
+The favorite control should:
+
+- Be visually subtle
+- Not clutter the card
+- Work on desktop and mobile
+- Have accessible labels, for example:
+  - “Add to wishlist”
+  - “Remove from wishlist”
+
+Avoid making the poster grid feel messy.
+
+9. Poster detail integration
+
+If there is a poster detail page, add the same favorite functionality there.
+
+The poster detail page should show whether the poster is already saved.
+
+10. Header / navigation
+
+Update the header/navigation with account-aware actions:
+
+Logged out:
+
+- Login
+- Register
+
+Logged in:
+
+- Wishlist/Favorites
+- Account/Profile
+- Logout
+
+Keep the navigation minimal.
+
+11. Optional account page
+
+Create a basic account/profile page if one does not exist.
+
+It can show:
+
+- Logged-in email
+- Link to wishlist
+- Logout button
+
+Do not overbuild profile functionality yet.
+
+------------------------------------------------------------
+IMPORTANT UX DETAILS
+------------------------------------------------------------
+
+Use friendly, non-technical copy.
+
+Examples:
+
+When logged-out user clicks favorite:
+
+“Log in to save posters”
+“Create an account to keep your favorite posters across devices.”
+
+Buttons:
+
+- “Log in”
+- “Create account”
+- “Continue browsing”
+
+Wishlist page:
+
+“Your saved posters”
+“Posters you save will appear here.”
+
+Error states:
+
+- “Could not save poster. Please try again.”
+- “Could not load your wishlist.”
+
+------------------------------------------------------------
+TECHNICAL EXPECTATIONS
+------------------------------------------------------------
+
+- Reuse existing poster types, store_key logic, slug logic, and poster fetching logic.
+- Do not break existing poster browsing.
+- Do not break existing admin poster management.
+- Do not require users to log in just to browse posters.
+- Auth is only required for saving favorites and viewing the wishlist.
+- Use TypeScript types where the project already uses TypeScript.
+- Add proper loading states.
+- Add proper error handling.
+- Make the implementation mobile-friendly.
+- Avoid duplicating business logic.
+
+------------------------------------------------------------
+DATABASE / MIGRATION EXPECTATION
+------------------------------------------------------------
+
+Create the needed migration or startup migration, depending on the current project pattern.
+
+If using Supabase SQL, create something conceptually like:
+
+- user_favorites table
+- foreign key to auth.users / profiles if appropriate
+- foreign key/reference to posters if appropriate
+- created_at timestamp
+- unique constraint preventing duplicate favorites
+- RLS policies for owner-only access
+
+Make sure this matches the actual existing schema and poster IDs.
+
+Do not assume posters are globally unique if the current app scopes posters by store_key. Follow the existing data model.
+
+------------------------------------------------------------
+ACCEPTANCE CRITERIA
+------------------------------------------------------------
+
+The implementation is complete when:
+
+1. A visitor can browse posters without an account.
+2. A visitor clicking favorite is prompted to log in or register.
+3. A user can register with email/password.
+4. A user can log in and log out.
+5. A logged-in user can favorite a poster.
+6. A logged-in user can unfavorite a poster.
+7. Favorite state persists after refresh.
+8. Favorite state persists after logout/login.
+9. The wishlist page only shows the current user’s saved posters.
+10. Users cannot access or modify another user’s wishlist data.
+11. Duplicate wishlist rows cannot be created.
+12. Existing poster admin functionality still works.
+13. Existing poster routes/slugs still work.
+14. The UI remains clean and not cluttered.
+
+------------------------------------------------------------
+TESTING
+------------------------------------------------------------
+
+After implementation, test and report back:
+
+- Register new user
+- Login
+- Logout
+- Favorite poster from poster grid
+- Favorite poster from poster detail page, if applicable
+- Remove favorite
+- Refresh page and confirm favorite state remains
+- Logout and log back in and confirm wishlist remains
+- Confirm logged-out users cannot save favorites
+- Confirm wishlist page is protected
+- Confirm one user cannot see another user’s saved posters
+- Confirm no duplicate favorite rows are created
+- Confirm existing poster browsing and admin flows still work
+
+Also report:
+
+- Files changed
+- Tables/migrations added
+- Any environment variables needed
+- Any remaining limitations
