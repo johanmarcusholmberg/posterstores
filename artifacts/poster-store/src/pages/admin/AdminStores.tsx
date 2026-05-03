@@ -59,7 +59,7 @@ export default function AdminStores() {
             <Globe className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
             <p className="text-sm font-medium">No stores in the database yet</p>
             <p className="text-xs text-muted-foreground mt-1">
-              PostsofSpain and other stores configured in code are available as fallback.
+              PostersofSpain and other stores configured in code are available as fallback.
               Create a store here to manage it from the admin panel.
             </p>
             <Link href="/admin/stores/new">

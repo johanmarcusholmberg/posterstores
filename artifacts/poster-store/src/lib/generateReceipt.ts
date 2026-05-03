@@ -5,7 +5,7 @@ import autoTable from "jspdf-autotable";
 // Update these values to match your brand when you're ready.
 
 const BRAND = {
-  storeName: "PostsofSpain",       // Printed at the top of the receipt
+  storeName: "PostersofSpain",      // Printed at the top of the receipt
   accentColor: [40, 40, 40] as [number, number, number],   // RGB — header background
   accentText: [255, 255, 255] as [number, number, number], // RGB — header text
   // logoUrl: "/logo.png",         // Uncomment + set path to add a logo image

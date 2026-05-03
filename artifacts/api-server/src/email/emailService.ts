@@ -22,7 +22,7 @@ function getFrom(): string {
 
 function storeDisplayName(storeKey: string): string {
   const map: Record<string, string> = {
-    postsofspain: "PostsofSpain",
+    postsofspain: "PostersofSpain",
   };
   return map[storeKey] ?? storeKey;
 }

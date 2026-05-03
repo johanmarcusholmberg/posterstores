@@ -38,7 +38,7 @@ export interface StorefrontConfig {
 export const storefronts: Record<string, StorefrontConfig> = {
   postsofspain: {
     storeKey: "postsofspain",
-    storeName: "PostsofSpain",
+    storeName: "PostersofSpain",
     countryFocus: "Spain",
     defaultCurrency: "EUR",
     defaultLanguage: "en",
@@ -65,7 +65,7 @@ export const storefronts: Record<string, StorefrontConfig> = {
     categories: ["Spanish Cities","Coastal Posters","Food & Drinks","Architecture","Botanical","Travel Posters","Minimal Posters","Vintage Posters","Café Posters"],
     tags: ["Mediterranean","Café","Orange","Architecture","Beach","Summer","Kitchen","Gallery wall","Botanical","Vintage","Minimal","Terracotta","Blue","Coastal"],
     seo: {
-      defaultTitle: "PostsofSpain — Art Posters of Spain",
+      defaultTitle: "PostersofSpain — Art Posters of Spain",
       defaultDescription: "Discover beautifully printed posters inspired by Spanish cities, regions and moments."
     }
   },

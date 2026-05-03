@@ -1,6 +1,6 @@
 # Overview
 
-This project is a pnpm monorepo TypeScript webstore platform designed to support multiple storefronts. The primary active storefront is "PostsofSpain", with the architecture built to easily accommodate future storefronts like "PostsofSweden" or "PostsofItaly through a flexible configuration layer. The platform features robust API services, a multi-store system, a comprehensive poster slug system for SEO, an admin interface for managing stores, posters, mockups, and orders, and user authentication with favorite poster functionality. The overall vision is to create a scalable e-commerce solution for poster sales.
+This project is a pnpm monorepo TypeScript webstore platform designed to support multiple storefronts. The primary active storefront is "PostersofSpain", with the architecture built to easily accommodate future storefronts like "PostsofSweden" or "PostsofItaly through a flexible configuration layer. The platform features robust API services, a multi-store system, a comprehensive poster slug system for SEO, an admin interface for managing stores, posters, mockups, and orders, and user authentication with favorite poster functionality. The overall vision is to create a scalable e-commerce solution for poster sales.
 
 # User Preferences
 
