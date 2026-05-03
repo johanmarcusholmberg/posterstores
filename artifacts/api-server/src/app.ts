@@ -11,6 +11,7 @@ import { migrateExistingPosterSizes } from "./lib/migrateExistingPosterSizes";
 import { migrateSlugField } from "./lib/migrateSlugField";
 import { migrateUserAuth } from "./lib/migrateUserAuth";
 import { migrateShipping } from "./lib/migrateShipping";
+import { seedPostsofSpain } from "./lib/seedPostsofSpain";
 
 const app: Express = express();
 
@@ -58,6 +59,10 @@ app.use("/api", router);
 
 seedMockupTemplates().catch((err) =>
   logger.error(err, "Failed to seed mockup templates")
+);
+
+seedPostsofSpain().catch((err) =>
+  logger.error(err, "Failed to seed PostsofSpain store")
 );
 
 migrateSlugField()

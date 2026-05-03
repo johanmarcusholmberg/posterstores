@@ -255,7 +255,10 @@ router.get("/admin/launch-checklist", requireAdmin, async (req, res) => {
   // ── 5. Email ──────────────────────────────────────────────────────────────
 
   const emailFromSet = !!process.env.EMAIL_FROM;
-  const emailProviderSet = !!process.env.EMAIL_PROVIDER;
+  const emailProvider = process.env.EMAIL_PROVIDER ?? "";
+  const emailProviderSet = !!emailProvider;
+  const emailProviderIsResend = emailProvider.toLowerCase() === "resend";
+  const resendApiKeySet = !!process.env.RESEND_API_KEY;
   const adminEmailSet = !!process.env.ADMIN_ORDER_NOTIFICATION_EMAIL;
 
   const emailItems: CheckItem[] = [
@@ -263,13 +266,23 @@ router.get("/admin/launch-checklist", requireAdmin, async (req, res) => {
       ? pass("email-from", "EMAIL_FROM configured", process.env.EMAIL_FROM)
       : missing("email-from", "EMAIL_FROM configured", "Set EMAIL_FROM in environment variables. Emails will not send without a valid sender address."),
 
-    emailProviderSet
-      ? pass("email-provider", "Email provider configured", process.env.EMAIL_PROVIDER)
-      : warn("email-provider", "Email provider configured", "EMAIL_PROVIDER not set — running in mock/log mode. Emails will not be delivered in production."),
+    !emailProviderSet
+      ? missing("email-provider", "EMAIL_PROVIDER configured", "EMAIL_PROVIDER is not set — running in mock/log mode. Emails will not be delivered in production. Set EMAIL_PROVIDER=resend to enable real sending.")
+      : !emailProviderIsResend
+      ? warn("email-provider", "EMAIL_PROVIDER configured", `EMAIL_PROVIDER is set to "${emailProvider}" but only "resend" is fully supported. Real emails may not be delivered.`)
+      : pass("email-provider", "EMAIL_PROVIDER configured", emailProvider),
+
+    emailProviderIsResend && !resendApiKeySet
+      ? missing("resend-api-key", "RESEND_API_KEY configured", "EMAIL_PROVIDER is set to resend but RESEND_API_KEY is missing. Real emails will not be sent without it.")
+      : !emailProviderIsResend && resendApiKeySet
+      ? warn("resend-api-key", "RESEND_API_KEY configured", "RESEND_API_KEY is set but EMAIL_PROVIDER is not set to resend — the key will not be used. Set EMAIL_PROVIDER=resend to activate Resend.")
+      : resendApiKeySet
+      ? pass("resend-api-key", "RESEND_API_KEY configured")
+      : warn("resend-api-key", "RESEND_API_KEY configured", "RESEND_API_KEY is not set. Required when EMAIL_PROVIDER=resend."),
 
     adminEmailSet
       ? pass("admin-notification-email", "ADMIN_ORDER_NOTIFICATION_EMAIL configured", process.env.ADMIN_ORDER_NOTIFICATION_EMAIL)
-      : warn("admin-notification-email", "ADMIN_ORDER_NOTIFICATION_EMAIL configured", "Set ADMIN_ORDER_NOTIFICATION_EMAIL to receive order notifications."),
+      : missing("admin-notification-email", "ADMIN_ORDER_NOTIFICATION_EMAIL configured", "ADMIN_ORDER_NOTIFICATION_EMAIL is not set — you will not receive order notification emails. Set it to your email address."),
 
     manual("customer-confirmation-email", "Customer confirmation email working", "Place and pay for a test order, then check that the customer receives a confirmation email."),
   ];

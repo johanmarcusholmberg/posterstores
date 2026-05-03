@@ -5,7 +5,7 @@ import { SubscribeNewsletterBody } from "@workspace/api-zod";
 
 const router = Router();
 
-router.post("/newsletter", async (req, res) => {
+async function handleSubscribe(req: Parameters<Parameters<typeof router.post>[1]>[0], res: Parameters<Parameters<typeof router.post>[1]>[1]) {
   const body = SubscribeNewsletterBody.safeParse(req.body);
   if (!body.success) return res.status(400).json({ error: body.error.flatten() });
 
@@ -17,6 +17,10 @@ router.post("/newsletter", async (req, res) => {
     .onConflictDoNothing();
 
   return res.json({ success: true, message: "You're on the list! Expect beautiful things soon." });
-});
+}
+
+router.post("/newsletter", handleSubscribe);
+
+router.post("/newsletter/subscribe", handleSubscribe);
 
 export default router;
