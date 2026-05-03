@@ -1,0 +1,227 @@
+Continue building the reusable multi-store poster webstore.
+
+CURRENT STATUS:
+- Reusable multi-store platform works.
+- PostsofSpain is the default active storefront.
+- Homepage, shop, poster detail, cart and favorites work.
+- Admin token gate works.
+- Admin poster CRUD works.
+- Store separation is verified.
+- Mockup template system works.
+- Poster asset separation works:
+  - masterPrintImageUrl
+  - previewImageUrl
+  - legacy imageUrl fallback
+- Structured poster sizes/prices work.
+- Cart uses selected poster size.
+- Checkout/order draft creation is hardened.
+- Orders are created with pending_payment status.
+- Prices are calculated server-side.
+- Cart is cleared after successful order creation.
+- Order items store snapshots.
+- Admin order list/detail/status update works.
+- All tests pass.
+
+NEXT GOAL:
+Integrate Stripe Checkout for real payment.
+
+Important:
+- Do not rewrite the storefront.
+- Do not break existing checkout/order draft creation.
+- Do not break admin order management.
+- Do not break mockups.
+- Do not connect print providers yet.
+- Do not connect real e-mail sending yet.
+- Keep everything store-scoped.
+- Keep all existing tests passing.
+- Payment status must be verified server-side.
+- Never mark an order as paid based only on a frontend redirect.
+
+STRIPE FLOW
+
+Use this flow:
+
+1. User completes checkout form.
+2. Server creates order with status pending_payment.
+3. Server creates Stripe Checkout Session for that order.
+4. Frontend redirects user to Stripe Checkout.
+5. Stripe redirects back to success or cancel page.
+6. Server verifies payment through webhook or server-side session retrieval.
+7. Order is updated to paid only after verified payment.
+8. Admin can see the updated payment/order status.
+
+ENVIRONMENT VARIABLES
+
+Add support for:
+
+STRIPE_SECRET_KEY
+STRIPE_WEBHOOK_SECRET
+STRIPE_PUBLIC_KEY or VITE_STRIPE_PUBLIC_KEY, depending on current frontend setup
+APP_BASE_URL
+
+Do not hard-code Stripe keys.
+
+ORDER MODEL
+
+Add fields to orders if not already present:
+
+- stripe_checkout_session_id nullable
+- stripe_payment_intent_id nullable
+- payment_status nullable
+- paid_at nullable
+- cancelled_at nullable
+
+Payment statuses may include:
+- unpaid
+- pending
+- paid
+- failed
+- cancelled
+- refunded
+
+CREATE CHECKOUT SESSION
+
+Add an endpoint such as:
+
+POST /api/orders/:id/create-checkout-session
+
+Rules:
+- Order must exist.
+- Order must belong to requested storeKey.
+- Order must have status pending_payment or draft.
+- Order must not already be paid.
+- Use server-side order/order_items snapshots to create Stripe line items.
+- Do not trust frontend prices.
+- Currency should come from order currency.
+- Include order id and storeKey in Stripe metadata.
+- Save stripe_checkout_session_id on the order.
+- Return checkout URL to frontend.
+
+Line items:
+- Use poster title snapshot.
+- Use size label snapshot.
+- Use unit price snapshot.
+- Use quantity.
+- Use currency.
+- Optional description: poster title + size.
+
+Success URL:
+APP_BASE_URL/order-confirmation/{orderId}?payment=success
+
+Cancel URL:
+APP_BASE_URL/checkout?payment=cancelled&orderId={orderId}
+
+WEBHOOK
+
+Add Stripe webhook endpoint, for example:
+
+POST /api/stripe/webhook
+
+Important:
+- Verify the Stripe signature using STRIPE_WEBHOOK_SECRET.
+- Do not parse body in a way that breaks signature verification.
+- Handle at least:
+  - checkout.session.completed
+  - checkout.session.expired
+  - payment_intent.payment_failed if useful
+- On checkout.session.completed:
+  - Find order by stripe_checkout_session_id or metadata.orderId.
+  - Confirm payment status.
+  - Set order.status = paid.
+  - Set order.payment_status = paid.
+  - Set paid_at.
+  - Save stripe_payment_intent_id if available.
+- If session expires:
+  - Set payment_status = cancelled or expired.
+  - Keep order status as pending_payment or cancelled depending on chosen behavior.
+
+SUCCESS / CANCEL HANDLING
+
+Update frontend:
+
+After checkout form submits:
+- Existing order creation should still happen server-side.
+- Then call create-checkout-session endpoint.
+- Redirect browser to returned Stripe Checkout URL.
+
+Order confirmation page:
+- If payment=success:
+  Show:
+  “Payment received. Your order is confirmed.”
+  only if server confirms the order is paid.
+- If payment is not yet verified:
+  Show:
+  “Payment is being verified.”
+- If payment not connected or still pending:
+  Show current pending payment message.
+
+Cancel handling:
+- If user returns from Stripe cancel page, show:
+  “Payment was cancelled. Your order has not been paid.”
+- Allow user to retry payment for the same pending order.
+
+ADMIN ORDER VIEW
+
+Update admin order detail to show:
+- Payment status
+- Stripe checkout session id
+- Stripe payment intent id
+- Paid at
+- Retry/refund placeholders if relevant, but do not implement refunds yet
+
+SECURITY
+
+- Stripe secret key must only be used server-side.
+- Webhook must verify signature.
+- Order paid status must only be set by verified webhook or verified server-side Stripe API call.
+- Frontend redirect must not mark order as paid.
+- User must not be able to create Stripe checkout for an order from another store.
+
+TESTING
+
+Add or update tests for:
+
+Create checkout session:
+- Requires valid order.
+- Rejects missing/wrong storeKey.
+- Rejects already paid order.
+- Uses server-side order item prices.
+- Saves checkout session id.
+- Returns checkout URL.
+
+Webhook:
+- Rejects invalid signature.
+- checkout.session.completed marks order paid.
+- Stores payment intent id.
+- Sets paid_at.
+- Does not mark unrelated order paid.
+- Expired/cancelled session handled appropriately.
+
+Frontend:
+- Checkout success redirects to Stripe URL.
+- Cancelled payment shows clear message.
+- Order confirmation does not claim paid unless server says paid.
+
+Admin:
+- Admin order detail shows payment fields.
+
+Regression:
+- Existing checkout/order draft tests still pass.
+- Homepage still loads.
+- Shop still loads.
+- Poster detail still loads.
+- Cart still works.
+- Favorites still work.
+- Admin poster CRUD still works.
+- Mockup assignment still works.
+- Admin orders still work.
+
+At the end, summarize:
+1. Stripe endpoints created.
+2. Environment variables required.
+3. Checkout flow.
+4. Webhook verification.
+5. Order status/payment status behavior.
+6. Admin payment fields.
+7. Tests added/updated.
+8. What I need to configure in Stripe/Replit before live testing.
