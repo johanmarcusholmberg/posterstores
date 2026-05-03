@@ -1,0 +1,92 @@
+Continue building the reusable multi-store poster webstore.
+
+CURRENT STATUS:
+QA passed with no broken user-facing routes and no runtime crashes.
+
+Remaining production-readiness items:
+1. postsofspain store exists in static config but not in the database.
+2. EMAIL_PROVIDER is not set, so Resend will not activate even though RESEND_API_KEY and EMAIL_FROM exist.
+3. ADMIN_ORDER_NOTIFICATION_EMAIL is not set.
+4. STRIPE_WEBHOOK_SECRET is needed for production.
+5. There is no /api/health endpoint.
+6. Newsletter endpoint is POST /api/newsletter, but /api/newsletter/subscribe returns 404.
+
+NEXT GOAL:
+Make the app production-readiness smoother without changing the user experience.
+
+Important:
+- Do not rewrite existing features.
+- Do not break checkout, Stripe, e-mails, fulfillment, admin, mockups, slugs, stores or store resolver.
+- Keep all tests passing.
+- Do not expose secret values.
+- Do not hard-code production credentials.
+
+TASK 1 — Seed/create PostsofSpain store record safely
+
+The app currently has PostsofSpain in static config, but not in the database.
+
+Add a safe startup seed or admin helper that creates the postsofspain store record from the static config if it does not already exist.
+
+Requirements:
+- Do not overwrite existing DB store config if it already exists.
+- Use storeKey = postsofspain.
+- Copy store name, country, currency, language, homepage config, theme config, SEO config and taxonomy config from the existing static PostsofSpain config.
+- This should make /api/stores/postsofspain/config return a proper DB-backed response.
+- Launch checklist should then be able to run full automated checks.
+
+TASK 2 — Improve production setup warnings
+
+Update /admin/production-setup and /admin/launch-checklist to clearly show:
+
+- EMAIL_PROVIDER must be set to resend for real e-mail sending.
+- RESEND_API_KEY alone is not enough.
+- ADMIN_ORDER_NOTIFICATION_EMAIL must be set for admin order notifications.
+- STRIPE_WEBHOOK_SECRET must be set for production Stripe webhook verification.
+- APP_BASE_URL must match the production domain.
+
+Do not show secret values, only configured/not configured.
+
+TASK 3 — Add /api/health endpoint
+
+Add a simple public health endpoint:
+
+GET /api/health
+
+Return:
+- status: ok
+- timestamp
+- service name or app name
+- optional database status if simple and safe
+
+Keep /api/healthz working if it already exists.
+
+TASK 4 — Newsletter subscribe alias
+
+The current newsletter endpoint is:
+POST /api/newsletter
+
+Add a backward-compatible alias:
+POST /api/newsletter/subscribe
+
+It should call the same logic as POST /api/newsletter.
+
+Do not break the existing endpoint.
+
+TASK 5 — Tests
+
+Add or update tests for:
+- PostsofSpain DB store config is created or returned correctly.
+- /api/stores/postsofspain/config returns 200 after seed.
+- /admin/launch-checklist no longer shows “store not in DB” for PostsofSpain.
+- Production setup warns when EMAIL_PROVIDER is missing even if RESEND_API_KEY exists.
+- /api/health returns 200.
+- POST /api/newsletter still works.
+- POST /api/newsletter/subscribe also works.
+- Existing store resolver, checkout, Stripe, e-mail, fulfillment and admin tests still pass.
+
+At the end, summarize:
+1. How PostsofSpain DB seeding works.
+2. What production warnings were improved.
+3. Health endpoint behavior.
+4. Newsletter alias behavior.
+5. Final test result.
