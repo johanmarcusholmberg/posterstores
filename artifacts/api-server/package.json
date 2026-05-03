@@ -20,7 +20,6 @@
     "express": "^5",
     "pino": "^9",
     "pino-http": "^10",
-    "resend": "^6.12.2",
     "stripe": "^22.1.0",
     "zod": "catalog:"
   },
