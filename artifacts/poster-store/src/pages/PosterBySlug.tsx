@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useStorefront } from "@/context/StorefrontContext";
+import { useAuth } from "@/context/AuthContext";
 import { getSessionId } from "@/lib/session";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { MockupGallery } from "@/components/public/MockupGallery";
 import { PosterCard } from "@/components/shared/PosterCard";
-import { ShoppingBag, ArrowLeft } from "lucide-react";
+import { LoginPromptModal } from "@/components/shared/LoginPromptModal";
+import { ShoppingBag, ArrowLeft, Heart } from "lucide-react";
 import { getPosterMockups, type PosterMockup } from "@/lib/mockupApi";
 import { useAddCartItem, getGetCartQueryKey, useListPosters, getListPostersQueryKey } from "@workspace/api-client-react";
+import { addFavorite, removeFavorite, getFavoriteIds } from "@/lib/favoritesApi";
 
 interface PosterSizeOption {
   id: number;
@@ -58,6 +61,7 @@ async function fetchPosterBySlug(storeKey: string, slug: string): Promise<Poster
 export default function PosterBySlug() {
   const { slug } = useParams<{ slug: string }>();
   const store = useStorefront();
+  const { user } = useAuth();
   const sessionId = getSessionId();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -66,6 +70,9 @@ export default function PosterBySlug() {
   const [notFound, setNotFound] = useState(false);
   const [selectedSizeId, setSelectedSizeId] = useState<number | null>(null);
   const [mockups, setMockups] = useState<PosterMockup[] | null>(null);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [favoritesPending, setFavoritesPending] = useState(false);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
 
   useEffect(() => {
     if (!slug) return;
@@ -110,6 +117,13 @@ export default function PosterBySlug() {
       .catch(() => setMockups([]));
   }, [poster?.id, store.storeKey]);
 
+  useEffect(() => {
+    if (!user || !poster) return;
+    getFavoriteIds(store.storeKey)
+      .then((ids) => setIsFavorite(ids.includes(poster.id)))
+      .catch(() => {});
+  }, [user, poster?.id, store.storeKey]);
+
   const { data: relatedPosters } = useListPosters(
     { storeKey: store.storeKey, region: poster?.region ?? undefined, limit: 4 },
     {
@@ -121,7 +135,6 @@ export default function PosterBySlug() {
   );
 
   const addCartItem = useAddCartItem();
-
   const selectedSize = activeSizes.find(s => s.id === selectedSizeId) ?? null;
 
   const displayedPrice = selectedSize
@@ -163,6 +176,30 @@ export default function PosterBySlug() {
     );
   };
 
+  const handleToggleFavorite = async () => {
+    if (!user) {
+      setShowLoginPrompt(true);
+      return;
+    }
+    if (favoritesPending || !poster) return;
+    setFavoritesPending(true);
+    const next = !isFavorite;
+    setIsFavorite(next);
+    try {
+      if (next) {
+        await addFavorite(poster.id, store.storeKey);
+        toast({ title: "Added to saved posters" });
+      } else {
+        await removeFavorite(poster.id, store.storeKey);
+      }
+    } catch {
+      setIsFavorite(!next);
+      toast({ variant: "destructive", title: "Could not save poster. Please try again." });
+    } finally {
+      setFavoritesPending(false);
+    }
+  };
+
   if (poster === undefined && !notFound) {
     return (
       <div className="container mx-auto px-4 py-12 flex gap-12 animate-pulse">
@@ -180,14 +217,11 @@ export default function PosterBySlug() {
     return (
       <div className="container mx-auto px-4 py-24 text-center">
         <h1 className="text-3xl font-serif mb-4">Poster not found</h1>
-        <Link href="/shop">
-          <Button variant="outline">Back to shop</Button>
-        </Link>
+        <Link href="/shop"><Button variant="outline">Back to shop</Button></Link>
       </div>
     );
   }
 
-  const hasMockups = mockups && mockups.length > 0;
   const noActiveSizes = activeSizes.length === 0;
 
   return (
@@ -255,7 +289,7 @@ export default function PosterBySlug() {
             </p>
           )}
 
-          <div className="flex gap-4 mt-auto">
+          <div className="flex gap-3 mt-auto">
             <Button
               size="lg"
               className="flex-1 text-lg h-14"
@@ -264,10 +298,18 @@ export default function PosterBySlug() {
               data-testid="btn-add-to-cart"
             >
               {addCartItem.isPending ? "Adding..." : (
-                <>
-                  <ShoppingBag className="mr-2 h-5 w-5" /> Add to cart
-                </>
+                <><ShoppingBag className="mr-2 h-5 w-5" /> Add to cart</>
               )}
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="h-14 px-4"
+              onClick={handleToggleFavorite}
+              disabled={favoritesPending}
+              aria-label={isFavorite ? "Remove from wishlist" : "Add to wishlist"}
+            >
+              <Heart className={`h-5 w-5 ${isFavorite ? "fill-secondary text-secondary" : ""}`} />
             </Button>
           </div>
 
@@ -298,6 +340,8 @@ export default function PosterBySlug() {
           </div>
         </section>
       )}
+
+      <LoginPromptModal open={showLoginPrompt} onClose={() => setShowLoginPrompt(false)} />
     </div>
   );
 }

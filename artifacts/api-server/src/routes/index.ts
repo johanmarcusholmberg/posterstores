@@ -9,9 +9,11 @@ import newsletterRouter from "./newsletter";
 import statsRouter from "./stats";
 import mockupsRouter from "./mockups";
 import storesRouter from "./stores";
+import authRouter from "./auth";
 
 const router: IRouter = Router();
 
+router.use(authRouter);
 router.use(healthRouter);
 router.use(postersRouter);
 router.use(posterSizesRouter);

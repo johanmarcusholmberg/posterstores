@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { StorefrontProvider } from "@/context/StorefrontContext";
 import { AdminTokenProvider } from "@/context/AdminTokenContext";
+import { AuthProvider } from "@/context/AuthContext";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import Home from "@/pages/Home";
@@ -15,6 +16,9 @@ import Cart from "@/pages/Cart";
 import Checkout from "@/pages/Checkout";
 import OrderConfirmation from "@/pages/OrderConfirmation";
 import Favorites from "@/pages/Favorites";
+import Login from "@/pages/Login";
+import Register from "@/pages/Register";
+import Account from "@/pages/Account";
 import NotFound from "@/pages/not-found";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import AdminPosters from "@/pages/admin/AdminPosters";
@@ -34,8 +38,6 @@ const queryClient = new QueryClient();
 function Router() {
   return (
     <Switch>
-      {/* Admin routes — most specific first so /admin/posters/new is never
-          swallowed by /admin/posters/:id or the /admin prefix */}
       <Route path="/admin/posters/new" component={AdminPosterNew} />
       <Route path="/admin/posters/:id/mockups" component={AdminPosterMockups} />
       <Route path="/admin/posters/:id" component={AdminPosterEdit} />
@@ -49,7 +51,6 @@ function Router() {
       <Route path="/admin/stores" component={AdminStores} />
       <Route path="/admin" component={AdminDashboard} />
 
-      {/* Storefront — catch-all with Navbar + Footer layout */}
       <Route>
         <div className="flex flex-col min-h-screen">
           <Navbar />
@@ -63,6 +64,9 @@ function Router() {
               <Route path="/checkout" component={Checkout} />
               <Route path="/order/:id" component={OrderConfirmation} />
               <Route path="/favorites" component={Favorites} />
+              <Route path="/login" component={Login} />
+              <Route path="/register" component={Register} />
+              <Route path="/account" component={Account} />
               <Route component={NotFound} />
             </Switch>
           </main>
@@ -77,14 +81,16 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <StorefrontProvider>
-        <AdminTokenProvider>
-          <TooltipProvider>
-            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-              <Router />
-            </WouterRouter>
-            <Toaster />
-          </TooltipProvider>
-        </AdminTokenProvider>
+        <AuthProvider>
+          <AdminTokenProvider>
+            <TooltipProvider>
+              <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+                <Router />
+              </WouterRouter>
+              <Toaster />
+            </TooltipProvider>
+          </AdminTokenProvider>
+        </AuthProvider>
       </StorefrontProvider>
     </QueryClientProvider>
   );

@@ -2,21 +2,18 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { favoritesTable, postersTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
-import {
-  GetFavoritesQueryParams,
-  AddFavoriteBody,
-  RemoveFavoriteQueryParams,
-} from "@workspace/api-zod";
+import { requireAuth } from "../middleware/requireAuth";
+import { z } from "zod";
 
 const router = Router();
 
-async function getFavoritedPosters(sessionId: string, storeKey: string) {
+async function getFavoritedPosters(userId: number, storeKey: string) {
   const rows = await db
     .select()
     .from(favoritesTable)
     .leftJoin(postersTable, eq(favoritesTable.posterId, postersTable.id))
     .where(and(
-      eq(favoritesTable.sessionId, sessionId),
+      eq(favoritesTable.userId, userId),
       eq(postersTable.storeKey, storeKey),
     ));
 
@@ -29,19 +26,30 @@ async function getFavoritedPosters(sessionId: string, storeKey: string) {
     }));
 }
 
-router.get("/favorites", async (req, res) => {
-  const query = GetFavoritesQueryParams.safeParse(req.query);
-  if (!query.success) return res.status(400).json({ error: query.error.flatten() });
+const addFavoriteSchema = z.object({
+  posterId: z.number().int().positive(),
+  storeKey: z.string().min(1),
+});
 
-  const posters = await getFavoritedPosters(query.data.sessionId, query.data.storeKey);
+const removeFavoriteSchema = z.object({
+  posterId: z.coerce.number().int().positive(),
+  storeKey: z.string().min(1),
+});
+
+router.get("/user/favorites", requireAuth, async (req, res) => {
+  const storeKey = req.query.storeKey as string;
+  if (!storeKey) return res.status(400).json({ error: "storeKey is required" });
+
+  const posters = await getFavoritedPosters(req.user!.id, storeKey);
   return res.json(posters);
 });
 
-router.post("/favorites", async (req, res) => {
-  const body = AddFavoriteBody.safeParse(req.body);
+router.post("/user/favorites", requireAuth, async (req, res) => {
+  const body = addFavoriteSchema.safeParse(req.body);
   if (!body.success) return res.status(400).json({ error: body.error.flatten() });
 
-  const { sessionId, posterId, storeKey } = body.data;
+  const { posterId, storeKey } = body.data;
+  const userId = req.user!.id;
 
   const [poster] = await db
     .select()
@@ -54,27 +62,28 @@ router.post("/favorites", async (req, res) => {
 
   await db
     .insert(favoritesTable)
-    .values({ sessionId, posterId })
+    .values({ userId, posterId })
     .onConflictDoNothing();
 
-  const posters = await getFavoritedPosters(sessionId, storeKey);
+  const posters = await getFavoritedPosters(userId, storeKey);
   return res.json(posters);
 });
 
-router.delete("/favorites", async (req, res) => {
-  const query = RemoveFavoriteQueryParams.safeParse(req.query);
+router.delete("/user/favorites", requireAuth, async (req, res) => {
+  const query = removeFavoriteSchema.safeParse(req.query);
   if (!query.success) return res.status(400).json({ error: query.error.flatten() });
 
-  const { sessionId, posterId, storeKey } = query.data;
+  const { posterId, storeKey } = query.data;
+  const userId = req.user!.id;
 
   await db
     .delete(favoritesTable)
     .where(and(
-      eq(favoritesTable.sessionId, sessionId),
-      eq(favoritesTable.posterId, Number(posterId)),
+      eq(favoritesTable.userId, userId),
+      eq(favoritesTable.posterId, posterId),
     ));
 
-  const posters = await getFavoritedPosters(sessionId, storeKey);
+  const posters = await getFavoritedPosters(userId, storeKey);
   return res.json(posters);
 });
 

@@ -98,8 +98,29 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 - `PATCH /api/posters/:id/mockups/:mockupId/primary?storeKey=` — set primary mockup (admin only)
 - `DELETE /api/posters/:id/mockups/:mockupId?storeKey=` — remove a mockup (admin only)
 
-### Session Management
-- Sessions use a UUID stored in `localStorage` as `session_id` (no auth required)
+### User Authentication
+- **Registration**: POST /api/auth/register — email + password (min 6 chars), returns `{user: {id, email}}`
+- **Login**: POST /api/auth/login — returns `{user: {id, email}}`, sets httpOnly cookie `auth_token` (30-day expiry)
+- **Logout**: POST /api/auth/logout — clears cookie, deletes session from DB
+- **Session check**: GET /api/auth/me — returns `{user}` if authenticated, 401 otherwise
+- **Session storage**: UUID token stored in `user_sessions` table (not JWT) — invalidatable
+- **Password hashing**: bcryptjs (salt rounds 12)
+- **Cookie**: `auth_token`, httpOnly, SameSite=Lax, 30-day maxAge, secure in production
+- **Middleware**: `artifacts/api-server/src/middleware/requireAuth.ts` — looks up cookie, validates session, attaches `req.user`
+- **Startup migration**: `artifacts/api-server/src/lib/migrateUserAuth.ts` — creates `users`, `user_sessions` tables; adds `user_id` FK column to `favorites` if missing
+- **Frontend context**: `artifacts/poster-store/src/context/AuthContext.tsx` — fetches `/api/auth/me` on mount, exposes `user`, `login`, `logout`, `register`
+
+### User Favorites (Authenticated)
+- **Routes**: `/api/user/favorites` (GET, POST, DELETE) — all require auth cookie
+- **GET**: `?storeKey=postsofspain` — returns array of poster objects saved by the logged-in user
+- **POST**: `{posterId, storeKey}` — adds to favorites (idempotent)
+- **DELETE**: `?posterId=X&storeKey=postsofspain` — removes from favorites
+- **Frontend API**: `artifacts/poster-store/src/lib/favoritesApi.ts` — raw fetch with credentials (not generated hooks)
+- **PosterCard**: shows filled/empty heart; login prompt modal when guest clicks heart
+- **Favorites page** (`/favorites`): shows login prompt for guests; shows saved posters with remove button when logged in
+
+### Session Management (Legacy / Cart)
+- Anonymous cart sessions use a UUID stored in `localStorage` as `session_id` (no auth required)
 - `artifacts/poster-store/src/lib/session.ts` — `getSessionId()` generates/retrieves the UUID
 
 ### Admin System

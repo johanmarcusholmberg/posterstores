@@ -1,5 +1,6 @@
 import express, { type Express } from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import router from "./routes";
 import stripeRouter from "./routes/stripe";
@@ -8,6 +9,7 @@ import { logger } from "./lib/logger";
 import { seedMockupTemplates } from "./routes/mockups";
 import { migrateExistingPosterSizes } from "./lib/migrateExistingPosterSizes";
 import { migrateSlugField } from "./lib/migrateSlugField";
+import { migrateUserAuth } from "./lib/migrateUserAuth";
 
 const app: Express = express();
 
@@ -30,7 +32,12 @@ app.use(
     },
   }),
 );
-app.use(cors());
+
+app.use(cors({
+  origin: true,
+  credentials: true,
+}));
+app.use(cookieParser());
 
 app.post("/api/stripe/webhook", (req, _res, next) => {
   const chunks: Buffer[] = [];
@@ -54,6 +61,7 @@ seedMockupTemplates().catch((err) =>
 
 migrateSlugField()
   .then(() => migrateExistingPosterSizes())
+  .then(() => migrateUserAuth())
   .catch((err) =>
     logger.error(err, "Failed to run startup migrations")
   );
