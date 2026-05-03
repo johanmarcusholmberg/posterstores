@@ -59,15 +59,15 @@ router.post("/auth/register", async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-    const result = await client.query<{ id: number }>(
-      "INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id",
+    const result = await client.query<{ id: number; is_admin: boolean }>(
+      "INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id, is_admin",
       [email.toLowerCase(), passwordHash]
     );
 
-    const userId = result.rows[0].id;
-    const token = await createSession(userId);
+    const row = result.rows[0];
+    const token = await createSession(row.id);
     res.cookie(COOKIE_NAME, token, cookieOpts);
-    return res.status(201).json({ user: { id: userId, email: email.toLowerCase() } });
+    return res.status(201).json({ user: { id: row.id, email: email.toLowerCase(), isAdmin: row.is_admin } });
   } finally {
     client.release();
   }
@@ -82,8 +82,8 @@ router.post("/auth/login", async (req, res) => {
   const { email, password } = parsed.data;
   const client = await pool.connect();
   try {
-    const result = await client.query<{ id: number; password_hash: string }>(
-      "SELECT id, password_hash FROM users WHERE email = $1",
+    const result = await client.query<{ id: number; password_hash: string; is_admin: boolean }>(
+      "SELECT id, password_hash, is_admin FROM users WHERE email = $1",
       [email.toLowerCase()]
     );
 
@@ -99,7 +99,7 @@ router.post("/auth/login", async (req, res) => {
 
     const token = await createSession(user.id);
     res.cookie(COOKIE_NAME, token, cookieOpts);
-    return res.json({ user: { id: user.id, email: email.toLowerCase() } });
+    return res.json({ user: { id: user.id, email: email.toLowerCase(), isAdmin: user.is_admin } });
   } finally {
     client.release();
   }

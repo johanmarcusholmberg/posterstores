@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useStorefront } from "@/context/StorefrontContext";
 import { useAuth } from "@/context/AuthContext";
-import { ShoppingBag, Heart, Menu, X, User, LogOut } from "lucide-react";
+import { ShoppingBag, Heart, Menu, X, User, LogOut, LayoutDashboard } from "lucide-react";
 import { useGetCart, getGetCartQueryKey } from "@workspace/api-client-react";
 import { getSessionId } from "@/lib/session";
 import { Button } from "@/components/ui/button";
@@ -90,6 +90,16 @@ export const Navbar = () => {
                     <User className="mr-2 h-4 w-4" /> Account
                   </Link>
                 </DropdownMenuItem>
+                {user.isAdmin && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin" className="cursor-pointer">
+                        <LayoutDashboard className="mr-2 h-4 w-4" /> Administration
+                      </Link>
+                    </DropdownMenuItem>
+                  </>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-muted-foreground">
                   <LogOut className="mr-2 h-4 w-4" /> Log out
@@ -146,6 +156,13 @@ export const Navbar = () => {
                   Account
                 </div>
               </Link>
+              {user.isAdmin && (
+                <Link href="/admin" onClick={closeMobile}>
+                  <div className={`flex items-center gap-2 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${location.startsWith("/admin") ? "bg-primary/10 text-primary" : "text-foreground hover:bg-muted"}`}>
+                    <LayoutDashboard className="h-4 w-4" /> Administration
+                  </div>
+                </Link>
+              )}
               <button onClick={handleLogout} className="w-full text-left">
                 <div className="flex items-center px-3 py-2.5 rounded-md text-sm font-medium text-muted-foreground hover:bg-muted transition-colors">
                   Log out
