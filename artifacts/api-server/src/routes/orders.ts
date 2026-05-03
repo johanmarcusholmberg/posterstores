@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db } from "@workspace/db";
+import { db, pool } from "@workspace/db";
 import {
   ordersTable,
   orderItemsTable,
@@ -9,6 +9,7 @@ import {
 } from "@workspace/db";
 import { eq, and, desc, count, inArray, ne } from "drizzle-orm";
 import { requireAdmin } from "../middleware/requireAdmin";
+import { requireAuth } from "../middleware/requireAuth";
 import { z } from "zod";
 
 const router = Router();
@@ -17,6 +18,7 @@ const CreateOrderBodySchema = z.object({
   storeKey: z.string().min(1),
   sessionId: z.string().min(1),
   customerEmail: z.string().email(),
+  customerPhone: z.string().optional().nullable(),
   shippingName: z.string().min(1),
   shippingAddressLine1: z.string().min(1),
   shippingAddressLine2: z.string().optional().nullable(),
@@ -24,6 +26,7 @@ const CreateOrderBodySchema = z.object({
   shippingCity: z.string().min(1),
   shippingRegion: z.string().optional().nullable(),
   shippingCountry: z.string().min(1),
+  shippingMethodId: z.number().int().optional().nullable(),
   customerNotes: z.string().optional().nullable(),
   newsletterOptIn: z.boolean().optional().default(false),
   currency: z.string().optional(),
@@ -56,7 +59,13 @@ function serializeOrderItem(item: typeof orderItemsTable.$inferSelect) {
 }
 
 function serializeOrder(
-  order: typeof ordersTable.$inferSelect,
+  order: typeof ordersTable.$inferSelect & {
+    customerPhone?: string | null;
+    selectedShippingMethodId?: number | null;
+    selectedShippingMethodName?: string | null;
+    selectedShippingMethodCourier?: string | null;
+    selectedShippingMethodEstimate?: string | null;
+  },
   items: (typeof orderItemsTable.$inferSelect)[]
 ) {
   return {
@@ -76,6 +85,20 @@ function serializeOrder(
   };
 }
 
+async function getOrderRaw(id: number, client: any) {
+  const result = await client.query(
+    `SELECT o.*, 
+      o.customer_phone as "customerPhone",
+      o.selected_shipping_method_id as "selectedShippingMethodId",
+      o.selected_shipping_method_name as "selectedShippingMethodName",
+      o.selected_shipping_method_courier as "selectedShippingMethodCourier",
+      o.selected_shipping_method_estimate as "selectedShippingMethodEstimate"
+     FROM orders o WHERE o.id = $1`,
+    [id]
+  );
+  return result.rows[0] ?? null;
+}
+
 router.post("/orders", async (req, res) => {
   const parsed = CreateOrderBodySchema.safeParse(req.body);
   if (!parsed.success) {
@@ -86,6 +109,7 @@ router.post("/orders", async (req, res) => {
     storeKey,
     sessionId,
     customerEmail,
+    customerPhone,
     shippingName,
     shippingAddressLine1,
     shippingAddressLine2,
@@ -93,6 +117,7 @@ router.post("/orders", async (req, res) => {
     shippingCity,
     shippingRegion,
     shippingCountry,
+    shippingMethodId,
     customerNotes,
     newsletterOptIn,
     currency: requestedCurrency,
@@ -189,39 +214,113 @@ router.post("/orders", async (req, res) => {
   });
 
   subtotal = Math.round(subtotal * 100) / 100;
-  const shippingCost = 0;
-  const total = subtotal + shippingCost;
 
-  const [order] = await db
-    .insert(ordersTable)
-    .values({
-      storeKey,
-      customerEmail,
-      status: "pending_payment",
-      subtotal: String(subtotal),
-      shippingCost: String(shippingCost),
-      total: String(total),
-      currency,
-      shippingName,
-      shippingAddressLine1,
-      shippingAddressLine2: shippingAddressLine2 ?? null,
-      shippingPostalCode,
-      shippingCity,
-      shippingRegion: shippingRegion ?? null,
-      shippingCountry,
-      customerNotes: customerNotes ?? null,
-      newsletterOptIn: newsletterOptIn ?? false,
-    })
-    .returning();
+  let shippingCost = 0;
+  let selectedShippingMethodName: string | null = null;
+  let selectedShippingMethodCourier: string | null = null;
+  let selectedShippingMethodEstimate: string | null = null;
+  let resolvedShippingMethodId: number | null = null;
 
-  const itemRows = await db
-    .insert(orderItemsTable)
-    .values(itemsToInsert.map(item => ({ ...item, orderId: order.id })))
-    .returning();
+  if (shippingMethodId) {
+    const client = await pool.connect();
+    try {
+      const methodRes = await client.query(
+        "SELECT * FROM shipping_methods WHERE id = $1 AND active = TRUE",
+        [shippingMethodId]
+      );
+      if (methodRes.rows.length > 0) {
+        const method = methodRes.rows[0];
+        shippingCost = Number(method.price);
+        selectedShippingMethodName = method.name;
+        selectedShippingMethodCourier = method.courier_name ?? null;
+        selectedShippingMethodEstimate = method.delivery_estimate ?? null;
+        resolvedShippingMethodId = method.id;
+      }
+    } finally {
+      client.release();
+    }
+  }
 
-  await db.delete(cartItemsTable).where(eq(cartItemsTable.sessionId, sessionId));
+  const total = Math.round((subtotal + shippingCost) * 100) / 100;
 
-  return res.status(201).json(serializeOrder(order, itemRows));
+  const dbClient = await pool.connect();
+  try {
+    const orderRes = await dbClient.query(
+      `INSERT INTO orders (
+        store_key, customer_email, customer_phone, status,
+        subtotal, shipping_cost, total, currency,
+        shipping_name, shipping_address_line1, shipping_address_line2,
+        shipping_postal_code, shipping_city, shipping_region, shipping_country,
+        selected_shipping_method_id, selected_shipping_method_name,
+        selected_shipping_method_courier, selected_shipping_method_estimate,
+        customer_notes, newsletter_opt_in
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+      RETURNING *`,
+      [
+        storeKey, customerEmail, customerPhone ?? null, "pending_payment",
+        String(subtotal), String(shippingCost), String(total), currency,
+        shippingName, shippingAddressLine1, shippingAddressLine2 ?? null,
+        shippingPostalCode, shippingCity, shippingRegion ?? null, shippingCountry,
+        resolvedShippingMethodId, selectedShippingMethodName,
+        selectedShippingMethodCourier, selectedShippingMethodEstimate,
+        customerNotes ?? null, newsletterOptIn ?? false,
+      ]
+    );
+
+    const order = orderRes.rows[0];
+
+    const itemRows = await db
+      .insert(orderItemsTable)
+      .values(itemsToInsert.map(item => ({ ...item, orderId: order.id })))
+      .returning();
+
+    await db.delete(cartItemsTable).where(eq(cartItemsTable.sessionId, sessionId));
+
+    const serializedOrder = {
+      id: order.id,
+      storeKey: order.store_key,
+      customerEmail: order.customer_email,
+      customerPhone: order.customer_phone ?? null,
+      status: order.status,
+      subtotal: Number(order.subtotal),
+      shippingCost: Number(order.shipping_cost),
+      total: Number(order.total),
+      currency: order.currency,
+      shippingName: order.shipping_name,
+      shippingAddressLine1: order.shipping_address_line1,
+      shippingAddressLine2: order.shipping_address_line2 ?? null,
+      shippingPostalCode: order.shipping_postal_code,
+      shippingCity: order.shipping_city,
+      shippingRegion: order.shipping_region ?? null,
+      shippingCountry: order.shipping_country,
+      selectedShippingMethodId: order.selected_shipping_method_id ?? null,
+      selectedShippingMethodName: order.selected_shipping_method_name ?? null,
+      selectedShippingMethodCourier: order.selected_shipping_method_courier ?? null,
+      selectedShippingMethodEstimate: order.selected_shipping_method_estimate ?? null,
+      customerNotes: order.customer_notes ?? null,
+      newsletterOptIn: order.newsletter_opt_in,
+      stripeCheckoutSessionId: order.stripe_checkout_session_id ?? null,
+      stripePaymentIntentId: order.stripe_payment_intent_id ?? null,
+      paymentStatus: order.payment_status ?? null,
+      paidAt: order.paid_at?.toISOString() ?? null,
+      cancelledAt: order.cancelled_at?.toISOString() ?? null,
+      customerConfirmationSentAt: order.customer_confirmation_sent_at?.toISOString() ?? null,
+      adminNotificationSentAt: order.admin_notification_sent_at?.toISOString() ?? null,
+      fulfillmentStatus: order.fulfillment_status ?? "not_started",
+      fulfillmentNotes: order.fulfillment_notes ?? null,
+      shippedAt: order.shipped_at?.toISOString() ?? null,
+      trackingNumber: order.tracking_number ?? null,
+      trackingUrl: order.tracking_url ?? null,
+      productionStartedAt: order.production_started_at?.toISOString() ?? null,
+      createdAt: order.created_at?.toISOString(),
+      updatedAt: order.updated_at?.toISOString(),
+      items: itemRows.map(serializeOrderItem),
+    };
+
+    return res.status(201).json(serializedOrder);
+  } finally {
+    dbClient.release();
+  }
 });
 
 router.get("/orders/:id", async (req, res) => {
@@ -231,9 +330,107 @@ router.get("/orders/:id", async (req, res) => {
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, id));
   if (!order) return res.status(404).json({ error: "Not found" });
 
-  const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
+  const dbClient = await pool.connect();
+  try {
+    const extraRes = await dbClient.query(
+      `SELECT customer_phone, selected_shipping_method_id, selected_shipping_method_name,
+              selected_shipping_method_courier, selected_shipping_method_estimate
+       FROM orders WHERE id = $1`,
+      [id]
+    );
+    const extra = extraRes.rows[0] ?? {};
+    const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
 
-  return res.json(serializeOrder(order, items));
+    return res.json({
+      ...serializeOrder(order, items),
+      customerPhone: extra.customer_phone ?? null,
+      selectedShippingMethodId: extra.selected_shipping_method_id ?? null,
+      selectedShippingMethodName: extra.selected_shipping_method_name ?? null,
+      selectedShippingMethodCourier: extra.selected_shipping_method_courier ?? null,
+      selectedShippingMethodEstimate: extra.selected_shipping_method_estimate ?? null,
+    });
+  } finally {
+    dbClient.release();
+  }
+});
+
+router.get("/user/orders", requireAuth, async (req, res) => {
+  const user = req.user!;
+  const limit = Number(req.query.limit) || 20;
+  const offset = Number(req.query.offset) || 0;
+
+  const dbClient = await pool.connect();
+  try {
+    const result = await dbClient.query(
+      `SELECT * FROM orders WHERE customer_email = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+      [user.email, limit, offset]
+    );
+    const countRes = await dbClient.query(
+      `SELECT COUNT(*) FROM orders WHERE customer_email = $1`,
+      [user.email]
+    );
+
+    const orderIds = result.rows.map((r: any) => r.id);
+    let allItems: any[] = [];
+    if (orderIds.length > 0) {
+      const itemsRes = await dbClient.query(
+        `SELECT * FROM order_items WHERE order_id = ANY($1)`,
+        [orderIds]
+      );
+      allItems = itemsRes.rows;
+    }
+
+    const itemsByOrder = new Map<number, any[]>();
+    for (const item of allItems) {
+      const arr = itemsByOrder.get(item.order_id) ?? [];
+      arr.push({
+        id: item.id,
+        orderId: item.order_id,
+        posterId: item.poster_id,
+        posterSizeId: item.poster_size_id ?? null,
+        posterTitleSnapshot: item.poster_title_snapshot,
+        sizeLabelSnapshot: item.size_label_snapshot ?? null,
+        unitPrice: Number(item.unit_price),
+        currency: item.currency,
+        quantity: item.quantity,
+        totalPrice: Number(item.total_price),
+        previewImageUrlSnapshot: item.preview_image_url_snapshot ?? null,
+        createdAt: item.created_at?.toISOString(),
+      });
+      itemsByOrder.set(item.order_id, arr);
+    }
+
+    const orders = result.rows.map((o: any) => ({
+      id: o.id,
+      storeKey: o.store_key,
+      customerEmail: o.customer_email,
+      status: o.status,
+      subtotal: Number(o.subtotal),
+      shippingCost: Number(o.shipping_cost),
+      total: Number(o.total),
+      currency: o.currency,
+      shippingName: o.shipping_name,
+      shippingCity: o.shipping_city,
+      shippingCountry: o.shipping_country,
+      selectedShippingMethodName: o.selected_shipping_method_name ?? null,
+      selectedShippingMethodEstimate: o.selected_shipping_method_estimate ?? null,
+      paidAt: o.paid_at?.toISOString() ?? null,
+      fulfillmentStatus: o.fulfillment_status ?? "not_started",
+      trackingNumber: o.tracking_number ?? null,
+      createdAt: o.created_at?.toISOString(),
+      updatedAt: o.updated_at?.toISOString(),
+      items: itemsByOrder.get(o.id) ?? [],
+    }));
+
+    return res.json({
+      orders,
+      total: Number(countRes.rows[0]?.count ?? 0),
+      offset,
+      limit,
+    });
+  } finally {
+    dbClient.release();
+  }
 });
 
 router.get("/admin/orders", requireAdmin, async (req, res) => {
@@ -273,12 +470,37 @@ router.get("/admin/orders", requireAdmin, async (req, res) => {
     itemsByOrder.set(item.orderId, arr);
   }
 
-  return res.json({
-    orders: orders.map(o => serializeOrder(o, itemsByOrder.get(o.id) ?? [])),
-    total: Number(totalResult[0]?.count ?? 0),
-    offset,
-    limit,
-  });
+  const dbClient = await pool.connect();
+  try {
+    const extraFields: Record<number, any> = {};
+    if (orderIds.length > 0) {
+      const extraRes = await dbClient.query(
+        `SELECT id, customer_phone, selected_shipping_method_id, selected_shipping_method_name,
+                selected_shipping_method_courier, selected_shipping_method_estimate
+         FROM orders WHERE id = ANY($1)`,
+        [orderIds]
+      );
+      for (const row of extraRes.rows) {
+        extraFields[row.id] = row;
+      }
+    }
+
+    return res.json({
+      orders: orders.map(o => ({
+        ...serializeOrder(o, itemsByOrder.get(o.id) ?? []),
+        customerPhone: extraFields[o.id]?.customer_phone ?? null,
+        selectedShippingMethodId: extraFields[o.id]?.selected_shipping_method_id ?? null,
+        selectedShippingMethodName: extraFields[o.id]?.selected_shipping_method_name ?? null,
+        selectedShippingMethodCourier: extraFields[o.id]?.selected_shipping_method_courier ?? null,
+        selectedShippingMethodEstimate: extraFields[o.id]?.selected_shipping_method_estimate ?? null,
+      })),
+      total: Number(totalResult[0]?.count ?? 0),
+      offset,
+      limit,
+    });
+  } finally {
+    dbClient.release();
+  }
 });
 
 router.get("/admin/orders/:id", requireAdmin, async (req, res) => {
@@ -288,9 +510,28 @@ router.get("/admin/orders/:id", requireAdmin, async (req, res) => {
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, id));
   if (!order) return res.status(404).json({ error: "Not found" });
 
-  const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
+  const dbClient = await pool.connect();
+  try {
+    const extraRes = await dbClient.query(
+      `SELECT customer_phone, selected_shipping_method_id, selected_shipping_method_name,
+              selected_shipping_method_courier, selected_shipping_method_estimate
+       FROM orders WHERE id = $1`,
+      [id]
+    );
+    const extra = extraRes.rows[0] ?? {};
+    const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
 
-  return res.json(serializeOrder(order, items));
+    return res.json({
+      ...serializeOrder(order, items),
+      customerPhone: extra.customer_phone ?? null,
+      selectedShippingMethodId: extra.selected_shipping_method_id ?? null,
+      selectedShippingMethodName: extra.selected_shipping_method_name ?? null,
+      selectedShippingMethodCourier: extra.selected_shipping_method_courier ?? null,
+      selectedShippingMethodEstimate: extra.selected_shipping_method_estimate ?? null,
+    });
+  } finally {
+    dbClient.release();
+  }
 });
 
 router.patch("/admin/orders/:id/status", requireAdmin, async (req, res) => {
@@ -480,33 +721,12 @@ router.get("/admin/fulfillment/export.csv", requireAdmin, async (req, res) => {
   }
 
   const HEADERS = [
-    "Order ID",
-    "Store",
-    "Order Date",
-    "Order Status",
-    "Fulfillment Status",
-    "Customer Email",
-    "Shipping Name",
-    "Address Line 1",
-    "Address Line 2",
-    "Postal Code",
-    "City",
-    "Country",
-    "Poster Title",
-    "Size",
-    "Width (cm)",
-    "Height (cm)",
-    "Quantity",
-    "Unit Price",
-    "Currency",
-    "Order Total",
-    "Master Print File URL",
-    "Preview Image URL",
-    "Tracking Number",
-    "Tracking URL",
-    "Production Started",
-    "Shipped At",
-    "Fulfillment Notes",
+    "Order ID", "Store", "Order Date", "Order Status", "Fulfillment Status",
+    "Customer Email", "Shipping Name", "Address Line 1", "Address Line 2",
+    "Postal Code", "City", "Country", "Poster Title", "Size",
+    "Width (cm)", "Height (cm)", "Quantity", "Unit Price", "Currency",
+    "Order Total", "Master Print File URL", "Preview Image URL",
+    "Tracking Number", "Tracking URL", "Production Started", "Shipped At", "Fulfillment Notes",
   ];
 
   const csvLines: string[] = [];
@@ -515,24 +735,15 @@ router.get("/admin/fulfillment/export.csv", requireAdmin, async (req, res) => {
   for (const order of orders) {
     const items = itemsByOrder.get(order.id) ?? [];
     const baseRow = [
-      String(order.id),
-      order.storeKey,
-      fmtDate(order.createdAt),
+      String(order.id), order.storeKey, fmtDate(order.createdAt),
       ORDER_STATUS_LABEL[order.status] ?? order.status,
       FULFILLMENT_LABEL[order.fulfillmentStatus ?? "not_started"] ?? order.fulfillmentStatus ?? "Not Started",
-      order.customerEmail,
-      order.shippingName,
-      order.shippingAddressLine1,
-      order.shippingAddressLine2 ?? "",
-      order.shippingPostalCode,
-      order.shippingCity,
-      order.shippingCountry,
+      order.customerEmail, order.shippingName, order.shippingAddressLine1,
+      order.shippingAddressLine2 ?? "", order.shippingPostalCode, order.shippingCity, order.shippingCountry,
     ];
     const trailingRow = [
-      order.trackingNumber ?? "",
-      order.trackingUrl ?? "",
-      fmtDate(order.productionStartedAt),
-      fmtDate(order.shippedAt),
+      order.trackingNumber ?? "", order.trackingUrl ?? "",
+      fmtDate(order.productionStartedAt), fmtDate(order.shippedAt),
       order.fulfillmentNotes ?? "",
     ];
 
@@ -550,9 +761,7 @@ router.get("/admin/fulfillment/export.csv", requireAdmin, async (req, res) => {
           item.sizeLabelSnapshot ?? "",
           item.widthCmSnapshot != null ? String(Number(item.widthCmSnapshot)) : "",
           item.heightCmSnapshot != null ? String(Number(item.heightCmSnapshot)) : "",
-          String(item.quantity),
-          String(Number(item.unitPrice)),
-          item.currency,
+          String(item.quantity), String(Number(item.unitPrice)), item.currency,
           String(Number(order.total)),
           item.masterPrintImageUrlSnapshot ?? "",
           item.previewImageUrlSnapshot ?? "",

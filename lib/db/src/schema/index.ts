@@ -9,3 +9,4 @@ export * from "./mockups";
 export * from "./stores";
 export * from "./users";
 export * from "./sessions";
+export * from "./shippingMethods";

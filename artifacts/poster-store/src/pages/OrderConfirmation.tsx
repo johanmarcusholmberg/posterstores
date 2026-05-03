@@ -198,7 +198,7 @@ export default function OrderConfirmation() {
 
       {/* Shipping Details */}
       <div className="bg-sand/30 rounded-xl p-6 mb-8">
-        <h2 className="font-serif text-xl font-bold mb-4 border-b pb-3">Shipping To</h2>
+        <h2 className="font-serif text-xl font-bold mb-4 border-b pb-3">Shipping</h2>
         <div className="text-sm space-y-0.5">
           <p className="font-medium">{order.shippingName}</p>
           <p className="text-muted-foreground">{order.shippingAddressLine1}</p>
@@ -211,8 +211,32 @@ export default function OrderConfirmation() {
           </p>
           <p className="text-muted-foreground">{order.shippingCountry}</p>
         </div>
+        {(orderAny.selectedShippingMethodName || orderAny.selectedShippingMethodEstimate) && (
+          <div className="mt-3 pt-3 border-t border-border flex items-center gap-2 text-sm">
+            <Package className="w-4 h-4 text-muted-foreground shrink-0" />
+            <div>
+              {orderAny.selectedShippingMethodName && (
+                <span className="font-medium">{orderAny.selectedShippingMethodName}</span>
+              )}
+              {orderAny.selectedShippingMethodEstimate && (
+                <span className="text-muted-foreground"> · {orderAny.selectedShippingMethodEstimate}</span>
+              )}
+            </div>
+          </div>
+        )}
+        {orderAny.trackingNumber && (
+          <div className="mt-3 pt-3 border-t border-border text-sm">
+            <p className="text-xs text-muted-foreground mb-0.5">Tracking number</p>
+            <p className="font-mono font-medium">{orderAny.trackingNumber}</p>
+            {orderAny.trackingUrl && (
+              <a href={orderAny.trackingUrl} target="_blank" rel="noreferrer" className="text-xs text-primary underline mt-0.5 block">
+                Track shipment →
+              </a>
+            )}
+          </div>
+        )}
         {order.customerNotes && (
-          <div className="mt-4 pt-4 border-t border-border">
+          <div className="mt-3 pt-3 border-t border-border">
             <p className="text-xs font-medium text-muted-foreground mb-1">Order Notes</p>
             <p className="text-sm">{order.customerNotes}</p>
           </div>

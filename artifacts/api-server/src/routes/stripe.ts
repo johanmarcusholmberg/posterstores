@@ -53,7 +53,7 @@ router.post("/orders/:id/create-checkout-session", async (req: Request, res: Res
 
   const currency = order.currency.toLowerCase();
 
-  const lineItems = items.map((item) => ({
+  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = items.map((item) => ({
     quantity: item.quantity,
     price_data: {
       currency,
@@ -69,6 +69,34 @@ router.post("/orders/:id/create-checkout-session", async (req: Request, res: Res
       },
     },
   }));
+
+  const shippingCost = Number(order.shippingCost);
+  if (shippingCost > 0) {
+    const dbClient2 = await (await import("@workspace/db")).pool.connect();
+    let shippingName = "Shipping";
+    try {
+      const extraRes = await dbClient2.query(
+        "SELECT selected_shipping_method_name FROM orders WHERE id = $1",
+        [orderId]
+      );
+      if (extraRes.rows[0]?.selected_shipping_method_name) {
+        shippingName = extraRes.rows[0].selected_shipping_method_name;
+      }
+    } finally {
+      dbClient2.release();
+    }
+
+    lineItems.push({
+      quantity: 1,
+      price_data: {
+        currency,
+        unit_amount: Math.round(shippingCost * 100),
+        product_data: {
+          name: shippingName,
+        },
+      },
+    });
+  }
 
   const session = await stripe.checkout.sessions.create({
     payment_method_types: ["card"],

@@ -10,6 +10,7 @@ import statsRouter from "./stats";
 import mockupsRouter from "./mockups";
 import storesRouter from "./stores";
 import authRouter from "./auth";
+import shippingRouter from "./shipping";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(newsletterRouter);
 router.use(statsRouter);
 router.use(mockupsRouter);
 router.use(storesRouter);
+router.use(shippingRouter);
 
 export default router;

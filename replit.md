@@ -29,11 +29,34 @@ The API server provides comprehensive endpoints for:
 - **Posters:** Listing, retrieving by slug or ID (published only for public), and admin-specific management (create, update, delete, view all statuses).
 - **Cart:** Anonymous session-based cart management (add, update, remove items).
 - **Favorites:** Both anonymous (session-based) and authenticated user-specific favorites.
-- **Orders:** Creation of order drafts, retrieval, and admin management of order statuses.
+- **Orders:** Creation of order drafts with shipping method selection, retrieval, user order history (`GET /api/user/orders` — auth required), and admin management of order statuses and fulfillment.
+- **Shipping Methods:** `GET /api/shipping-methods` (public, filterable by storeKey/country) and admin CRUD at `/api/admin/shipping-methods`.
 - **Newsletter:** Subscription functionality.
 - **Store Configuration:** Public endpoints to retrieve store configurations and admin endpoints for store management.
 - **Mockup Templates:** CRUD operations for mockup templates (admin only) and listing available templates (public).
 - **Poster Mockups:** Associating mockups with posters, setting primary mockups, and batch updates (admin only).
+
+## Shipping System
+A `shipping_methods` table stores available shipping options per store. The migration (`migrateShipping`) runs at server startup and:
+- Creates the `shipping_methods` table if not present
+- Adds `customer_phone`, `selected_shipping_method_id`, `selected_shipping_method_name`, `selected_shipping_method_courier`, `selected_shipping_method_estimate` columns to the `orders` table
+- Seeds two default methods for postsofspain: Standard Shipping (€4.95, 5-10 days) and Express Shipping (€9.95, 2-4 days)
+
+When an order is created, the selected shipping method's price is included in the total and Stripe line items.
+
+## Checkout Flow
+Multi-step checkout (Details → Shipping → Payment):
+1. **Details**: Contact info (email + optional phone) and full shipping address
+2. **Shipping**: Select from available shipping methods loaded from `/api/shipping-methods`
+3. **Payment**: Review summary and redirect to Stripe Checkout
+
+Order creation uses direct `fetch` (not generated client) to pass `shippingMethodId` and `customerPhone` fields not yet in the OpenAPI spec.
+
+## Account / Order History
+The Account page (`/account`) shows:
+- User email and quick actions (Saved posters, Log out)
+- Order history section fetching from `GET /api/user/orders` (requires auth cookie)
+- Expandable order cards showing items, shipping method, tracking, price breakdown
 
 ## User Authentication
 - **Registration/Login:** Email and password-based authentication with `httpOnly` cookies for session management.

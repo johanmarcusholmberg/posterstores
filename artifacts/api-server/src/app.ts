@@ -10,6 +10,7 @@ import { seedMockupTemplates } from "./routes/mockups";
 import { migrateExistingPosterSizes } from "./lib/migrateExistingPosterSizes";
 import { migrateSlugField } from "./lib/migrateSlugField";
 import { migrateUserAuth } from "./lib/migrateUserAuth";
+import { migrateShipping } from "./lib/migrateShipping";
 
 const app: Express = express();
 
@@ -62,6 +63,7 @@ seedMockupTemplates().catch((err) =>
 migrateSlugField()
   .then(() => migrateExistingPosterSizes())
   .then(() => migrateUserAuth())
+  .then(() => migrateShipping())
   .catch((err) =>
     logger.error(err, "Failed to run startup migrations")
   );

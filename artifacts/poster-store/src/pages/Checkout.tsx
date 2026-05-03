@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useGetCart, getGetCartQueryKey, useCreateOrder } from "@workspace/api-client-react";
+import { useGetCart, getGetCartQueryKey } from "@workspace/api-client-react";
 import { getSessionId } from "@/lib/session";
 import { useStorefront } from "@/context/StorefrontContext";
 import { useLocation, useSearch } from "wouter";
@@ -13,10 +13,24 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, XCircle } from "lucide-react";
+import { AlertCircle, XCircle, CheckCircle2, Truck, Shield, Package } from "lucide-react";
+
+interface ShippingMethod {
+  id: number;
+  name: string;
+  description: string | null;
+  courierName: string | null;
+  deliveryEstimate: string | null;
+  price: number;
+  currency: string;
+}
+
+const STEPS = ["Details", "Shipping", "Payment"] as const;
+type Step = 0 | 1 | 2;
 
 const checkoutSchema = z.object({
   customerEmail: z.string().email("Valid email is required"),
+  customerPhone: z.string().optional(),
   shippingName: z.string().min(1, "Full name is required"),
   shippingAddressLine1: z.string().min(1, "Address is required"),
   shippingAddressLine2: z.string().optional(),
@@ -30,6 +44,48 @@ const checkoutSchema = z.object({
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
 
+function formatPrice(price: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat("en-EU", { style: "currency", currency }).format(price);
+  } catch {
+    const symbols: Record<string, string> = { EUR: "€", SEK: "kr", USD: "$", GBP: "£" };
+    const s = symbols[currency] ?? currency;
+    return `${s}${price.toFixed(2)}`;
+  }
+}
+
+function StepIndicator({ step }: { step: Step }) {
+  return (
+    <div className="flex items-center justify-center gap-0 mb-10">
+      {STEPS.map((label, i) => {
+        const isComplete = i < step;
+        const isActive = i === step;
+        return (
+          <React.Fragment key={label}>
+            <div className="flex flex-col items-center">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-all ${
+                isComplete
+                  ? "bg-primary border-primary text-primary-foreground"
+                  : isActive
+                  ? "border-primary text-primary bg-background"
+                  : "border-border text-muted-foreground bg-background"
+              }`}>
+                {isComplete ? <CheckCircle2 className="w-4 h-4" /> : i + 1}
+              </div>
+              <span className={`mt-1.5 text-xs font-medium ${isActive ? "text-foreground" : "text-muted-foreground"}`}>
+                {label}
+              </span>
+            </div>
+            {i < STEPS.length - 1 && (
+              <div className={`h-0.5 w-12 sm:w-16 mb-5 mx-1 transition-all ${i < step ? "bg-primary" : "bg-border"}`} />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function Checkout() {
   const sessionId = getSessionId();
   const store = useStorefront();
@@ -37,8 +93,13 @@ export default function Checkout() {
   const search = useSearch();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  const [step, setStep] = useState<Step>(0);
   const [redirecting, setRedirecting] = useState(false);
   const [stripeError, setStripeError] = useState<string | null>(null);
+  const [shippingMethods, setShippingMethods] = useState<ShippingMethod[]>([]);
+  const [selectedMethodId, setSelectedMethodId] = useState<number | null>(null);
+  const [shippingLoading, setShippingLoading] = useState(false);
 
   const params = new URLSearchParams(search);
   const paymentCancelled = params.get("payment") === "cancelled";
@@ -53,12 +114,14 @@ export default function Checkout() {
     },
   });
 
-  const createOrder = useCreateOrder();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
     defaultValues: {
       customerEmail: "",
+      customerPhone: "",
       shippingName: "",
       shippingAddressLine1: "",
       shippingAddressLine2: "",
@@ -71,66 +134,125 @@ export default function Checkout() {
     },
   });
 
-  const onSubmit = (values: CheckoutFormValues) => {
+  const shippingCountry = form.watch("shippingCountry");
+
+  useEffect(() => {
+    if (step !== 1) return;
+    setShippingLoading(true);
+    const qs = new URLSearchParams({ storeKey: store.storeKey });
+    if (shippingCountry) qs.set("country", shippingCountry);
+    fetch(`/api/shipping-methods?${qs}`)
+      .then(r => r.json())
+      .then(data => {
+        setShippingMethods(Array.isArray(data) ? data : []);
+        if (Array.isArray(data) && data.length > 0 && !selectedMethodId) {
+          setSelectedMethodId(data[0].id);
+        }
+      })
+      .catch(() => setShippingMethods([]))
+      .finally(() => setShippingLoading(false));
+  }, [step, store.storeKey, shippingCountry]);
+
+  const selectedMethod = shippingMethods.find(m => m.id === selectedMethodId) ?? null;
+  const currency = cart ? ((cart as any).currency || store.defaultCurrency || "EUR") : (store.defaultCurrency || "EUR");
+  const shippingCost = selectedMethod?.price ?? 0;
+  const cartTotal = cart?.total ?? 0;
+  const orderTotal = cartTotal + shippingCost;
+
+  const proceedToShipping = async () => {
+    const valid = await form.trigger([
+      "customerEmail", "customerPhone", "shippingName",
+      "shippingAddressLine1", "shippingPostalCode", "shippingCity", "shippingCountry",
+    ]);
+    if (valid) setStep(1);
+  };
+
+  const proceedToPayment = () => {
+    if (!selectedMethodId && shippingMethods.length > 0) {
+      toast({ variant: "destructive", title: "Select a shipping method", description: "Please choose a shipping option to continue." });
+      return;
+    }
+    setStep(2);
+  };
+
+  const onSubmit = async (values: CheckoutFormValues) => {
     if (!cart || cart.items.length === 0) return;
     setStripeError(null);
+    setSubmitError(null);
+    setIsSubmitting(true);
 
-    createOrder.mutate(
-      {
-        data: {
+    try {
+      const orderRes = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
           storeKey: store.storeKey,
           sessionId,
           customerEmail: values.customerEmail,
+          customerPhone: values.customerPhone || null,
           shippingName: values.shippingName,
           shippingAddressLine1: values.shippingAddressLine1,
-          shippingAddressLine2: values.shippingAddressLine2 || undefined,
+          shippingAddressLine2: values.shippingAddressLine2 || null,
           shippingPostalCode: values.shippingPostalCode,
           shippingCity: values.shippingCity,
-          shippingRegion: values.shippingRegion || undefined,
+          shippingRegion: values.shippingRegion || null,
           shippingCountry: values.shippingCountry,
-          customerNotes: values.customerNotes || undefined,
+          shippingMethodId: selectedMethodId,
+          customerNotes: values.customerNotes || null,
           newsletterOptIn: values.newsletterOptIn ?? false,
-        },
-      },
-      {
-        onSuccess: async (order) => {
-          queryClient.invalidateQueries({ queryKey: getGetCartQueryKey(cartParams) });
+        }),
+      });
 
-          try {
-            setRedirecting(true);
-            const res = await fetch(
-              `/api/orders/${order.id}/create-checkout-session?storeKey=${encodeURIComponent(store.storeKey)}`,
-              { method: "POST", headers: { "Content-Type": "application/json" } }
-            );
-
-            if (!res.ok) {
-              const body = await res.json().catch(() => ({}));
-              const msg = (body as any)?.error ?? "Failed to create payment session";
-              setStripeError(msg);
-              setRedirecting(false);
-              setLocation(`/order/${order.id}`);
-              return;
-            }
-
-            const { checkoutUrl } = await res.json();
-            if (checkoutUrl) {
-              window.location.href = checkoutUrl;
-            } else {
-              setRedirecting(false);
-              setLocation(`/order/${order.id}`);
-            }
-          } catch (err: any) {
-            setStripeError(err?.message ?? "Failed to redirect to payment");
-            setRedirecting(false);
-            setLocation(`/order/${order.id}`);
-          }
-        },
-        onError: (err: any) => {
-          const msg = err?.response?.data?.error ?? err?.message ?? "Failed to place order";
-          toast({ variant: "destructive", title: "Order failed", description: msg });
-        },
+      if (!orderRes.ok) {
+        const body = await orderRes.json().catch(() => ({}));
+        const msg = (body as any)?.error ?? "Failed to place order";
+        setSubmitError(msg);
+        toast({ variant: "destructive", title: "Order failed", description: msg });
+        setIsSubmitting(false);
+        return;
       }
-    );
+
+      const order = await orderRes.json();
+      queryClient.invalidateQueries({ queryKey: getGetCartQueryKey(cartParams) });
+
+      try {
+        setRedirecting(true);
+        const sessionRes = await fetch(
+          `/api/orders/${order.id}/create-checkout-session?storeKey=${encodeURIComponent(store.storeKey)}`,
+          { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include" }
+        );
+
+        if (!sessionRes.ok) {
+          const body = await sessionRes.json().catch(() => ({}));
+          const msg = (body as any)?.error ?? "Failed to create payment session";
+          setStripeError(msg);
+          setRedirecting(false);
+          setIsSubmitting(false);
+          setLocation(`/order/${order.id}`);
+          return;
+        }
+
+        const { checkoutUrl } = await sessionRes.json();
+        if (checkoutUrl) {
+          window.location.href = checkoutUrl;
+        } else {
+          setRedirecting(false);
+          setIsSubmitting(false);
+          setLocation(`/order/${order.id}`);
+        }
+      } catch (err: any) {
+        setStripeError(err?.message ?? "Failed to redirect to payment");
+        setRedirecting(false);
+        setIsSubmitting(false);
+        setLocation(`/order/${order.id}`);
+      }
+    } catch (err: any) {
+      const msg = err?.message ?? "Network error. Please try again.";
+      setSubmitError(msg);
+      toast({ variant: "destructive", title: "Order failed", description: msg });
+      setIsSubmitting(false);
+    }
   };
 
   const shouldRedirect = !cartLoading && (!cart || cart.items.length === 0) && !paymentCancelled;
@@ -139,11 +261,12 @@ export default function Checkout() {
     if (shouldRedirect) setLocation("/cart");
   }, [shouldRedirect, setLocation]);
 
-  if (cartLoading) return <div className="p-24 text-center">Loading...</div>;
+  if (cartLoading) return <div className="p-24 text-center text-muted-foreground">Loading...</div>;
 
   if (redirecting) {
     return (
       <div className="p-24 text-center">
+        <div className="w-12 h-12 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
         <p className="text-lg font-medium">Redirecting to secure payment...</p>
         <p className="text-muted-foreground text-sm mt-2">Please do not close this page.</p>
       </div>
@@ -152,264 +275,424 @@ export default function Checkout() {
 
   if (shouldRedirect) return null;
 
-  const currency = cart ? ((cart as any).currency || cart.items[0]?.poster?.currency || store.defaultCurrency) : store.defaultCurrency;
-
   return (
-    <div className="container mx-auto px-4 py-12 max-w-6xl">
-      <h1 className="font-serif text-4xl font-bold mb-2">Checkout</h1>
-      <p className="text-muted-foreground mb-10">Fill in your details to proceed to payment</p>
+    <div className="container mx-auto px-4 py-10 max-w-6xl">
+      <div className="mb-8 text-center">
+        <h1 className="font-serif text-3xl sm:text-4xl font-bold mb-6">Checkout</h1>
+        <StepIndicator step={step} />
+      </div>
 
       {paymentCancelled && (
-        <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 mb-8 text-sm text-amber-800">
+        <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 mb-8 text-sm text-amber-800 max-w-2xl mx-auto">
           <XCircle className="w-5 h-5 shrink-0 mt-0.5 text-amber-600" />
           <div>
             <p className="font-semibold mb-1">Payment was cancelled</p>
-            <p>
-              Your order has not been paid.{cancelledOrderId ? ` Order #${cancelledOrderId} is still pending.` : ""} You can complete your payment below or return to your cart.
-            </p>
+            <p>Your order has not been charged.{cancelledOrderId ? ` Order #${cancelledOrderId} is still pending.` : ""} Complete the form below to retry.</p>
           </div>
         </div>
       )}
 
       {stripeError && (
-        <div className="flex items-start gap-2 rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive mb-6">
+        <div className="flex items-start gap-2 rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive mb-6 max-w-2xl mx-auto">
           <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
           <span>{stripeError}</span>
         </div>
       )}
 
-      <div className="flex flex-col lg:flex-row gap-12">
-        <div className="flex-1">
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)}>
+          <div className="flex flex-col lg:flex-row gap-10">
+            {/* Left: Steps */}
+            <div className="flex-1 min-w-0">
 
-              {/* Contact */}
-              <div className="space-y-4">
-                <h2 className="font-serif text-2xl font-bold border-b pb-2">Contact</h2>
-                <FormField
-                  control={form.control}
-                  name="customerEmail"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email Address *</FormLabel>
-                      <FormControl>
-                        <Input type="email" placeholder="you@example.com" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+              {/* Step 0: Contact + Address */}
+              {step === 0 && (
+                <div className="space-y-8">
+                  <section className="space-y-4">
+                    <h2 className="font-serif text-xl font-bold pb-2 border-b border-border">Contact</h2>
+                    <FormField
+                      control={form.control}
+                      name="customerEmail"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email address *</FormLabel>
+                          <FormControl>
+                            <Input type="email" placeholder="you@example.com" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="customerPhone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Phone number <span className="text-muted-foreground text-xs">(optional, for delivery)</span></FormLabel>
+                          <FormControl>
+                            <Input type="tel" placeholder="+1 555 000 0000" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </section>
 
-              {/* Shipping */}
-              <div className="space-y-4">
-                <h2 className="font-serif text-2xl font-bold border-b pb-2">Shipping Address</h2>
-                <FormField
-                  control={form.control}
-                  name="shippingName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Full Name *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Jane Doe" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="shippingAddressLine1"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Address Line 1 *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="123 Main Street" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="shippingAddressLine2"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Address Line 2 <span className="text-muted-foreground text-xs">(optional)</span></FormLabel>
-                      <FormControl>
-                        <Input placeholder="Apt, suite, floor..." {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="shippingPostalCode"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Postal Code *</FormLabel>
-                        <FormControl>
-                          <Input placeholder="28001" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="shippingCity"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>City *</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Madrid" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="shippingRegion"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Region / State <span className="text-muted-foreground text-xs">(optional)</span></FormLabel>
-                        <FormControl>
-                          <Input placeholder="Community of Madrid" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="shippingCountry"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Country *</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Spain" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </div>
+                  <section className="space-y-4">
+                    <h2 className="font-serif text-xl font-bold pb-2 border-b border-border">Shipping Address</h2>
+                    <FormField
+                      control={form.control}
+                      name="shippingName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Full name *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Jane Doe" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="shippingAddressLine1"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Street address *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="123 Main Street" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="shippingAddressLine2"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Apt, suite, floor <span className="text-muted-foreground text-xs">(optional)</span></FormLabel>
+                          <FormControl>
+                            <Input placeholder="Apt 4B" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="shippingPostalCode"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Postal code *</FormLabel>
+                            <FormControl>
+                              <Input placeholder="28001" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="shippingCity"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>City *</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Madrid" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="shippingRegion"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Region / State <span className="text-muted-foreground text-xs">(optional)</span></FormLabel>
+                            <FormControl>
+                              <Input placeholder="Madrid" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="shippingCountry"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Country *</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Spain" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </section>
 
-              {/* Notes */}
-              <div className="space-y-4">
-                <h2 className="font-serif text-2xl font-bold border-b pb-2">Additional Information</h2>
-                <FormField
-                  control={form.control}
-                  name="customerNotes"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Order Notes <span className="text-muted-foreground text-xs">(optional)</span></FormLabel>
-                      <FormControl>
-                        <Textarea placeholder="Any special instructions for your order..." rows={3} {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="newsletterOptIn"
-                  render={({ field }) => (
-                    <FormItem className="flex items-start gap-3">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          className="mt-0.5"
-                        />
-                      </FormControl>
-                      <div>
-                        <FormLabel className="font-normal cursor-pointer">
-                          Keep me updated with news and new poster releases
-                        </FormLabel>
-                      </div>
-                    </FormItem>
-                  )}
-                />
-              </div>
+                  <section className="space-y-4">
+                    <h2 className="font-serif text-xl font-bold pb-2 border-b border-border">Additional notes</h2>
+                    <FormField
+                      control={form.control}
+                      name="customerNotes"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Order notes <span className="text-muted-foreground text-xs">(optional)</span></FormLabel>
+                          <FormControl>
+                            <Textarea placeholder="Any special instructions for your order..." rows={3} {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="newsletterOptIn"
+                      render={({ field }) => (
+                        <FormItem className="flex items-start gap-3">
+                          <FormControl>
+                            <Checkbox checked={field.value} onCheckedChange={field.onChange} className="mt-0.5" />
+                          </FormControl>
+                          <FormLabel className="font-normal cursor-pointer text-sm text-muted-foreground">
+                            Keep me updated with news and new poster releases
+                          </FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                  </section>
 
-              {createOrder.error && (
-                <div className="flex items-start gap-2 rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
-                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                  <span>
-                    {(createOrder.error as any)?.response?.data?.error ?? "Something went wrong. Please check your cart and try again."}
-                  </span>
+                  <Button type="button" size="lg" className="w-full h-12" onClick={proceedToShipping}>
+                    Continue to shipping →
+                  </Button>
                 </div>
               )}
 
-              <Button
-                type="submit"
-                size="lg"
-                className="w-full h-14 text-lg mt-8"
-                disabled={createOrder.isPending || redirecting}
-              >
-                {createOrder.isPending
-                  ? "Creating order..."
-                  : redirecting
-                  ? "Redirecting to payment..."
-                  : `Pay Now — ${cart?.total ?? ""} ${currency}`}
-              </Button>
-              <p className="text-center text-xs text-muted-foreground">
-                You will be redirected to Stripe's secure checkout to complete payment.
-              </p>
-            </form>
-          </Form>
-        </div>
+              {/* Step 1: Shipping method */}
+              {step === 1 && (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="font-serif text-xl font-bold">Shipping Method</h2>
+                    <button type="button" onClick={() => setStep(0)} className="text-sm text-muted-foreground hover:text-foreground">
+                      ← Edit details
+                    </button>
+                  </div>
 
-        {/* Order Summary */}
-        {cart && (
-          <div className="w-full lg:w-96 shrink-0">
-            <div className="bg-sand/30 p-6 rounded-lg sticky top-24">
-              <h2 className="font-serif text-xl font-bold mb-6">Order Summary</h2>
-              <div className="space-y-4 mb-6">
-                {cart.items.map((item) => {
-                  const anyItem = item as any;
-                  return (
-                    <div key={item.id} className="flex gap-4">
-                      <div className="w-16 h-20 bg-muted rounded overflow-hidden shrink-0">
-                        <img src={item.poster?.imageUrl} className="w-full h-full object-cover" alt={item.poster?.title} />
-                      </div>
-                      <div className="flex-1 text-sm">
-                        <p className="font-medium">{item.poster?.title}</p>
-                        {anyItem.size && <p className="text-muted-foreground">Size: {anyItem.size}</p>}
-                        <p className="text-muted-foreground">Qty: {item.quantity}</p>
-                        <p className="font-medium mt-1">
-                          {anyItem.unitPrice ?? item.poster?.price} {anyItem.currency ?? item.poster?.currency}
-                        </p>
+                  <div className="rounded-lg border border-border p-4 bg-muted/20 text-sm space-y-0.5">
+                    <p className="font-medium">{form.getValues("shippingName")}</p>
+                    <p className="text-muted-foreground">{form.getValues("shippingAddressLine1")}{form.getValues("shippingAddressLine2") ? `, ${form.getValues("shippingAddressLine2")}` : ""}</p>
+                    <p className="text-muted-foreground">{form.getValues("shippingPostalCode")} {form.getValues("shippingCity")}{form.getValues("shippingRegion") ? `, ${form.getValues("shippingRegion")}` : ""}</p>
+                    <p className="text-muted-foreground">{form.getValues("shippingCountry")}</p>
+                  </div>
+
+                  {shippingLoading ? (
+                    <div className="space-y-3">
+                      {[1, 2].map(i => (
+                        <div key={i} className="h-20 rounded-lg border border-border bg-muted/20 animate-pulse" />
+                      ))}
+                    </div>
+                  ) : shippingMethods.length === 0 ? (
+                    <div className="rounded-lg border border-border p-6 text-center text-muted-foreground text-sm">
+                      <Package className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                      <p>No shipping options available for your location.</p>
+                      <p className="mt-1">Please contact us for assistance.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {shippingMethods.map((method) => {
+                        const isSelected = selectedMethodId === method.id;
+                        return (
+                          <button
+                            type="button"
+                            key={method.id}
+                            className={`w-full text-left rounded-lg border-2 p-4 transition-all ${
+                              isSelected
+                                ? "border-primary bg-primary/5"
+                                : "border-border hover:border-border/80 bg-background"
+                            }`}
+                            onClick={() => setSelectedMethodId(method.id)}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-start gap-3">
+                                <div className={`w-4 h-4 mt-0.5 rounded-full border-2 shrink-0 flex items-center justify-center ${
+                                  isSelected ? "border-primary" : "border-muted-foreground/40"
+                                }`}>
+                                  {isSelected && <div className="w-2 h-2 rounded-full bg-primary" />}
+                                </div>
+                                <div>
+                                  <p className="font-medium text-sm">{method.name}</p>
+                                  {method.courierName && (
+                                    <p className="text-xs text-muted-foreground mt-0.5">{method.courierName}</p>
+                                  )}
+                                  {method.description && (
+                                    <p className="text-xs text-muted-foreground mt-0.5">{method.description}</p>
+                                  )}
+                                  {method.deliveryEstimate && (
+                                    <div className="flex items-center gap-1 mt-1">
+                                      <Truck className="h-3 w-3 text-muted-foreground" />
+                                      <p className="text-xs text-muted-foreground">{method.deliveryEstimate}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              <p className="font-semibold text-sm shrink-0">
+                                {method.price === 0 ? "Free" : formatPrice(method.price, method.currency)}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <Button
+                    type="button"
+                    size="lg"
+                    className="w-full h-12"
+                    onClick={proceedToPayment}
+                    disabled={shippingMethods.length > 0 && !selectedMethodId}
+                  >
+                    Continue to payment →
+                  </Button>
+                </div>
+              )}
+
+              {/* Step 2: Review + Pay */}
+              {step === 2 && (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="font-serif text-xl font-bold">Review & Pay</h2>
+                    <button type="button" onClick={() => setStep(1)} className="text-sm text-muted-foreground hover:text-foreground">
+                      ← Edit shipping
+                    </button>
+                  </div>
+
+                  {/* Address summary */}
+                  <div className="rounded-lg border border-border p-4 bg-muted/20 text-sm">
+                    <p className="font-medium text-xs text-muted-foreground uppercase tracking-wider mb-2">Delivering to</p>
+                    <p className="font-medium">{form.getValues("shippingName")}</p>
+                    <p className="text-muted-foreground">{form.getValues("shippingAddressLine1")}</p>
+                    <p className="text-muted-foreground">{form.getValues("shippingPostalCode")} {form.getValues("shippingCity")}, {form.getValues("shippingCountry")}</p>
+                  </div>
+
+                  {/* Shipping summary */}
+                  {selectedMethod && (
+                    <div className="rounded-lg border border-border p-4 bg-muted/20 text-sm">
+                      <p className="font-medium text-xs text-muted-foreground uppercase tracking-wider mb-2">Shipping method</p>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">{selectedMethod.name}</p>
+                          {selectedMethod.deliveryEstimate && (
+                            <p className="text-muted-foreground text-xs mt-0.5">{selectedMethod.deliveryEstimate}</p>
+                          )}
+                        </div>
+                        <p className="font-semibold">{selectedMethod.price === 0 ? "Free" : formatPrice(selectedMethod.price, selectedMethod.currency)}</p>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-              <div className="border-t border-border pt-4 space-y-2">
-                <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>Subtotal</span>
-                  <span>{cart.total} {currency}</span>
+                  )}
+
+                  {submitError && (
+                    <div className="flex items-start gap-2 rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
+                      <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                      <span>{submitError}</span>
+                    </div>
+                  )}
+
+                  <div className="border border-border rounded-lg overflow-hidden">
+                    <div className="flex items-center gap-3 bg-muted/20 px-4 py-3 border-b border-border">
+                      <Shield className="h-4 w-4 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">You will be redirected to Stripe's secure payment page</p>
+                    </div>
+                    <div className="p-4">
+                      <Button
+                        type="submit"
+                        size="lg"
+                        className="w-full h-12 text-base font-semibold"
+                        disabled={isSubmitting || redirecting}
+                      >
+                        {isSubmitting || redirecting
+                          ? "Processing..."
+                          : `Pay ${formatPrice(orderTotal, currency)}`}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>Shipping</span>
-                  <span>Calculated at payment</span>
-                </div>
-                <div className="flex justify-between font-bold text-lg pt-2 border-t border-border">
-                  <span>Total</span>
-                  <span>{cart.total} {currency}</span>
-                </div>
-              </div>
+              )}
             </div>
+
+            {/* Right: Order Summary */}
+            {cart && (
+              <div className="w-full lg:w-80 xl:w-96 shrink-0">
+                <div className="bg-muted/30 border border-border/60 rounded-xl p-6 sticky top-24">
+                  <h2 className="font-serif text-lg font-bold mb-5">Order Summary</h2>
+
+                  <div className="space-y-3 mb-5">
+                    {cart.items.map((item) => {
+                      const anyItem = item as any;
+                      const unitPrice = anyItem.unitPrice ?? item.poster?.price ?? 0;
+                      const itemCurrency = anyItem.currency ?? currency;
+                      const lineTotal = unitPrice * item.quantity;
+                      return (
+                        <div key={item.id} className="flex gap-3">
+                          <div className="w-14 h-[4.5rem] bg-muted rounded overflow-hidden shrink-0">
+                            {item.poster?.imageUrl && (
+                              <img src={item.poster.imageUrl} className="w-full h-full object-cover" alt={item.poster?.title} />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0 text-sm">
+                            <p className="font-medium truncate">{item.poster?.title}</p>
+                            {anyItem.size && <p className="text-muted-foreground text-xs">{anyItem.size}</p>}
+                            <p className="text-muted-foreground text-xs">Qty {item.quantity}</p>
+                            <p className="font-semibold text-xs mt-0.5">{formatPrice(lineTotal, itemCurrency)}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="border-t border-border pt-4 space-y-2 text-sm">
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Subtotal</span>
+                      <span>{formatPrice(cartTotal, currency)}</span>
+                    </div>
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Shipping</span>
+                      <span>
+                        {step === 0
+                          ? "Calculated next"
+                          : selectedMethod
+                          ? (selectedMethod.price === 0 ? "Free" : formatPrice(selectedMethod.price, selectedMethod.currency))
+                          : "—"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between font-bold text-base pt-2 border-t border-border">
+                      <span>Total</span>
+                      <span>{formatPrice(step === 0 ? cartTotal : orderTotal, currency)}</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-4 border-t border-border space-y-2 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-3 w-3 shrink-0" />
+                      <span>Secure payment by Stripe</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Truck className="h-3 w-3 shrink-0" />
+                      <span>Print orders are non-refundable once in production</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </form>
+      </Form>
     </div>
   );
 }
