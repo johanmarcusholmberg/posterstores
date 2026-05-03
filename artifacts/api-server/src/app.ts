@@ -2,6 +2,8 @@ import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes";
+import stripeRouter from "./routes/stripe";
+import { stripeWebhookHandler } from "./routes/stripeWebhook";
 import { logger } from "./lib/logger";
 import { seedMockupTemplates } from "./routes/mockups";
 import { migrateExistingPosterSizes } from "./lib/migrateExistingPosterSizes";
@@ -28,9 +30,21 @@ app.use(
   }),
 );
 app.use(cors());
+
+app.post("/api/stripe/webhook", (req, _res, next) => {
+  const chunks: Buffer[] = [];
+  req.on("data", (chunk: Buffer) => chunks.push(chunk));
+  req.on("end", () => {
+    req.body = Buffer.concat(chunks);
+    next();
+  });
+  req.on("error", next);
+}, stripeWebhookHandler);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.use("/api", stripeRouter);
 app.use("/api", router);
 
 seedMockupTemplates().catch((err) =>

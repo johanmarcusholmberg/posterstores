@@ -21,6 +21,11 @@ export const ordersTable = pgTable("orders", {
   shippingCountry: text("shipping_country").notNull(),
   customerNotes: text("customer_notes"),
   newsletterOptIn: boolean("newsletter_opt_in").notNull().default(false),
+  stripeCheckoutSessionId: text("stripe_checkout_session_id"),
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  paymentStatus: text("payment_status"),
+  paidAt: timestamp("paid_at"),
+  cancelledAt: timestamp("cancelled_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

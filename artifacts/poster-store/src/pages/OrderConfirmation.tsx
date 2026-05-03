@@ -1,8 +1,9 @@
 import React from "react";
-import { useParams, Link } from "wouter";
+import { useParams, Link, useSearch } from "wouter";
 import { useGetOrder, getGetOrderQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
-import { ClockIcon, CheckCircle2, AlertCircle } from "lucide-react";
+import { ClockIcon, CheckCircle2, AlertCircle, XCircle } from "lucide-react";
+import { useStorefront } from "@/context/StorefrontContext";
 
 const STATUS_CONFIG: Record<string, { label: string; icon: React.FC<any>; color: string; bg: string }> = {
   draft: { label: "Draft", icon: ClockIcon, color: "text-gray-600", bg: "bg-gray-100" },
@@ -16,11 +17,17 @@ const STATUS_CONFIG: Record<string, { label: string; icon: React.FC<any>; color:
 export default function OrderConfirmation() {
   const { id } = useParams();
   const orderId = Number(id);
+  const store = useStorefront();
+  const search = useSearch();
+  const params = new URLSearchParams(search);
+  const paymentParam = params.get("payment");
 
   const { data: order, isLoading } = useGetOrder(orderId, {
     query: {
       enabled: !!orderId && !isNaN(orderId),
       queryKey: getGetOrderQueryKey(orderId),
+      refetchInterval: paymentParam === "success" ? 3000 : false,
+      refetchIntervalInBackground: false,
     },
   });
 
@@ -30,16 +37,38 @@ export default function OrderConfirmation() {
   const status = order.status ?? "pending_payment";
   const statusConfig = STATUS_CONFIG[status] ?? STATUS_CONFIG.pending_payment;
   const StatusIcon = statusConfig.icon;
+  const isPaid = status === "paid";
   const isPendingPayment = status === "pending_payment" || status === "draft";
+  const isCancelled = status === "cancelled";
+  const orderAny = order as any;
+  const paymentStatus = orderAny.paymentStatus;
+
+  const retryCheckout = async () => {
+    try {
+      const res = await fetch(
+        `/api/orders/${order.id}/create-checkout-session?storeKey=${encodeURIComponent(store.storeKey)}`,
+        { method: "POST", headers: { "Content-Type": "application/json" } }
+      );
+      if (res.ok) {
+        const { checkoutUrl } = await res.json();
+        if (checkoutUrl) window.location.href = checkoutUrl;
+      }
+    } catch {
+    }
+  };
 
   return (
     <div className="container mx-auto px-4 py-16 max-w-3xl">
       <div className="text-center mb-10">
-        <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full mb-6 ${statusConfig.bg}`}>
-          <StatusIcon className={`h-10 w-10 ${statusConfig.color}`} />
+        <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full mb-6 ${isPaid ? "bg-green-100" : statusConfig.bg}`}>
+          {isPaid ? (
+            <CheckCircle2 className="h-10 w-10 text-green-600" />
+          ) : (
+            <StatusIcon className={`h-10 w-10 ${statusConfig.color}`} />
+          )}
         </div>
         <h1 className="font-serif text-4xl font-bold mb-3">
-          {isPendingPayment ? "Order Created!" : "Order Confirmed"}
+          {isPaid ? "Order Confirmed!" : isPendingPayment ? "Order Created" : isCancelled ? "Order Cancelled" : "Order Status"}
         </h1>
         <p className="text-muted-foreground text-lg">
           Order #{order.id} &middot; {order.customerEmail}
@@ -50,10 +79,49 @@ export default function OrderConfirmation() {
         </div>
       </div>
 
-      {isPendingPayment && (
+      {/* Payment success: confirmed server-side */}
+      {isPaid && (
+        <div className="rounded-lg border border-green-200 bg-green-50 p-4 mb-8 text-sm text-green-800">
+          <p className="font-semibold mb-1">Payment received. Your order is confirmed.</p>
+          <p>Thank you for your purchase! We'll process your order and keep you updated at <strong>{order.customerEmail}</strong>.</p>
+          {orderAny.paidAt && (
+            <p className="mt-1 text-green-700">Paid at: {new Date(orderAny.paidAt).toLocaleString()}</p>
+          )}
+        </div>
+      )}
+
+      {/* Payment success redirect but not yet confirmed server-side */}
+      {paymentParam === "success" && !isPaid && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 mb-8 text-sm text-blue-800">
+          <p className="font-semibold mb-1">Payment is being verified.</p>
+          <p>We received your payment and are verifying it now. This page will update automatically. Please wait a moment.</p>
+        </div>
+      )}
+
+      {/* Cancelled payment */}
+      {paymentParam === "cancelled" && isPendingPayment && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 mb-8 text-sm text-amber-800">
-          <p className="font-semibold mb-1">Payment not collected yet</p>
-          <p>Your order has been created but payment is not connected yet. We will contact you at <strong>{order.customerEmail}</strong> with payment instructions.</p>
+          <div className="flex items-start gap-2">
+            <XCircle className="w-4 h-4 mt-0.5 shrink-0" />
+            <div>
+              <p className="font-semibold mb-1">Payment was cancelled</p>
+              <p className="mb-3">Your order has not been paid. You can retry payment below.</p>
+              <Button size="sm" onClick={retryCheckout}>
+                Retry Payment
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Default pending (no Stripe redirect) */}
+      {isPendingPayment && !paymentParam && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 mb-8 text-sm text-amber-800">
+          <p className="font-semibold mb-1">Payment pending</p>
+          <p>Your order has been created but payment has not been completed yet.</p>
+          <Button size="sm" className="mt-3" onClick={retryCheckout}>
+            Complete Payment
+          </Button>
         </div>
       )}
 

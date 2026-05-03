@@ -25,6 +25,15 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: "bg-red-100 text-red-700",
 };
 
+const PAYMENT_STATUS_COLORS: Record<string, string> = {
+  unpaid: "bg-gray-100 text-gray-700",
+  pending: "bg-amber-100 text-amber-700",
+  paid: "bg-green-100 text-green-700",
+  failed: "bg-red-100 text-red-700",
+  cancelled: "bg-orange-100 text-orange-700",
+  refunded: "bg-purple-100 text-purple-700",
+};
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString("en-GB", {
     day: "2-digit",
@@ -33,6 +42,16 @@ function formatDate(iso: string) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function MonoField({ label, value }: { label: string; value: string | null | undefined }) {
+  if (!value) return null;
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="font-mono text-xs break-all bg-muted/50 px-2 py-1 rounded">{value}</span>
+    </div>
+  );
 }
 
 export default function AdminOrderDetail() {
@@ -92,6 +111,8 @@ export default function AdminOrderDetail() {
     );
   }
 
+  const hasStripeData = order.stripeCheckoutSessionId || order.stripePaymentIntentId || order.paymentStatus || order.paidAt;
+
   return (
     <AdminDashboardLayout
       title={`Order #${order.id}`}
@@ -114,6 +135,12 @@ export default function AdminOrderDetail() {
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Store:</span>
               <span className="text-sm font-medium">{order.storeKey}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Order Status:</span>
+              <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full", STATUS_COLORS[order.status] ?? "bg-gray-100 text-gray-700")}>
+                {order.status}
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Created:</span>
@@ -144,6 +171,45 @@ export default function AdminOrderDetail() {
             </Button>
           </div>
         </div>
+
+        {/* Payment Info */}
+        {hasStripeData && (
+          <div className="rounded-lg border bg-background p-5">
+            <h3 className="font-semibold mb-4 text-sm text-muted-foreground uppercase tracking-wide">Payment Information</h3>
+            <div className="space-y-3">
+              {order.paymentStatus && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Payment Status:</span>
+                  <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full", PAYMENT_STATUS_COLORS[order.paymentStatus] ?? "bg-gray-100 text-gray-700")}>
+                    {order.paymentStatus}
+                  </span>
+                </div>
+              )}
+              {order.paidAt && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Paid At:</span>
+                  <span className="text-sm font-medium text-green-700">{formatDate(order.paidAt)}</span>
+                </div>
+              )}
+              {order.cancelledAt && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Cancelled At:</span>
+                  <span className="text-sm">{formatDate(order.cancelledAt)}</span>
+                </div>
+              )}
+              <div className="space-y-2 mt-3">
+                <MonoField label="Stripe Checkout Session ID" value={order.stripeCheckoutSessionId} />
+                <MonoField label="Stripe Payment Intent ID" value={order.stripePaymentIntentId} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!hasStripeData && order.status === "pending_payment" && (
+          <div className="rounded-lg border border-dashed bg-background p-4">
+            <p className="text-sm text-muted-foreground">No Stripe payment data yet. Customer has not initiated payment.</p>
+          </div>
+        )}
 
         {/* Customer + Shipping */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

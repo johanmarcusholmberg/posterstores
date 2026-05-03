@@ -1,8 +1,8 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useGetCart, getGetCartQueryKey, useCreateOrder } from "@workspace/api-client-react";
 import { getSessionId } from "@/lib/session";
 import { useStorefront } from "@/context/StorefrontContext";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, XCircle } from "lucide-react";
 
 const checkoutSchema = z.object({
   customerEmail: z.string().email("Valid email is required"),
@@ -34,8 +34,15 @@ export default function Checkout() {
   const sessionId = getSessionId();
   const store = useStorefront();
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [redirecting, setRedirecting] = useState(false);
+  const [stripeError, setStripeError] = useState<string | null>(null);
+
+  const params = new URLSearchParams(search);
+  const paymentCancelled = params.get("payment") === "cancelled";
+  const cancelledOrderId = params.get("orderId");
 
   const cartParams = { sessionId, storeKey: store.storeKey };
 
@@ -66,6 +73,7 @@ export default function Checkout() {
 
   const onSubmit = (values: CheckoutFormValues) => {
     if (!cart || cart.items.length === 0) return;
+    setStripeError(null);
 
     createOrder.mutate(
       {
@@ -85,10 +93,37 @@ export default function Checkout() {
         },
       },
       {
-        onSuccess: (order) => {
+        onSuccess: async (order) => {
           queryClient.invalidateQueries({ queryKey: getGetCartQueryKey(cartParams) });
-          toast({ title: "Order created successfully!" });
-          setLocation(`/order/${order.id}`);
+
+          try {
+            setRedirecting(true);
+            const res = await fetch(
+              `/api/orders/${order.id}/create-checkout-session?storeKey=${encodeURIComponent(store.storeKey)}`,
+              { method: "POST", headers: { "Content-Type": "application/json" } }
+            );
+
+            if (!res.ok) {
+              const body = await res.json().catch(() => ({}));
+              const msg = (body as any)?.error ?? "Failed to create payment session";
+              setStripeError(msg);
+              setRedirecting(false);
+              setLocation(`/order/${order.id}`);
+              return;
+            }
+
+            const { checkoutUrl } = await res.json();
+            if (checkoutUrl) {
+              window.location.href = checkoutUrl;
+            } else {
+              setRedirecting(false);
+              setLocation(`/order/${order.id}`);
+            }
+          } catch (err: any) {
+            setStripeError(err?.message ?? "Failed to redirect to payment");
+            setRedirecting(false);
+            setLocation(`/order/${order.id}`);
+          }
         },
         onError: (err: any) => {
           const msg = err?.response?.data?.error ?? err?.message ?? "Failed to place order";
@@ -98,7 +133,7 @@ export default function Checkout() {
     );
   };
 
-  const shouldRedirect = !cartLoading && (!cart || cart.items.length === 0);
+  const shouldRedirect = !cartLoading && (!cart || cart.items.length === 0) && !paymentCancelled;
 
   useEffect(() => {
     if (shouldRedirect) setLocation("/cart");
@@ -106,14 +141,42 @@ export default function Checkout() {
 
   if (cartLoading) return <div className="p-24 text-center">Loading...</div>;
 
+  if (redirecting) {
+    return (
+      <div className="p-24 text-center">
+        <p className="text-lg font-medium">Redirecting to secure payment...</p>
+        <p className="text-muted-foreground text-sm mt-2">Please do not close this page.</p>
+      </div>
+    );
+  }
+
   if (shouldRedirect) return null;
 
-  const currency = (cart as any).currency || cart.items[0]?.poster?.currency || store.defaultCurrency;
+  const currency = cart ? ((cart as any).currency || cart.items[0]?.poster?.currency || store.defaultCurrency) : store.defaultCurrency;
 
   return (
     <div className="container mx-auto px-4 py-12 max-w-6xl">
       <h1 className="font-serif text-4xl font-bold mb-2">Checkout</h1>
-      <p className="text-muted-foreground mb-10">Fill in your details to create your order</p>
+      <p className="text-muted-foreground mb-10">Fill in your details to proceed to payment</p>
+
+      {paymentCancelled && (
+        <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 mb-8 text-sm text-amber-800">
+          <XCircle className="w-5 h-5 shrink-0 mt-0.5 text-amber-600" />
+          <div>
+            <p className="font-semibold mb-1">Payment was cancelled</p>
+            <p>
+              Your order has not been paid.{cancelledOrderId ? ` Order #${cancelledOrderId} is still pending.` : ""} You can complete your payment below or return to your cart.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {stripeError && (
+        <div className="flex items-start gap-2 rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive mb-6">
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+          <span>{stripeError}</span>
+        </div>
+      )}
 
       <div className="flex flex-col lg:flex-row gap-12">
         <div className="flex-1">
@@ -289,57 +352,63 @@ export default function Checkout() {
                 type="submit"
                 size="lg"
                 className="w-full h-14 text-lg mt-8"
-                disabled={createOrder.isPending}
+                disabled={createOrder.isPending || redirecting}
               >
-                {createOrder.isPending ? "Creating order..." : `Place Order — ${cart.total} ${currency}`}
+                {createOrder.isPending
+                  ? "Creating order..."
+                  : redirecting
+                  ? "Redirecting to payment..."
+                  : `Pay Now — ${cart?.total ?? ""} ${currency}`}
               </Button>
               <p className="text-center text-xs text-muted-foreground">
-                Payment is not collected yet. Your order will be created as a draft pending payment.
+                You will be redirected to Stripe's secure checkout to complete payment.
               </p>
             </form>
           </Form>
         </div>
 
         {/* Order Summary */}
-        <div className="w-full lg:w-96 shrink-0">
-          <div className="bg-sand/30 p-6 rounded-lg sticky top-24">
-            <h2 className="font-serif text-xl font-bold mb-6">Order Summary</h2>
-            <div className="space-y-4 mb-6">
-              {cart.items.map((item) => {
-                const anyItem = item as any;
-                return (
-                  <div key={item.id} className="flex gap-4">
-                    <div className="w-16 h-20 bg-muted rounded overflow-hidden shrink-0">
-                      <img src={item.poster?.imageUrl} className="w-full h-full object-cover" alt={item.poster?.title} />
+        {cart && (
+          <div className="w-full lg:w-96 shrink-0">
+            <div className="bg-sand/30 p-6 rounded-lg sticky top-24">
+              <h2 className="font-serif text-xl font-bold mb-6">Order Summary</h2>
+              <div className="space-y-4 mb-6">
+                {cart.items.map((item) => {
+                  const anyItem = item as any;
+                  return (
+                    <div key={item.id} className="flex gap-4">
+                      <div className="w-16 h-20 bg-muted rounded overflow-hidden shrink-0">
+                        <img src={item.poster?.imageUrl} className="w-full h-full object-cover" alt={item.poster?.title} />
+                      </div>
+                      <div className="flex-1 text-sm">
+                        <p className="font-medium">{item.poster?.title}</p>
+                        {anyItem.size && <p className="text-muted-foreground">Size: {anyItem.size}</p>}
+                        <p className="text-muted-foreground">Qty: {item.quantity}</p>
+                        <p className="font-medium mt-1">
+                          {anyItem.unitPrice ?? item.poster?.price} {anyItem.currency ?? item.poster?.currency}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex-1 text-sm">
-                      <p className="font-medium">{item.poster?.title}</p>
-                      {anyItem.size && <p className="text-muted-foreground">Size: {anyItem.size}</p>}
-                      <p className="text-muted-foreground">Qty: {item.quantity}</p>
-                      <p className="font-medium mt-1">
-                        {anyItem.unitPrice ?? item.poster?.price} {anyItem.currency ?? item.poster?.currency}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="border-t border-border pt-4 space-y-2">
-              <div className="flex justify-between text-sm text-muted-foreground">
-                <span>Subtotal</span>
-                <span>{cart.total} {currency}</span>
+                  );
+                })}
               </div>
-              <div className="flex justify-between text-sm text-muted-foreground">
-                <span>Shipping</span>
-                <span>Calculated at payment</span>
-              </div>
-              <div className="flex justify-between font-bold text-lg pt-2 border-t border-border">
-                <span>Total</span>
-                <span>{cart.total} {currency}</span>
+              <div className="border-t border-border pt-4 space-y-2">
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>Subtotal</span>
+                  <span>{cart.total} {currency}</span>
+                </div>
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>Shipping</span>
+                  <span>Calculated at payment</span>
+                </div>
+                <div className="flex justify-between font-bold text-lg pt-2 border-t border-border">
+                  <span>Total</span>
+                  <span>{cart.total} {currency}</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

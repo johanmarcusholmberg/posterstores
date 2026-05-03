@@ -2,6 +2,7 @@ const BASE = "/api";
 
 export type PosterStatus = "draft" | "published" | "archived";
 export type OrderStatus = "draft" | "pending_payment" | "paid" | "processing" | "shipped" | "cancelled";
+export type PaymentStatus = "unpaid" | "pending" | "paid" | "failed" | "cancelled" | "refunded";
 
 export const ORDER_STATUSES: { value: OrderStatus; label: string }[] = [
   { value: "draft", label: "Draft" },
@@ -92,6 +93,7 @@ export interface AdminOrder {
   storeKey: string;
   customerEmail: string;
   status: OrderStatus;
+  paymentStatus?: PaymentStatus | null;
   subtotal: number;
   shippingCost: number;
   total: number;
@@ -104,6 +106,10 @@ export interface AdminOrder {
   shippingRegion?: string | null;
   shippingCountry: string;
   customerNotes?: string | null;
+  stripeCheckoutSessionId?: string | null;
+  stripePaymentIntentId?: string | null;
+  paidAt?: string | null;
+  cancelledAt?: string | null;
   items: AdminOrderItem[];
   createdAt: string;
   updatedAt: string;
