@@ -46,6 +46,8 @@ export interface PosterMockupTemplate {
   backgroundImageUrl: string | null;
   storagePath: string | null;
   storeKey: string | null;
+  active: boolean | null;
+  isFeatured: boolean | null;
   posterX: number | null;
   posterY: number | null;
   posterWidth: number | null;
@@ -87,15 +89,73 @@ async function handleError(res: Response): Promise<never> {
   throw new Error(msg);
 }
 
+// ─── Format compatibility (client-side mirror of the server helper) ──────────
+
+/**
+ * Infer a poster's orientation from its size label, e.g. "50x70" → portrait.
+ */
+export function getPosterOrientation(
+  sizeLabel: string
+): "portrait" | "landscape" | "square" {
+  if (/^A\d+$/i.test(sizeLabel)) return "portrait";
+  const match = sizeLabel.match(/^(\d+)[xX×](\d+)$/);
+  if (match) {
+    const w = parseInt(match[1], 10);
+    const h = parseInt(match[2], 10);
+    if (w === h) return "square";
+    return w > h ? "landscape" : "portrait";
+  }
+  return "portrait";
+}
+
+/**
+ * Returns true when a template is compatible with the given poster format label.
+ */
+export function isFormatCompatible(
+  templateFormats: string[] | null | undefined,
+  templateOrientation: string | null | undefined,
+  posterFormat: string
+): boolean {
+  if (!templateFormats || templateFormats.length === 0) return true;
+  if (templateFormats.includes(posterFormat)) return true;
+  const posterOrientation = getPosterOrientation(posterFormat);
+  const tmplOrient = templateOrientation ?? "any";
+  if (tmplOrient === "any") return true;
+  if (tmplOrient === posterOrientation) return true;
+  return false;
+}
+
+/**
+ * Filter and sort templates by compatibility with a poster format.
+ * Order: exact match first, then orientation-compatible, then unrestricted.
+ */
+export function filterTemplatesByFormat(
+  templates: MockupTemplate[],
+  posterFormat: string | null | undefined
+): MockupTemplate[] {
+  if (!posterFormat) return templates;
+  return templates.filter((t) =>
+    isFormatCompatible(t.supportedFormats, t.orientation, posterFormat)
+  );
+}
+
+// ─── API calls ───────────────────────────────────────────────────────────────
+
 export async function listMockupTemplates(
   storeKey?: string,
-  options?: { activeOnly?: boolean; category?: string; orientation?: string }
+  options?: {
+    activeOnly?: boolean;
+    category?: string;
+    orientation?: string;
+    format?: string;
+  }
 ): Promise<MockupTemplate[]> {
   const params = new URLSearchParams();
   if (storeKey) params.set("storeKey", storeKey);
   if (options?.activeOnly === false) params.set("activeOnly", "false");
   if (options?.category) params.set("category", options.category);
   if (options?.orientation) params.set("orientation", options.orientation);
+  if (options?.format) params.set("format", options.format);
   const qs = params.toString() ? `?${params.toString()}` : "";
   const res = await fetch(`${BASE}/mockup-templates${qs}`);
   if (!res.ok) await handleError(res);
@@ -285,7 +345,10 @@ export function resolvePosterDisplayImage(
 ): string {
   if (!mockups || mockups.length === 0) return fallbackImageUrl;
   const validMockups = mockups.filter(
-    (m) => m.mockupImageUrl || m.template?.previewThumbnailUrl || m.template?.backgroundImageUrl
+    (m) =>
+      m.mockupImageUrl ||
+      m.template?.previewThumbnailUrl ||
+      m.template?.backgroundImageUrl
   );
   if (validMockups.length === 0) return fallbackImageUrl;
   const primary = validMockups.find((m) => m.isPrimary) ?? validMockups[0];

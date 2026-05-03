@@ -40,14 +40,73 @@ import {
   Star,
   Search,
   ImageIcon,
-  Filter,
+  Sparkles,
+  Hand,
+  Shuffle,
+  CheckCircle2,
+  AlertCircle,
+  PenLine,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface AdminMockupTemplateListProps {
   storeKey: string;
 }
 
 const CATEGORIES = ["All", "Wall", "Interior", "Café/Table", "Frame", "Lifestyle", "Minimal", "Decorative"];
+
+function DetectionBadge({ source, confidence, manuallyAdjusted }: {
+  source: string | null | undefined;
+  confidence: number | null | undefined;
+  manuallyAdjusted: boolean | null | undefined;
+}) {
+  if (!source) return null;
+
+  const pct = confidence != null ? Math.round(confidence * 100) : null;
+
+  let icon: React.ReactNode;
+  let label: string;
+  let className: string;
+
+  if (source === "ai") {
+    icon = <Sparkles className="w-2.5 h-2.5" />;
+    label = pct != null ? `AI ${pct}%` : "AI";
+    className =
+      pct != null && pct >= 80
+        ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+        : pct != null && pct >= 50
+        ? "bg-yellow-100 text-yellow-800 border-yellow-300"
+        : "bg-orange-100 text-orange-800 border-orange-300";
+  } else if (source === "fallback") {
+    icon = <Shuffle className="w-2.5 h-2.5" />;
+    label = "Fallback";
+    className = "bg-muted text-muted-foreground border-border";
+  } else {
+    icon = <Hand className="w-2.5 h-2.5" />;
+    label = "Manual";
+    className = "bg-blue-100 text-blue-800 border-blue-300";
+  }
+
+  return (
+    <div className="flex items-center gap-1 flex-wrap">
+      <span
+        className={cn(
+          "inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded border",
+          className
+        )}
+      >
+        {icon}
+        {label}
+      </span>
+      {manuallyAdjusted && (
+        <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded border bg-violet-100 text-violet-800 border-violet-300">
+          <PenLine className="w-2.5 h-2.5" />
+          Adjusted
+        </span>
+      )}
+    </div>
+  );
+}
 
 export const AdminMockupTemplateList = ({
   storeKey,
@@ -271,11 +330,13 @@ export const AdminMockupTemplateList = ({
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete mockup template?</AlertDialogTitle>
+            <AlertDialogTitle>Remove this mockup template?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete <strong>"{deleteTarget?.name}"</strong>.
-              Any posters using this template will lose their link to it, but the
-              poster images themselves won't be affected.
+              Existing poster images will not be deleted, but{" "}
+              <strong>"{deleteTarget?.name}"</strong> will no longer be
+              available for previews. Any posters that used this template will
+              lose the composited preview, but the original poster images remain
+              untouched.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -285,7 +346,7 @@ export const AdminMockupTemplateList = ({
               disabled={deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleting ? "Deleting…" : "Delete template"}
+              {deleting ? "Removing…" : "Remove template"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -378,6 +439,9 @@ function TemplateCard({
               Featured
             </Badge>
           )}
+          {!template.active && (
+            <Badge variant="destructive" className="text-[10px]">Inactive</Badge>
+          )}
         </div>
         <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button
@@ -394,7 +458,7 @@ function TemplateCard({
             variant="secondary"
             className="h-7 w-7 bg-background/90 hover:bg-destructive hover:text-destructive-foreground"
             onClick={() => onDelete(template)}
-            title="Delete template"
+            title="Remove template"
           >
             <Trash2 className="w-3 h-3" />
           </Button>
@@ -428,9 +492,6 @@ function TemplateCard({
           {template.orientation && (
             <Badge variant="outline" className="text-[10px]">{template.orientation}</Badge>
           )}
-          {!template.active && (
-            <Badge variant="destructive" className="text-[10px]">Inactive</Badge>
-          )}
         </div>
 
         {template.supportedFormats && template.supportedFormats.length > 0 && (
@@ -444,11 +505,17 @@ function TemplateCard({
         )}
 
         {(template.posterX != null || template.posterWidth != null) && (
-          <p className="text-[10px] text-muted-foreground">
-            Placement: {template.posterX ?? "?"}%, {template.posterY ?? "?"}% •{" "}
+          <p className="text-[10px] text-muted-foreground font-mono">
+            {template.posterX ?? "?"}% {template.posterY ?? "?"}% &nbsp;
             {template.posterWidth ?? "?"}×{template.posterHeight ?? "?"}%
           </p>
         )}
+
+        <DetectionBadge
+          source={template.detectionSource}
+          confidence={template.detectionConfidence}
+          manuallyAdjusted={template.placementWasManuallyAdjusted}
+        />
       </div>
     </div>
   );

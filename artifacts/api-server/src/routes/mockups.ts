@@ -11,6 +11,55 @@ import { adminLimiter } from "../middleware/rateLimiter";
 
 const router = Router();
 
+// ─── Format compatibility helpers ──────────────────────────────────────────
+
+/**
+ * Infer a poster's orientation from its size label, e.g. "50x70" → portrait,
+ * "70x50" → landscape, "50x50" → square, "A4/A3/A2" → portrait.
+ */
+export function getPosterOrientation(
+  sizeLabel: string
+): "portrait" | "landscape" | "square" {
+  if (/^A\d+$/i.test(sizeLabel)) return "portrait";
+  const match = sizeLabel.match(/^(\d+)[xX×](\d+)$/);
+  if (match) {
+    const w = parseInt(match[1], 10);
+    const h = parseInt(match[2], 10);
+    if (w === h) return "square";
+    return w > h ? "landscape" : "portrait";
+  }
+  return "portrait";
+}
+
+/**
+ * Returns true when a mockup template is compatible with the given poster format.
+ * Priority:
+ *  1. Exact format match (supportedFormats includes the label, e.g. "50x70")
+ *  2. Template orientation matches poster orientation (or template is "any")
+ *  3. Template has no supportedFormats restriction at all → always compatible
+ */
+export function isFormatCompatible(
+  templateFormats: string[] | null | undefined,
+  templateOrientation: string | null | undefined,
+  posterFormat: string
+): boolean {
+  // No formats set → compatible with everything
+  if (!templateFormats || templateFormats.length === 0) return true;
+
+  // 1. Exact format match
+  if (templateFormats.includes(posterFormat)) return true;
+
+  // 2. Orientation-compatible fallback
+  const posterOrientation = getPosterOrientation(posterFormat);
+  const tmplOrient = templateOrientation ?? "any";
+  if (tmplOrient === "any") return true;
+  if (tmplOrient === posterOrientation) return true;
+
+  return false;
+}
+
+// ─── Seed data ──────────────────────────────────────────────────────────────
+
 const SEED_TEMPLATES = [
   {
     name: "Simple white wall with black frame",
@@ -138,6 +187,8 @@ export async function seedMockupTemplates() {
   );
 }
 
+// ─── Allowed update fields ───────────────────────────────────────────────────
+
 const ALLOWED_TEMPLATE_FIELDS = [
   "name",
   "templateKey",
@@ -170,6 +221,8 @@ const ALLOWED_TEMPLATE_FIELDS = [
   "placementWasManuallyAdjusted",
 ] as const;
 
+// ─── Template routes ─────────────────────────────────────────────────────────
+
 router.get("/mockup-templates", async (req, res) => {
   res.set("Cache-Control", "no-store");
   const storeKey =
@@ -178,9 +231,12 @@ router.get("/mockup-templates", async (req, res) => {
     typeof req.query.category === "string" ? req.query.category : null;
   const orientation =
     typeof req.query.orientation === "string" ? req.query.orientation : null;
+  // Optional poster format label for compatibility filtering, e.g. "50x70"
+  const format =
+    typeof req.query.format === "string" ? req.query.format : null;
   const activeOnly = req.query.activeOnly !== "false";
 
-  let query = db
+  const templates = await db
     .select()
     .from(mockupTemplatesTable)
     .where(
@@ -190,19 +246,27 @@ router.get("/mockup-templates", async (req, res) => {
     )
     .orderBy(asc(mockupTemplatesTable.sortOrder), asc(mockupTemplatesTable.id));
 
-  const templates = await query;
-
   let filtered = templates;
-  if (activeOnly && req.query.activeOnly !== "false") {
-    filtered = filtered.filter(t => t.active);
+
+  if (activeOnly) {
+    filtered = filtered.filter((t) => t.active);
   }
   if (category) {
-    filtered = filtered.filter(t => t.category === category);
+    filtered = filtered.filter((t) => t.category === category);
   }
   if (orientation) {
-    filtered = filtered.filter(t =>
-      !t.orientation || t.orientation === orientation || t.orientation === "any"
+    filtered = filtered.filter(
+      (t) =>
+        !t.orientation || t.orientation === orientation || t.orientation === "any"
     );
+  }
+  if (format) {
+    // Three-tier format compatibility: exact → orientation-compatible → any
+    const exact = filtered.filter((t) =>
+      isFormatCompatible(t.supportedFormats, t.orientation, format)
+    );
+    // exact already includes orientation-compatible and unrestricted templates
+    filtered = exact;
   }
 
   return res.json(filtered);
@@ -307,9 +371,12 @@ router.delete("/mockup-templates/:id", requireAdmin, async (req, res) => {
   const id = Number(req.params.id);
   if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
 
+  // poster_mockups.mockup_template_id has onDelete: "set null" — safe to hard delete.
   await db.delete(mockupTemplatesTable).where(eq(mockupTemplatesTable.id, id));
   return res.status(204).send();
 });
+
+// ─── Poster mockup routes ────────────────────────────────────────────────────
 
 router.get("/posters/:id/mockups", async (req, res) => {
   res.set("Cache-Control", "no-store");
@@ -347,6 +414,8 @@ router.get("/posters/:id/mockups", async (req, res) => {
         backgroundImageUrl: mockupTemplatesTable.backgroundImageUrl,
         storagePath: mockupTemplatesTable.storagePath,
         storeKey: mockupTemplatesTable.storeKey,
+        active: mockupTemplatesTable.active,
+        isFeatured: mockupTemplatesTable.isFeatured,
         posterX: mockupTemplatesTable.posterX,
         posterY: mockupTemplatesTable.posterY,
         posterWidth: mockupTemplatesTable.posterWidth,
@@ -454,6 +523,8 @@ router.put("/posters/:id/mockups/batch", requireAdmin, async (req, res) => {
         backgroundImageUrl: mockupTemplatesTable.backgroundImageUrl,
         storagePath: mockupTemplatesTable.storagePath,
         storeKey: mockupTemplatesTable.storeKey,
+        active: mockupTemplatesTable.active,
+        isFeatured: mockupTemplatesTable.isFeatured,
         posterX: mockupTemplatesTable.posterX,
         posterY: mockupTemplatesTable.posterY,
         posterWidth: mockupTemplatesTable.posterWidth,

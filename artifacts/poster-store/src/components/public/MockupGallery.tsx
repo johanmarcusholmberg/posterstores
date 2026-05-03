@@ -9,10 +9,15 @@ interface MockupGalleryProps {
   alt: string;
 }
 
+/**
+ * Returns the URL to display for a poster mockup row.
+ * Custom image URLs take priority; then template background image; then thumbnail.
+ * Returns null when nothing is renderable.
+ */
 function getDisplayUrl(m: PosterMockup): string | null {
   if (m.mockupImageUrl) return m.mockupImageUrl;
-  if (m.template?.previewThumbnailUrl) return m.template.previewThumbnailUrl;
   if (m.template?.backgroundImageUrl) return m.template.backgroundImageUrl;
+  if (m.template?.previewThumbnailUrl) return m.template.previewThumbnailUrl;
   return null;
 }
 
@@ -24,6 +29,19 @@ function hasPlacementData(t: PosterMockupTemplate | null): boolean {
     t.posterWidth != null &&
     t.posterHeight != null
   );
+}
+
+/**
+ * Returns true when a mockup row should be shown to public users.
+ * Rows whose template is inactive are hidden; custom-URL rows (no template) are always shown.
+ */
+function isVisible(m: PosterMockup): boolean {
+  // Custom image URL with no template → always visible
+  if (!m.mockupTemplateId) return true;
+  // If template is present in the join, check active flag
+  if (m.template) return m.template.active !== false;
+  // Template ID exists but join returned null (template was deleted) → hide
+  return false;
 }
 
 interface CompositedMockupProps {
@@ -88,22 +106,26 @@ export const MockupGallery = ({
   fallbackImageUrl,
   alt,
 }: MockupGalleryProps) => {
-  const primaryMockup = mockups.find((m) => m.isPrimary) ?? null;
+  // Filter out inactive template mockups before building the display list
+  const visibleMockups = mockups.filter(isVisible);
 
   const allImages: DisplayImage[] = [
     { url: fallbackImageUrl, label: "Original" },
-    ...mockups
+    ...visibleMockups
       .map((m) => {
-        const displayUrl = getDisplayUrl(m);
-        const canComposite = hasPlacementData(m.template) && m.template?.backgroundImageUrl;
+        const canComposite =
+          hasPlacementData(m.template) && !!m.template?.backgroundImageUrl;
+        const displayUrl = m.mockupImageUrl ?? m.template?.backgroundImageUrl ?? m.template?.previewThumbnailUrl ?? null;
+
         if (!displayUrl && !canComposite) return null;
+
         return {
           url: canComposite
-            ? (m.template!.backgroundImageUrl ?? displayUrl ?? fallbackImageUrl)
-            : displayUrl ?? fallbackImageUrl,
+            ? m.template!.backgroundImageUrl!
+            : (displayUrl ?? fallbackImageUrl),
           label: m.template?.name ?? "Custom",
           mockup: m,
-          isComposited: !!canComposite,
+          isComposited: canComposite,
         } as DisplayImage;
       })
       .filter((img): img is DisplayImage => img !== null),
@@ -111,9 +133,24 @@ export const MockupGallery = ({
     arr.findIndex((x) => x.url === img.url && x.label === img.label) === idx
   );
 
-  const primaryDisplayUrl = primaryMockup ? getDisplayUrl(primaryMockup) : null;
+  // Prioritise featured template among visible mockups, then isPrimary, then first
+  const primaryMockup =
+    visibleMockups.find((m) => m.isPrimary && m.template?.isFeatured) ??
+    visibleMockups.find((m) => m.template?.isFeatured) ??
+    visibleMockups.find((m) => m.isPrimary) ??
+    null;
+
+  const primaryDisplayUrl = primaryMockup
+    ? (primaryMockup.mockupImageUrl ?? primaryMockup.template?.backgroundImageUrl ?? primaryMockup.template?.previewThumbnailUrl ?? null)
+    : null;
+
   const primaryIdx = primaryDisplayUrl
-    ? allImages.findIndex((i) => i.url === primaryDisplayUrl || i.mockup === primaryMockup)
+    ? allImages.findIndex(
+        (i) =>
+          i.url === primaryDisplayUrl ||
+          i.mockup === primaryMockup ||
+          (primaryMockup && i.mockup?.template?.backgroundImageUrl === primaryMockup.template?.backgroundImageUrl)
+      )
     : 0;
 
   const [activeIdx, setActiveIdx] = useState(primaryIdx >= 0 ? primaryIdx : 0);
@@ -146,8 +183,7 @@ export const MockupGallery = ({
     return () => window.removeEventListener("keydown", handler);
   }, [lightboxOpen, closeLightbox, prev, next]);
 
-  const activeItem = allImages[activeIdx];
-  const activeUrl = activeItem?.url ?? fallbackImageUrl;
+  const activeItem = allImages[activeIdx] ?? { url: fallbackImageUrl, label: "Original" };
 
   function renderMainImage(item: DisplayImage, className?: string) {
     if (
@@ -187,7 +223,7 @@ export const MockupGallery = ({
           style={{ aspectRatio: "3/4", maxHeight: "420px" }}
           onClick={openLightbox}
         >
-          {renderMainImage(activeItem ?? { url: fallbackImageUrl, label: "Original" })}
+          {renderMainImage(activeItem)}
           <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/10">
             <div className="bg-white/80 backdrop-blur-sm rounded-full p-2 shadow">
               <ZoomIn className="w-5 h-5 text-stone-700" />
@@ -242,7 +278,10 @@ export const MockupGallery = ({
               <X className="w-7 h-7" />
             </button>
 
-            <div className="relative w-full rounded-xl overflow-hidden bg-black/20 shadow-2xl" style={{ maxHeight: "75vh", aspectRatio: "3/4" }}>
+            <div
+              className="relative w-full rounded-xl overflow-hidden bg-black/20 shadow-2xl"
+              style={{ maxHeight: "75vh", aspectRatio: "3/4" }}
+            >
               {renderMainImage(allImages[lightboxIdx] ?? { url: fallbackImageUrl, label: "Original" })}
 
               {allImages.length > 1 && (
