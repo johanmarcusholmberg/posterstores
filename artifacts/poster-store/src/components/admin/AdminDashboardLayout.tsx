@@ -18,6 +18,7 @@ import {
   Package,
   Globe,
   Rocket,
+  Settings2,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
   { href: "/admin/mockups", label: "Mockups", icon: LayoutTemplate },
   { href: "/admin/stores", label: "Stores", icon: Globe },
   { href: "/admin/launch-checklist", label: "Launch Checklist", icon: Rocket },
+  { href: "/admin/production-setup", label: "Production Setup", icon: Settings2 },
   { href: "/admin/taxonomy", label: "Taxonomy", icon: Tag, disabled: true },
   { href: "/admin/newsletter", label: "Newsletter", icon: Mail, disabled: true },
 ];

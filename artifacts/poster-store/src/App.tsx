@@ -39,6 +39,7 @@ import AdminStores from "@/pages/admin/AdminStores";
 import AdminStoreNew from "@/pages/admin/AdminStoreNew";
 import AdminStoreEdit from "@/pages/admin/AdminStoreEdit";
 import AdminLaunchChecklist from "@/pages/admin/AdminLaunchChecklist";
+import AdminProductionSetup from "@/pages/admin/AdminProductionSetup";
 
 const queryClient = new QueryClient();
 
@@ -117,6 +118,7 @@ function Router() {
       <Route path="/admin/orders" component={AdminOrders} />
       <Route path="/admin/fulfillment" component={AdminFulfillment} />
       <Route path="/admin/launch-checklist" component={AdminLaunchChecklist} />
+      <Route path="/admin/production-setup" component={AdminProductionSetup} />
       <Route path="/admin/stores/new" component={AdminStoreNew} />
       <Route path="/admin/stores/:storeKey" component={AdminStoreEdit} />
       <Route path="/admin/stores" component={AdminStores} />
