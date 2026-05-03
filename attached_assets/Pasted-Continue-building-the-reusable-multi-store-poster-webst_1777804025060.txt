@@ -1,0 +1,165 @@
+Continue building the reusable multi-store poster webstore.
+
+CURRENT STATUS:
+The platform is technically launch-ready:
+- Multi-store architecture works
+- Storefront works
+- Admin works
+- Poster CRUD works
+- Mockups work
+- Cart/checkout/Stripe works
+- E-mails work
+- Fulfillment works
+- Content pages work
+- Launch checklist works
+- 183 tests pass
+
+NEXT GOAL:
+Final UX polish before launch.
+
+Important:
+- Do not add new major features.
+- Do not rewrite the app.
+- Do not change backend architecture unless required for small UI polish.
+- Do not break tests.
+- Keep all existing functionality working.
+- Focus on clarity, trust, mobile usability and visual consistency.
+
+POLISH 1 — Product detail reassurance
+
+On poster detail pages, near the Add to Cart area, add a small trust/reassurance block with:
+- Printed on demand
+- Secure payment with Stripe
+- Carefully packed for shipping
+- High-resolution print file prepared for production
+
+Add collapsible or clearly separated sections:
+- Print details
+- Shipping & delivery
+- Returns & damaged items
+
+Use existing store content pages where relevant for links.
+
+POLISH 2 — Checkout trust and clarity
+
+On checkout:
+- Add a clear step indicator: Details → Shipping → Payment
+- Add text near payment:
+  “Secure payment handled by Stripe. We never store your card details.”
+- Improve validation copy to be human-readable.
+- Make mobile checkout spacing comfortable.
+
+POLISH 3 — Cart clarity
+
+On cart:
+- Clearly show poster image, title, selected size, quantity, price and subtotal.
+- Add note:
+  “Taxes and shipping calculated at checkout” or the correct current behavior.
+- Add continue shopping link.
+- Add checkout CTA that is visually clear.
+
+POLISH 4 — Shop filters and empty states
+
+Improve shop filter UX:
+- Mobile filters should open in a clean drawer or bottom sheet.
+- Add Clear filters.
+- Add Show results on mobile.
+- Selected filters should be visible and easy to remove.
+
+Improve empty state:
+- “No posters found”
+- “Try clearing filters or browsing all posters.”
+- Add button: Clear filters
+
+POLISH 5 — Poster card consistency
+
+Make poster cards visually consistent:
+- Image/mockup
+- Region/city label
+- Title
+- Price from
+- Favorite icon
+
+Limit visible badges to avoid clutter.
+Use no more than two badges per card.
+
+POLISH 6 — Favorites logged-out experience
+
+Improve logged-out favorites prompt:
+Title:
+“Save posters you love”
+
+Text:
+“Create a free account to keep a personal favorite list across devices.”
+
+Buttons:
+- Create account
+- Log in
+- Continue browsing
+
+POLISH 7 — Homepage brand story
+
+Add a small brand/value section on the homepage:
+Text:
+“A curated poster collection inspired by cities, landscapes, food, architecture and everyday moments.”
+
+For PostsofSpain, the copy should naturally feel Spanish/Mediterranean, but keep the component store-config friendly.
+
+Add three value cards:
+- Inspired by real places
+- Printed for modern homes
+- Easy ordering and secure payment
+
+POLISH 8 — Admin product readiness indicators
+
+On admin poster list, add small readiness indicators:
+- Missing master file
+- No mockups
+- No active size
+- Draft
+
+These should help prepare products for launch.
+Do not block editing; only show helpful indicators.
+
+POLISH 9 — Placeholder mockup safety
+
+Ensure public poster galleries do not show obvious empty placeholder mockup images.
+If a mockup template has no previewThumbnailUrl and no custom mockupImageUrl:
+- Do not show it as a public gallery image.
+- Fall back to poster preview/master image.
+
+Admin can still see placeholder templates.
+
+POLISH 10 — Consistent microcopy
+
+Review key user-facing messages:
+- Add to cart success
+- Favorite saved
+- Checkout validation
+- Empty cart
+- Empty favorites
+- Payment pending
+- Payment success
+- Payment cancelled
+
+Make the tone calm, clear and helpful.
+
+TESTING
+
+Add or update tests for:
+- Product detail trust block renders.
+- Checkout step indicator renders.
+- Cart clarity still works.
+- Shop empty state renders when filters match nothing.
+- Public mockup gallery skips empty mockup placeholders.
+- Admin poster readiness indicators render.
+- Mobile menu still works.
+- Existing checkout, Stripe, e-mail, fulfillment and admin tests still pass.
+
+At the end, summarize:
+1. UX polish completed.
+2. Components changed.
+3. Mobile improvements.
+4. Public placeholder safety.
+5. Admin readiness indicators.
+6. Final test result.
