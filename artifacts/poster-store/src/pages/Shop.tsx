@@ -67,7 +67,7 @@ export default function Shop() {
       <div className="flex flex-col md:flex-row gap-8">
         {/* Sidebar Filters */}
         <aside className="w-full md:w-64 shrink-0">
-          <div className="sticky top-24 space-y-8">
+          <div className="space-y-8">
             <div>
               <h3 className="font-serif font-bold text-lg mb-4">Search</h3>
               <Input 
