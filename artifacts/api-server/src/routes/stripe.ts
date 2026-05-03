@@ -11,7 +11,7 @@ const router = Router();
 function getStripe(): Stripe {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) throw new Error("STRIPE_SECRET_KEY is not configured");
-  return new Stripe(key, { apiVersion: "2025-04-30.basil" });
+  return new Stripe(key, { apiVersion: "2026-04-22.dahlia" });
 }
 
 router.post("/orders/:id/create-checkout-session", async (req: Request, res: Response) => {
@@ -53,7 +53,7 @@ router.post("/orders/:id/create-checkout-session", async (req: Request, res: Res
 
   const currency = order.currency.toLowerCase();
 
-  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = items.map((item) => ({
+  const lineItems = items.map((item) => ({
     quantity: item.quantity,
     price_data: {
       currency,

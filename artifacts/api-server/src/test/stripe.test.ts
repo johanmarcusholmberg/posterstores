@@ -229,7 +229,7 @@ describe("POST /api/stripe/webhook", () => {
       created: Math.floor(Date.now() / 1000),
     };
 
-    const stripe = new Stripe(stripeKey, { apiVersion: "2025-04-30.basil" });
+    const stripe = new Stripe(stripeKey, { apiVersion: "2026-04-22.dahlia" });
     const payloadString = JSON.stringify(eventPayload);
     const timestamp = Math.floor(Date.now() / 1000);
     const sig = stripe.webhooks.generateTestHeaderString({
@@ -291,7 +291,7 @@ describe("POST /api/stripe/webhook", () => {
       created: Math.floor(Date.now() / 1000),
     };
 
-    const stripe = new Stripe(stripeKey, { apiVersion: "2025-04-30.basil" });
+    const stripe = new Stripe(stripeKey, { apiVersion: "2026-04-22.dahlia" });
     const payloadString = JSON.stringify(eventPayload);
     const sig = stripe.webhooks.generateTestHeaderString({
       payload: payloadString,
@@ -354,7 +354,7 @@ describe("POST /api/stripe/webhook", () => {
       created: Math.floor(Date.now() / 1000),
     };
 
-    const stripe = new Stripe(stripeKey, { apiVersion: "2025-04-30.basil" });
+    const stripe = new Stripe(stripeKey, { apiVersion: "2026-04-22.dahlia" });
     const payloadString = JSON.stringify(eventPayload);
     const sig = stripe.webhooks.generateTestHeaderString({
       payload: payloadString,

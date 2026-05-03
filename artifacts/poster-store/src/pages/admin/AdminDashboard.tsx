@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { AdminDashboardLayout } from "@/components/admin/AdminDashboardLayout";
 import { useAdminToken } from "@/context/AdminTokenContext";
 import { adminGetStats } from "@/lib/adminApi";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Images,
@@ -15,6 +15,7 @@ import {
   Star,
   Sparkles,
   ArrowRight,
+  ClipboardList,
 } from "lucide-react";
 
 export default function AdminDashboard() {
@@ -74,7 +75,6 @@ export default function AdminDashboard() {
   ];
 
   const placeholderCards = [
-    { label: "Mockups", icon: LayoutTemplate, description: "Assign mockup templates to poster categories." },
     { label: "Taxonomy", icon: Tag, description: "Manage categories, regions, cities and tags." },
     { label: "Newsletter", icon: Mail, description: "View subscribers and send campaign emails." },
   ];
@@ -99,8 +99,8 @@ export default function AdminDashboard() {
             {statCards.map(card => {
               const Icon = card.icon;
               return (
-                <Link key={card.label} href={card.disabled ? "#" : card.href}>
-                  <Card className={`hover:shadow-md transition-shadow cursor-pointer ${card.disabled ? "opacity-60" : ""}`}>
+                <Link key={card.label} href={card.href}>
+                  <Card className="hover:shadow-md transition-shadow cursor-pointer">
                     <CardContent className="p-4 flex items-start gap-3">
                       <div className={`rounded-lg p-2 ${card.bg}`}>
                         <Icon className={`w-5 h-5 ${card.color}`} />
@@ -143,30 +143,6 @@ export default function AdminDashboard() {
 
         <div>
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-            Coming soon
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {placeholderCards.map(card => {
-              const Icon = card.icon;
-              return (
-                <Card key={card.label} className="border-dashed opacity-60">
-                  <CardContent className="p-4 flex items-start gap-3">
-                    <div className="rounded-lg p-2 bg-muted">
-                      <Icon className="w-5 h-5 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">{card.label}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{card.description}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-
-        <div>
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
             Quick actions
           </h2>
           <div className="flex flex-wrap gap-3">
@@ -184,6 +160,44 @@ export default function AdminDashboard() {
                 <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
               </div>
             </Link>
+            <Link href="/admin/orders">
+              <div className="flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium bg-background hover:bg-muted transition-colors cursor-pointer">
+                <ClipboardList className="w-4 h-4 text-primary" />
+                View orders
+                <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
+              </div>
+            </Link>
+            <Link href="/admin/mockups">
+              <div className="flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium bg-background hover:bg-muted transition-colors cursor-pointer">
+                <LayoutTemplate className="w-4 h-4 text-primary" />
+                Manage mockups
+                <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
+              </div>
+            </Link>
+          </div>
+        </div>
+
+        <div>
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+            Coming soon
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {placeholderCards.map(card => {
+              const Icon = card.icon;
+              return (
+                <Card key={card.label} className="border-dashed opacity-60">
+                  <CardContent className="p-4 flex items-start gap-3">
+                    <div className="rounded-lg p-2 bg-muted">
+                      <Icon className="w-5 h-5 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">{card.label}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{card.description}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </div>
       </div>
