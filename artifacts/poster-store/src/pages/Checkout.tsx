@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useGetCart, getGetCartQueryKey } from "@workspace/api-client-react";
 import { getSessionId } from "@/lib/session";
 import { useStorefront } from "@/context/StorefrontContext";
+import { useAuth } from "@/context/AuthContext";
 import { useLocation, useSearch } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, XCircle, CheckCircle2, Truck, Shield, Package } from "lucide-react";
+import { AlertCircle, XCircle, CheckCircle2, Truck, Shield, Package, UserPlus } from "lucide-react";
 
 interface ShippingMethod {
   id: number;
@@ -89,6 +90,7 @@ function StepIndicator({ step }: { step: Step }) {
 export default function Checkout() {
   const sessionId = getSessionId();
   const store = useStorefront();
+  const { user } = useAuth();
   const [, setLocation] = useLocation();
   const search = useSearch();
   const queryClient = useQueryClient();
@@ -100,6 +102,10 @@ export default function Checkout() {
   const [shippingMethods, setShippingMethods] = useState<ShippingMethod[]>([]);
   const [selectedMethodId, setSelectedMethodId] = useState<number | null>(null);
   const [shippingLoading, setShippingLoading] = useState(false);
+
+  const [wantsAccount, setWantsAccount] = useState(false);
+  const [accountPassword, setAccountPassword] = useState("");
+  const [accountPasswordError, setAccountPasswordError] = useState<string | null>(null);
 
   const params = new URLSearchParams(search);
   const paymentCancelled = params.get("payment") === "cancelled";
@@ -164,7 +170,17 @@ export default function Checkout() {
       "customerEmail", "customerPhone", "shippingName",
       "shippingAddressLine1", "shippingPostalCode", "shippingCity", "shippingCountry",
     ]);
-    if (valid) setStep(1);
+    if (!valid) return;
+
+    if (wantsAccount) {
+      if (accountPassword.length < 6) {
+        setAccountPasswordError("Password must be at least 6 characters");
+        return;
+      }
+      setAccountPasswordError(null);
+    }
+
+    setStep(1);
   };
 
   const proceedToPayment = () => {
@@ -180,6 +196,24 @@ export default function Checkout() {
     setStripeError(null);
     setSubmitError(null);
     setIsSubmitting(true);
+
+    if (!user && wantsAccount && accountPassword.length >= 6) {
+      try {
+        const regRes = await fetch("/api/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ email: values.customerEmail, password: accountPassword }),
+        });
+        if (!regRes.ok) {
+          const body = await regRes.json().catch(() => ({}));
+          const msg = (body as any)?.error ?? "Account creation failed";
+          toast({ title: "Account note", description: msg + " — continuing as guest.", duration: 5000 });
+        }
+      } catch {
+        // non-fatal — proceed with order as guest
+      }
+    }
 
     try {
       const orderRes = await fetch("/api/orders", {
@@ -317,7 +351,7 @@ export default function Checkout() {
                         <FormItem>
                           <FormLabel>Email address *</FormLabel>
                           <FormControl>
-                            <Input type="email" placeholder="you@example.com" {...field} />
+                            <Input type="email" autoComplete="email" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -330,12 +364,56 @@ export default function Checkout() {
                         <FormItem>
                           <FormLabel>Phone number <span className="text-muted-foreground text-xs">(optional, for delivery)</span></FormLabel>
                           <FormControl>
-                            <Input type="tel" placeholder="+1 555 000 0000" {...field} />
+                            <Input type="tel" autoComplete="tel" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
+
+                    {/* Account creation for guests */}
+                    {!user && (
+                      <div className="pt-1 space-y-3">
+                        <label className="flex items-start gap-3 cursor-pointer group">
+                          <Checkbox
+                            checked={wantsAccount}
+                            onCheckedChange={(v) => {
+                              setWantsAccount(!!v);
+                              setAccountPasswordError(null);
+                            }}
+                            className="mt-0.5"
+                          />
+                          <div>
+                            <span className="text-sm font-medium flex items-center gap-1.5">
+                              <UserPlus className="h-3.5 w-3.5 text-muted-foreground" />
+                              Create an account to track your orders
+                            </span>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Save your details for next time and view order history.
+                            </p>
+                          </div>
+                        </label>
+
+                        {wantsAccount && (
+                          <div className="ml-7 space-y-1.5">
+                            <label className="text-sm font-medium">Choose a password *</label>
+                            <Input
+                              type="password"
+                              autoComplete="new-password"
+                              value={accountPassword}
+                              onChange={e => {
+                                setAccountPassword(e.target.value);
+                                if (accountPasswordError) setAccountPasswordError(null);
+                              }}
+                            />
+                            {accountPasswordError && (
+                              <p className="text-xs text-destructive">{accountPasswordError}</p>
+                            )}
+                            <p className="text-xs text-muted-foreground">At least 6 characters</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </section>
 
                   <section className="space-y-4">
@@ -347,7 +425,7 @@ export default function Checkout() {
                         <FormItem>
                           <FormLabel>Full name *</FormLabel>
                           <FormControl>
-                            <Input placeholder="Jane Doe" {...field} />
+                            <Input autoComplete="name" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -360,7 +438,7 @@ export default function Checkout() {
                         <FormItem>
                           <FormLabel>Street address *</FormLabel>
                           <FormControl>
-                            <Input placeholder="123 Main Street" {...field} />
+                            <Input autoComplete="address-line1" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -373,7 +451,7 @@ export default function Checkout() {
                         <FormItem>
                           <FormLabel>Apt, suite, floor <span className="text-muted-foreground text-xs">(optional)</span></FormLabel>
                           <FormControl>
-                            <Input placeholder="Apt 4B" {...field} />
+                            <Input autoComplete="address-line2" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -387,7 +465,7 @@ export default function Checkout() {
                           <FormItem>
                             <FormLabel>Postal code *</FormLabel>
                             <FormControl>
-                              <Input placeholder="28001" {...field} />
+                              <Input autoComplete="postal-code" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -400,7 +478,7 @@ export default function Checkout() {
                           <FormItem>
                             <FormLabel>City *</FormLabel>
                             <FormControl>
-                              <Input placeholder="Madrid" {...field} />
+                              <Input autoComplete="address-level2" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -415,7 +493,7 @@ export default function Checkout() {
                           <FormItem>
                             <FormLabel>Region / State <span className="text-muted-foreground text-xs">(optional)</span></FormLabel>
                             <FormControl>
-                              <Input placeholder="Madrid" {...field} />
+                              <Input autoComplete="address-level1" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -428,7 +506,7 @@ export default function Checkout() {
                           <FormItem>
                             <FormLabel>Country *</FormLabel>
                             <FormControl>
-                              <Input placeholder="Spain" {...field} />
+                              <Input autoComplete="country-name" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -446,7 +524,7 @@ export default function Checkout() {
                         <FormItem>
                           <FormLabel>Order notes <span className="text-muted-foreground text-xs">(optional)</span></FormLabel>
                           <FormControl>
-                            <Textarea placeholder="Any special instructions for your order..." rows={3} {...field} />
+                            <Textarea rows={3} {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
