@@ -1,7 +1,12 @@
 import React from "react";
 import { Link } from "wouter";
 import { useStorefront } from "@/context/StorefrontContext";
-import { useGetFeaturedPosters, getGetFeaturedPostersQueryKey, useGetNewArrivals, getGetNewArrivalsQueryKey } from "@workspace/api-client-react";
+import {
+  useGetFeaturedPosters,
+  getGetFeaturedPostersQueryKey,
+  useGetNewArrivals,
+  getGetNewArrivalsQueryKey,
+} from "@workspace/api-client-react";
 import { PosterCard } from "@/components/shared/PosterCard";
 import { Button } from "@/components/ui/button";
 
@@ -9,10 +14,10 @@ export default function Home() {
   const store = useStorefront();
 
   const { data: featured } = useGetFeaturedPosters(
-    { storeKey: store.storeKey, limit: 4 },
+    { storeKey: store.storeKey, limit: 6 },
     {
       query: {
-        queryKey: getGetFeaturedPostersQueryKey({ storeKey: store.storeKey, limit: 4 }),
+        queryKey: getGetFeaturedPostersQueryKey({ storeKey: store.storeKey, limit: 6 }),
       },
     }
   );
@@ -26,24 +31,112 @@ export default function Home() {
     }
   );
 
+  const heroPosters = featured?.slice(0, 4) ?? [];
+
   return (
     <div className="min-h-screen pb-16">
       {/* Hero Section */}
-      <section className="relative h-[80vh] flex items-center justify-center overflow-hidden bg-sand">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1546272989-40c92939c17f?auto=format&fit=crop&q=80&w=2000')] bg-cover bg-center opacity-30 mix-blend-multiply" />
-        <div className="relative z-10 text-center px-4 max-w-3xl">
-          <h1 className="font-serif text-5xl md:text-7xl font-bold text-primary mb-6">
-            {store.homepage.heroTitle}
-          </h1>
-          <p className="text-lg md:text-xl text-foreground/80 mb-8 max-w-xl mx-auto font-medium">
-            {store.homepage.heroSubtitle}
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/shop">
-              <Button size="lg" className="w-full sm:w-auto text-lg h-14 px-8" data-testid="btn-hero-primary">
-                {store.homepage.primaryCta || "Browse posters"}
-              </Button>
-            </Link>
+      <section className="relative min-h-[88vh] flex items-center overflow-hidden bg-sand">
+        <div className="container mx-auto px-6 lg:px-10">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-20 items-center min-h-[88vh] py-16 lg:py-0">
+
+            {/* Left: Headline + CTA */}
+            <div className="flex flex-col justify-center order-2 lg:order-1 text-center lg:text-left">
+              <h1 className="font-serif text-5xl md:text-6xl xl:text-7xl font-bold text-primary mb-6 leading-[1.1]">
+                {store.homepage.heroTitle}
+              </h1>
+              <p className="text-lg md:text-xl text-foreground/65 mb-10 max-w-md mx-auto lg:mx-0 leading-relaxed">
+                {store.homepage.heroSubtitle}
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+                <Link href="/shop">
+                  <Button
+                    size="lg"
+                    className="w-full sm:w-auto text-lg h-14 px-8"
+                    data-testid="btn-hero-primary"
+                  >
+                    {store.homepage.primaryCta || "Browse posters"}
+                  </Button>
+                </Link>
+                <Link href="/shop">
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="w-full sm:w-auto text-lg h-14 px-8 border-primary/30 text-primary hover:bg-primary/5"
+                  >
+                    View all regions
+                  </Button>
+                </Link>
+              </div>
+
+              {/* Trust indicators */}
+              <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-2 justify-center lg:justify-start text-sm text-foreground/50">
+                <span>✦ Fine art prints</span>
+                <span>✦ Ships worldwide</span>
+                <span>✦ Sustainably made</span>
+              </div>
+            </div>
+
+            {/* Right: Staggered poster collage */}
+            <div className="order-1 lg:order-2">
+              {heroPosters.length > 0 ? (
+                <div className="grid grid-cols-2 gap-3 lg:gap-5 max-w-sm mx-auto lg:max-w-none">
+                  {/* Column 1 — sits higher */}
+                  <div className="flex flex-col gap-3 lg:gap-5 lg:-mt-10">
+                    {heroPosters.slice(0, 2).map((poster) => (
+                      <Link
+                        key={poster.id}
+                        href={poster.slug ? `/posters/${poster.slug}` : `/poster/${poster.id}`}
+                        className="block"
+                      >
+                        <div className="overflow-hidden rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 group">
+                          <div className="aspect-[3/4]">
+                            <img
+                              src={poster.imageUrl ?? ""}
+                              alt={poster.title}
+                              className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500"
+                            />
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                  {/* Column 2 — sits lower */}
+                  <div className="flex flex-col gap-3 lg:gap-5 lg:mt-10">
+                    {heroPosters.slice(2, 4).map((poster) => (
+                      <Link
+                        key={poster.id}
+                        href={poster.slug ? `/posters/${poster.slug}` : `/poster/${poster.id}`}
+                        className="block"
+                      >
+                        <div className="overflow-hidden rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 group">
+                          <div className="aspect-[3/4]">
+                            <img
+                              src={poster.imageUrl ?? ""}
+                              alt={poster.title}
+                              className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500"
+                            />
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                /* Skeleton while loading */
+                <div className="grid grid-cols-2 gap-3 lg:gap-5 max-w-sm mx-auto lg:max-w-none">
+                  <div className="flex flex-col gap-3 lg:gap-5 lg:-mt-10">
+                    <div className="aspect-[3/4] bg-muted/60 animate-pulse rounded-xl" />
+                    <div className="aspect-[3/4] bg-muted/60 animate-pulse rounded-xl" />
+                  </div>
+                  <div className="flex flex-col gap-3 lg:gap-5 lg:mt-10">
+                    <div className="aspect-[3/4] bg-muted/60 animate-pulse rounded-xl" />
+                    <div className="aspect-[3/4] bg-muted/60 animate-pulse rounded-xl" />
+                  </div>
+                </div>
+              )}
+            </div>
+
           </div>
         </div>
       </section>
@@ -56,10 +149,10 @@ export default function Home() {
             View all &rarr;
           </Link>
         </div>
-        
+
         {featured && featured.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            {featured.map((poster) => (
+            {featured.slice(0, 4).map((poster) => (
               <PosterCard key={poster.id} poster={poster} />
             ))}
           </div>
@@ -72,14 +165,17 @@ export default function Home() {
         )}
       </section>
 
-      {/* Categories/Regions Banner */}
+      {/* Explore by Region */}
       <section className="bg-primary text-primary-foreground py-24">
         <div className="container mx-auto px-4 text-center">
           <h2 className="font-serif text-3xl font-bold mb-8">Explore by Region</h2>
           <div className="flex flex-wrap justify-center gap-4">
             {store.regions.slice(0, 6).map((region) => (
               <Link key={region} href={`/shop?region=${encodeURIComponent(region)}`}>
-                <Button variant="outline" className="bg-transparent border-primary-foreground/30 hover:bg-primary-foreground/10 text-primary-foreground">
+                <Button
+                  variant="outline"
+                  className="bg-transparent border-primary-foreground/30 hover:bg-primary-foreground/10 text-primary-foreground"
+                >
                   {region}
                 </Button>
               </Link>
