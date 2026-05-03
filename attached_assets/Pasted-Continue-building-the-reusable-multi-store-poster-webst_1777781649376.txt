@@ -1,0 +1,171 @@
+Continue building the reusable multi-store poster webstore.
+
+CURRENT STATUS:
+- Multi-store platform works.
+- Admin store management works.
+- New webstores can be created from admin.
+- Store-scoped posters, orders, newsletter, cart, favorites and fulfillment work.
+- PostsofSpain still works.
+- Admin poster CRUD works.
+- Mockups work.
+- Stripe works.
+- E-mails work.
+- Fulfillment works.
+- SEO-friendly slugs work.
+- Tests pass.
+
+NEXT GOAL:
+Add domain-based and route-based storefront resolution.
+
+Important:
+- Do not break PostsofSpain.
+- Do not break admin store selector.
+- Do not break admin store management.
+- Do not break checkout, Stripe, e-mail, fulfillment, mockups or slugs.
+- Keep everything store-scoped.
+- Keep all existing tests passing.
+
+WHY THIS MATTERS:
+I want the same app to support different public webstores, for example:
+- postsofspain.com loads PostsofSpain
+- postsofsweden.com loads PostsofSweden
+- optionally /spain loads PostsofSpain
+- optionally /sweden loads PostsofSweden
+
+RESOLUTION PRIORITY
+
+Implement a clear active store resolver for public storefront pages.
+
+Suggested priority:
+
+1. Explicit route prefix, if present:
+   - /spain → postsofspain
+   - /sweden → postsofsweden
+
+2. Domain mapping:
+   - postsofspain.com → postsofspain
+   - www.postsofspain.com → postsofspain
+   - postsofsweden.com → postsofsweden
+   - www.postsofsweden.com → postsofsweden
+
+3. Environment/default fallback:
+   - ACTIVE_STORE_KEY
+   - fallback to postsofspain
+
+ADMIN
+
+Admin should remain separate:
+- Admin store selector should continue to control admin context.
+- Admin should not unexpectedly switch store based on public storefront route.
+- /admin should not be prefixed by /spain or /sweden unless already designed that way.
+
+DATA MODEL
+
+If needed, add domain mappings to stores:
+
+stores:
+- primary_domain nullable
+- domain_aliases json nullable
+- route_prefix nullable
+
+Examples:
+PostsofSpain:
+- primary_domain: postsofspain.com
+- domain_aliases: ["www.postsofspain.com"]
+- route_prefix: spain
+
+PostsofSweden:
+- primary_domain: postsofsweden.com
+- domain_aliases: ["www.postsofsweden.com"]
+- route_prefix: sweden
+
+ADMIN STORE FORM
+
+Update admin store management so each store can configure:
+- Primary domain
+- Domain aliases
+- Route prefix
+
+Validation:
+- route_prefix should be lowercase URL-safe.
+- primary_domain should be valid domain-like string.
+- aliases should be valid domain-like strings.
+- domain/route prefix should be unique across stores.
+
+FRONTEND PUBLIC ROUTING
+
+Support route-prefixed storefronts if feasible:
+
+Examples:
+- /spain
+- /spain/shop
+- /spain/posters/:slug
+- /sweden
+- /sweden/shop
+- /sweden/posters/:slug
+
+But preserve current unprefixed routes:
+- /
+- /shop
+- /posters/:slug
+
+Unprefixed routes should use the default active store.
+
+If adding fully prefixed routes is too much in one step:
+- First implement resolver architecture and domain mapping.
+- Keep unprefixed routes working.
+- Add route prefixes as a follow-up.
+
+API
+
+All public API calls should continue passing resolved active storeKey.
+
+Do not let API infer store from domain alone unless clearly server-side safe.
+The frontend can resolve active store and pass storeKey as it does now.
+
+SEO
+
+For route/domain-resolved stores:
+- Page titles should use resolved store name.
+- Poster slug lookup should use resolved storeKey + slug.
+- Wrong-store slug should 404.
+
+TESTING
+
+Add or update tests for:
+
+Resolver:
+- postsofspain.com resolves to postsofspain.
+- www.postsofspain.com resolves to postsofspain.
+- postsofsweden.com resolves to postsofsweden.
+- Unknown domain falls back safely.
+- /spain resolves to postsofspain if route prefixes are implemented.
+- /sweden resolves to postsofsweden if route prefixes are implemented.
+
+Admin:
+- Admin store selector still works independently.
+- Admin store edit can save domain/route settings.
+- Duplicate domain/route prefix is rejected.
+
+Public:
+- Storefront uses resolved store config.
+- Shop passes resolved storeKey.
+- Poster slug page uses resolved storeKey.
+- Wrong-store slug returns 404.
+
+Regression:
+- Existing unprefixed PostsofSpain routes still work.
+- Homepage still loads.
+- Shop still loads.
+- Poster pages still load.
+- Cart/favorites still work.
+- Checkout/Stripe/e-mail/fulfillment tests still pass.
+
+At the end, summarize:
+1. Active store resolver behavior.
+2. Domain mapping behavior.
+3. Route prefix behavior.
+4. Admin store form updates.
+5. What remains for production domain setup.
+6. Tests added/updated.
+7. What I should manually test before continuing.
