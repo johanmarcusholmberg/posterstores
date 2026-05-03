@@ -36,7 +36,11 @@ router.post("/orders/:id/create-checkout-session", async (req: Request, res: Res
   const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, orderId));
   if (items.length === 0) return res.status(400).json({ error: "Order has no items" });
 
-  const appBaseUrl = process.env.APP_BASE_URL;
+  const appBaseUrl =
+    process.env.APP_BASE_URL ||
+    (process.env.REPLIT_DOMAINS
+      ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}`
+      : null);
   if (!appBaseUrl) return res.status(500).json({ error: "APP_BASE_URL is not configured" });
 
   let stripe: Stripe;
