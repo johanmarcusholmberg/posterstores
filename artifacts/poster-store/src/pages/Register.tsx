@@ -59,7 +59,7 @@ export default function Register() {
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                placeholder=""
                 required
               />
             </div>
@@ -71,7 +71,7 @@ export default function Register() {
                 autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="At least 6 characters"
+                placeholder=""
                 minLength={6}
                 required
               />
@@ -84,7 +84,7 @@ export default function Register() {
                 autoComplete="new-password"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
-                placeholder="••••••••"
+                placeholder=""
                 required
               />
             </div>
