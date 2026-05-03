@@ -36,9 +36,9 @@ export default function Home() {
   return (
     <div className="min-h-screen pb-16">
       {/* Hero Section */}
-      <section className="relative min-h-[88vh] flex items-center overflow-hidden bg-sand">
-        <div className="container mx-auto px-6 lg:px-10">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-20 items-center min-h-[88vh] py-16 lg:py-0">
+      <section className="relative bg-sand h-[calc(100vh-64px)] flex items-stretch overflow-hidden">
+        <div className="container mx-auto px-6 lg:px-10 flex items-stretch">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 w-full items-center py-10 lg:py-0">
 
             {/* Left: Headline + CTA */}
             <div className="flex flex-col justify-center order-2 lg:order-1 text-center lg:text-left">
@@ -77,46 +77,42 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Right: Staggered poster collage */}
-            <div className="order-1 lg:order-2">
+            {/* Right: Staggered poster collage — clips intentionally at top/bottom */}
+            <div className="order-1 lg:order-2 h-full flex items-center overflow-hidden">
               {heroPosters.length > 0 ? (
-                <div className="grid grid-cols-2 gap-3 lg:gap-5 max-w-sm mx-auto lg:max-w-none">
-                  {/* Column 1 — sits higher */}
-                  <div className="flex flex-col gap-3 lg:gap-5 lg:-mt-10">
+                <div className="grid grid-cols-2 gap-3 lg:gap-4 w-full h-[110%]">
+                  {/* Column 1 — starts higher */}
+                  <div className="flex flex-col gap-3 lg:gap-4 -mt-[8%]">
                     {heroPosters.slice(0, 2).map((poster) => (
                       <Link
                         key={poster.id}
                         href={poster.slug ? `/posters/${poster.slug}` : `/poster/${poster.id}`}
-                        className="block"
+                        className="flex-1 block min-h-0"
                       >
-                        <div className="overflow-hidden rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 group">
-                          <div className="aspect-[3/4]">
-                            <img
-                              src={poster.imageUrl ?? ""}
-                              alt={poster.title}
-                              className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500"
-                            />
-                          </div>
+                        <div className="overflow-hidden rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 group h-full">
+                          <img
+                            src={poster.imageUrl ?? ""}
+                            alt={poster.title}
+                            className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500"
+                          />
                         </div>
                       </Link>
                     ))}
                   </div>
-                  {/* Column 2 — sits lower */}
-                  <div className="flex flex-col gap-3 lg:gap-5 lg:mt-10">
+                  {/* Column 2 — starts lower */}
+                  <div className="flex flex-col gap-3 lg:gap-4 mt-[8%]">
                     {heroPosters.slice(2, 4).map((poster) => (
                       <Link
                         key={poster.id}
                         href={poster.slug ? `/posters/${poster.slug}` : `/poster/${poster.id}`}
-                        className="block"
+                        className="flex-1 block min-h-0"
                       >
-                        <div className="overflow-hidden rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 group">
-                          <div className="aspect-[3/4]">
-                            <img
-                              src={poster.imageUrl ?? ""}
-                              alt={poster.title}
-                              className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500"
-                            />
-                          </div>
+                        <div className="overflow-hidden rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 group h-full">
+                          <img
+                            src={poster.imageUrl ?? ""}
+                            alt={poster.title}
+                            className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500"
+                          />
                         </div>
                       </Link>
                     ))}
@@ -124,14 +120,14 @@ export default function Home() {
                 </div>
               ) : (
                 /* Skeleton while loading */
-                <div className="grid grid-cols-2 gap-3 lg:gap-5 max-w-sm mx-auto lg:max-w-none">
-                  <div className="flex flex-col gap-3 lg:gap-5 lg:-mt-10">
-                    <div className="aspect-[3/4] bg-muted/60 animate-pulse rounded-xl" />
-                    <div className="aspect-[3/4] bg-muted/60 animate-pulse rounded-xl" />
+                <div className="grid grid-cols-2 gap-3 lg:gap-4 w-full h-[110%]">
+                  <div className="flex flex-col gap-3 lg:gap-4 -mt-[8%]">
+                    <div className="flex-1 bg-muted/60 animate-pulse rounded-xl" />
+                    <div className="flex-1 bg-muted/60 animate-pulse rounded-xl" />
                   </div>
-                  <div className="flex flex-col gap-3 lg:gap-5 lg:mt-10">
-                    <div className="aspect-[3/4] bg-muted/60 animate-pulse rounded-xl" />
-                    <div className="aspect-[3/4] bg-muted/60 animate-pulse rounded-xl" />
+                  <div className="flex flex-col gap-3 lg:gap-4 mt-[8%]">
+                    <div className="flex-1 bg-muted/60 animate-pulse rounded-xl" />
+                    <div className="flex-1 bg-muted/60 animate-pulse rounded-xl" />
                   </div>
                 </div>
               )}
