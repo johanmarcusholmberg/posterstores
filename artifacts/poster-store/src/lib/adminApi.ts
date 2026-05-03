@@ -3,12 +3,21 @@ const BASE = "/api";
 export type PosterStatus = "draft" | "published" | "archived";
 export type OrderStatus = "draft" | "pending_payment" | "paid" | "processing" | "shipped" | "cancelled";
 export type PaymentStatus = "unpaid" | "pending" | "paid" | "failed" | "cancelled" | "refunded";
+export type FulfillmentStatus = "not_started" | "ready_for_production" | "in_production" | "shipped" | "cancelled";
 
 export const ORDER_STATUSES: { value: OrderStatus; label: string }[] = [
   { value: "draft", label: "Draft" },
   { value: "pending_payment", label: "Pending Payment" },
   { value: "paid", label: "Paid" },
   { value: "processing", label: "Processing" },
+  { value: "shipped", label: "Shipped" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
+export const FULFILLMENT_STATUSES: { value: FulfillmentStatus; label: string }[] = [
+  { value: "not_started", label: "Not Started" },
+  { value: "ready_for_production", label: "Ready for Production" },
+  { value: "in_production", label: "In Production" },
   { value: "shipped", label: "Shipped" },
   { value: "cancelled", label: "Cancelled" },
 ];
@@ -112,6 +121,12 @@ export interface AdminOrder {
   cancelledAt?: string | null;
   customerConfirmationSentAt?: string | null;
   adminNotificationSentAt?: string | null;
+  fulfillmentStatus?: FulfillmentStatus | null;
+  fulfillmentNotes?: string | null;
+  shippedAt?: string | null;
+  trackingNumber?: string | null;
+  trackingUrl?: string | null;
+  productionStartedAt?: string | null;
   items: AdminOrderItem[];
   createdAt: string;
   updatedAt: string;
@@ -122,6 +137,15 @@ export interface AdminOrderListResponse {
   total: number;
   offset: number;
   limit: number;
+}
+
+export interface UpdateFulfillmentPayload {
+  fulfillmentStatus?: FulfillmentStatus;
+  fulfillmentNotes?: string | null;
+  trackingNumber?: string | null;
+  trackingUrl?: string | null;
+  markShipped?: boolean;
+  markInProduction?: boolean;
 }
 
 function headers(token: string): HeadersInit {
@@ -241,11 +265,12 @@ export async function adminGetStats(token: string, storeKey: string) {
 export async function adminListOrders(
   token: string,
   storeKey: string,
-  params: { status?: string; limit?: number; offset?: number } = {}
+  params: { status?: string; fulfillmentStatus?: string; limit?: number; offset?: number } = {}
 ): Promise<AdminOrderListResponse> {
   const qs = new URLSearchParams();
   if (storeKey) qs.set("storeKey", storeKey);
   if (params.status) qs.set("status", params.status);
+  if (params.fulfillmentStatus) qs.set("fulfillmentStatus", params.fulfillmentStatus);
   if (params.limit !== undefined) qs.set("limit", String(params.limit));
   if (params.offset !== undefined) qs.set("offset", String(params.offset));
 
@@ -277,4 +302,54 @@ export async function adminUpdateOrderStatus(token: string, id: number, status: 
     throw new Error(extractErrorMessage(body));
   }
   return res.json();
+}
+
+export async function adminUpdateFulfillment(
+  token: string,
+  id: number,
+  payload: UpdateFulfillmentPayload
+): Promise<AdminOrder> {
+  const res = await fetch(`${BASE}/admin/orders/${id}/fulfillment`, {
+    method: "PATCH",
+    headers: headers(token),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(extractErrorMessage(body));
+  }
+  return res.json();
+}
+
+export async function adminListFulfillment(
+  token: string,
+  storeKey: string,
+  params: { fulfillmentStatus?: string; orderStatus?: string; limit?: number; offset?: number } = {}
+): Promise<AdminOrderListResponse> {
+  const qs = new URLSearchParams();
+  if (storeKey) qs.set("storeKey", storeKey);
+  if (params.fulfillmentStatus) qs.set("fulfillmentStatus", params.fulfillmentStatus);
+  if (params.orderStatus) qs.set("orderStatus", params.orderStatus);
+  if (params.limit !== undefined) qs.set("limit", String(params.limit));
+  if (params.offset !== undefined) qs.set("offset", String(params.offset));
+
+  const res = await fetch(`${BASE}/admin/fulfillment?${qs}`, { headers: headers(token) });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(extractErrorMessage(body));
+  }
+  return res.json();
+}
+
+export function adminFulfillmentExportUrl(
+  token: string,
+  storeKey: string,
+  params: { fulfillmentStatus?: string; orderStatus?: string } = {}
+): string {
+  const qs = new URLSearchParams();
+  if (storeKey) qs.set("storeKey", storeKey);
+  if (params.fulfillmentStatus) qs.set("fulfillmentStatus", params.fulfillmentStatus);
+  if (params.orderStatus) qs.set("orderStatus", params.orderStatus);
+  qs.set("x-admin-token", token);
+  return `${BASE}/admin/fulfillment/export.csv?${qs}`;
 }

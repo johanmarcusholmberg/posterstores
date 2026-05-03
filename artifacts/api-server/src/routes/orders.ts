@@ -7,7 +7,7 @@ import {
   postersTable,
   posterSizesTable,
 } from "@workspace/db";
-import { eq, and, desc, count, inArray } from "drizzle-orm";
+import { eq, and, desc, count, inArray, ne } from "drizzle-orm";
 import { requireAdmin } from "../middleware/requireAdmin";
 import { z } from "zod";
 
@@ -31,6 +31,17 @@ const CreateOrderBodySchema = z.object({
 
 const UpdateOrderStatusSchema = z.object({
   status: z.enum(["draft", "pending_payment", "paid", "processing", "shipped", "cancelled"]),
+});
+
+const FULFILLMENT_STATUSES = ["not_started", "ready_for_production", "in_production", "shipped", "cancelled"] as const;
+
+const UpdateFulfillmentSchema = z.object({
+  fulfillmentStatus: z.enum(FULFILLMENT_STATUSES).optional(),
+  fulfillmentNotes: z.string().nullable().optional(),
+  trackingNumber: z.string().nullable().optional(),
+  trackingUrl: z.string().nullable().optional(),
+  markShipped: z.boolean().optional(),
+  markInProduction: z.boolean().optional(),
 });
 
 function serializeOrderItem(item: typeof orderItemsTable.$inferSelect) {
@@ -59,6 +70,8 @@ function serializeOrder(
     cancelledAt: order.cancelledAt?.toISOString() ?? null,
     customerConfirmationSentAt: order.customerConfirmationSentAt?.toISOString() ?? null,
     adminNotificationSentAt: order.adminNotificationSentAt?.toISOString() ?? null,
+    shippedAt: order.shippedAt?.toISOString() ?? null,
+    productionStartedAt: order.productionStartedAt?.toISOString() ?? null,
     items: items.map(serializeOrderItem),
   };
 }
@@ -226,12 +239,14 @@ router.get("/orders/:id", async (req, res) => {
 router.get("/admin/orders", requireAdmin, async (req, res) => {
   const storeKey = typeof req.query.storeKey === "string" ? req.query.storeKey : undefined;
   const status = typeof req.query.status === "string" ? req.query.status : undefined;
+  const fulfillmentStatus = typeof req.query.fulfillmentStatus === "string" ? req.query.fulfillmentStatus : undefined;
   const limit = Number(req.query.limit) || 50;
   const offset = Number(req.query.offset) || 0;
 
   const conditions = [];
   if (storeKey) conditions.push(eq(ordersTable.storeKey, storeKey));
   if (status) conditions.push(eq(ordersTable.status, status));
+  if (fulfillmentStatus) conditions.push(eq(ordersTable.fulfillmentStatus, fulfillmentStatus));
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -299,5 +314,228 @@ router.patch("/admin/orders/:id/status", requireAdmin, async (req, res) => {
 
   return res.json(serializeOrder(order, items));
 });
+
+router.patch("/admin/orders/:id/fulfillment", requireAdmin, async (req, res) => {
+  const id = Number(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+
+  const parsed = UpdateFulfillmentSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Invalid request", details: parsed.error.flatten() });
+  }
+
+  const [existing] = await db.select().from(ordersTable).where(eq(ordersTable.id, id));
+  if (!existing) return res.status(404).json({ error: "Not found" });
+
+  const updateFields: Partial<typeof ordersTable.$inferSelect> = { updatedAt: new Date() };
+
+  if (parsed.data.fulfillmentStatus !== undefined) {
+    updateFields.fulfillmentStatus = parsed.data.fulfillmentStatus;
+  }
+  if (parsed.data.fulfillmentNotes !== undefined) {
+    updateFields.fulfillmentNotes = parsed.data.fulfillmentNotes;
+  }
+  if (parsed.data.trackingNumber !== undefined) {
+    updateFields.trackingNumber = parsed.data.trackingNumber;
+  }
+  if (parsed.data.trackingUrl !== undefined) {
+    updateFields.trackingUrl = parsed.data.trackingUrl;
+  }
+  if (parsed.data.markShipped) {
+    updateFields.fulfillmentStatus = "shipped";
+    updateFields.shippedAt = new Date();
+    if (existing.status !== "shipped") {
+      updateFields.status = "shipped";
+    }
+  }
+  if (parsed.data.markInProduction) {
+    if (!existing.productionStartedAt) {
+      updateFields.productionStartedAt = new Date();
+    }
+    updateFields.fulfillmentStatus = "in_production";
+  }
+
+  const [order] = await db
+    .update(ordersTable)
+    .set(updateFields)
+    .where(eq(ordersTable.id, id))
+    .returning();
+
+  if (!order) return res.status(404).json({ error: "Not found" });
+
+  const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
+
+  return res.json(serializeOrder(order, items));
+});
+
+router.get("/admin/fulfillment", requireAdmin, async (req, res) => {
+  const storeKey = typeof req.query.storeKey === "string" ? req.query.storeKey : undefined;
+  const fulfillmentStatus = typeof req.query.fulfillmentStatus === "string" ? req.query.fulfillmentStatus : undefined;
+  const orderStatus = typeof req.query.orderStatus === "string" ? req.query.orderStatus : undefined;
+  const limit = Number(req.query.limit) || 50;
+  const offset = Number(req.query.offset) || 0;
+
+  const conditions = [];
+
+  if (storeKey) conditions.push(eq(ordersTable.storeKey, storeKey));
+
+  if (fulfillmentStatus) {
+    conditions.push(eq(ordersTable.fulfillmentStatus, fulfillmentStatus));
+  }
+
+  if (orderStatus) {
+    conditions.push(eq(ordersTable.status, orderStatus));
+  } else {
+    conditions.push(eq(ordersTable.status, "paid"));
+  }
+
+  if (!fulfillmentStatus) {
+    conditions.push(ne(ordersTable.fulfillmentStatus, "shipped"));
+  }
+
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const [totalResult, orders] = await Promise.all([
+    db.select({ count: count() }).from(ordersTable).where(whereClause),
+    db
+      .select()
+      .from(ordersTable)
+      .where(whereClause)
+      .orderBy(desc(ordersTable.createdAt))
+      .limit(limit)
+      .offset(offset),
+  ]);
+
+  const orderIds = orders.map(o => o.id);
+  const allItems = orderIds.length > 0
+    ? await db.select().from(orderItemsTable).where(inArray(orderItemsTable.orderId, orderIds))
+    : [];
+
+  const itemsByOrder = new Map<number, (typeof orderItemsTable.$inferSelect)[]>();
+  for (const item of allItems) {
+    const arr = itemsByOrder.get(item.orderId) ?? [];
+    arr.push(item);
+    itemsByOrder.set(item.orderId, arr);
+  }
+
+  return res.json({
+    orders: orders.map(o => serializeOrder(o, itemsByOrder.get(o.id) ?? [])),
+    total: Number(totalResult[0]?.count ?? 0),
+    offset,
+    limit,
+  });
+});
+
+router.get("/admin/fulfillment/export.csv", requireAdmin, async (req, res) => {
+  const storeKey = typeof req.query.storeKey === "string" ? req.query.storeKey : undefined;
+  const fulfillmentStatus = typeof req.query.fulfillmentStatus === "string" ? req.query.fulfillmentStatus : undefined;
+  const orderStatus = typeof req.query.orderStatus === "string" ? req.query.orderStatus : undefined;
+
+  const conditions = [];
+  if (storeKey) conditions.push(eq(ordersTable.storeKey, storeKey));
+  if (fulfillmentStatus) conditions.push(eq(ordersTable.fulfillmentStatus, fulfillmentStatus));
+  if (orderStatus) conditions.push(eq(ordersTable.status, orderStatus));
+
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const orders = await db
+    .select()
+    .from(ordersTable)
+    .where(whereClause)
+    .orderBy(desc(ordersTable.createdAt))
+    .limit(1000);
+
+  const orderIds = orders.map(o => o.id);
+  const allItems = orderIds.length > 0
+    ? await db.select().from(orderItemsTable).where(inArray(orderItemsTable.orderId, orderIds))
+    : [];
+
+  const itemsByOrder = new Map<number, (typeof orderItemsTable.$inferSelect)[]>();
+  for (const item of allItems) {
+    const arr = itemsByOrder.get(item.orderId) ?? [];
+    arr.push(item);
+    itemsByOrder.set(item.orderId, arr);
+  }
+
+  const csvRows: string[] = [];
+  const headers = [
+    "order_id",
+    "store_key",
+    "customer_email",
+    "shipping_name",
+    "shipping_address_line1",
+    "shipping_address_line2",
+    "shipping_postal_code",
+    "shipping_city",
+    "shipping_country",
+    "poster_title",
+    "size_label",
+    "width_cm",
+    "height_cm",
+    "quantity",
+    "master_print_image_url",
+    "tracking_number",
+    "fulfillment_status",
+  ];
+  csvRows.push(headers.join(","));
+
+  for (const order of orders) {
+    const items = itemsByOrder.get(order.id) ?? [];
+    if (items.length === 0) {
+      csvRows.push([
+        order.id,
+        csvEscape(order.storeKey),
+        csvEscape(order.customerEmail),
+        csvEscape(order.shippingName),
+        csvEscape(order.shippingAddressLine1),
+        csvEscape(order.shippingAddressLine2 ?? ""),
+        csvEscape(order.shippingPostalCode),
+        csvEscape(order.shippingCity),
+        csvEscape(order.shippingCountry),
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        csvEscape(order.trackingNumber ?? ""),
+        csvEscape(order.fulfillmentStatus ?? "not_started"),
+      ].join(","));
+    } else {
+      for (const item of items) {
+        csvRows.push([
+          order.id,
+          csvEscape(order.storeKey),
+          csvEscape(order.customerEmail),
+          csvEscape(order.shippingName),
+          csvEscape(order.shippingAddressLine1),
+          csvEscape(order.shippingAddressLine2 ?? ""),
+          csvEscape(order.shippingPostalCode),
+          csvEscape(order.shippingCity),
+          csvEscape(order.shippingCountry),
+          csvEscape(item.posterTitleSnapshot),
+          csvEscape(item.sizeLabelSnapshot ?? ""),
+          item.widthCmSnapshot ?? "",
+          item.heightCmSnapshot ?? "",
+          item.quantity,
+          csvEscape(item.masterPrintImageUrlSnapshot ?? ""),
+          csvEscape(order.trackingNumber ?? ""),
+          csvEscape(order.fulfillmentStatus ?? "not_started"),
+        ].join(","));
+      }
+    }
+  }
+
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", `attachment; filename="fulfillment-export.csv"`);
+  return res.send(csvRows.join("\n"));
+});
+
+function csvEscape(value: string): string {
+  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
 
 export default router;

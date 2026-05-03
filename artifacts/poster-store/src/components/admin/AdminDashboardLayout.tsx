@@ -15,12 +15,14 @@ import {
   LayoutTemplate,
   LogOut,
   ChevronRight,
+  Package,
 } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { href: "/admin/posters", label: "Posters", icon: Images },
   { href: "/admin/orders", label: "Orders", icon: ShoppingBag },
+  { href: "/admin/fulfillment", label: "Fulfillment", icon: Package },
   { href: "/admin/mockups", label: "Mockups", icon: LayoutTemplate },
   { href: "/admin/taxonomy", label: "Taxonomy", icon: Tag, disabled: true },
   { href: "/admin/newsletter", label: "Newsletter", icon: Mail, disabled: true },

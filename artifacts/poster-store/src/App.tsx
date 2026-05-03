@@ -23,6 +23,7 @@ import AdminMockups from "@/pages/admin/AdminMockups";
 import AdminPosterMockups from "@/pages/admin/AdminPosterMockups";
 import AdminOrders from "@/pages/admin/AdminOrders";
 import AdminOrderDetail from "@/pages/admin/AdminOrderDetail";
+import AdminFulfillment from "@/pages/admin/AdminFulfillment";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +39,7 @@ function Router() {
       <Route path="/admin/mockups" component={AdminMockups} />
       <Route path="/admin/orders/:id" component={AdminOrderDetail} />
       <Route path="/admin/orders" component={AdminOrders} />
+      <Route path="/admin/fulfillment" component={AdminFulfillment} />
       <Route path="/admin" component={AdminDashboard} />
 
       {/* Storefront — catch-all with Navbar + Footer layout */}

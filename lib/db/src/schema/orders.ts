@@ -28,6 +28,12 @@ export const ordersTable = pgTable("orders", {
   cancelledAt: timestamp("cancelled_at"),
   customerConfirmationSentAt: timestamp("customer_confirmation_sent_at"),
   adminNotificationSentAt: timestamp("admin_notification_sent_at"),
+  fulfillmentStatus: text("fulfillment_status").default("not_started"),
+  fulfillmentNotes: text("fulfillment_notes"),
+  shippedAt: timestamp("shipped_at"),
+  trackingNumber: text("tracking_number"),
+  trackingUrl: text("tracking_url"),
+  productionStartedAt: timestamp("production_started_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
