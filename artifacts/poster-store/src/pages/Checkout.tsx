@@ -289,7 +289,7 @@ export default function Checkout() {
     }
   };
 
-  const shouldRedirect = !cartLoading && (!cart || cart.items.length === 0) && !paymentCancelled;
+  const shouldRedirect = !cartLoading && (!cart || cart.items.length === 0) && !paymentCancelled && !isSubmitting && !redirecting;
 
   useEffect(() => {
     if (shouldRedirect) setLocation("/cart");

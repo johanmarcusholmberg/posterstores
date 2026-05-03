@@ -12,6 +12,7 @@ import storesRouter from "./stores";
 import authRouter from "./auth";
 import shippingRouter from "./shipping";
 import launchChecklistRouter from "./launchChecklist";
+import stripeRouter from "./stripe";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(mockupsRouter);
 router.use(storesRouter);
 router.use(shippingRouter);
 router.use(launchChecklistRouter);
+router.use(stripeRouter);
 
 export default router;

@@ -53,7 +53,7 @@ router.post("/orders/:id/create-checkout-session", async (req: Request, res: Res
 
   const currency = order.currency.toLowerCase();
 
-  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = items.map((item) => ({
+  const lineItems: Array<{ quantity: number; price_data: { currency: string; unit_amount: number; product_data: { name: string; description?: string; images?: string[] } } }> = items.map((item) => ({
     quantity: item.quantity,
     price_data: {
       currency,

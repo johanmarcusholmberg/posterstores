@@ -43,7 +43,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       }
 
       req.user = { id: row.user_id, email: row.email, isAdmin: row.is_admin };
-      next();
+      return next();
     } finally {
       client.release();
     }
