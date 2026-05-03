@@ -494,6 +494,45 @@ export async function adminUpdateStore(
   return res.json();
 }
 
+// ─── Launch checklist ──────────────────────────────────────────────────────
+
+export type CheckStatus = "pass" | "warning" | "missing" | "manual";
+
+export interface CheckItem {
+  id: string;
+  label: string;
+  status: CheckStatus;
+  detail?: string;
+  value?: string;
+}
+
+export interface CheckSection {
+  id: string;
+  title: string;
+  items: CheckItem[];
+}
+
+export interface LaunchChecklistResponse {
+  storeKey: string;
+  storeName: string;
+  generatedAt: string;
+  sections: CheckSection[];
+}
+
+export async function adminGetLaunchChecklist(
+  token: string,
+  storeKey: string
+): Promise<LaunchChecklistResponse> {
+  const res = await fetch(`${BASE}/admin/launch-checklist?storeKey=${encodeURIComponent(storeKey)}`, {
+    headers: headers(token),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(extractErrorMessage(body));
+  }
+  return res.json();
+}
+
 export async function adminDeactivateStore(token: string, storeKey: string): Promise<AdminStore> {
   const res = await fetch(`${BASE}/admin/stores/${encodeURIComponent(storeKey)}/deactivate`, {
     method: "PATCH",

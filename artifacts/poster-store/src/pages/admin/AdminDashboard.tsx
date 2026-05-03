@@ -18,6 +18,7 @@ import {
   ClipboardList,
   Package,
   Globe,
+  Rocket,
 } from "lucide-react";
 
 export default function AdminDashboard() {
@@ -187,6 +188,13 @@ export default function AdminDashboard() {
               <div className="flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium bg-background hover:bg-muted transition-colors cursor-pointer">
                 <Globe className="w-4 h-4 text-primary" />
                 Manage stores
+                <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
+              </div>
+            </Link>
+            <Link href="/admin/launch-checklist">
+              <div className="flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium bg-background hover:bg-muted transition-colors cursor-pointer">
+                <Rocket className="w-4 h-4 text-primary" />
+                Launch checklist
                 <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
               </div>
             </Link>
