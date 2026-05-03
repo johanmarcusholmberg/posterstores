@@ -1,0 +1,186 @@
+Continue building the reusable multi-store poster webstore.
+
+CURRENT STATUS:
+- Reusable multi-store platform works.
+- PostsofSpain is the default active storefront.
+- Storefront, shop, poster detail, cart, favorites work.
+- Admin poster CRUD works.
+- Mockup assignment works.
+- Asset separation works.
+- Structured sizes/prices work.
+- Checkout/order creation is hardened.
+- Stripe payment integration exists.
+- Admin order management works.
+- Order statuses are normalized.
+- Canonical statuses are:
+  - draft
+  - pending_payment
+  - paid
+  - processing
+  - shipped
+  - cancelled
+- All 47 tests pass.
+
+NEXT GOAL:
+Add transactional e-mail infrastructure.
+
+Important:
+- Do not rewrite the checkout flow.
+- Do not rewrite Stripe integration.
+- Do not connect print providers yet.
+- Do not build newsletter campaigns yet.
+- Keep everything store-scoped.
+- Keep all existing tests passing.
+- E-mail sending must be server-side only.
+- Do not expose provider API keys in frontend code.
+
+EMAIL PROVIDER
+
+Use a provider abstraction so the app is not locked to one provider.
+
+Create an e-mail service layer such as:
+
+server/email/emailService.ts
+
+Support:
+- sendOrderCreatedEmail
+- sendPaymentConfirmedEmail
+- sendAdminNewOrderEmail
+
+If no real provider key is configured:
+- Use a safe development/mock sender.
+- Log the e-mail payload server-side.
+- Do not fail checkout/payment if e-mail provider is missing.
+- Return clear logs that e-mail sending was skipped/mock-sent.
+
+Prepare for providers like:
+- Resend
+- SendGrid
+- Brevo
+- Mailchimp Transactional
+
+If choosing one now, prefer Resend because it is simple for transactional e-mails.
+
+ENVIRONMENT VARIABLES
+
+Prepare support for:
+
+EMAIL_PROVIDER
+EMAIL_FROM
+ADMIN_ORDER_NOTIFICATION_EMAIL
+RESEND_API_KEY optional if Resend is used
+
+Do not require these for tests unless mocked.
+
+EMAIL EVENTS
+
+1. Order created / pending payment
+When an order draft/pending_payment is created:
+- Optional: send a pending order e-mail only if useful.
+- If implemented, wording must clearly say payment is not completed yet.
+
+2. Payment confirmed
+When Stripe webhook verifies payment and order becomes paid:
+Send customer payment/order confirmation e-mail.
+
+Subject example:
+“Your PostsofSpain order is confirmed”
+
+E-mail content should include:
+- Store name
+- Order number
+- Payment status
+- Customer e-mail
+- Items
+- Poster title snapshot
+- Size label snapshot
+- Quantity
+- Unit price
+- Total
+- Shipping address summary
+- Message that the order is confirmed and will be processed
+
+3. Admin new paid order notification
+When order becomes paid:
+Send admin notification e-mail to ADMIN_ORDER_NOTIFICATION_EMAIL.
+
+Subject example:
+“New paid order — PostsofSpain #123”
+
+Admin e-mail content should include:
+- Store key/name
+- Order id
+- Customer e-mail
+- Total
+- Items
+- Size
+- Quantity
+- Link or reference to admin order detail if APP_BASE_URL exists
+
+IMPORTANT IDEMPOTENCY
+
+Stripe webhooks can be delivered more than once.
+
+Do not send duplicate payment confirmation e-mails for the same paid order.
+
+Add a safe idempotency mechanism, for example fields on orders:
+- customer_confirmation_sent_at nullable
+- admin_notification_sent_at nullable
+
+Only send each e-mail once.
+If e-mail fails, log the error and allow retry later.
+
+ADMIN ORDER DETAIL
+
+Add e-mail status indicators to admin order detail:
+- Customer confirmation sent / not sent
+- Admin notification sent / not sent
+- Sent timestamps if available
+
+Optional:
+Add a “Resend confirmation e-mail” admin action if simple.
+If not simple, leave as future placeholder.
+
+STORE-SCOPED BRANDING
+
+E-mails should use store-specific data:
+- active/order store name
+- currency
+- support/contact placeholder
+- theme does not need full HTML branding yet
+
+For now, simple clean HTML/text e-mails are enough.
+
+TESTING
+
+Add or update tests for:
+
+Email service:
+- Mock sender records payload.
+- Missing provider does not crash checkout/webhook.
+- E-mail uses store name and order snapshot data.
+
+Payment webhook:
+- When order becomes paid, customer confirmation e-mail is sent once.
+- Admin notification e-mail is sent once.
+- Duplicate webhook does not send duplicate e-mails.
+- If e-mail sending fails, order still remains paid and error is logged.
+
+Admin:
+- Admin order detail shows e-mail sent status.
+
+Regression:
+- Stripe webhook still marks order paid.
+- Checkout/order tests still pass.
+- Admin order tests still pass.
+- Homepage/shop/poster/cart/favorites still pass.
+
+At the end, summarize:
+1. E-mail service structure.
+2. Provider abstraction.
+3. Environment variables.
+4. Which e-mails are sent and when.
+5. Idempotency handling.
+6. Admin e-mail status display.
+7. Tests added/updated.
+8. What I need to configure for real e-mail sending.
