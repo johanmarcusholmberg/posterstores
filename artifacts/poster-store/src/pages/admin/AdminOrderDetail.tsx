@@ -139,7 +139,7 @@ export default function AdminOrderDetail() {
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Order Status:</span>
               <span className={cn("text-xs font-medium px-2 py-0.5 rounded-full", STATUS_COLORS[order.status] ?? "bg-gray-100 text-gray-700")}>
-                {order.status}
+                {ORDER_STATUSES.find(s => s.value === order.status)?.label ?? order.status}
               </span>
             </div>
             <div className="flex items-center gap-2">
