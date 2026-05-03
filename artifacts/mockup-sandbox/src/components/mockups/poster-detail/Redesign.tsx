@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 
 const POSTER_IMAGE = "https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=600&q=80";
-const MOCKUP_IMAGES = [
+const ALL_IMAGES = [
+  { url: POSTER_IMAGE, label: "Original" },
   { url: "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=900&q=80", label: "Living Room" },
   { url: "https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=900&q=80", label: "Bedroom" },
   { url: "https://images.unsplash.com/photo-1493552152660-f915ab47ae9d?w=900&q=80", label: "Office" },
@@ -13,90 +14,59 @@ const SIZES = [
   { id: 3, label: "70×100 cm", price: "€79.00" },
 ];
 
-function MockupLightbox({ onClose }: { onClose: () => void }) {
-  const [active, setActive] = useState(0);
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
-      onClick={onClose}
-    >
-      <div
-        className="relative bg-white rounded-2xl overflow-hidden max-w-4xl w-full shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-black/20 hover:bg-black/40 text-white flex items-center justify-center transition-colors text-xl leading-none"
-        >
-          ×
-        </button>
-
-        <div className="aspect-[16/9] bg-stone-100 overflow-hidden">
-          <img
-            src={MOCKUP_IMAGES[active].url}
-            alt={MOCKUP_IMAGES[active].label}
-            className="w-full h-full object-cover"
-          />
-        </div>
-
-        <div className="p-4 flex gap-3 border-t border-stone-100">
-          {MOCKUP_IMAGES.map((img, idx) => (
-            <button
-              key={idx}
-              onClick={() => setActive(idx)}
-              className={`relative rounded-lg overflow-hidden border-2 transition-all ${
-                active === idx ? "border-stone-800" : "border-transparent opacity-50 hover:opacity-80"
-              }`}
-              style={{ width: 80, height: 56 }}
-            >
-              <img src={img.url} alt={img.label} className="w-full h-full object-cover" />
-              <div className="absolute bottom-0 inset-x-0 bg-black/40 text-white text-[10px] text-center py-0.5 font-medium">
-                {img.label}
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function Redesign() {
+  const [activeImg, setActiveImg] = useState(ALL_IMAGES[0].url);
   const [selectedSize, setSelectedSize] = useState<number | null>(null);
-  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-[#faf9f7] font-sans">
-      {lightboxOpen && <MockupLightbox onClose={() => setLightboxOpen(false)} />}
-
       <div className="max-w-5xl mx-auto px-6 py-8">
         <a href="#" className="inline-flex items-center gap-1.5 text-sm text-stone-500 hover:text-stone-800 mb-6 transition-colors">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
           Back to shop
         </a>
 
-        <div className="grid grid-cols-1 md:grid-cols-[380px_1fr] gap-10 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-[360px_1fr] gap-10 items-start">
 
-          {/* Left: compact image + mockup button */}
-          <div className="flex flex-col gap-3">
-            <div className="relative rounded-xl overflow-hidden bg-stone-100 shadow-md" style={{ aspectRatio: "3/4", maxHeight: 420 }}>
+          {/* Left: compact image + thumbnail strip */}
+          <div className="flex flex-col gap-2.5">
+            {/* Main image */}
+            <div
+              className="relative rounded-xl overflow-hidden bg-stone-100 shadow-md"
+              style={{ aspectRatio: "3/4", maxHeight: 400 }}
+            >
               <img
-                src={POSTER_IMAGE}
+                src={activeImg}
                 alt="Barcelona Night Skyline"
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover transition-opacity duration-200"
               />
             </div>
 
-            <button
-              onClick={() => setLightboxOpen(true)}
-              className="w-full flex items-center justify-center gap-2 border border-stone-300 rounded-lg py-2.5 text-sm font-medium text-stone-700 hover:bg-stone-100 hover:border-stone-400 transition-all bg-white"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
-              </svg>
-              See in a room
-              <span className="text-stone-400 text-xs ml-0.5">(3 mockups)</span>
-            </button>
+            {/* Thumbnail strip — always visible */}
+            <div className="flex gap-2">
+              {ALL_IMAGES.map((img, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setActiveImg(img.url)}
+                  title={img.label}
+                  className={`relative shrink-0 rounded-lg overflow-hidden border-2 transition-all ${
+                    activeImg === img.url
+                      ? "border-stone-800 opacity-100"
+                      : "border-transparent opacity-50 hover:opacity-80"
+                  }`}
+                  style={{ width: 68, height: 68 }}
+                >
+                  <img
+                    src={img.url}
+                    alt={img.label}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute bottom-0 inset-x-0 bg-black/40 text-white text-[9px] text-center py-0.5 font-medium leading-tight">
+                    {img.label}
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Right: product info */}
@@ -110,7 +80,9 @@ export function Redesign() {
             <p className="text-xl font-semibold text-stone-800 mb-5">From €29.00</p>
 
             <p className="text-stone-500 text-sm leading-relaxed mb-7">
-              A stunning nighttime view of Barcelona's iconic skyline, capturing the warm glow of the city lights reflected in the Mediterranean. Perfect for lovers of art, travel, and Spanish culture.
+              A stunning nighttime view of Barcelona's iconic skyline, capturing the warm glow of
+              the city lights reflected in the Mediterranean. Perfect for lovers of art, travel,
+              and Spanish culture.
             </p>
 
             <div className="mb-6">
@@ -155,7 +127,7 @@ export function Redesign() {
           </div>
         </div>
 
-        {/* Related posters section */}
+        {/* Related posters */}
         <div className="mt-14 pt-8 border-t border-stone-200">
           <h2 className="font-serif text-xl font-bold text-stone-800 mb-5">More from Catalonia</h2>
           <div className="grid grid-cols-4 gap-4">

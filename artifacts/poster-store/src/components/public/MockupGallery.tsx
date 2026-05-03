@@ -38,12 +38,12 @@ export const MockupGallery = ({
   );
 
   return (
-    <div className="space-y-3" data-testid="mockup-gallery">
-      <div className="relative aspect-[3/4] bg-muted rounded-lg overflow-hidden shadow-lg">
+    <div className="space-y-2.5" data-testid="mockup-gallery">
+      <div className="relative bg-muted rounded-xl overflow-hidden shadow-md" style={{ aspectRatio: "3/4", maxHeight: "420px" }}>
         <img
           src={active}
           alt={alt}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover transition-opacity duration-200"
           data-testid="mockup-gallery-main-image"
           onError={(e) => {
             (e.target as HTMLImageElement).src = fallbackImageUrl;
@@ -52,7 +52,7 @@ export const MockupGallery = ({
       </div>
 
       {uniqueImages.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto pb-1">
+        <div className="flex gap-2 overflow-x-auto pb-0.5">
           {uniqueImages.map((img, idx) => (
             <button
               key={idx}
@@ -60,11 +60,12 @@ export const MockupGallery = ({
               onClick={() => setActive(img.url)}
               title={img.label}
               className={cn(
-                "shrink-0 w-14 h-14 rounded overflow-hidden border-2 transition-all",
+                "relative shrink-0 rounded-lg overflow-hidden border-2 transition-all",
                 active === img.url
-                  ? "border-primary"
-                  : "border-transparent opacity-60 hover:opacity-100"
+                  ? "border-primary opacity-100"
+                  : "border-transparent opacity-50 hover:opacity-80"
               )}
+              style={{ width: 68, height: 68 }}
             >
               <img
                 src={img.url}
@@ -74,6 +75,9 @@ export const MockupGallery = ({
                   (e.target as HTMLImageElement).src = fallbackImageUrl;
                 }}
               />
+              <div className="absolute bottom-0 inset-x-0 bg-black/40 text-white text-[9px] text-center py-0.5 font-medium leading-tight">
+                {img.label}
+              </div>
             </button>
           ))}
         </div>

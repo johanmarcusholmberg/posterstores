@@ -80,6 +80,10 @@ export default function PosterBySlug() {
   }, [slug, store.storeKey]);
 
   useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [slug]);
+
+  useEffect(() => {
     if (!poster) return;
     document.title = `${poster.title} | ${store.storeName ?? store.storeKey}`;
     const metaDesc = document.querySelector('meta[name="description"]');
@@ -201,7 +205,7 @@ export default function PosterBySlug() {
               alt={poster.title}
             />
           ) : (
-            <div className="relative aspect-[3/4] bg-muted rounded-lg overflow-hidden shadow-lg">
+            <div className="relative bg-muted rounded-xl overflow-hidden shadow-md" style={{ aspectRatio: "3/4", maxHeight: "420px" }}>
               <img
                 src={poster.imageUrl}
                 alt={poster.title}

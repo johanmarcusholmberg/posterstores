@@ -58,6 +58,10 @@ export default function PosterDetail() {
   }, [activeSizes.length, selectedSizeId]);
 
   useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [posterId]);
+
+  useEffect(() => {
     if (!posterId || isNaN(posterId)) return;
     getPosterMockups(posterId, store.storeKey)
       .then(setMockups)
@@ -162,7 +166,7 @@ export default function PosterDetail() {
               alt={poster.title}
             />
           ) : (
-            <div className="relative aspect-[3/4] bg-muted rounded-lg overflow-hidden shadow-lg">
+            <div className="relative bg-muted rounded-xl overflow-hidden shadow-md" style={{ aspectRatio: "3/4", maxHeight: "420px" }}>
               <img
                 src={poster.imageUrl}
                 alt={poster.title}
