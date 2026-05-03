@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import { requireAuth } from "../middleware/requireAuth";
+import { authLimiter } from "../middleware/rateLimiter";
 
 const router = Router();
 
@@ -21,7 +22,7 @@ const cookieOpts = {
 
 const registerSchema = z.object({
   email: z.string().email("Please enter a valid email"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
 const loginSchema = z.object({
@@ -44,7 +45,7 @@ async function createSession(userId: number): Promise<string> {
   }
 }
 
-router.post("/auth/register", async (req, res) => {
+router.post("/auth/register", authLimiter, async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Invalid input" });
@@ -73,7 +74,7 @@ router.post("/auth/register", async (req, res) => {
   }
 });
 
-router.post("/auth/login", async (req, res) => {
+router.post("/auth/login", authLimiter, async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: "Invalid email or password" });

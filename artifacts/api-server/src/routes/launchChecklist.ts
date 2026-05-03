@@ -12,6 +12,7 @@ import {
 } from "@workspace/db";
 import { eq, and, count, isNull, isNotNull, sql } from "drizzle-orm";
 import { requireAdmin } from "../middleware/requireAdmin";
+import { adminLimiter } from "../middleware/rateLimiter";
 
 const router = Router();
 

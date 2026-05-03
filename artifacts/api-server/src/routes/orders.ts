@@ -10,6 +10,7 @@ import {
 import { eq, and, desc, count, inArray, ne } from "drizzle-orm";
 import { requireAdmin } from "../middleware/requireAdmin";
 import { requireAuth } from "../middleware/requireAuth";
+import { adminLimiter } from "../middleware/rateLimiter";
 import { z } from "zod";
 
 const router = Router();

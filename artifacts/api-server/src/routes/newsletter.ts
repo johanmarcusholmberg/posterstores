@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { newsletterTable } from "@workspace/db";
 import { SubscribeNewsletterBody } from "@workspace/api-zod";
+import { newsletterLimiter } from "../middleware/rateLimiter";
 
 const router = Router();
 
@@ -19,8 +20,8 @@ async function handleSubscribe(req: Parameters<Parameters<typeof router.post>[1]
   return res.json({ success: true, message: "You're on the list! Expect beautiful things soon." });
 }
 
-router.post("/newsletter", handleSubscribe);
+router.post("/newsletter", newsletterLimiter, handleSubscribe);
 
-router.post("/newsletter/subscribe", handleSubscribe);
+router.post("/newsletter/subscribe", newsletterLimiter, handleSubscribe);
 
 export default router;

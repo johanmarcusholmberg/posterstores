@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { storesTable, postersTable, ordersTable } from "@workspace/db";
 import { eq, sql, and, ne } from "drizzle-orm";
 import { requireAdmin } from "../middleware/requireAdmin";
+import { adminLimiter } from "../middleware/rateLimiter";
 import { z } from "zod";
 
 const router = Router();

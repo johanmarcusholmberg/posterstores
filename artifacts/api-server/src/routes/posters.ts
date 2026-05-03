@@ -11,6 +11,7 @@ import {
   DeletePosterParams,
 } from "@workspace/api-zod";
 import { requireAdmin } from "../middleware/requireAdmin";
+import { adminLimiter } from "../middleware/rateLimiter";
 import { generateSlug } from "../lib/migrateSlugField";
 
 const router = Router();

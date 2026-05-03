@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
@@ -35,10 +35,40 @@ app.use(
   }),
 );
 
-app.use(cors({
-  origin: true,
-  credentials: true,
-}));
+function buildCorsOrigins(): string[] | true {
+  const raw = process.env.ALLOWED_ORIGINS;
+  if (!raw || raw.trim() === "") {
+    if (process.env.NODE_ENV === "production") {
+      logger.warn(
+        "ALLOWED_ORIGINS is not set in production — CORS will block all cross-origin requests. " +
+          "Set ALLOWED_ORIGINS to a comma-separated list of your public domain(s)."
+      );
+      return [];
+    }
+    return true;
+  }
+  return raw
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
+}
+
+const corsOrigins = buildCorsOrigins();
+
+app.use(
+  cors({
+    origin: corsOrigins,
+    credentials: true,
+  })
+);
+
+app.use("/__mockup", (_req: Request, res: Response, _next: NextFunction) => {
+  if (process.env.NODE_ENV === "production") {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  _next();
+});
 app.use(cookieParser());
 
 app.post("/api/stripe/webhook", (req, _res, next) => {

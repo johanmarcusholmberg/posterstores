@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { pool } from "@workspace/db";
 import { requireAdmin } from "../middleware/requireAdmin";
+import { adminLimiter } from "../middleware/rateLimiter";
 import { z } from "zod";
 
 const router = Router();

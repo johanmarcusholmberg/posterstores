@@ -5,6 +5,7 @@ import { ordersTable, orderItemsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import { sendPaymentConfirmedEmail, sendAdminNewOrderEmail } from "../email/emailService";
+import { checkoutLimiter } from "../middleware/rateLimiter";
 
 const router = Router();
 
@@ -14,7 +15,7 @@ function getStripe(): Stripe {
   return new Stripe(key, { apiVersion: "2026-04-22.dahlia" });
 }
 
-router.post("/orders/:id/create-checkout-session", async (req: Request, res: Response) => {
+router.post("/orders/:id/create-checkout-session", checkoutLimiter, async (req: Request, res: Response) => {
   const orderId = Number(req.params.id);
   if (isNaN(orderId)) return res.status(400).json({ error: "Invalid order id" });
 
@@ -122,7 +123,7 @@ router.post("/orders/:id/create-checkout-session", async (req: Request, res: Res
 });
 
 // Fallback verification — used when webhook hasn't fired yet (e.g. dev without Stripe CLI)
-router.post("/orders/:id/verify-payment", async (req: Request, res: Response) => {
+router.post("/orders/:id/verify-payment", checkoutLimiter, async (req: Request, res: Response) => {
   const orderId = Number(req.params.id);
   if (isNaN(orderId)) return res.status(400).json({ error: "Invalid order id" });
 

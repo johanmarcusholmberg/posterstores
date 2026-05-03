@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { posterSizesTable, postersTable } from "@workspace/db";
 import { eq, and, asc } from "drizzle-orm";
 import { requireAdmin } from "../middleware/requireAdmin";
+import { adminLimiter } from "../middleware/rateLimiter";
 
 const router = Router();
 
