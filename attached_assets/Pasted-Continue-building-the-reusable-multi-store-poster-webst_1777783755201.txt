@@ -1,0 +1,102 @@
+Continue building the reusable multi-store poster webstore.
+
+NEXT GOAL:
+Create a production launch readiness checklist inside the admin area.
+
+Add an admin page:
+
+/admin/launch-checklist
+
+Purpose:
+Help me verify whether the current selected store is ready to launch.
+
+The checklist should be store-scoped and should not block the app unless explicitly stated.
+
+Include checklist sections:
+
+1. Store configuration
+- Store name exists
+- Store key exists
+- Default currency exists
+- Primary domain configured
+- Route prefix configured
+- Homepage hero title/subtitle configured
+- SEO title/description configured
+
+2. Products
+- At least one published poster
+- All published posters have slug
+- All published posters have preview image
+- All published posters have master print image
+- All published posters have at least one active size/price
+- All published posters have category/region/city where relevant
+
+3. Mockups
+- Published posters have at least one mockup assigned
+- Published posters have a primary mockup where possible
+- Mockup templates exist
+
+4. Checkout and payment
+- Stripe secret key configured
+- Stripe webhook secret configured
+- APP_BASE_URL configured
+- Checkout route works
+- Orders can be created
+- Paid orders appear in admin
+
+5. Email
+- EMAIL_FROM configured
+- EMAIL_PROVIDER configured or mock mode clearly shown
+- ADMIN_ORDER_NOTIFICATION_EMAIL configured
+- Customer confirmation email status available on paid orders
+
+6. Fulfillment
+- Fulfillment page available
+- Paid orders appear in fulfillment queue
+- Master print file accessible for order items
+- CSV export available
+
+7. Legal/store pages
+- Shipping page exists
+- Returns page exists
+- Privacy page exists
+- Terms page exists
+- Contact page exists
+- About page exists
+
+8. Mobile/UX
+- Mobile menu works
+- Shop filters usable on mobile
+- Cart usable on mobile
+- Checkout usable on mobile
+
+Show each item as:
+- Pass
+- Warning
+- Missing
+- Manual check required
+
+Add helpful explanations for missing items.
+
+Add quick links to relevant admin pages:
+- Edit store
+- Manage posters
+- Manage mockups
+- Orders
+- Fulfillment
+- Policy pages if editable
+
+Do not expose secrets, only show whether they are configured.
+
+Testing:
+- /admin/launch-checklist requires admin token.
+- Checklist loads for selected admin store.
+- Checklist is store-scoped.
+- Missing environment variables show as missing/warning.
+- Existing app routes still pass.
+
+At the end, summarize:
+1. Checklist page created.
+2. Checks implemented.
+3. Which checks are automatic vs manual.
+4. Tests added/updated.
