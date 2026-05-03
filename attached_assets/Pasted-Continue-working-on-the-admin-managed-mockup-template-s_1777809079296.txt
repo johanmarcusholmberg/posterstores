@@ -1,0 +1,125 @@
+Continue working on the admin-managed mockup template system.
+
+The placement detection implementation looks good. Now do a final hardening and frontend QA pass so the feature works cleanly from admin upload all the way to product/shop mockup preview.
+
+GOAL
+Make sure admin-managed mockup templates are reliable, correctly displayed for posters, and safe for production-like usage.
+
+Do not rebuild the feature.
+Do not replace the current implementation.
+Only polish, verify, and fix gaps.
+
+1. Timestamp handling
+
+The mockup_templates.detected_at column is currently timestamp without time zone.
+
+Please check whether this should be changed to timestamp with time zone / timestamptz to avoid timezone confusion.
+
+Preferred:
+- Use timestamptz for detected_at
+- Store detection timestamps consistently in UTC
+- Make sure frontend displays the timestamp correctly if shown
+- Add a safe migration if needed
+
+Do not break existing records.
+
+2. End-to-end mockup preview check
+
+Verify the full flow:
+
+Admin:
+- Upload mockup image
+- AI detects placement
+- Admin adjusts placement manually
+- Admin saves mockup
+- Metadata and placement values persist after refresh
+
+Frontend/product:
+- Active mockup templates are fetched from backend
+- Inactive mockups are not shown to normal users
+- Poster image is placed using saved x/y/width/height
+- Manually adjusted placement values are respected
+- Fallback placement values are respected
+- Featured mockup is used first if available
+- If no compatible mockups exist, the UI falls back gracefully
+
+3. Format compatibility
+
+Check that supported_formats works correctly.
+
+A 50x70 poster should only show mockups that support:
+- 50x70
+- or a generic compatible portrait format if such logic exists
+
+A 50x50 poster should only show square-compatible mockups.
+
+A landscape format should not be shown inside portrait-only mockups unless explicitly supported.
+
+If needed, add helper logic for:
+- exact format match first
+- then orientation-compatible fallback
+- then generic active fallback only if nothing else exists
+
+4. Admin UI polish
+
+Make sure the mockup template list is easy to manage:
+
+- Show thumbnail
+- Name
+- Category
+- Supported formats
+- Active/inactive badge
+- Featured badge
+- Detection source: AI / Manual / Fallback
+- Confidence if available
+- Manually adjusted indicator if true
+- Edit/delete actions
+
+Add filters if missing:
+- Active/inactive
+- Category
+- Format
+- Frame material
+
+5. User-facing mockup polish
+
+The normal user/shop preview should not feel like an admin tool.
+
+Make sure:
+- No AI detection metadata is shown to normal users
+- No internal category/debug fields are shown unless useful as filters
+- Mockup previews look clean and product-focused
+- Broken mockup images are hidden or shown with a graceful fallback
+- Loading state does not look broken
+
+6. Delete/archive behavior
+
+Verify deletion behavior:
+- Deleting a mockup template must never delete poster images or products
+- If a mockup is used by existing product previews, prefer archive/inactive over hard delete unless the current architecture safely supports hard delete
+- Add confirmation copy that explains what will happen
+
+Suggested confirmation:
+“Remove this mockup template? Existing poster images will not be deleted, but this mockup will no longer be available for previews.”
+
+7. Tests / verification
+
+Add or update tests where practical for:
+- timestamp migration / serialization
+- supported format filtering
+- active/inactive visibility
+- featured mockup priority
+- manual placement persistence
+- fallback behavior when no compatible mockup exists
+- broken mockup image handling
+
+8. Final report
+
+After the check/fixes, report:
+- whether detected_at was migrated to timestamptz
+- whether admin save/refresh works
+- whether frontend mockup preview uses saved placement values
+- how compatible mockups are selected
+- what happens if no mockup matches a poster format
+- what happens when a mockup is deleted or archived
+- any remaining limitations
