@@ -1,0 +1,129 @@
+Continue working on the admin-managed mockup templates.
+
+The automatic placement detection sounds good. Now harden and polish it so it is production-safe, cost-aware, and reliable.
+
+GOAL
+Make the mockup placement detection dependable without making the admin workflow fragile or expensive.
+
+IMPORTANT
+Do not replace the current implementation.
+Keep the existing upload → auto-detect → editable placement fields flow.
+Build on top of what is already implemented.
+
+CHECK AND IMPROVE THE FOLLOWING
+
+1. Detection should not run too often
+- Do not run GPT vision repeatedly on every small form edit.
+- Run detection only when:
+  - a new image file is uploaded
+  - a new image URL is pasted and the admin clicks Detect
+  - the admin manually clicks Auto-detect / Detect
+- Avoid duplicate calls for the same unchanged image.
+- Disable the Detect button while detection is running.
+
+2. Store detection metadata
+For each mockup template, store:
+- detection_confidence
+- detection_description
+- detection_source: ai / manual / fallback
+- detection_model if available
+- detected_at
+- placement_was_manually_adjusted boolean
+
+If the admin edits x/y/width/height after detection, mark placement_was_manually_adjusted = true.
+
+3. Add sensible fallback placement
+If AI detection fails, create a safe default placement instead of leaving the mockup unusable.
+
+Default fallback for portrait mockups:
+- x: 30%
+- y: 15%
+- width: 40%
+- height: 70%
+
+Default fallback for square mockups:
+- x: 25%
+- y: 20%
+- width: 50%
+- height: 50%
+
+Default fallback for landscape mockups:
+- x: 20%
+- y: 25%
+- width: 60%
+- height: 45%
+
+Make it clear in the admin UI that these are fallback values and should be checked manually.
+
+4. Validate placement values
+Make sure placement values:
+- are percentages
+- cannot be negative
+- cannot exceed the image boundaries
+- width and height must be greater than 0
+- x + width cannot exceed 100
+- y + height cannot exceed 100
+
+Show friendly validation errors in the form.
+
+5. Add confidence-based UI guidance
+If confidence is high, for example >= 80:
+- show green “Detected”
+
+If confidence is medium, for example 50–79:
+- show yellow “Check placement”
+
+If confidence is low, for example < 50:
+- show orange/red “Low confidence — adjust manually”
+
+Do not block saving just because confidence is low, but make it visible.
+
+6. Make manual editing comfortable
+Improve the admin preview so:
+- the dashed placement box is easy to see
+- moving values updates preview immediately
+- the current x/y/width/height values are shown near the preview
+- there is a “Reset to detected values” option if AI values exist
+- there is a “Reset to default fallback” option
+
+7. Security for image URL detection
+If detection can run from pasted URLs:
+- validate that URL is http/https
+- block localhost/private network/internal URLs to avoid SSRF risk
+- set reasonable download timeout and file size limit
+- only allow image MIME types
+- handle broken URLs gracefully
+
+8. Admin-only protection
+Confirm that:
+- only admin users can run placement detection
+- only admin users can upload mockup images
+- only admin users can create/update/delete mockup templates
+- normal users can only read active templates if needed by the public/frontend mockup preview
+
+9. Cost visibility
+In the admin UI, add small helper text:
+“Auto-detection uses AI and may have a small cost. You can also set placement manually.”
+
+If the backend already tracks AI usage/costs, log placement detection calls separately as:
+mockup_placement_detection
+
+10. Testing
+Add or update tests where practical for:
+- placement validation
+- fallback placement generation
+- admin-only detection endpoint
+- detection status UI states
+- failed detection handling
+- URL validation if URL detection exists
+
+DELIVERABLES
+After implementation, report:
+- what files changed
+- whether detection is called on upload only or also on URL/manual actions
+- where detection metadata is stored
+- how fallback placement works
+- how invalid placement values are prevented
+- how SSRF/private URL risks are handled
+- whether admin-only protection is enforced
+- any remaining limitations
