@@ -457,78 +457,119 @@ router.get("/admin/fulfillment/export.csv", requireAdmin, async (req, res) => {
     itemsByOrder.set(item.orderId, arr);
   }
 
-  const csvRows: string[] = [];
-  const headers = [
-    "order_id",
-    "store_key",
-    "customer_email",
-    "shipping_name",
-    "shipping_address_line1",
-    "shipping_address_line2",
-    "shipping_postal_code",
-    "shipping_city",
-    "shipping_country",
-    "poster_title",
-    "size_label",
-    "width_cm",
-    "height_cm",
-    "quantity",
-    "master_print_image_url",
-    "tracking_number",
-    "fulfillment_status",
+  const FULFILLMENT_LABEL: Record<string, string> = {
+    not_started: "Not Started",
+    ready_for_production: "Ready for Production",
+    in_production: "In Production",
+    shipped: "Shipped",
+    cancelled: "Cancelled",
+  };
+
+  const ORDER_STATUS_LABEL: Record<string, string> = {
+    draft: "Draft",
+    pending_payment: "Pending Payment",
+    paid: "Paid",
+    processing: "Processing",
+    shipped: "Shipped",
+    cancelled: "Cancelled",
+  };
+
+  function fmtDate(d: Date | null | undefined): string {
+    if (!d) return "";
+    return d.toISOString().replace("T", " ").slice(0, 16);
+  }
+
+  const HEADERS = [
+    "Order ID",
+    "Store",
+    "Order Date",
+    "Order Status",
+    "Fulfillment Status",
+    "Customer Email",
+    "Shipping Name",
+    "Address Line 1",
+    "Address Line 2",
+    "Postal Code",
+    "City",
+    "Country",
+    "Poster Title",
+    "Size",
+    "Width (cm)",
+    "Height (cm)",
+    "Quantity",
+    "Unit Price",
+    "Currency",
+    "Order Total",
+    "Master Print File URL",
+    "Preview Image URL",
+    "Tracking Number",
+    "Tracking URL",
+    "Production Started",
+    "Shipped At",
+    "Fulfillment Notes",
   ];
-  csvRows.push(headers.join(","));
+
+  const csvLines: string[] = [];
+  csvLines.push(HEADERS.map(h => csvEscape(h)).join(","));
 
   for (const order of orders) {
     const items = itemsByOrder.get(order.id) ?? [];
+    const baseRow = [
+      String(order.id),
+      order.storeKey,
+      fmtDate(order.createdAt),
+      ORDER_STATUS_LABEL[order.status] ?? order.status,
+      FULFILLMENT_LABEL[order.fulfillmentStatus ?? "not_started"] ?? order.fulfillmentStatus ?? "Not Started",
+      order.customerEmail,
+      order.shippingName,
+      order.shippingAddressLine1,
+      order.shippingAddressLine2 ?? "",
+      order.shippingPostalCode,
+      order.shippingCity,
+      order.shippingCountry,
+    ];
+    const trailingRow = [
+      order.trackingNumber ?? "",
+      order.trackingUrl ?? "",
+      fmtDate(order.productionStartedAt),
+      fmtDate(order.shippedAt),
+      order.fulfillmentNotes ?? "",
+    ];
+
     if (items.length === 0) {
-      csvRows.push([
-        order.id,
-        csvEscape(order.storeKey),
-        csvEscape(order.customerEmail),
-        csvEscape(order.shippingName),
-        csvEscape(order.shippingAddressLine1),
-        csvEscape(order.shippingAddressLine2 ?? ""),
-        csvEscape(order.shippingPostalCode),
-        csvEscape(order.shippingCity),
-        csvEscape(order.shippingCountry),
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        csvEscape(order.trackingNumber ?? ""),
-        csvEscape(order.fulfillmentStatus ?? "not_started"),
-      ].join(","));
+      csvLines.push([
+        ...baseRow,
+        "", "", "", "", "", "", "", String(Number(order.total)), order.currency,
+        ...trailingRow,
+      ].map(csvEscape).join(","));
     } else {
       for (const item of items) {
-        csvRows.push([
-          order.id,
-          csvEscape(order.storeKey),
-          csvEscape(order.customerEmail),
-          csvEscape(order.shippingName),
-          csvEscape(order.shippingAddressLine1),
-          csvEscape(order.shippingAddressLine2 ?? ""),
-          csvEscape(order.shippingPostalCode),
-          csvEscape(order.shippingCity),
-          csvEscape(order.shippingCountry),
-          csvEscape(item.posterTitleSnapshot),
-          csvEscape(item.sizeLabelSnapshot ?? ""),
-          item.widthCmSnapshot ?? "",
-          item.heightCmSnapshot ?? "",
-          item.quantity,
-          csvEscape(item.masterPrintImageUrlSnapshot ?? ""),
-          csvEscape(order.trackingNumber ?? ""),
-          csvEscape(order.fulfillmentStatus ?? "not_started"),
-        ].join(","));
+        csvLines.push([
+          ...baseRow,
+          item.posterTitleSnapshot,
+          item.sizeLabelSnapshot ?? "",
+          item.widthCmSnapshot != null ? String(Number(item.widthCmSnapshot)) : "",
+          item.heightCmSnapshot != null ? String(Number(item.heightCmSnapshot)) : "",
+          String(item.quantity),
+          String(Number(item.unitPrice)),
+          item.currency,
+          String(Number(order.total)),
+          item.masterPrintImageUrlSnapshot ?? "",
+          item.previewImageUrlSnapshot ?? "",
+          ...trailingRow,
+        ].map(csvEscape).join(","));
       }
     }
   }
 
-  res.setHeader("Content-Type", "text/csv");
-  res.setHeader("Content-Disposition", `attachment; filename="fulfillment-export.csv"`);
-  return res.send(csvRows.join("\n"));
+  const exportDate = new Date().toISOString().slice(0, 10);
+  const filename = `fulfillment-export-${exportDate}.csv`;
+  const BOM = "\uFEFF";
+  const body = BOM + csvLines.join("\r\n");
+
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  return res.send(body);
 });
 
 function csvEscape(value: string): string {

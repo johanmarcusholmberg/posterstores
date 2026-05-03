@@ -364,20 +364,23 @@ describe("GET /api/admin/fulfillment/export.csv", () => {
     expect(res.headers["content-type"]).toMatch(/text\/csv/);
   });
 
-  it("returns CSV with expected headers", async () => {
+  it("returns CSV with human-readable headers", async () => {
     const res = await request(app)
       .get(`/api/admin/fulfillment/export.csv?storeKey=${TEST_STORE_KEY}`)
       .set("X-Admin-Token", ADMIN_TOKEN);
 
     expect(res.status).toBe(200);
-    const firstLine = res.text.split("\n")[0];
-    expect(firstLine).toContain("order_id");
-    expect(firstLine).toContain("customer_email");
-    expect(firstLine).toContain("shipping_name");
-    expect(firstLine).toContain("poster_title");
-    expect(firstLine).toContain("master_print_image_url");
-    expect(firstLine).toContain("tracking_number");
-    expect(firstLine).toContain("fulfillment_status");
+    const firstLine = res.text.replace(/^\uFEFF/, "").split("\r\n")[0];
+    expect(firstLine).toContain("Order ID");
+    expect(firstLine).toContain("Customer Email");
+    expect(firstLine).toContain("Shipping Name");
+    expect(firstLine).toContain("Poster Title");
+    expect(firstLine).toContain("Master Print File URL");
+    expect(firstLine).toContain("Tracking Number");
+    expect(firstLine).toContain("Fulfillment Status");
+    expect(firstLine).toContain("Order Date");
+    expect(firstLine).toContain("Order Total");
+    expect(firstLine).toContain("Currency");
   });
 
   it("is store-scoped (nonexistent store returns only header row)", async () => {
@@ -386,7 +389,7 @@ describe("GET /api/admin/fulfillment/export.csv", () => {
       .set("X-Admin-Token", ADMIN_TOKEN);
 
     expect(res.status).toBe(200);
-    const lines = res.text.trim().split("\n");
+    const lines = res.text.replace(/^\uFEFF/, "").trim().split("\r\n");
     expect(lines.length).toBe(1);
   });
 
