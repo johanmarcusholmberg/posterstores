@@ -10,6 +10,7 @@ import { Footer } from "@/components/layout/Footer";
 import Home from "@/pages/Home";
 import Shop from "@/pages/Shop";
 import PosterDetail from "@/pages/PosterDetail";
+import PosterBySlug from "@/pages/PosterBySlug";
 import Cart from "@/pages/Cart";
 import Checkout from "@/pages/Checkout";
 import OrderConfirmation from "@/pages/OrderConfirmation";
@@ -50,6 +51,7 @@ function Router() {
             <Switch>
               <Route path="/" component={Home} />
               <Route path="/shop" component={Shop} />
+              <Route path="/posters/:slug" component={PosterBySlug} />
               <Route path="/poster/:id" component={PosterDetail} />
               <Route path="/cart" component={Cart} />
               <Route path="/checkout" component={Checkout} />

@@ -44,9 +44,22 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 - `artifacts/poster-store/src/config/activeStore.ts` — ACTIVE_STORE_KEY = "postsofspain"
 - `artifacts/poster-store/src/context/StorefrontContext.tsx` — React context providing active store config
 
+### Poster Slug System
+- `slug` column added to `posters` table (text, nullable, unique per store_key)
+- Unique constraint: `posters_store_key_slug_unique` on `(store_key, slug) WHERE slug IS NOT NULL`
+- Migration runs on API startup via `migrateSlugField()` — adds column + index if missing, then generates slugs for any poster that lacks one
+- Slug generation: lowercase, NFD-normalized (strips diacritics), strips non-alphanumeric, spaces → dashes, deduped with `-2`, `-3` suffix per store
+- Admin form: auto-generates slug from title (live), allows manual edit, shows regenerate button, validates format + uniqueness
+- Public URLs: `/posters/:slug` → `PosterBySlug.tsx` (published only, store-scoped 404 if draft or wrong store)
+- Backward compat: `/poster/:id` → `PosterDetail.tsx` still works
+- PosterCard links to `/posters/:slug` when slug present, falls back to `/poster/:id`
+- SEO basics: `PosterBySlug` sets `document.title` and `meta[name=description]` on load
+- API: `GET /api/posters/by-slug/:slug?storeKey=` — public, published only
+
 ### API Endpoints
 - `GET /api/posters` — list posters (storeKey, region, city, category, tag, search, sort, limit, offset)
-- `GET /api/posters/:id` — single poster
+- `GET /api/posters/by-slug/:slug?storeKey=` — single poster by slug (published only, store-scoped)
+- `GET /api/posters/:id` — single poster by ID (backward compat)
 - `GET /api/stats/featured` — featured posters array (NOT wrapped in object)
 - `GET /api/stats/new-arrivals` — new arrivals array (NOT wrapped in object)
 - `GET /api/cart` — cart by sessionId (returns `{sessionId, items, total, itemCount}`)

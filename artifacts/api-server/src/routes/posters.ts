@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { postersTable, posterSizesTable } from "@workspace/db";
-import { eq, and, ilike, gte, lte, desc, asc, sql, inArray } from "drizzle-orm";
+import { eq, and, ilike, gte, lte, desc, asc, sql, inArray, ne } from "drizzle-orm";
 import {
   ListPostersQueryParams,
   CreatePosterBody,
@@ -11,8 +11,11 @@ import {
   DeletePosterParams,
 } from "@workspace/api-zod";
 import { requireAdmin } from "../middleware/requireAdmin";
+import { generateSlug } from "../lib/migrateSlugField";
 
 const router = Router();
+
+const SLUG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 function isAdminRequest(req: import("express").Request): boolean {
   const token = process.env.ADMIN_API_TOKEN;
@@ -86,6 +89,33 @@ async function savePosterSizes(
         sortOrder: s.sortOrder ?? idx,
       }))
     );
+  }
+}
+
+async function isSlugTaken(storeKey: string, slug: string, excludeId?: number): Promise<boolean> {
+  const conditions = [
+    eq(postersTable.storeKey, storeKey),
+    eq(postersTable.slug, slug),
+  ];
+  if (excludeId !== undefined) {
+    conditions.push(ne(postersTable.id, excludeId));
+  }
+  const rows = await db
+    .select({ id: postersTable.id })
+    .from(postersTable)
+    .where(and(...conditions))
+    .limit(1);
+  return rows.length > 0;
+}
+
+async function resolveUniqueSlug(storeKey: string, baseSlug: string, excludeId?: number): Promise<string> {
+  let slug = baseSlug;
+  let attempt = 0;
+  while (true) {
+    const candidate = attempt === 0 ? slug : `${baseSlug}-${attempt + 1}`;
+    const taken = await isSlugTaken(storeKey, candidate, excludeId);
+    if (!taken) return candidate;
+    attempt++;
   }
 }
 
@@ -177,10 +207,24 @@ router.post("/posters", requireAdmin, async (req, res) => {
   const body = CreatePosterBody.safeParse(req.body);
   if (!body.success) return res.status(400).json({ error: body.error.flatten() });
 
-  const { price, posterSizes: posterSizesInput, ...rest } = body.data;
+  const { price, posterSizes: posterSizesInput, slug: rawSlug, ...rest } = body.data as typeof body.data & { slug?: string };
+
+  if (rawSlug !== undefined) {
+    if (!SLUG_REGEX.test(rawSlug)) {
+      return res.status(400).json({ error: "slug must be lowercase, URL-safe (letters, numbers, hyphens only), and cannot start or end with a hyphen" });
+    }
+    const taken = await isSlugTaken(rest.storeKey, rawSlug);
+    if (taken) {
+      return res.status(409).json({ error: "This slug is already in use in this store. Please choose a different slug." });
+    }
+  }
+
+  const titleSlug = rest.title ? generateSlug(rest.title) : null;
+  const slug = rawSlug ?? (titleSlug ? await resolveUniqueSlug(rest.storeKey, titleSlug) : null);
+
   const [poster] = await db
     .insert(postersTable)
-    .values({ ...rest, price: String(price) })
+    .values({ ...rest, price: String(price), slug })
     .returning();
 
   if (posterSizesInput && posterSizesInput.length > 0) {
@@ -189,6 +233,27 @@ router.post("/posters", requireAdmin, async (req, res) => {
 
   const [withSizes] = await attachSizesToPosters([poster], true);
   return res.status(201).json(withSizes);
+});
+
+router.get("/posters/by-slug/:slug", async (req, res) => {
+  const slug = req.params.slug;
+  const storeKey = typeof req.query.storeKey === "string" ? req.query.storeKey : undefined;
+  if (!storeKey) return res.status(400).json({ error: "storeKey query parameter is required" });
+
+  const [poster] = await db
+    .select()
+    .from(postersTable)
+    .where(and(
+      eq(postersTable.storeKey, storeKey),
+      eq(postersTable.slug, slug),
+      eq(postersTable.status, "published"),
+    ))
+    .limit(1);
+
+  if (!poster) return res.status(404).json({ error: "Not found" });
+
+  const [withSizes] = await attachSizesToPosters([poster], false);
+  return res.json(withSizes);
 });
 
 router.get("/posters/:id", async (req, res) => {
@@ -234,10 +299,21 @@ router.put("/posters/:id", requireAdmin, async (req, res) => {
     return res.status(403).json({ error: "storeKey mismatch: cannot edit poster from another store" });
   }
 
-  const { price, posterSizes: posterSizesInput, ...rest } = body.data;
-  const updateData = price !== undefined
-    ? { ...rest, price: String(price) }
-    : rest;
+  const { price, posterSizes: posterSizesInput, slug: rawSlug, ...rest } = body.data as typeof body.data & { slug?: string };
+
+  if (rawSlug !== undefined) {
+    if (!SLUG_REGEX.test(rawSlug)) {
+      return res.status(400).json({ error: "slug must be lowercase, URL-safe (letters, numbers, hyphens only), and cannot start or end with a hyphen" });
+    }
+    const taken = await isSlugTaken(existing.storeKey, rawSlug, existing.id);
+    if (taken) {
+      return res.status(409).json({ error: "This slug is already in use in this store. Please choose a different slug." });
+    }
+  }
+
+  const updateData: Record<string, unknown> = { ...rest };
+  if (price !== undefined) updateData.price = String(price);
+  if (rawSlug !== undefined) updateData.slug = rawSlug;
 
   const [poster] = await db
     .update(postersTable)

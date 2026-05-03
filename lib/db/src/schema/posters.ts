@@ -5,6 +5,7 @@ import { z } from "zod/v4";
 export const postersTable = pgTable("posters", {
   id: serial("id").primaryKey(),
   storeKey: text("store_key").notNull().default("postsofspain"),
+  slug: text("slug"),
   title: text("title").notNull(),
   description: text("description"),
   imageUrl: text("image_url").notNull(),

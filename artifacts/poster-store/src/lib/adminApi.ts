@@ -37,6 +37,7 @@ export interface AdminPosterSize {
 export interface AdminPoster {
   id: number;
   storeKey: string;
+  slug?: string | null;
   title: string;
   description?: string | null;
   imageUrl: string;
@@ -74,9 +75,11 @@ export interface PosterSizePayload {
 
 export type CreatePosterPayload = Omit<AdminPoster, "id" | "createdAt" | "posterSizes" | "lowestActivePrice"> & {
   posterSizes?: PosterSizePayload[];
+  slug?: string;
 };
 export type UpdatePosterPayload = Partial<Omit<AdminPoster, "id" | "createdAt" | "storeKey" | "posterSizes" | "lowestActivePrice">> & {
   posterSizes?: PosterSizePayload[];
+  slug?: string;
 };
 
 export interface AdminOrderItem {

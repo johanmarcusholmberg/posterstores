@@ -86,8 +86,10 @@ export const PosterCard = ({ poster }: PosterCardProps) => {
     ? `From ${formatPrice(displayPrice, displayCurrency)}`
     : formatPrice(displayPrice, displayCurrency);
 
+  const href = (poster as any).slug ? `/posters/${(poster as any).slug}` : `/poster/${poster.id}`;
+
   return (
-    <Link href={`/poster/${poster.id}`} className="group block" data-testid={`link-poster-${poster.id}`}>
+    <Link href={href} className="group block" data-testid={`link-poster-${poster.id}`}>
       <div className="relative aspect-[3/4] overflow-hidden bg-muted rounded-md mb-4 shadow-sm group-hover:shadow-md transition-shadow">
         <img
           src={displayImage}

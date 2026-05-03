@@ -7,6 +7,7 @@ import { stripeWebhookHandler } from "./routes/stripeWebhook";
 import { logger } from "./lib/logger";
 import { seedMockupTemplates } from "./routes/mockups";
 import { migrateExistingPosterSizes } from "./lib/migrateExistingPosterSizes";
+import { migrateSlugField } from "./lib/migrateSlugField";
 
 const app: Express = express();
 
@@ -51,8 +52,10 @@ seedMockupTemplates().catch((err) =>
   logger.error(err, "Failed to seed mockup templates")
 );
 
-migrateExistingPosterSizes().catch((err) =>
-  logger.error(err, "Failed to migrate existing poster sizes")
-);
+migrateSlugField()
+  .then(() => migrateExistingPosterSizes())
+  .catch((err) =>
+    logger.error(err, "Failed to run startup migrations")
+  );
 
 export default app;

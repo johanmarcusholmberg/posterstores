@@ -22,10 +22,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { storefronts } from "@/config/storefronts";
-import { Save, ArrowLeft, Loader2 } from "lucide-react";
+import { Save, ArrowLeft, Loader2, RefreshCw } from "lucide-react";
 
 interface AdminPosterFormProps {
   existing?: AdminPoster;
+}
+
+const SLUG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+function generateSlugFromTitle(title: string): string {
+  return title
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 function validateSizes(sizes: SizeRow[], status: PosterStatus): string[] {
@@ -50,12 +64,15 @@ function buildPublishBlockReasons(fields: {
   title: string;
   imageUrl: string;
   category: string;
+  slug: string;
   sizes: SizeRow[];
 }): string[] {
   const reasons: string[] = [];
   if (!fields.title.trim()) reasons.push("Title is required");
   if (!fields.imageUrl.trim()) reasons.push("Image URL is required");
   if (!fields.category.trim()) reasons.push("Category is required");
+  if (!fields.slug.trim()) reasons.push("Slug is required before publishing");
+  else if (!SLUG_REGEX.test(fields.slug)) reasons.push("Slug format is invalid");
   const activeSizes = fields.sizes.filter(s => s.active);
   if (activeSizes.length === 0) reasons.push("At least one active size with price is required");
   else {
@@ -88,6 +105,8 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
 
   const [storeKey] = useState(existing?.storeKey ?? adminStoreKey);
   const [title, setTitle] = useState(existing?.title ?? "");
+  const [slug, setSlug] = useState(existing?.slug ?? "");
+  const [slugManuallyEdited, setSlugManuallyEdited] = useState(!!existing?.slug);
   const [description, setDescription] = useState(existing?.description ?? "");
   const [imageUrl, setImageUrl] = useState(existing?.imageUrl ?? "");
   const [category, setCategory] = useState(existing?.category ?? "");
@@ -114,7 +133,26 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
       .catch(() => setMockups([]));
   }, [existing?.id]);
 
-  const publishBlockReasons = buildPublishBlockReasons({ title, imageUrl, category, sizes });
+  useEffect(() => {
+    if (!slugManuallyEdited && !existing) {
+      setSlug(generateSlugFromTitle(title));
+    }
+  }, [title, slugManuallyEdited, existing]);
+
+  const handleSlugChange = (value: string) => {
+    setSlugManuallyEdited(true);
+    setSlug(value);
+    setErrors(p => ({ ...p, slug: "" }));
+  };
+
+  const handleRegenerateSlug = () => {
+    const generated = generateSlugFromTitle(title);
+    setSlug(generated);
+    setSlugManuallyEdited(false);
+    setErrors(p => ({ ...p, slug: "" }));
+  };
+
+  const publishBlockReasons = buildPublishBlockReasons({ title, imageUrl, category, slug, sizes });
   const canPublish = publishBlockReasons.length === 0;
 
   const validate = () => {
@@ -122,6 +160,10 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
     if (!title.trim()) errs.title = "Title is required";
     if (!imageUrl.trim()) errs.imageUrl = "Image URL is required";
     if (!category.trim()) errs.category = "Category is required";
+
+    if (slug.trim() && !SLUG_REGEX.test(slug.trim())) {
+      errs.slug = "Slug must be lowercase, URL-safe (letters, numbers, hyphens only), and cannot start or end with a hyphen";
+    }
 
     const sizeErrs = validateSizes(sizes, status);
     setSizeErrors(sizeErrs);
@@ -160,6 +202,8 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
       sortOrder: idx,
     }));
 
+    const slugValue = slug.trim() || undefined;
+
     try {
       if (existing) {
         const payload: UpdatePosterPayload = {
@@ -177,6 +221,7 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
           status,
           isFeatured,
           isNew,
+          slug: slugValue,
         };
         await adminUpdatePoster(token, existing.id, storeKey, payload);
         toast({ title: "Poster updated", description: title });
@@ -197,6 +242,7 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
           status,
           isFeatured,
           isNew,
+          slug: slugValue,
         };
         const created = await adminCreatePoster(token, payload);
         toast({ title: "Poster created", description: title });
@@ -204,9 +250,13 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
         return;
       }
     } catch (err: any) {
+      const message: string = err?.message ?? "Unknown error";
+      if (message.toLowerCase().includes("slug")) {
+        setErrors(p => ({ ...p, slug: message }));
+      }
       toast({
         title: existing ? "Update failed" : "Create failed",
-        description: err?.message ?? "Unknown error",
+        description: message,
         variant: "destructive",
       });
     } finally {
@@ -256,6 +306,36 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
                   data-testid="field-title"
                 />
                 {errors.title && <p className="text-xs text-destructive">{errors.title}</p>}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="slug">
+                  URL Slug <span className="text-destructive">*</span>
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="slug"
+                    value={slug}
+                    onChange={e => handleSlugChange(e.target.value)}
+                    placeholder="e.g. valencia-sunset"
+                    className="font-mono text-sm"
+                    data-testid="field-slug"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={handleRegenerateSlug}
+                    title="Regenerate from title"
+                    data-testid="btn-regenerate-slug"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Used in the public product URL: <span className="font-mono">/posters/{slug || "your-slug-here"}</span>. Must be unique within the selected store.
+                </p>
+                {errors.slug && <p className="text-xs text-destructive">{errors.slug}</p>}
               </div>
 
               <div className="space-y-1.5">
@@ -455,6 +535,17 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
               {errors.status && <p className="text-xs text-destructive mt-2">{errors.status}</p>}
             </CardContent>
           </Card>
+
+          {slug && (
+            <Card className="border-muted">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-muted-foreground">Public URL preview</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs font-mono text-muted-foreground break-all">/posters/{slug}</p>
+              </CardContent>
+            </Card>
+          )}
 
           {sizes.filter(s => s.active).length > 0 && (
             <Card className="border-muted">
