@@ -1,0 +1,168 @@
+Continue building the reusable multi-store poster webstore.
+
+CURRENT STATUS:
+- Public store pages exist:
+  - /about
+  - /shipping
+  - /returns
+  - /privacy
+  - /terms
+  - /contact
+- The app has admin store management, launch checklist and production setup.
+- The app is multi-store and store-scoped.
+
+NEXT GOAL:
+Add store-scoped editable content pages so text on public pages can be updated from admin.
+
+Important:
+- Do not rewrite the public page design.
+- Do not break existing routes.
+- Do not add a complex CMS.
+- Keep this simple and practical.
+- Keep everything store-scoped.
+- Keep all tests passing.
+
+WHY THIS MATTERS:
+Each webstore needs editable copy for:
+- About
+- Shipping
+- Returns
+- Privacy
+- Terms
+- Contact
+
+PostsofSpain and PostsofSweden should be able to have different text.
+
+DATA MODEL
+
+Create a store_content_pages table/model:
+
+store_content_pages:
+- id
+- store_key
+- page_key
+- title
+- subtitle nullable
+- content markdown/text
+- meta_title nullable
+- meta_description nullable
+- published boolean
+- updated_at
+- created_at
+
+Rules:
+- Unique constraint on store_key + page_key.
+- Supported page_key values:
+  - about
+  - shipping
+  - returns
+  - privacy
+  - terms
+  - contact
+- Content is store-scoped.
+- If no row exists for a page, the public page should fall back to the current default placeholder copy.
+
+ADMIN ROUTES
+
+Create:
+
+/admin/content
+/admin/content/:pageKey
+
+/admin/content:
+Show all editable pages for selected admin store:
+- About
+- Shipping
+- Returns
+- Privacy
+- Terms
+- Contact
+
+For each page show:
+- Page title
+- Published status
+- Last updated
+- Edit button
+
+/admin/content/:pageKey:
+Edit selected page.
+
+Fields:
+- Title
+- Subtitle
+- Content
+- Meta title
+- Meta description
+- Published toggle
+
+Use a simple textarea for content.
+Markdown support is nice if already available, but not required.
+If Markdown is used, render safely.
+
+PUBLIC PAGE BEHAVIOR
+
+Update public pages:
+- /about
+- /shipping
+- /returns
+- /privacy
+- /terms
+- /contact
+
+Behavior:
+- Load content for active store + pageKey.
+- If published content exists, render it.
+- If no content exists, render existing fallback/default copy.
+- If content exists but published = false, use fallback/default copy for public users.
+- Page title/meta description should use content page meta fields if available, otherwise fallback defaults.
+
+ADMIN NAVIGATION
+
+Add admin nav item:
+- Content Pages
+
+Add quick link from dashboard:
+- Edit content pages
+
+LAUNCH CHECKLIST
+
+Update /admin/launch-checklist:
+- Instead of only checking that routes exist, also check whether store content pages are configured/published.
+- Show Warning if a page is only using fallback placeholder copy.
+- Show Pass if a store-specific published content row exists.
+- Pages:
+  - Shipping
+  - Returns
+  - Privacy
+  - Terms
+  - Contact
+  - About
+
+SECURITY
+
+- Content editing requires admin token.
+- Public reads do not require admin token.
+- Public reads only return published content.
+- Admin reads can return draft/unpublished content.
+
+TESTING
+
+Add or update tests for:
+- /admin/content requires admin token.
+- Admin can create/update about page content for selected store.
+- Content is store-scoped.
+- Public /about renders store-specific published content.
+- Public page falls back to default copy if no content row exists.
+- Unpublished content is not shown publicly.
+- Launch checklist warns when content pages use fallback copy.
+- Existing public pages still load.
+- Existing storefront/admin/checkout tests still pass.
+
+At the end, summarize:
+1. Data model created.
+2. Admin content pages added.
+3. Public page rendering behavior.
+4. Fallback behavior.
+5. Store scoping.
+6. Launch checklist update.
+7. Tests added/updated.
