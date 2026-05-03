@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
 import { useGetPoster, getGetPosterQueryKey, useListPosters, getListPostersQueryKey, useAddCartItem, getGetCartQueryKey } from "@workspace/api-client-react";
 import { useStorefront } from "@/context/StorefrontContext";
 import { useAuth } from "@/context/AuthContext";
@@ -38,6 +38,15 @@ export default function PosterDetail() {
   const sessionId = getSessionId();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
+
+  const goBack = () => {
+    if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      setLocation("/shop");
+    }
+  };
 
   const [selectedSizeId, setSelectedSizeId] = useState<number | null>(null);
   const [mockups, setMockups] = useState<PosterMockup[] | null>(null);
@@ -175,7 +184,7 @@ export default function PosterDetail() {
     return (
       <div className="container mx-auto px-4 py-24 text-center">
         <h1 className="text-3xl font-serif mb-4">Poster not found</h1>
-        <Link href="/shop"><Button variant="outline">Back to shop</Button></Link>
+        <Button variant="outline" onClick={goBack}>Back to shop</Button>
       </div>
     );
   }
@@ -184,9 +193,9 @@ export default function PosterDetail() {
 
   return (
     <div className="container mx-auto px-4 py-12">
-      <Link href="/shop" className="inline-flex items-center text-muted-foreground hover:text-foreground mb-8">
+      <button onClick={goBack} className="inline-flex items-center text-muted-foreground hover:text-foreground mb-8">
         <ArrowLeft className="mr-2 h-4 w-4" /> Back to shop
-      </Link>
+      </button>
 
       <div className="grid grid-cols-1 md:grid-cols-[360px_1fr] gap-10 mb-24 items-start">
         <div>

@@ -86,7 +86,7 @@ export default function Home() {
                     {heroPosters.slice(0, 2).map((poster) => (
                       <Link
                         key={poster.id}
-                        href={poster.slug ? `/posters/${poster.slug}` : `/poster/${poster.id}`}
+                        href={(poster as any).slug ? `/posters/${(poster as any).slug}` : `/poster/${poster.id}`}
                         className="flex-1 block min-h-0"
                       >
                         <div className="overflow-hidden rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 group h-full">
@@ -104,7 +104,7 @@ export default function Home() {
                     {heroPosters.slice(2, 4).map((poster) => (
                       <Link
                         key={poster.id}
-                        href={poster.slug ? `/posters/${poster.slug}` : `/poster/${poster.id}`}
+                        href={(poster as any).slug ? `/posters/${(poster as any).slug}` : `/poster/${poster.id}`}
                         className="flex-1 block min-h-0"
                       >
                         <div className="overflow-hidden rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 group h-full">
