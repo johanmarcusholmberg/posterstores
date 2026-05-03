@@ -1,0 +1,80 @@
+There is a runtime error after the latest changes:
+
+[plugin:runtime-error-plugin] useStorefront must be used within a StorefrontProvider
+
+Stack trace:
+- useStorefront at src/context/StorefrontContext.tsx
+- PublicStorefrontSection at src/App.tsx
+
+GOAL:
+Fix the provider wrapping issue so every component that calls useStorefront is rendered inside StorefrontProvider.
+
+Important:
+- Do not disable the error.
+- Do not remove useStorefront where it is needed.
+- Do not hard-code store values as a workaround.
+- Do not break domain/route-based storefront resolution.
+- Do not break admin routes.
+- Do not break public routes.
+- Keep all tests passing.
+
+Please inspect:
+1. src/App.tsx
+2. StorefrontProvider usage
+3. PublicStorefrontSection
+4. Any newly added policy/legal/contact/about routes
+5. Any component calling useStorefront outside the provider
+
+Likely issue:
+PublicStorefrontSection calls useStorefront but is mounted before or outside StorefrontProvider.
+
+Required fix:
+- Ensure StorefrontProvider wraps all public storefront routes/components that use useStorefront.
+- If App.tsx has separate admin and public routing sections, keep admin outside if needed, but wrap the public storefront section properly.
+- If PublicStorefrontSection itself calls useStorefront, then PublicStorefrontSection must be rendered inside StorefrontProvider, or split it into:
+  - outer wrapper that provides StorefrontProvider
+  - inner component that calls useStorefront
+
+Suggested pattern:
+
+function App() {
+  return (
+    <StorefrontProvider>
+      <PublicStorefrontSection />
+    </StorefrontProvider>
+  )
+}
+
+Or if admin must stay separate:
+
+function App() {
+  return (
+    <>
+      <AdminRoutes />
+      <StorefrontProvider>
+        <PublicStorefrontSection />
+      </StorefrontProvider>
+    </>
+  )
+}
+
+But make sure route-prefix/domain resolver still works as designed.
+
+Also check that route-prefixed storefronts like:
+- /spain
+- /spain/shop
+- /spain/posters/:slug
+
+still resolve the correct store after the fix.
+
+Add/update a regression test:
+- App renders homepage without throwing useStorefront provider error.
+- Public policy pages render without throwing.
+- /admin still renders without being broken by the provider change.
+- /spain route still works if route prefix is configured.
+
+At the end, summarize:
+1. What component was outside StorefrontProvider.
+2. How it was fixed.
+3. Why domain/route resolution still works.
+4. Confirm test result.

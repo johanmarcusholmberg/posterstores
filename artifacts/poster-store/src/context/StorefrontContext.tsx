@@ -1,6 +1,11 @@
-import React, { createContext, useContext, ReactNode, useState, useEffect } from 'react';
+// @refresh reset
+import React, { ReactNode, useState, useEffect, useContext } from 'react';
 import { getActiveStore, DEFAULT_STORE_KEY } from '../config/activeStore';
 import { StorefrontConfig } from '../config/storefronts';
+import { StorefrontContext, StorefrontContextValue } from './storefrontContextDef';
+
+export type { StorefrontContextValue };
+export { StorefrontContext };
 
 interface StoreSummary {
   storeKey: string;
@@ -9,13 +14,6 @@ interface StoreSummary {
   routePrefix: string | null;
   active: boolean;
 }
-
-interface StorefrontContextValue extends StorefrontConfig {
-  isLoadingFromDb: boolean;
-  resolvedRoutePrefix: string | null;
-}
-
-const StorefrontContext = createContext<StorefrontContextValue | null>(null);
 
 async function fetchAllActiveStores(): Promise<StoreSummary[]> {
   try {
@@ -53,10 +51,11 @@ function resolveStore(
   const segments = pathname.split('/').filter(Boolean);
   const firstSegment = segments[0];
 
-  // 1. Route prefix — but skip known top-level pages and admin
+  // 1. Route prefix — skip known top-level pages, admin, and policy pages
   const SKIP_SEGMENTS = new Set([
     'admin', 'shop', 'posters', 'poster', 'cart', 'checkout',
     'order', 'favorites', 'login', 'register', 'account',
+    'shipping', 'returns', 'privacy', 'terms', 'contact', 'about',
   ]);
 
   if (firstSegment && !SKIP_SEGMENTS.has(firstSegment)) {
@@ -113,7 +112,6 @@ export const StorefrontProvider = ({ children }: { children: ReactNode }) => {
         if (dbConfig) {
           setStoreConfig(dbConfig);
         } else {
-          // Try to fall back to static config for resolved store
           const { storefronts } = await import('../config/storefronts');
           const staticFallback = storefronts[storeKey];
           if (staticFallback) setStoreConfig(staticFallback);
@@ -136,7 +134,7 @@ export const StorefrontProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-export const useStorefront = () => {
+export const useStorefront = (): StorefrontContextValue => {
   const context = useContext(StorefrontContext);
   if (!context) {
     throw new Error('useStorefront must be used within a StorefrontProvider');
