@@ -196,7 +196,7 @@ export default function PosterBySlug() {
         <ArrowLeft className="mr-2 h-4 w-4" /> Back to shop
       </Link>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-24 mb-24">
+      <div className="grid grid-cols-1 md:grid-cols-[360px_1fr] gap-10 mb-24 items-start">
         <div>
           {hasMockups ? (
             <MockupGallery
