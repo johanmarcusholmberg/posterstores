@@ -2,7 +2,9 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Heart, User, LogOut, Package, ChevronRight, Truck } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Heart, User, LogOut, Package, ChevronRight, Truck, KeyRound } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface OrderItem {
@@ -217,6 +219,119 @@ function OrderHistory() {
   );
 }
 
+function ChangePasswordForm() {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(false);
+
+    if (newPassword !== confirmPassword) {
+      setError("New passwords do not match");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Failed to change password");
+        return;
+      }
+      setSuccess(true);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setOpen(false);
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (!open) {
+    return (
+      <div>
+        {success && (
+          <p className="text-sm text-green-700 mb-3">Password changed successfully.</p>
+        )}
+        <Button
+          variant="outline"
+          className="w-full justify-start gap-2 h-11"
+          onClick={() => { setSuccess(false); setOpen(true); }}
+        >
+          <KeyRound className="h-4 w-4" />
+          Change password
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border border-border rounded-xl p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-sm">Change password</h3>
+        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setOpen(false)}>
+          Cancel
+        </Button>
+      </div>
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="current-password" className="text-xs">Current password</Label>
+          <Input
+            id="current-password"
+            type="password"
+            autoComplete="current-password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            required
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="new-password" className="text-xs">New password</Label>
+          <Input
+            id="new-password"
+            type="password"
+            autoComplete="new-password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            required
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="confirm-password" className="text-xs">Confirm new password</Label>
+          <Input
+            id="confirm-password"
+            type="password"
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+          />
+        </div>
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        <Button type="submit" size="sm" className="w-full" disabled={isLoading}>
+          {isLoading ? "Saving..." : "Update password"}
+        </Button>
+      </form>
+    </div>
+  );
+}
+
 export default function Account() {
   const { user, isLoading, logout } = useAuth();
   const [, navigate] = useLocation();
@@ -278,6 +393,10 @@ export default function Account() {
               Log out
             </Button>
           </div>
+        </section>
+
+        <section>
+          <ChangePasswordForm />
         </section>
 
         <section>

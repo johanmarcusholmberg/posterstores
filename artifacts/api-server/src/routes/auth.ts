@@ -124,4 +124,43 @@ router.get("/auth/me", requireAuth, (req, res) => {
   return res.json({ user: req.user });
 });
 
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z.string().min(8, "New password must be at least 8 characters"),
+});
+
+router.post("/auth/change-password", requireAuth, authLimiter, async (req, res) => {
+  const parsed = changePasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Invalid input" });
+  }
+
+  const { currentPassword, newPassword } = parsed.data;
+  const userId = req.user!.id;
+
+  const client = await pool.connect();
+  try {
+    const result = await client.query<{ password_hash: string }>(
+      "SELECT password_hash FROM users WHERE id = $1",
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const valid = await bcrypt.compare(currentPassword, result.rows[0].password_hash);
+    if (!valid) {
+      return res.status(401).json({ error: "Current password is incorrect" });
+    }
+
+    const newHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    await client.query("UPDATE users SET password_hash = $1 WHERE id = $2", [newHash, userId]);
+
+    return res.json({ ok: true });
+  } finally {
+    client.release();
+  }
+});
+
 export default router;
