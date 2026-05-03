@@ -1,0 +1,93 @@
+Review and harden the current Replit monorepo for production deployment.
+
+Current architecture:
+- pnpm monorepo in Replit
+- React + Vite frontend served at /
+- Express 5 API served at /api
+- Internal mockup sandbox at /__mockup
+- Replit PostgreSQL via DATABASE_URL
+- Drizzle ORM
+- Custom email/password auth with bcryptjs and session tokens in httpOnly cookies
+- Stripe Checkout + webhook
+- Resend email provider
+- Admin access currently token-gated with X-Admin-Token from localStorage
+
+Goal:
+Make the project safer and more production-ready before connecting a custom domain and publishing.
+
+Tasks:
+
+1. CORS hardening
+- Replace permissive origin: true with an explicit allowlist.
+- Read allowed origins from an environment variable, for example ALLOWED_ORIGINS.
+- Support comma-separated domains.
+- Include clear development fallback for Replit preview/dev domains without weakening production.
+
+2. Rate limiting
+- Add rate limiting to sensitive routes:
+  - /api/auth/login
+  - /api/auth/register
+  - /api/checkout or Stripe checkout session route
+  - /api/newsletter
+  - admin routes if applicable
+- Use reasonable defaults.
+- Return clear but non-revealing error messages.
+
+3. Admin security review
+- Identify where ADMIN_API_TOKEN is used.
+- Make sure it is never hardcoded or exposed in frontend source.
+- If keeping the current admin-token approach for now, add warnings/comments and make it production-safe enough for MVP.
+- Prefer a path toward httpOnly-cookie-based admin sessions if this can be done without a major rewrite.
+- Make sure /__mockup is not publicly accessible in production unless explicitly enabled.
+
+4. Environment variable validation
+- Add startup validation for required production variables:
+  - DATABASE_URL
+  - STRIPE_SECRET_KEY
+  - STRIPE_WEBHOOK_SECRET
+  - APP_BASE_URL
+  - RESEND_API_KEY
+  - EMAIL_FROM
+  - EMAIL_PROVIDER
+  - ADMIN_API_TOKEN
+  - ADMIN_ORDER_NOTIFICATION_EMAIL
+- Fail clearly on missing required production variables.
+- Allow safe development fallbacks only in development.
+
+5. Stripe production readiness
+- Confirm Stripe success/cancel URLs use APP_BASE_URL.
+- Confirm webhook signature validation is required in production.
+- Confirm order payment status cannot be spoofed from the frontend.
+- Confirm /api/orders/:id/verify-payment verifies directly with Stripe server-side.
+
+6. Auth hardening
+- Review password policy.
+- Increase minimum password length if currently 6 characters.
+- Ensure login/register errors do not reveal whether an email exists.
+- Confirm session cookies are httpOnly, secure in production, sameSite appropriate, and have a sensible expiry.
+
+7. Deployment checklist
+Create a clear production checklist in the repo, for example docs/PRODUCTION_DEPLOYMENT.md, covering:
+- Replit deployment steps
+- Required environment variables
+- Custom domain setup
+- DNS setup
+- Stripe production webhook setup
+- Resend sender verification
+- Admin token generation
+- Smoke test checklist after deployment
+
+Important constraints:
+- Do not rewrite the hosting architecture.
+- Do not migrate away from Replit PostgreSQL.
+- Do not introduce Supabase, Clerk, Firebase, or another auth provider.
+- Do not change the checkout flow unless needed for security.
+- Keep changes focused on production hardening.
+- Preserve the current frontend routes and API contract.
+
+After implementation, report:
+1. What changed
+2. Which files changed
+3. Which production risks remain
+4. Exact environment variables needed
+5. Step-by-step instructions to publish safely
