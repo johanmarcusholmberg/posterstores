@@ -93,7 +93,7 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
   return (
     <>
       <Link href={href} className="group block" data-testid={`link-poster-${poster.id}`}>
-        <div className="relative aspect-[3/4] overflow-hidden bg-muted rounded-md mb-4 shadow-sm group-hover:shadow-md transition-shadow">
+        <div className="relative aspect-[3/4] overflow-hidden bg-muted rounded-md mb-2 shadow-sm group-hover:shadow-md transition-shadow">
           <img
             src={displayImage}
             alt={poster.title}
