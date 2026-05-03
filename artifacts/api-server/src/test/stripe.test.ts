@@ -138,18 +138,21 @@ describe("POST /api/orders/:id/create-checkout-session", () => {
     expect(res.status).toBe(500);
   });
 
-  it("returns 500 if APP_BASE_URL is not configured", async () => {
+  it("returns 500 if neither APP_BASE_URL nor REPLIT_DOMAINS is configured", async () => {
     if (!publishedPosterId) return;
     const order = await createTestOrder();
 
     const originalUrl = process.env.APP_BASE_URL;
+    const originalDomains = process.env.REPLIT_DOMAINS;
     delete process.env.APP_BASE_URL;
+    delete process.env.REPLIT_DOMAINS;
 
     const res = await request(app)
       .post(`/api/orders/${order.id}/create-checkout-session?storeKey=${TEST_STORE_KEY}`)
       .send();
 
     if (originalUrl) process.env.APP_BASE_URL = originalUrl;
+    if (originalDomains) process.env.REPLIT_DOMAINS = originalDomains;
 
     expect(res.status).toBe(500);
   });

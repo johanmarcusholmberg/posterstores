@@ -15,13 +15,13 @@ async function sendOrderConfirmationEmail(
   order: typeof ordersTable.$inferSelect,
   items: (typeof orderItemsTable.$inferSelect)[]
 ) {
-  const apiKey = process.env.RESEND_API_KEY;
+  const apiKey = process.env.SENDGRID_API_KEY;
   if (!apiKey) {
-    logger.warn("RESEND_API_KEY not set, skipping confirmation email");
+    logger.warn("SENDGRID_API_KEY not set, skipping confirmation email");
     return;
   }
 
-  const from = process.env.EMAIL_FROM || "onboarding@resend.dev";
+  const from = process.env.EMAIL_FROM || "noreply@example.com";
 
   const itemRows = items
     .map(
@@ -108,17 +108,17 @@ async function sendOrderConfirmationEmail(
 </html>`;
 
   try {
-    const response = await fetch("https://api.resend.com/emails", {
+    const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        from,
-        to: [order.customerEmail],
+        from: { email: from },
+        personalizations: [{ to: [{ email: order.customerEmail }] }],
         subject: `Order Confirmed — #${order.id}`,
-        html,
+        content: [{ type: "text/html", value: html }],
       }),
     });
 
