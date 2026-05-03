@@ -4,7 +4,7 @@ import { db } from "@workspace/db";
 import { ordersTable, orderItemsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
-import { sendOrderConfirmationEmail } from "./stripeWebhook";
+import { sendPaymentConfirmedEmail, sendAdminNewOrderEmail } from "../email/emailService";
 
 const router = Router();
 
@@ -146,8 +146,30 @@ router.post("/orders/:id/verify-payment", async (req: Request, res: Response) =>
 
   const [updatedOrder] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId));
   const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, orderId));
+
   if (updatedOrder) {
-    await sendOrderConfirmationEmail(updatedOrder, items);
+    if (!updatedOrder.customerConfirmationSentAt) {
+      try {
+        await sendPaymentConfirmedEmail(updatedOrder, items);
+        await db
+          .update(ordersTable)
+          .set({ customerConfirmationSentAt: new Date() })
+          .where(eq(ordersTable.id, orderId));
+      } catch (err) {
+        logger.error({ err, orderId }, "Failed to send customer confirmation email via verify-payment fallback");
+      }
+    }
+    if (!updatedOrder.adminNotificationSentAt) {
+      try {
+        await sendAdminNewOrderEmail(updatedOrder, items);
+        await db
+          .update(ordersTable)
+          .set({ adminNotificationSentAt: new Date() })
+          .where(eq(ordersTable.id, orderId));
+      } catch (err) {
+        logger.error({ err, orderId }, "Failed to send admin notification email via verify-payment fallback");
+      }
+    }
   }
 
   return res.json({ paid: true });

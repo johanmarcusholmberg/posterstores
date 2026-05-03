@@ -26,6 +26,8 @@ export const ordersTable = pgTable("orders", {
   paymentStatus: text("payment_status"),
   paidAt: timestamp("paid_at"),
   cancelledAt: timestamp("cancelled_at"),
+  customerConfirmationSentAt: timestamp("customer_confirmation_sent_at"),
+  adminNotificationSentAt: timestamp("admin_notification_sent_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

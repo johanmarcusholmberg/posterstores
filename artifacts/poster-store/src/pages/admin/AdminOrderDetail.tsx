@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ExternalLink, ArrowLeft } from "lucide-react";
+import { ExternalLink, ArrowLeft, CheckCircle2, XCircle, Mail } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -210,6 +210,45 @@ export default function AdminOrderDetail() {
             <p className="text-sm text-muted-foreground">No Stripe payment data yet. Customer has not initiated payment.</p>
           </div>
         )}
+
+        {/* Email Status */}
+        <div className="rounded-lg border bg-background p-5">
+          <h3 className="font-semibold mb-4 text-sm text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+            <Mail className="w-4 h-4" /> Email Notifications
+          </h3>
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              {order.customerConfirmationSentAt ? (
+                <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+              ) : (
+                <XCircle className="w-4 h-4 text-muted-foreground shrink-0" />
+              )}
+              <div>
+                <p className={cn("text-sm font-medium", order.customerConfirmationSentAt ? "text-green-700" : "text-muted-foreground")}>
+                  Customer confirmation {order.customerConfirmationSentAt ? "sent" : "not sent"}
+                </p>
+                {order.customerConfirmationSentAt && (
+                  <p className="text-xs text-muted-foreground">{formatDate(order.customerConfirmationSentAt)}</p>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              {order.adminNotificationSentAt ? (
+                <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+              ) : (
+                <XCircle className="w-4 h-4 text-muted-foreground shrink-0" />
+              )}
+              <div>
+                <p className={cn("text-sm font-medium", order.adminNotificationSentAt ? "text-green-700" : "text-muted-foreground")}>
+                  Admin notification {order.adminNotificationSentAt ? "sent" : "not sent"}
+                </p>
+                {order.adminNotificationSentAt && (
+                  <p className="text-xs text-muted-foreground">{formatDate(order.adminNotificationSentAt)}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Customer + Shipping */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

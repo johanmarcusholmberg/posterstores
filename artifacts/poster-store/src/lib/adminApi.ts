@@ -110,6 +110,8 @@ export interface AdminOrder {
   stripePaymentIntentId?: string | null;
   paidAt?: string | null;
   cancelledAt?: string | null;
+  customerConfirmationSentAt?: string | null;
+  adminNotificationSentAt?: string | null;
   items: AdminOrderItem[];
   createdAt: string;
   updatedAt: string;

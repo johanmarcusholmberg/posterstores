@@ -55,6 +55,10 @@ function serializeOrder(
     total: Number(order.total),
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),
+    paidAt: order.paidAt?.toISOString() ?? null,
+    cancelledAt: order.cancelledAt?.toISOString() ?? null,
+    customerConfirmationSentAt: order.customerConfirmationSentAt?.toISOString() ?? null,
+    adminNotificationSentAt: order.adminNotificationSentAt?.toISOString() ?? null,
     items: items.map(serializeOrderItem),
   };
 }

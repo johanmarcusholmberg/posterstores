@@ -4,133 +4,12 @@ import { db } from "@workspace/db";
 import { ordersTable, orderItemsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
+import { sendPaymentConfirmedEmail, sendAdminNewOrderEmail } from "../email/emailService";
 
 function getStripe(): Stripe {
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) throw new Error("STRIPE_SECRET_KEY is not configured");
   return new Stripe(key, { apiVersion: "2025-04-30.basil" });
-}
-
-export async function sendOrderConfirmationEmail(
-  order: typeof ordersTable.$inferSelect,
-  items: (typeof orderItemsTable.$inferSelect)[]
-) {
-  const apiKey = process.env.SENDGRID_API_KEY;
-  if (!apiKey) {
-    logger.warn("SENDGRID_API_KEY not set, skipping confirmation email");
-    return;
-  }
-
-  const from = process.env.EMAIL_FROM || "noreply@example.com";
-
-  const itemRows = items
-    .map(
-      (item) => `
-      <tr>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;">${item.posterTitleSnapshot}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;">${item.sizeLabelSnapshot ?? "—"}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center;">${item.quantity}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;">${item.unitPrice} ${item.currency}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;">${item.totalPrice} ${item.currency}</td>
-      </tr>`
-    )
-    .join("");
-
-  const addrLine2 = order.shippingAddressLine2 ? `<br>${order.shippingAddressLine2}` : "";
-  const region = order.shippingRegion ? `, ${order.shippingRegion}` : "";
-
-  const html = `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#f9f6f1;font-family:Georgia,serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f6f1;padding:40px 0;">
-    <tr><td align="center">
-      <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.06);">
-        <tr>
-          <td style="background:#1a1a1a;padding:32px 40px;">
-            <h1 style="margin:0;color:#fff;font-size:22px;font-weight:normal;letter-spacing:0.05em;">Order Confirmed</h1>
-            <p style="margin:6px 0 0;color:#aaa;font-size:13px;">Order #${order.id}</p>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:32px 40px;">
-            <p style="margin:0 0 24px;color:#333;font-size:15px;">
-              Hi <strong>${order.shippingName}</strong>, thank you for your purchase!
-              Your order has been confirmed and will be processed shortly.
-            </p>
-
-            <h2 style="margin:0 0 12px;font-size:16px;color:#111;border-bottom:2px solid #f0ece4;padding-bottom:8px;">Items Ordered</h2>
-            <table width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;color:#333;">
-              <thead>
-                <tr style="background:#f9f6f1;">
-                  <th style="padding:8px 12px;text-align:left;">Item</th>
-                  <th style="padding:8px 12px;text-align:left;">Size</th>
-                  <th style="padding:8px 12px;text-align:center;">Qty</th>
-                  <th style="padding:8px 12px;text-align:right;">Price</th>
-                  <th style="padding:8px 12px;text-align:right;">Total</th>
-                </tr>
-              </thead>
-              <tbody>${itemRows}</tbody>
-            </table>
-
-            <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;font-size:14px;color:#555;">
-              <tr>
-                <td style="padding:4px 12px;">Subtotal</td>
-                <td style="padding:4px 12px;text-align:right;">${order.subtotal} ${order.currency}</td>
-              </tr>
-              <tr>
-                <td style="padding:4px 12px;">Shipping</td>
-                <td style="padding:4px 12px;text-align:right;">${Number(order.shippingCost) === 0 ? "TBD" : `${order.shippingCost} ${order.currency}`}</td>
-              </tr>
-              <tr style="font-weight:bold;font-size:16px;color:#111;">
-                <td style="padding:12px 12px 4px;border-top:2px solid #f0ece4;">Total</td>
-                <td style="padding:12px 12px 4px;border-top:2px solid #f0ece4;text-align:right;">${order.total} ${order.currency}</td>
-              </tr>
-            </table>
-
-            <h2 style="margin:28px 0 10px;font-size:16px;color:#111;border-bottom:2px solid #f0ece4;padding-bottom:8px;">Shipping To</h2>
-            <p style="margin:0;font-size:14px;color:#555;line-height:1.7;">
-              ${order.shippingName}<br>
-              ${order.shippingAddressLine1}${addrLine2}<br>
-              ${order.shippingPostalCode} ${order.shippingCity}${region}<br>
-              ${order.shippingCountry}
-            </p>
-
-            <p style="margin:32px 0 0;font-size:13px;color:#999;text-align:center;">
-              If you have any questions about your order, reply to this email.
-            </p>
-          </td>
-        </tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
-
-  try {
-    const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        from: { email: from },
-        personalizations: [{ to: [{ email: order.customerEmail }] }],
-        subject: `Order Confirmed — #${order.id}`,
-        content: [{ type: "text/html", value: html }],
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      logger.error({ orderId: order.id, error }, "Failed to send confirmation email");
-    } else {
-      logger.info({ orderId: order.id }, "Order confirmation email sent");
-    }
-  } catch (err) {
-    logger.error({ err, orderId: order.id }, "Error sending confirmation email");
-  }
 }
 
 export const stripeWebhookHandler: RequestHandler = async (req, res) => {
@@ -204,8 +83,37 @@ export const stripeWebhookHandler: RequestHandler = async (req, res) => {
     const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId));
     const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, orderId));
 
-    if (order) {
-      await sendOrderConfirmationEmail(order, items);
+    if (!order) {
+      res.json({ received: true });
+      return;
+    }
+
+    if (!order.customerConfirmationSentAt) {
+      try {
+        await sendPaymentConfirmedEmail(order, items);
+        await db
+          .update(ordersTable)
+          .set({ customerConfirmationSentAt: new Date() })
+          .where(eq(ordersTable.id, orderId));
+      } catch (err) {
+        logger.error({ err, orderId }, "Failed to send customer confirmation email — order remains paid");
+      }
+    } else {
+      logger.info({ orderId }, "Customer confirmation email already sent — skipping (idempotent)");
+    }
+
+    if (!order.adminNotificationSentAt) {
+      try {
+        await sendAdminNewOrderEmail(order, items);
+        await db
+          .update(ordersTable)
+          .set({ adminNotificationSentAt: new Date() })
+          .where(eq(ordersTable.id, orderId));
+      } catch (err) {
+        logger.error({ err, orderId }, "Failed to send admin notification email — order remains paid");
+      }
+    } else {
+      logger.info({ orderId }, "Admin notification email already sent — skipping (idempotent)");
     }
 
   } else if (event.type === "checkout.session.expired") {
