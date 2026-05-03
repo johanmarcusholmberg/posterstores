@@ -1,0 +1,72 @@
+Please do a validation pass on the mockup-template filtering logic.
+
+The recent update format-locked 8 mockup templates and kept 2 templates generic/unrestricted.
+
+Goal:
+Make sure storefront mockup selection is mathematically and visually correct for every poster format.
+
+Please verify the following:
+
+1. Filtering logic
+- A mockup template should only be shown if the poster matches both:
+  - supportedFormats, when defined
+  - supportedOrientation, when defined
+- If a template is marked unrestricted/generic, confirm exactly how that is represented in the database and frontend logic.
+- Make sure "any" or unrestricted does not accidentally override format-locked templates.
+
+2. Portrait formats
+For these formats:
+- 30x40
+- 50x70
+- A4
+- A3
+- A2
+
+Expected:
+- The 8 format-locked portrait templates should be available.
+- The 2 generic templates should also be available if intended.
+
+3. Square format
+For 50x50 or any square poster format:
+
+Expected:
+- Portrait-only templates should not be shown.
+- Only generic/unrestricted templates should be shown unless a template is explicitly designed for square.
+
+4. Landscape format
+For any landscape poster format:
+
+Expected:
+- Portrait-only templates should not be shown.
+- Only generic/unrestricted templates should be shown unless a template is explicitly designed for landscape.
+
+5. Database consistency
+Check that every mockup template has:
+- category
+- frame
+- supportedFormats or an explicit unrestricted marker
+- supportedOrientation or an explicit unrestricted marker
+- no empty or null values that could cause incorrect filtering
+
+6. Seed consistency
+Confirm the seed file matches the live database.
+Fresh deployments should produce the same 10 templates with the same filtering behavior.
+
+7. UI behavior
+Confirm that the storefront, product page, cart, and any mockup preview/admin view all use the same filtering logic.
+Avoid having one page show mockups that another page would reject.
+
+8. Tests
+Add or update tests for:
+- 50x70 portrait poster
+- A4 portrait poster
+- 50x50 square poster
+- landscape poster
+- missing/unknown format fallback
+
+After testing, report:
+1. Exact filtering rule
+2. Which templates appear for each tested format
+3. Whether square/landscape posters are protected from portrait-only mockups
+4. Whether seed and live DB are aligned
+5. Any remaining visual risks
