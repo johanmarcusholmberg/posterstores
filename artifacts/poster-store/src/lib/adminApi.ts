@@ -494,6 +494,99 @@ export async function adminUpdateStore(
   return res.json();
 }
 
+// ─── Content pages ─────────────────────────────────────────────────────────
+
+export interface AdminContentPageSummary {
+  id: number | null;
+  storeKey: string;
+  pageKey: string;
+  title: string | null;
+  subtitle: string | null;
+  content: string | null;
+  metaTitle: string | null;
+  metaDescription: string | null;
+  published: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+  hasFallback: boolean;
+}
+
+export interface AdminContentPage extends AdminContentPageSummary {
+  exists: boolean;
+}
+
+export interface UpsertContentPagePayload {
+  title: string;
+  subtitle?: string | null;
+  content: string;
+  metaTitle?: string | null;
+  metaDescription?: string | null;
+  published?: boolean;
+}
+
+export async function adminListContentPages(
+  token: string,
+  storeKey: string
+): Promise<AdminContentPageSummary[]> {
+  const res = await fetch(`${BASE}/admin/content?storeKey=${encodeURIComponent(storeKey)}`, {
+    headers: headers(token),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(extractErrorMessage(body));
+  }
+  return res.json();
+}
+
+export async function adminGetContentPage(
+  token: string,
+  storeKey: string,
+  pageKey: string
+): Promise<AdminContentPage> {
+  const res = await fetch(
+    `${BASE}/admin/content/${encodeURIComponent(pageKey)}?storeKey=${encodeURIComponent(storeKey)}`,
+    { headers: headers(token) }
+  );
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(extractErrorMessage(body));
+  }
+  return res.json();
+}
+
+export async function adminUpsertContentPage(
+  token: string,
+  storeKey: string,
+  pageKey: string,
+  payload: UpsertContentPagePayload
+): Promise<AdminContentPage> {
+  const res = await fetch(
+    `${BASE}/admin/content/${encodeURIComponent(pageKey)}?storeKey=${encodeURIComponent(storeKey)}`,
+    {
+      method: "PUT",
+      headers: headers(token),
+      body: JSON.stringify(payload),
+    }
+  );
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(extractErrorMessage(body));
+  }
+  return res.json();
+}
+
+export async function fetchPublicContentPage(
+  storeKey: string,
+  pageKey: string
+): Promise<AdminContentPage | null> {
+  const res = await fetch(
+    `${BASE}/content/${encodeURIComponent(pageKey)}?storeKey=${encodeURIComponent(storeKey)}`
+  );
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.exists ? data : null;
+}
+
 // ─── Launch checklist ──────────────────────────────────────────────────────
 
 export type CheckStatus = "pass" | "warning" | "missing" | "manual";

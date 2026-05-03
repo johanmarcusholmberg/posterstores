@@ -13,6 +13,7 @@ import authRouter from "./auth";
 import shippingRouter from "./shipping";
 import launchChecklistRouter from "./launchChecklist";
 import stripeRouter from "./stripe";
+import contentPagesRouter from "./contentPages";
 
 const router: IRouter = Router();
 
@@ -30,5 +31,6 @@ router.use(storesRouter);
 router.use(shippingRouter);
 router.use(launchChecklistRouter);
 router.use(stripeRouter);
+router.use(contentPagesRouter);
 
 export default router;

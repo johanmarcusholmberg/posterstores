@@ -85,8 +85,19 @@ The Account page (`/account`) shows:
 A comprehensive admin interface (`/admin`) is provided for managing various aspects of the platform:
 - **Authentication:** Token-gated access with an `admin_token` stored in `localStorage`.
 - **Store Selection:** Admins can select an active store, influencing data displayed and managed.
-- **Management:** Dedicated sections for managing posters, mockup templates, individual poster mockups, orders, and stores.
+- **Management:** Dedicated sections for managing posters, mockup templates, individual poster mockups, orders, stores, and content pages.
 - **API Access:** Admin API calls require an `X-Admin-Token` header.
+
+## Store Content Pages
+Each store can have editable content for six public pages: About, Shipping, Returns, Privacy, Terms, and Contact.
+
+- **Data Model:** `store_content_pages` table with `store_key + page_key` unique constraint. Fields: `id`, `store_key`, `page_key`, `title`, `subtitle`, `content`, `meta_title`, `meta_description`, `published`, `created_at`, `updated_at`.
+- **Admin API:** `GET /api/admin/content?storeKey=`, `GET /api/admin/content/:pageKey?storeKey=`, `PUT /api/admin/content/:pageKey?storeKey=` (all require `X-Admin-Token`).
+- **Public API:** `GET /api/content/:pageKey?storeKey=` — only returns published content rows.
+- **Fallback behavior:** If no published content row exists for a store + pageKey, the public page renders its built-in default placeholder copy.
+- **Store scoping:** Each store's content is fully independent; PostsofSpain and PostsofSweden can have different text.
+- **Admin UI:** `/admin/content` (list all 6 pages) and `/admin/content/:pageKey` (edit form with title, subtitle, textarea, SEO fields, published toggle).
+- **Launch checklist:** The "Legal / store pages" section now checks whether each page has a published content row, warning if only fallback copy is in use.
 
 ## Mockup System
 - **Data Model:** `mockup_templates` (global or store-specific) and `poster_mockups` (linking posters to templates with `mockupImageUrl` and `isPrimary` flag).

@@ -1,8 +1,36 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useStorefront } from "@/context/StorefrontContext";
+import { fetchPublicContentPage, type AdminContentPage } from "@/lib/adminApi";
 
 export default function Privacy() {
   const store = useStorefront();
+  const [contentPage, setContentPage] = useState<AdminContentPage | null>(null);
+
+  useEffect(() => {
+    fetchPublicContentPage(store.storeKey, "privacy").then(data => {
+      if (data) setContentPage(data);
+    });
+  }, [store.storeKey]);
+
+  if (contentPage) {
+    return (
+      <div className="min-h-screen pb-20">
+        <div className="bg-sand py-14">
+          <div className="container mx-auto px-4">
+            <h1 className="font-serif text-4xl font-bold text-primary mb-3">{contentPage.title}</h1>
+            {contentPage.subtitle && (
+              <p className="text-foreground/60 max-w-xl">{contentPage.subtitle}</p>
+            )}
+          </div>
+        </div>
+        <div className="container mx-auto px-4 py-14 max-w-3xl">
+          <div className="prose prose-neutral max-w-none text-foreground/80 leading-relaxed whitespace-pre-wrap">
+            {contentPage.content}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen pb-20">

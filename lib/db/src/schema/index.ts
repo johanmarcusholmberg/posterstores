@@ -10,3 +10,4 @@ export * from "./stores";
 export * from "./users";
 export * from "./sessions";
 export * from "./shippingMethods";
+export * from "./storeContentPages";

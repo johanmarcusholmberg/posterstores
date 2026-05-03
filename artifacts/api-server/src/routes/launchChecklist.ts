@@ -7,6 +7,8 @@ import {
   posterMockupsTable,
   mockupTemplatesTable,
   ordersTable,
+  storeContentPagesTable,
+  PAGE_KEYS,
 } from "@workspace/db";
 import { eq, and, count, isNull, isNotNull, sql } from "drizzle-orm";
 import { requireAdmin } from "../middleware/requireAdmin";
@@ -294,18 +296,34 @@ router.get("/admin/launch-checklist", requireAdmin, async (req, res) => {
 
   // ── 7. Legal / store pages ────────────────────────────────────────────────
 
-  const legalPages = [
-    { id: "page-shipping", label: "Shipping page exists", route: "/shipping" },
-    { id: "page-returns", label: "Returns page exists", route: "/returns" },
-    { id: "page-privacy", label: "Privacy page exists", route: "/privacy" },
-    { id: "page-terms", label: "Terms page exists", route: "/terms" },
-    { id: "page-contact", label: "Contact page exists", route: "/contact" },
-    { id: "page-about", label: "About page exists", route: "/about" },
+  const contentRows = await db
+    .select()
+    .from(storeContentPagesTable)
+    .where(eq(storeContentPagesTable.storeKey, storeKey));
+
+  const publishedContentKeys = new Set(
+    contentRows.filter(r => r.published).map(r => r.pageKey)
+  );
+
+  const contentPageDefs = [
+    { pageKey: "shipping", label: "Shipping page" },
+    { pageKey: "returns", label: "Returns page" },
+    { pageKey: "privacy", label: "Privacy page" },
+    { pageKey: "terms", label: "Terms page" },
+    { pageKey: "contact", label: "Contact page" },
+    { pageKey: "about", label: "About page" },
   ];
 
-  const legalItems: CheckItem[] = legalPages.map(p =>
-    pass(p.id, p.label, `Route ${p.route} is registered`)
-  );
+  const legalItems: CheckItem[] = contentPageDefs.map(p => {
+    if (publishedContentKeys.has(p.pageKey)) {
+      return pass(`content-${p.pageKey}`, `${p.label} has store-specific published content`);
+    }
+    return warn(
+      `content-${p.pageKey}`,
+      `${p.label} has store-specific published content`,
+      `Using fallback placeholder copy. Go to Content Pages to add and publish custom copy for ${storeKey}.`
+    );
+  });
 
   // ── 8. Mobile / UX ───────────────────────────────────────────────────────
 

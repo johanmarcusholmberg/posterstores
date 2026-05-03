@@ -20,6 +20,7 @@ import {
   Globe,
   Rocket,
   Settings2,
+  FileText,
 } from "lucide-react";
 
 export default function AdminDashboard() {
@@ -196,6 +197,13 @@ export default function AdminDashboard() {
               <div className="flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium bg-background hover:bg-muted transition-colors cursor-pointer">
                 <Rocket className="w-4 h-4 text-primary" />
                 Launch checklist
+                <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
+              </div>
+            </Link>
+            <Link href="/admin/content">
+              <div className="flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium bg-background hover:bg-muted transition-colors cursor-pointer">
+                <FileText className="w-4 h-4 text-primary" />
+                Edit content pages
                 <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
               </div>
             </Link>
