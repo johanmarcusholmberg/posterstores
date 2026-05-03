@@ -1,15 +1,17 @@
-import React from "react";
+import React, { useCallback, useState } from "react";
 import { useParams, Link, useSearch } from "wouter";
 import { useGetOrder, getGetOrderQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
-import { ClockIcon, CheckCircle2, AlertCircle, XCircle } from "lucide-react";
+import { CheckCircle2, AlertCircle, XCircle, ShoppingBag, Package, Download } from "lucide-react";
 import { useStorefront } from "@/context/StorefrontContext";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 const STATUS_CONFIG: Record<string, { label: string; icon: React.FC<any>; color: string; bg: string }> = {
-  draft: { label: "Draft", icon: ClockIcon, color: "text-gray-600", bg: "bg-gray-100" },
-  pending_payment: { label: "Pending Payment", icon: ClockIcon, color: "text-amber-600", bg: "bg-amber-100" },
+  draft: { label: "Draft", icon: Package, color: "text-gray-600", bg: "bg-gray-100" },
+  pending_payment: { label: "Pending Payment", icon: ShoppingBag, color: "text-amber-600", bg: "bg-amber-100" },
   paid: { label: "Paid", icon: CheckCircle2, color: "text-green-600", bg: "bg-green-100" },
-  processing: { label: "Processing", icon: ClockIcon, color: "text-blue-600", bg: "bg-blue-100" },
+  processing: { label: "Processing", icon: Package, color: "text-blue-600", bg: "bg-blue-100" },
   shipped: { label: "Shipped", icon: CheckCircle2, color: "text-green-600", bg: "bg-green-100" },
   cancelled: { label: "Cancelled", icon: AlertCircle, color: "text-destructive", bg: "bg-destructive/10" },
 };
@@ -21,6 +23,7 @@ export default function OrderConfirmation() {
   const search = useSearch();
   const params = new URLSearchParams(search);
   const paymentParam = params.get("payment");
+  const [closeFailed, setCloseFailed] = useState(false);
 
   const { data: order, isLoading } = useGetOrder(orderId, {
     query: {
@@ -30,6 +33,80 @@ export default function OrderConfirmation() {
       refetchIntervalInBackground: false,
     },
   });
+
+  const downloadReceipt = useCallback(() => {
+    if (!order) return;
+    const doc = new jsPDF();
+    const orderAny = order as any;
+
+    doc.setFontSize(22);
+    doc.setFont("helvetica", "bold");
+    doc.text("Order Receipt", 14, 24);
+
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100);
+    doc.text(`Order #${order.id}`, 14, 34);
+    doc.text(`Date: ${order.createdAt ? new Date(order.createdAt).toLocaleDateString() : new Date().toLocaleDateString()}`, 14, 40);
+    doc.text(`Email: ${order.customerEmail}`, 14, 46);
+    if (orderAny.paidAt) {
+      doc.text(`Paid: ${new Date(orderAny.paidAt).toLocaleString()}`, 14, 52);
+    }
+
+    doc.setTextColor(0);
+
+    autoTable(doc, {
+      startY: 62,
+      head: [["Item", "Size", "Qty", "Unit Price", "Total"]],
+      body: order.items.map((item) => [
+        item.posterTitleSnapshot,
+        item.sizeLabelSnapshot || "—",
+        String(item.quantity),
+        `${item.unitPrice} ${item.currency}`,
+        `${item.totalPrice} ${item.currency}`,
+      ]),
+      headStyles: { fillColor: [40, 40, 40] },
+      styles: { fontSize: 10 },
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Subtotal: ${order.subtotal} ${order.currency}`, 130, finalY, { align: "left" });
+    doc.text(
+      `Shipping: ${Number(order.shippingCost) === 0 ? "TBD" : `${order.shippingCost} ${order.currency}`}`,
+      130,
+      finalY + 7,
+      { align: "left" }
+    );
+    doc.setTextColor(0);
+    doc.setFontSize(13);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Total: ${order.total} ${order.currency}`, 130, finalY + 16, { align: "left" });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(60);
+    doc.text("Shipping To:", 14, finalY + 10);
+    doc.setTextColor(0);
+    const addr = [
+      order.shippingName,
+      order.shippingAddressLine1,
+      order.shippingAddressLine2,
+      `${order.shippingPostalCode} ${order.shippingCity}${order.shippingRegion ? ", " + order.shippingRegion : ""}`,
+      order.shippingCountry,
+    ].filter(Boolean);
+    addr.forEach((line, i) => {
+      doc.text(line!, 14, finalY + 18 + i * 6);
+    });
+
+    doc.save(`receipt-order-${order.id}.pdf`);
+  }, [order]);
+
+  const handleCloseWindow = () => {
+    window.close();
+    setTimeout(() => setCloseFailed(true), 400);
+  };
 
   if (isLoading) return <div className="p-24 text-center">Loading order...</div>;
   if (!order) return <div className="p-24 text-center">Order not found</div>;
@@ -41,7 +118,6 @@ export default function OrderConfirmation() {
   const isPendingPayment = status === "pending_payment" || status === "draft";
   const isCancelled = status === "cancelled";
   const orderAny = order as any;
-  const paymentStatus = orderAny.paymentStatus;
 
   const retryCheckout = async () => {
     try {
@@ -79,18 +155,29 @@ export default function OrderConfirmation() {
         </div>
       </div>
 
-      {/* Payment success: confirmed server-side */}
+      {/* Payment confirmed */}
       {isPaid && (
-        <div className="rounded-lg border border-green-200 bg-green-50 p-4 mb-8 text-sm text-green-800">
-          <p className="font-semibold mb-1">Payment received. Your order is confirmed.</p>
-          <p>Thank you for your purchase! We'll process your order and keep you updated at <strong>{order.customerEmail}</strong>.</p>
+        <div className="rounded-lg border border-green-200 bg-green-50 p-5 mb-8 text-sm text-green-800">
+          <p className="font-semibold mb-1 text-base">Payment received. Your order is confirmed.</p>
+          <p className="mb-3">
+            A confirmation summary has been sent to <strong>{order.customerEmail}</strong>. Thank you for your purchase!
+          </p>
           {orderAny.paidAt && (
-            <p className="mt-1 text-green-700">Paid at: {new Date(orderAny.paidAt).toLocaleString()}</p>
+            <p className="text-green-700 text-xs mb-4">Paid: {new Date(orderAny.paidAt).toLocaleString()}</p>
           )}
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-green-600 text-green-700 hover:bg-green-100 gap-2"
+            onClick={downloadReceipt}
+          >
+            <Download className="w-4 h-4" />
+            Download Receipt (PDF)
+          </Button>
         </div>
       )}
 
-      {/* Payment success redirect but not yet confirmed server-side */}
+      {/* Verifying payment */}
       {paymentParam === "success" && !isPaid && (
         <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 mb-8 text-sm text-blue-800">
           <p className="font-semibold mb-1">Payment is being verified.</p>
@@ -98,7 +185,7 @@ export default function OrderConfirmation() {
         </div>
       )}
 
-      {/* Cancelled payment */}
+      {/* Cancelled */}
       {paymentParam === "cancelled" && isPendingPayment && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 mb-8 text-sm text-amber-800">
           <div className="flex items-start gap-2">
@@ -114,7 +201,7 @@ export default function OrderConfirmation() {
         </div>
       )}
 
-      {/* Default pending (no Stripe redirect) */}
+      {/* Default pending */}
       {isPendingPayment && !paymentParam && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 mb-8 text-sm text-amber-800">
           <p className="font-semibold mb-1">Payment pending</p>
@@ -184,9 +271,23 @@ export default function OrderConfirmation() {
         )}
       </div>
 
-      <div className="text-center">
+      {/* Close window / continue */}
+      <div className="text-center space-y-3">
+        {isPaid && (
+          <>
+            {closeFailed ? (
+              <p className="text-sm text-muted-foreground mb-2">
+                You can safely close this tab now.
+              </p>
+            ) : (
+              <Button variant="outline" size="lg" onClick={handleCloseWindow} className="mr-3">
+                Close Window
+              </Button>
+            )}
+          </>
+        )}
         <Link href="/shop">
-          <Button size="lg">Continue Shopping</Button>
+          <Button size="lg" variant={isPaid ? "ghost" : "default"}>Continue Shopping</Button>
         </Link>
       </div>
     </div>
