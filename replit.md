@@ -108,6 +108,7 @@ Each store can have editable content for six public pages: About, Shipping, Retu
 - **Admin Template Management:** Full CRUD UI at `/admin/mockups` — admins can upload background images to object storage, define poster placement areas as % of image size, set category/frame/orientation/format filters, toggle featured/active, and scope templates as global or store-specific.
 - **File Upload:** Admin template form uploads images directly to Replit Object Storage via presigned URLs (`POST /api/storage/uploads/request-url` → PUT to GCS presigned URL). Images are served at `/api/storage/objects/*`.
 - **Object Storage:** Replit object storage is provisioned (`DEFAULT_OBJECT_STORAGE_BUCKET_ID`, `PUBLIC_OBJECT_SEARCH_PATHS`, `PRIVATE_OBJECT_DIR` env vars). Storage routes are at `/api/storage/uploads/request-url` (POST), `/api/storage/public-objects/*` (GET), `/api/storage/objects/*` (GET). `lib/object-storage-web` is the client-side library (composite lib with `composite: true`).
+- **AI Placement Detection:** `POST /api/mockup-templates/analyze-placement` accepts `{ imageUrl }` and uses GPT vision (gpt-5.1) to locate the poster/frame area in a background image, returning `x/y/width/height` as percentages plus rotation and confidence. Powered by `@workspace/integrations-openai-ai-server` (Replit AI Integrations proxy, no API key needed). The admin form auto-runs this after every upload and shows a confidence-color-coded status banner with detected values highlighted in green.
 
 # External Dependencies
 

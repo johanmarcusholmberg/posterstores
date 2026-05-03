@@ -219,6 +219,30 @@ export async function adminDeletePosterMockup(
   if (!res.ok) await handleError(res);
 }
 
+export interface PlacementAnalysis {
+  detected: boolean;
+  confidence: number;
+  description: string;
+  x: number | null;
+  y: number | null;
+  width: number | null;
+  height: number | null;
+  rotation: number;
+}
+
+export async function analyzeMockupPlacement(
+  token: string,
+  imageUrl: string
+): Promise<PlacementAnalysis> {
+  const res = await fetch(`${BASE}/mockup-templates/analyze-placement`, {
+    method: "POST",
+    headers: headers(token),
+    body: JSON.stringify({ imageUrl }),
+  });
+  if (!res.ok) await handleError(res);
+  return res.json();
+}
+
 export async function requestMockupImageUploadUrl(
   token: string,
   file: { name: string; size: number; contentType: string }
