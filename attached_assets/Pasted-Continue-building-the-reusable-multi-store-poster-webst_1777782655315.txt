@@ -1,0 +1,78 @@
+Continue building the reusable multi-store poster webstore.
+
+CURRENT STATUS:
+- The platform is stable.
+- 144/144 tests pass.
+- Multi-store, admin, checkout, Stripe, e-mails, fulfillment, mockups, slugs and domain/route resolver all work.
+
+NEXT GOAL:
+Add store policy and launch-readiness pages.
+
+Create public pages:
+- /shipping
+- /returns
+- /privacy
+- /terms
+- /contact
+- /about
+
+Important:
+- Use active store config for store name and branding.
+- Keep pages reusable for any store, not hard-coded only to PostsofSpain.
+- Add links to these pages in the footer.
+- Add placeholder policy copy that is clearly editable before launch.
+- Do not present placeholder text as legal advice.
+- Keep design consistent with the storefront.
+
+Shipping page should include editable sections for:
+- Production time
+- Delivery time
+- Shipping countries
+- Tracking
+- Damaged/lost shipments
+
+Returns page should include:
+- Return window
+- Custom/print-on-demand limitations
+- Damaged item process
+- Refund timing
+
+Privacy page should include:
+- What data is collected
+- Orders and payments
+- Newsletter
+- Cookies/analytics placeholder
+- Contact for privacy questions
+
+Terms page should include:
+- Use of site
+- Product images and color variation
+- Payment
+- Fulfillment
+- Limitation placeholder
+
+Contact page should include:
+- Contact form placeholder or email link
+- Order support guidance
+- Store name from active config
+
+About page should include:
+- Brand story section
+- Store-specific copy from active store if available
+- Placeholder image/mockup area
+
+Admin:
+If simple, add editable policy text fields to store config later, but do not overbuild CMS in this step.
+
+Tests:
+- Footer links exist.
+- Each policy page loads.
+- Pages use active store name.
+- Existing routes still pass.
+
+At the end, summarize:
+1. Pages created.
+2. Footer updates.
+3. Store config usage.
+4. What text must be reviewed before launch.
+5. Tests added/updated.
