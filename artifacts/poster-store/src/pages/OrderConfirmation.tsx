@@ -4,8 +4,7 @@ import { useGetOrder, getGetOrderQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, AlertCircle, XCircle, ShoppingBag, Package, Download } from "lucide-react";
 import { useStorefront } from "@/context/StorefrontContext";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import { generateReceipt } from "@/lib/generateReceipt";
 
 const STATUS_CONFIG: Record<string, { label: string; icon: React.FC<any>; color: string; bg: string }> = {
   draft: { label: "Draft", icon: Package, color: "text-gray-600", bg: "bg-gray-100" },
@@ -56,71 +55,7 @@ export default function OrderConfirmation() {
 
   const downloadReceipt = useCallback(() => {
     if (!order) return;
-    const doc = new jsPDF();
-    const orderAny = order as any;
-
-    doc.setFontSize(22);
-    doc.setFont("helvetica", "bold");
-    doc.text("Order Receipt", 14, 24);
-
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(100);
-    doc.text(`Order #${order.id}`, 14, 34);
-    doc.text(`Date: ${order.createdAt ? new Date(order.createdAt).toLocaleDateString() : new Date().toLocaleDateString()}`, 14, 40);
-    doc.text(`Email: ${order.customerEmail}`, 14, 46);
-    if (orderAny.paidAt) {
-      doc.text(`Paid: ${new Date(orderAny.paidAt).toLocaleString()}`, 14, 52);
-    }
-
-    doc.setTextColor(0);
-
-    autoTable(doc, {
-      startY: 62,
-      head: [["Item", "Size", "Qty", "Unit Price", "Total"]],
-      body: order.items.map((item) => [
-        item.posterTitleSnapshot,
-        item.sizeLabelSnapshot || "—",
-        String(item.quantity),
-        `${item.unitPrice} ${item.currency}`,
-        `${item.totalPrice} ${item.currency}`,
-      ]),
-      headStyles: { fillColor: [40, 40, 40] },
-      styles: { fontSize: 10 },
-    });
-
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Subtotal: ${order.subtotal} ${order.currency}`, 130, finalY, { align: "left" });
-    doc.text(
-      `Shipping: ${Number(order.shippingCost) === 0 ? "TBD" : `${order.shippingCost} ${order.currency}`}`,
-      130,
-      finalY + 7,
-      { align: "left" }
-    );
-    doc.setTextColor(0);
-    doc.setFontSize(13);
-    doc.setFont("helvetica", "bold");
-    doc.text(`Total: ${order.total} ${order.currency}`, 130, finalY + 16, { align: "left" });
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(60);
-    doc.text("Shipping To:", 14, finalY + 10);
-    doc.setTextColor(0);
-    const addr = [
-      order.shippingName,
-      order.shippingAddressLine1,
-      order.shippingAddressLine2,
-      `${order.shippingPostalCode} ${order.shippingCity}${order.shippingRegion ? ", " + order.shippingRegion : ""}`,
-      order.shippingCountry,
-    ].filter(Boolean);
-    addr.forEach((line, i) => {
-      doc.text(line!, 14, finalY + 18 + i * 6);
-    });
-
-    doc.save(`receipt-order-${order.id}.pdf`);
+    generateReceipt(order as any);
   }, [order]);
 
   const handleCloseWindow = () => {
