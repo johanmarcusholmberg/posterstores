@@ -37,7 +37,7 @@ function getReadinessIssues(poster: AdminPoster): string[] {
 }
 
 export const AdminPosterList = () => {
-  const { token, adminStoreKey } = useAdminToken();
+  const { adminStoreKey } = useAdminToken();
   const { toast } = useToast();
 
   const [posters, setPosters] = useState<AdminPoster[]>([]);
@@ -54,21 +54,20 @@ export const AdminPosterList = () => {
   const [regions, setRegions] = useState<string[]>([]);
 
   useEffect(() => {
-    if (!token || !adminStoreKey) return;
-    adminGetPosterMeta(token, adminStoreKey)
+    if (!adminStoreKey) return;
+    adminGetPosterMeta(adminStoreKey)
       .then(meta => {
         setCategories(meta.categories);
         setRegions(meta.regions);
       })
       .catch(() => {});
-  }, [token, adminStoreKey]);
+  }, [adminStoreKey]);
 
   const load = useCallback(async () => {
-    if (!token) return;
     setLoading(true);
     setError("");
     try {
-      const data = await adminListPosters(token, adminStoreKey, {
+      const data = await adminListPosters(adminStoreKey, {
         status: statusFilter === "all" ? "all" : statusFilter,
         search: search || undefined,
         category: categoryFilter === "all" ? undefined : categoryFilter,
@@ -83,7 +82,7 @@ export const AdminPosterList = () => {
     } finally {
       setLoading(false);
     }
-  }, [token, adminStoreKey, statusFilter, categoryFilter, regionFilter, search, offset]);
+  }, [adminStoreKey, statusFilter, categoryFilter, regionFilter, search, offset]);
 
   useEffect(() => {
     setOffset(0);
@@ -99,9 +98,8 @@ export const AdminPosterList = () => {
   };
 
   const handleDelete = async (poster: AdminPoster) => {
-    if (!token) return;
     try {
-      await adminDeletePoster(token, poster.id, poster.storeKey);
+      await adminDeletePoster(poster.id, poster.storeKey);
       toast({ title: "Poster deleted", description: poster.title });
       load();
     } catch (e: any) {

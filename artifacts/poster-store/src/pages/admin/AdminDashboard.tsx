@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 
 export default function AdminDashboard() {
-  const { token, adminStoreKey } = useAdminToken();
+  const { adminStoreKey } = useAdminToken();
   const [stats, setStats] = useState<{
     totalPosters: number;
     totalOrders: number;
@@ -36,13 +36,12 @@ export default function AdminDashboard() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!token) return;
     setLoading(true);
-    adminGetStats(token, adminStoreKey)
+    adminGetStats(adminStoreKey)
       .then(setStats)
       .catch(e => setError(e?.message ?? "Failed to load stats"))
       .finally(() => setLoading(false));
-  }, [token, adminStoreKey]);
+  }, [adminStoreKey]);
 
   const statCards = [
     {

@@ -43,7 +43,7 @@ interface AdminDashboardLayoutProps {
 }
 
 export const AdminDashboardLayout = ({ children, title, breadcrumb }: AdminDashboardLayoutProps) => {
-  const { clearToken } = useAdminToken();
+  const { logout } = useAdminToken();
   const [location] = useLocation();
 
   return (
@@ -61,12 +61,12 @@ export const AdminDashboardLayout = ({ children, title, breadcrumb }: AdminDashb
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={clearToken}
+                onClick={logout}
                 className="text-muted-foreground text-xs gap-1"
                 data-testid="admin-logout"
               >
                 <LogOut className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Clear token</span>
+                <span className="hidden sm:inline">Log out</span>
               </Button>
             </div>
           </div>

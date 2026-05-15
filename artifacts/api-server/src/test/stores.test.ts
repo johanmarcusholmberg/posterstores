@@ -1,15 +1,14 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, beforeAll } from "vitest";
+import { getAdminCookie } from "./setup";
 import request from "supertest";
 import app from "../app";
 import { db } from "@workspace/db";
 import { storesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
-const ADMIN_TOKEN = process.env.ADMIN_API_TOKEN ?? "test-admin-token";
-const adminHeaders = {
-  "Content-Type": "application/json",
-  "X-Admin-Token": ADMIN_TOKEN,
-};
+
+let adminCookie = "";
+beforeAll(async () => { adminCookie = await getAdminCookie(); });
 
 const TEST_STORE_KEY = "testvitest";
 const TEST_STORE_KEY_2 = "testvitest2";
@@ -71,7 +70,7 @@ describe("GET /api/admin/stores — auth", () => {
   });
 
   it("returns 200 with valid admin token", async () => {
-    const res = await request(app).get("/api/admin/stores").set(adminHeaders);
+    const res = await request(app).get("/api/admin/stores").set("Cookie", adminCookie).set("Content-Type", "application/json");
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
   });
@@ -83,7 +82,7 @@ describe("POST /api/admin/stores — create", () => {
   it("creates a new store with valid payload", async () => {
     const res = await request(app)
       .post("/api/admin/stores")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send(baseStorePayload());
 
     expect(res.status).toBe(201);
@@ -98,7 +97,7 @@ describe("POST /api/admin/stores — create", () => {
   it("creates a store with domain and route prefix", async () => {
     const res = await request(app)
       .post("/api/admin/stores")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send(
         baseStorePayload({
           primaryDomain: "testland.com",
@@ -114,10 +113,10 @@ describe("POST /api/admin/stores — create", () => {
   });
 
   it("rejects duplicate storeKey with 409", async () => {
-    await request(app).post("/api/admin/stores").set(adminHeaders).send(baseStorePayload());
+    await request(app).post("/api/admin/stores").set("Cookie", adminCookie).set("Content-Type", "application/json").send(baseStorePayload());
     const res = await request(app)
       .post("/api/admin/stores")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send(baseStorePayload());
     expect(res.status).toBe(409);
     expect(res.body.error).toContain("already exists");
@@ -126,7 +125,7 @@ describe("POST /api/admin/stores — create", () => {
   it("rejects storeKey with invalid characters", async () => {
     const res = await request(app)
       .post("/api/admin/stores")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send(baseStorePayload({ storeKey: "Bad-Key!" }));
     expect(res.status).toBe(400);
   });
@@ -134,7 +133,7 @@ describe("POST /api/admin/stores — create", () => {
   it("rejects storeKey with uppercase letters", async () => {
     const res = await request(app)
       .post("/api/admin/stores")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send(baseStorePayload({ storeKey: "PostsofItaly" }));
     expect(res.status).toBe(400);
   });
@@ -142,7 +141,7 @@ describe("POST /api/admin/stores — create", () => {
   it("rejects storeKey with spaces", async () => {
     const res = await request(app)
       .post("/api/admin/stores")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send(baseStorePayload({ storeKey: "posts of italy" }));
     expect(res.status).toBe(400);
   });
@@ -150,7 +149,7 @@ describe("POST /api/admin/stores — create", () => {
   it("rejects missing store name", async () => {
     const res = await request(app)
       .post("/api/admin/stores")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send(baseStorePayload({ name: "" }));
     expect(res.status).toBe(400);
   });
@@ -158,7 +157,7 @@ describe("POST /api/admin/stores — create", () => {
   it("rejects missing currency", async () => {
     const res = await request(app)
       .post("/api/admin/stores")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send(baseStorePayload({ defaultCurrency: "" }));
     expect(res.status).toBe(400);
   });
@@ -166,7 +165,7 @@ describe("POST /api/admin/stores — create", () => {
   it("rejects invalid hex color in themeConfig", async () => {
     const res = await request(app)
       .post("/api/admin/stores")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send(
         baseStorePayload({
           themeConfig: {
@@ -195,7 +194,7 @@ describe("POST /api/admin/stores — create", () => {
   it("rejects invalid routePrefix", async () => {
     const res = await request(app)
       .post("/api/admin/stores")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send(baseStorePayload({ routePrefix: "Bad Prefix!" }));
     expect(res.status).toBe(400);
   });
@@ -203,7 +202,7 @@ describe("POST /api/admin/stores — create", () => {
   it("rejects invalid primaryDomain", async () => {
     const res = await request(app)
       .post("/api/admin/stores")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send(baseStorePayload({ primaryDomain: "not a domain" }));
     expect(res.status).toBe(400);
   });
@@ -211,12 +210,12 @@ describe("POST /api/admin/stores — create", () => {
   it("rejects duplicate routePrefix across stores", async () => {
     await request(app)
       .post("/api/admin/stores")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send(baseStorePayload({ storeKey: "testprefixstore", routePrefix: "uniqueprefix" }));
 
     const res = await request(app)
       .post("/api/admin/stores")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send(baseStorePayload({ storeKey: "testprefixstore2", routePrefix: "uniqueprefix" }));
 
     expect(res.status).toBe(409);
@@ -226,12 +225,12 @@ describe("POST /api/admin/stores — create", () => {
   it("rejects duplicate primaryDomain across stores", async () => {
     await request(app)
       .post("/api/admin/stores")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send(baseStorePayload({ storeKey: "testdomainstore", primaryDomain: "unique-domain-test.com" }));
 
     const res = await request(app)
       .post("/api/admin/stores")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send(baseStorePayload({ storeKey: "testdomainstore2", primaryDomain: "unique-domain-test.com" }));
 
     expect(res.status).toBe(409);
@@ -245,15 +244,15 @@ describe("GET /api/admin/stores/:storeKey", () => {
   it("returns 404 for unknown store", async () => {
     const res = await request(app)
       .get("/api/admin/stores/nonexistent-store-xyz")
-      .set(adminHeaders);
+      .set("Cookie", adminCookie).set("Content-Type", "application/json");
     expect(res.status).toBe(404);
   });
 
   it("returns created store by key", async () => {
-    await request(app).post("/api/admin/stores").set(adminHeaders).send(baseStorePayload());
+    await request(app).post("/api/admin/stores").set("Cookie", adminCookie).set("Content-Type", "application/json").send(baseStorePayload());
     const res = await request(app)
       .get(`/api/admin/stores/${TEST_STORE_KEY}`)
-      .set(adminHeaders);
+      .set("Cookie", adminCookie).set("Content-Type", "application/json");
     expect(res.status).toBe(200);
     expect(res.body.storeKey).toBe(TEST_STORE_KEY);
     expect(typeof res.body.posterCount).toBe("number");
@@ -263,7 +262,7 @@ describe("GET /api/admin/stores/:storeKey", () => {
   it("returns domain/prefix fields in store response", async () => {
     await request(app)
       .post("/api/admin/stores")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send(
         baseStorePayload({
           primaryDomain: "testviteststore.com",
@@ -272,7 +271,7 @@ describe("GET /api/admin/stores/:storeKey", () => {
         })
       );
 
-    const res = await request(app).get(`/api/admin/stores/${TEST_STORE_KEY}`).set(adminHeaders);
+    const res = await request(app).get(`/api/admin/stores/${TEST_STORE_KEY}`).set("Cookie", adminCookie).set("Content-Type", "application/json");
     expect(res.status).toBe(200);
     expect(res.body.primaryDomain).toBe("testviteststore.com");
     expect(res.body.domainAliases).toEqual(["www.testviteststore.com"]);
@@ -284,11 +283,11 @@ describe("GET /api/admin/stores/:storeKey", () => {
 
 describe("PUT /api/admin/stores/:storeKey — edit", () => {
   it("updates store name and config", async () => {
-    await request(app).post("/api/admin/stores").set(adminHeaders).send(baseStorePayload());
+    await request(app).post("/api/admin/stores").set("Cookie", adminCookie).set("Content-Type", "application/json").send(baseStorePayload());
 
     const res = await request(app)
       .put(`/api/admin/stores/${TEST_STORE_KEY}`)
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send({ name: "Updated Store Name", defaultCurrency: "SEK" });
 
     expect(res.status).toBe(200);
@@ -297,11 +296,11 @@ describe("PUT /api/admin/stores/:storeKey — edit", () => {
   });
 
   it("saves domain and route prefix on update", async () => {
-    await request(app).post("/api/admin/stores").set(adminHeaders).send(baseStorePayload());
+    await request(app).post("/api/admin/stores").set("Cookie", adminCookie).set("Content-Type", "application/json").send(baseStorePayload());
 
     const res = await request(app)
       .put(`/api/admin/stores/${TEST_STORE_KEY}`)
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send({
         primaryDomain: "updated-testland.com",
         domainAliases: ["www.updated-testland.com"],
@@ -317,12 +316,12 @@ describe("PUT /api/admin/stores/:storeKey — edit", () => {
   it("clears domain and prefix when set to null", async () => {
     await request(app)
       .post("/api/admin/stores")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send(baseStorePayload({ primaryDomain: "templand.com", routePrefix: "templand" }));
 
     const res = await request(app)
       .put(`/api/admin/stores/${TEST_STORE_KEY}`)
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send({ primaryDomain: null, routePrefix: null, domainAliases: null });
 
     expect(res.status).toBe(200);
@@ -333,16 +332,16 @@ describe("PUT /api/admin/stores/:storeKey — edit", () => {
   it("rejects duplicate routePrefix on update", async () => {
     await request(app)
       .post("/api/admin/stores")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send(baseStorePayload({ storeKey: "testprefixstore", routePrefix: "myuniqprefix" }));
     await request(app)
       .post("/api/admin/stores")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send(baseStorePayload({ storeKey: "testprefixstore2" }));
 
     const res = await request(app)
       .put("/api/admin/stores/testprefixstore2")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send({ routePrefix: "myuniqprefix" });
 
     expect(res.status).toBe(409);
@@ -350,11 +349,11 @@ describe("PUT /api/admin/stores/:storeKey — edit", () => {
   });
 
   it("rejects invalid hex color on update", async () => {
-    await request(app).post("/api/admin/stores").set(adminHeaders).send(baseStorePayload());
+    await request(app).post("/api/admin/stores").set("Cookie", adminCookie).set("Content-Type", "application/json").send(baseStorePayload());
 
     const res = await request(app)
       .put(`/api/admin/stores/${TEST_STORE_KEY}`)
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send({
         themeConfig: {
           background: "red",
@@ -373,7 +372,7 @@ describe("PUT /api/admin/stores/:storeKey — edit", () => {
   it("returns 404 when updating non-existent store", async () => {
     const res = await request(app)
       .put("/api/admin/stores/nonexistent-store-xyz")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send({ name: "Nope" });
     expect(res.status).toBe(404);
   });
@@ -383,10 +382,10 @@ describe("PUT /api/admin/stores/:storeKey — edit", () => {
 
 describe("PATCH /api/admin/stores/:storeKey/deactivate", () => {
   it("deactivates a store with no posters/orders", async () => {
-    await request(app).post("/api/admin/stores").set(adminHeaders).send(baseStorePayload());
+    await request(app).post("/api/admin/stores").set("Cookie", adminCookie).set("Content-Type", "application/json").send(baseStorePayload());
     const res = await request(app)
       .patch(`/api/admin/stores/${TEST_STORE_KEY}/deactivate`)
-      .set(adminHeaders);
+      .set("Cookie", adminCookie).set("Content-Type", "application/json");
     expect(res.status).toBe(200);
     expect(res.body.active).toBe(false);
   });
@@ -394,7 +393,7 @@ describe("PATCH /api/admin/stores/:storeKey/deactivate", () => {
   it("returns 404 for unknown store", async () => {
     const res = await request(app)
       .patch("/api/admin/stores/nonexistent-store-xyz/deactivate")
-      .set(adminHeaders);
+      .set("Cookie", adminCookie).set("Content-Type", "application/json");
     expect(res.status).toBe(404);
   });
 });
@@ -403,10 +402,10 @@ describe("PATCH /api/admin/stores/:storeKey/deactivate", () => {
 
 describe("GET /api/stores — public", () => {
   it("returns only active stores", async () => {
-    await request(app).post("/api/admin/stores").set(adminHeaders).send(baseStorePayload());
+    await request(app).post("/api/admin/stores").set("Cookie", adminCookie).set("Content-Type", "application/json").send(baseStorePayload());
     await request(app)
       .post("/api/admin/stores")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send(baseStorePayload({ storeKey: TEST_STORE_KEY_2, name: "Test Store 2", active: false }));
 
     const res = await request(app).get("/api/stores");
@@ -421,7 +420,7 @@ describe("GET /api/stores — public", () => {
   it("includes domain and routePrefix in public store list", async () => {
     await request(app)
       .post("/api/admin/stores")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send(
         baseStorePayload({
           primaryDomain: "testvitestpublic.com",
@@ -448,7 +447,7 @@ describe("GET /api/stores/:storeKey/config — public", () => {
   });
 
   it("returns full config for a created store", async () => {
-    await request(app).post("/api/admin/stores").set(adminHeaders).send(baseStorePayload());
+    await request(app).post("/api/admin/stores").set("Cookie", adminCookie).set("Content-Type", "application/json").send(baseStorePayload());
 
     const res = await request(app).get(`/api/stores/${TEST_STORE_KEY}/config`);
     expect(res.status).toBe(200);
@@ -464,7 +463,7 @@ describe("GET /api/stores/:storeKey/config — public", () => {
   it("includes domain/prefix fields in store config", async () => {
     await request(app)
       .post("/api/admin/stores")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send(
         baseStorePayload({
           primaryDomain: "configtest.com",
@@ -487,7 +486,7 @@ describe("GET /api/stores/resolve", () => {
   it("resolves by route prefix", async () => {
     await request(app)
       .post("/api/admin/stores")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send(baseStorePayload({ routePrefix: "resolvertest" }));
 
     const res = await request(app).get("/api/stores/resolve?prefix=resolvertest");
@@ -498,7 +497,7 @@ describe("GET /api/stores/resolve", () => {
   it("resolves by primary domain", async () => {
     await request(app)
       .post("/api/admin/stores")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send(baseStorePayload({ primaryDomain: "resolvertest.com" }));
 
     const res = await request(app).get("/api/stores/resolve?domain=resolvertest.com");
@@ -509,7 +508,7 @@ describe("GET /api/stores/resolve", () => {
   it("resolves by www domain alias", async () => {
     await request(app)
       .post("/api/admin/stores")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send(
         baseStorePayload({
           primaryDomain: "resolveralias.com",
@@ -523,7 +522,7 @@ describe("GET /api/stores/resolve", () => {
   });
 
   it("falls back to specified store for unknown domain", async () => {
-    await request(app).post("/api/admin/stores").set(adminHeaders).send(baseStorePayload());
+    await request(app).post("/api/admin/stores").set("Cookie", adminCookie).set("Content-Type", "application/json").send(baseStorePayload());
 
     const res = await request(app).get(
       `/api/stores/resolve?domain=totally-unknown-xyz-domain.com&fallback=${TEST_STORE_KEY}`
@@ -535,7 +534,7 @@ describe("GET /api/stores/resolve", () => {
   it("resolves by prefix over domain when both provided", async () => {
     await request(app)
       .post("/api/admin/stores")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send(baseStorePayload({ routePrefix: "resolverpriority", primaryDomain: "resolverpriority.com" }));
 
     const res = await request(app).get(
@@ -550,7 +549,7 @@ describe("GET /api/stores/resolve", () => {
 
 describe("Regression — public store config endpoint still works", () => {
   it("GET /api/stores returns created active store", async () => {
-    await request(app).post("/api/admin/stores").set(adminHeaders).send(baseStorePayload());
+    await request(app).post("/api/admin/stores").set("Cookie", adminCookie).set("Content-Type", "application/json").send(baseStorePayload());
 
     const res = await request(app).get("/api/stores");
     expect(res.status).toBe(200);
@@ -559,7 +558,7 @@ describe("Regression — public store config endpoint still works", () => {
   });
 
   it("GET /api/stores/:storeKey/config returns store config for any store", async () => {
-    await request(app).post("/api/admin/stores").set(adminHeaders).send(baseStorePayload());
+    await request(app).post("/api/admin/stores").set("Cookie", adminCookie).set("Content-Type", "application/json").send(baseStorePayload());
 
     const res = await request(app).get(`/api/stores/${TEST_STORE_KEY}/config`);
     expect(res.status).toBe(200);

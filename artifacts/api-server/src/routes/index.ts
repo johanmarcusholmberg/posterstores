@@ -10,6 +10,7 @@ import statsRouter from "./stats";
 import mockupsRouter from "./mockups";
 import storesRouter from "./stores";
 import authRouter from "./auth";
+import adminAuthRouter from "./adminAuth";
 import shippingRouter from "./shipping";
 import launchChecklistRouter from "./launchChecklist";
 import stripeRouter from "./stripe";
@@ -19,6 +20,7 @@ import analyzePlacementRouter from "./analyzePlacement";
 
 const router: IRouter = Router();
 
+router.use(adminAuthRouter);
 router.use(authRouter);
 router.use(healthRouter);
 router.use(postersRouter);

@@ -75,11 +75,8 @@ export interface BatchMockupItem {
   isPrimary?: boolean;
 }
 
-function headers(token: string): HeadersInit {
-  return {
-    "Content-Type": "application/json",
-    "X-Admin-Token": token,
-  };
+function jsonHeaders(): HeadersInit {
+  return { "Content-Type": "application/json" };
 }
 
 async function handleError(res: Response): Promise<never> {
@@ -91,9 +88,6 @@ async function handleError(res: Response): Promise<never> {
 
 // ─── Format compatibility (client-side mirror of the server helper) ──────────
 
-/**
- * Infer a poster's orientation from its size label, e.g. "50x70" → portrait.
- */
 export function getPosterOrientation(
   sizeLabel: string
 ): "portrait" | "landscape" | "square" {
@@ -108,9 +102,6 @@ export function getPosterOrientation(
   return "portrait";
 }
 
-/**
- * Returns true when a template is compatible with the given poster format label.
- */
 export function isFormatCompatible(
   templateFormats: string[] | null | undefined,
   templateOrientation: string | null | undefined,
@@ -125,10 +116,6 @@ export function isFormatCompatible(
   return false;
 }
 
-/**
- * Filter and sort templates by compatibility with a poster format.
- * Order: exact match first, then orientation-compatible, then unrestricted.
- */
 export function filterTemplatesByFormat(
   templates: MockupTemplate[],
   posterFormat: string | null | undefined
@@ -163,35 +150,33 @@ export async function listMockupTemplates(
 }
 
 export async function adminListAllMockupTemplates(
-  token: string,
   storeKey?: string
 ): Promise<MockupTemplate[]> {
   const qs = storeKey ? `?storeKey=${encodeURIComponent(storeKey)}` : "";
   const res = await fetch(`${BASE}/mockup-templates/all${qs}`, {
-    headers: { "X-Admin-Token": token },
+    credentials: "include",
   });
   if (!res.ok) await handleError(res);
   return res.json();
 }
 
 export async function adminGetMockupTemplate(
-  token: string,
   id: number
 ): Promise<MockupTemplate> {
   const res = await fetch(`${BASE}/mockup-templates/${id}`, {
-    headers: { "X-Admin-Token": token },
+    credentials: "include",
   });
   if (!res.ok) await handleError(res);
   return res.json();
 }
 
 export async function adminCreateMockupTemplate(
-  token: string,
   data: Partial<MockupTemplate>
 ): Promise<MockupTemplate> {
   const res = await fetch(`${BASE}/mockup-templates`, {
     method: "POST",
-    headers: headers(token),
+    headers: jsonHeaders(),
+    credentials: "include",
     body: JSON.stringify(data),
   });
   if (!res.ok) await handleError(res);
@@ -199,13 +184,13 @@ export async function adminCreateMockupTemplate(
 }
 
 export async function adminUpdateMockupTemplate(
-  token: string,
   id: number,
   data: Partial<MockupTemplate>
 ): Promise<MockupTemplate> {
   const res = await fetch(`${BASE}/mockup-templates/${id}`, {
     method: "PUT",
-    headers: headers(token),
+    headers: jsonHeaders(),
+    credentials: "include",
     body: JSON.stringify(data),
   });
   if (!res.ok) await handleError(res);
@@ -213,12 +198,11 @@ export async function adminUpdateMockupTemplate(
 }
 
 export async function adminDeleteMockupTemplate(
-  token: string,
   id: number
 ): Promise<void> {
   const res = await fetch(`${BASE}/mockup-templates/${id}`, {
     method: "DELETE",
-    headers: headers(token),
+    credentials: "include",
   });
   if (!res.ok) await handleError(res);
 }
@@ -235,7 +219,6 @@ export async function getPosterMockups(
 }
 
 export async function adminSavePosterMockupsBatch(
-  token: string,
   posterId: number,
   storeKey: string,
   mockups: BatchMockupItem[]
@@ -244,7 +227,8 @@ export async function adminSavePosterMockupsBatch(
     `${BASE}/posters/${posterId}/mockups/batch?storeKey=${encodeURIComponent(storeKey)}`,
     {
       method: "PUT",
-      headers: headers(token),
+      headers: jsonHeaders(),
+      credentials: "include",
       body: JSON.stringify({ mockups }),
     }
   );
@@ -253,7 +237,6 @@ export async function adminSavePosterMockupsBatch(
 }
 
 export async function adminSetPrimaryMockup(
-  token: string,
   posterId: number,
   mockupId: number,
   storeKey: string
@@ -262,7 +245,8 @@ export async function adminSetPrimaryMockup(
     `${BASE}/posters/${posterId}/mockups/${mockupId}/primary?storeKey=${encodeURIComponent(storeKey)}`,
     {
       method: "PATCH",
-      headers: headers(token),
+      headers: jsonHeaders(),
+      credentials: "include",
     }
   );
   if (!res.ok) await handleError(res);
@@ -270,7 +254,6 @@ export async function adminSetPrimaryMockup(
 }
 
 export async function adminDeletePosterMockup(
-  token: string,
   posterId: number,
   mockupId: number,
   storeKey: string
@@ -279,7 +262,7 @@ export async function adminDeletePosterMockup(
     `${BASE}/posters/${posterId}/mockups/${mockupId}?storeKey=${encodeURIComponent(storeKey)}`,
     {
       method: "DELETE",
-      headers: headers(token),
+      credentials: "include",
     }
   );
   if (!res.ok) await handleError(res);
@@ -298,12 +281,12 @@ export interface PlacementAnalysis {
 }
 
 export async function analyzeMockupPlacement(
-  token: string,
   imageUrl: string
 ): Promise<PlacementAnalysis> {
   const res = await fetch(`${BASE}/mockup-templates/analyze-placement`, {
     method: "POST",
-    headers: headers(token),
+    headers: jsonHeaders(),
+    credentials: "include",
     body: JSON.stringify({ imageUrl }),
   });
   if (!res.ok) await handleError(res);
@@ -311,12 +294,12 @@ export async function analyzeMockupPlacement(
 }
 
 export async function requestMockupImageUploadUrl(
-  token: string,
   file: { name: string; size: number; contentType: string }
 ): Promise<{ uploadURL: string; objectPath: string }> {
   const res = await fetch(`${BASE}/storage/uploads/request-url`, {
     method: "POST",
-    headers: headers(token),
+    headers: jsonHeaders(),
+    credentials: "include",
     body: JSON.stringify(file),
   });
   if (!res.ok) await handleError(res);

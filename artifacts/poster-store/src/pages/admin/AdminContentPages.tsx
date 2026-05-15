@@ -22,20 +22,19 @@ const PAGE_LABELS: Record<string, string> = {
 };
 
 export default function AdminContentPages() {
-  const { token, adminStoreKey } = useAdminToken();
+  const { adminStoreKey } = useAdminToken();
   const [pages, setPages] = useState<AdminContentPageSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const load = useCallback(() => {
-    if (!token) return;
     setLoading(true);
     setError("");
-    adminListContentPages(token, adminStoreKey)
+    adminListContentPages(adminStoreKey)
       .then(setPages)
       .catch(e => setError(e?.message ?? "Failed to load content pages"))
       .finally(() => setLoading(false));
-  }, [token, adminStoreKey]);
+  }, [adminStoreKey]);
 
   useEffect(() => {
     load();

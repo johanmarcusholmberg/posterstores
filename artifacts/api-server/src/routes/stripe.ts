@@ -54,6 +54,37 @@ router.post("/orders/:id/create-checkout-session", checkoutLimiter, async (req: 
 
   const currency = order.currency.toLowerCase();
 
+  const isProduction = process.env.NODE_ENV === "production";
+  const rawImageHosts = process.env.ALLOWED_IMAGE_HOSTS ?? "";
+  const allowedImageHosts = rawImageHosts
+    .split(",")
+    .map((h) => h.trim().toLowerCase())
+    .filter(Boolean);
+
+  const imageHostsConfigured = allowedImageHosts.length > 0;
+  const allowAllImageHosts = process.env.STRIPE_ALLOW_ALL_IMAGE_HOSTS === "true";
+
+  if (isProduction && !imageHostsConfigured && !allowAllImageHosts) {
+    logger.warn(
+      "ALLOWED_IMAGE_HOSTS is not set — product images will be omitted from Stripe checkout. " +
+      "Set ALLOWED_IMAGE_HOSTS to the comma-separated hostnames that serve your poster images, " +
+      "or set STRIPE_ALLOW_ALL_IMAGE_HOSTS=true to explicitly allow all hosts."
+    );
+  }
+
+  function isAllowedImageUrl(url: string | null | undefined): boolean {
+    if (!url) return false;
+    if (!isProduction) return true;
+    if (allowAllImageHosts) return true;
+    if (!imageHostsConfigured) return false;
+    try {
+      const { hostname } = new URL(url);
+      return allowedImageHosts.includes(hostname);
+    } catch {
+      return false;
+    }
+  }
+
   const lineItems: Array<{ quantity: number; price_data: { currency: string; unit_amount: number; product_data: { name: string; description?: string; images?: string[] } } }> = items.map((item) => ({
     quantity: item.quantity,
     price_data: {
@@ -64,8 +95,8 @@ router.post("/orders/:id/create-checkout-session", checkoutLimiter, async (req: 
         description: item.sizeLabelSnapshot
           ? `${item.posterTitleSnapshot} — ${item.sizeLabelSnapshot}`
           : item.posterTitleSnapshot,
-        ...(item.previewImageUrlSnapshot
-          ? { images: [item.previewImageUrlSnapshot] }
+        ...(isAllowedImageUrl(item.previewImageUrlSnapshot)
+          ? { images: [item.previewImageUrlSnapshot as string] }
           : {}),
       },
     },

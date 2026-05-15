@@ -96,7 +96,7 @@ function posterSizesToSizeRows(poster: AdminPoster, defaultCurrency: string): Si
 }
 
 export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
-  const { token, adminStoreKey } = useAdminToken();
+  const { adminStoreKey } = useAdminToken();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -127,7 +127,7 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
   });
 
   useEffect(() => {
-    if (!existing || !token) return;
+    if (!existing) return;
     getPosterMockups(existing.id, existing.storeKey)
       .then(setMockups)
       .catch(() => setMockups([]));
@@ -181,7 +181,6 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
     const currentSizeErrors = validateSizes(sizes, status);
     setSizeErrors(currentSizeErrors);
     if (Object.keys(errs).length > 0 || currentSizeErrors.length > 0) return;
-    if (!token) return;
 
     setSaving(true);
     const tags = tagsInput
@@ -223,7 +222,7 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
           isNew,
           slug: slugValue,
         };
-        await adminUpdatePoster(token, existing.id, storeKey, payload);
+        await adminUpdatePoster(existing.id, storeKey, payload);
         toast({ title: "Poster updated", description: title });
       } else {
         const payload: CreatePosterPayload = {
@@ -244,7 +243,7 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
           isNew,
           slug: slugValue,
         };
-        const created = await adminCreatePoster(token, payload);
+        const created = await adminCreatePoster(payload);
         toast({ title: "Poster created", description: title });
         setLocation(`/admin/posters/${created.id}`);
         return;
@@ -482,11 +481,10 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
               <CardTitle className="text-base">Mockup images</CardTitle>
             </CardHeader>
             <CardContent>
-              {existing && token ? (
+              {existing ? (
                 <AdminMockupEditor
                   posterId={existing.id}
                   storeKey={existing.storeKey}
-                  token={token}
                   mockups={mockups}
                   onMockupsChange={setMockups}
                 />

@@ -28,7 +28,7 @@ const VALID_PAGE_KEYS = ["about", "shipping", "returns", "privacy", "terms", "co
 export default function AdminContentPageEdit() {
   const params = useParams<{ pageKey: string }>();
   const pageKey = params.pageKey ?? "";
-  const { token, adminStoreKey } = useAdminToken();
+  const { adminStoreKey } = useAdminToken();
   const [, navigate] = useLocation();
 
   const [loading, setLoading] = useState(false);
@@ -44,10 +44,10 @@ export default function AdminContentPageEdit() {
   const [published, setPublished] = useState(false);
 
   const load = useCallback(() => {
-    if (!token || !pageKey) return;
+    if (!pageKey) return;
     setLoading(true);
     setError("");
-    adminGetContentPage(token, adminStoreKey, pageKey)
+    adminGetContentPage(adminStoreKey, pageKey)
       .then(data => {
         if (data.exists) {
           setTitle(data.title ?? "");
@@ -60,7 +60,7 @@ export default function AdminContentPageEdit() {
       })
       .catch(e => setError(e?.message ?? "Failed to load page content"))
       .finally(() => setLoading(false));
-  }, [token, adminStoreKey, pageKey]);
+  }, [adminStoreKey, pageKey]);
 
   useEffect(() => {
     if (!VALID_PAGE_KEYS.includes(pageKey)) {
@@ -72,12 +72,11 @@ export default function AdminContentPageEdit() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (!token) return;
     setSaving(true);
     setError("");
     setSuccess("");
     try {
-      await adminUpsertContentPage(token, adminStoreKey, pageKey, {
+      await adminUpsertContentPage(adminStoreKey, pageKey, {
         title,
         subtitle: subtitle || null,
         content,

@@ -11,12 +11,15 @@ import {
   getFirstActiveSizeForPoster,
   addCartItem,
   TEST_STORE_KEY,
+  getAdminCookie,
 } from "./setup";
 import Stripe from "stripe";
 import { sendPaymentConfirmedEmail, sendAdminNewOrderEmail } from "../email/emailService";
 
+let adminCookie = "";
+
 const TEST_EMAIL = "email-test-vitest@example.com";
-const ADMIN_TOKEN = process.env.ADMIN_API_TOKEN ?? "test-admin-token";
+beforeAll(async () => { adminCookie = await getAdminCookie(); });
 
 const VALID_CHECKOUT = {
   storeKey: TEST_STORE_KEY,
@@ -292,7 +295,7 @@ describe("Admin order detail — email status fields", () => {
 
     const res = await request(app)
       .get(`/api/admin/orders/${order.id}`)
-      .set("X-Admin-Token", ADMIN_TOKEN);
+      .set("Cookie", adminCookie);
 
     expect(res.status).toBe(200);
     expect(res.body.customerConfirmationSentAt).toBeTruthy();
@@ -305,7 +308,7 @@ describe("Admin order detail — email status fields", () => {
 
     const res = await request(app)
       .get(`/api/admin/orders/${order.id}`)
-      .set("X-Admin-Token", ADMIN_TOKEN);
+      .set("Cookie", adminCookie);
 
     expect(res.status).toBe(200);
     expect(res.body.customerConfirmationSentAt).toBeNull();

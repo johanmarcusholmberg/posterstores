@@ -12,7 +12,6 @@ import {
 interface AdminMockupEditorProps {
   posterId: number;
   storeKey: string;
-  token: string;
   mockups: PosterMockup[];
   onMockupsChange: (mockups: PosterMockup[]) => void;
 }
@@ -20,7 +19,6 @@ interface AdminMockupEditorProps {
 export function AdminMockupEditor({
   posterId,
   storeKey,
-  token,
   mockups,
   onMockupsChange,
 }: AdminMockupEditorProps) {
@@ -48,7 +46,8 @@ export function AdminMockupEditor({
         `/api/posters/${posterId}/mockups?storeKey=${encodeURIComponent(storeKey)}`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json", "X-Admin-Token": token },
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({ mockupImageUrl: url, isPrimary, sortOrder: mockups.length }),
         }
       );
@@ -67,7 +66,7 @@ export function AdminMockupEditor({
   const handleRemove = async (mockup: PosterMockup) => {
     setRemovingId(mockup.id);
     try {
-      await adminDeletePosterMockup(token, posterId, mockup.id, storeKey);
+      await adminDeletePosterMockup(posterId, mockup.id, storeKey);
       const remaining = mockups.filter(m => m.id !== mockup.id);
       if (mockup.isPrimary && remaining.length > 0) {
         remaining[0] = { ...remaining[0], isPrimary: true };
@@ -84,7 +83,7 @@ export function AdminMockupEditor({
     if (mockup.isPrimary) return;
     setSettingPrimaryId(mockup.id);
     try {
-      await adminSetPrimaryMockup(token, posterId, mockup.id, storeKey);
+      await adminSetPrimaryMockup(posterId, mockup.id, storeKey);
       onMockupsChange(mockups.map(m => ({ ...m, isPrimary: m.id === mockup.id })));
     } catch {
       toast({ variant: "destructive", title: "Failed to set primary image" });

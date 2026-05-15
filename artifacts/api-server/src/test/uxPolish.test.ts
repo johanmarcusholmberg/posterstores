@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { getAdminCookie } from "./setup";
 import request from "supertest";
 import app from "../app";
 import { db } from "@workspace/db";
@@ -11,16 +12,14 @@ import {
 import { seedPostsofSpain } from "../lib/seedPostsofSpain";
 import { eq } from "drizzle-orm";
 
-const ADMIN_TOKEN = process.env.ADMIN_API_TOKEN ?? "test-admin-token";
-const adminHeaders = {
-  "Content-Type": "application/json",
-  "X-Admin-Token": ADMIN_TOKEN,
-};
+
+let adminCookie = "";
 
 const STORE_KEY = "postsofspain";
 
 beforeAll(async () => {
   await seedPostsofSpain();
+  adminCookie = await getAdminCookie();
 });
 
 // ── POLISH 1: Product detail trust block ─────────────────────────────────────
@@ -29,7 +28,7 @@ describe("POLISH 1 — Product detail page data", () => {
   it("poster detail API returns poster with active sizes for trust block", async () => {
     const posterRes = await request(app)
       .post("/api/posters")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send({
         storeKey: STORE_KEY,
         title: "Trust Block Test Poster",
@@ -97,7 +96,7 @@ describe("POLISH 8 — Admin readiness indicators", () => {
   it("poster without master file and no sizes is flagged as not-ready in list", async () => {
     const createRes = await request(app)
       .post("/api/posters")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send({
         storeKey: STORE_KEY,
         title: "Readiness Test — No Sizes No Master",
@@ -113,7 +112,7 @@ describe("POLISH 8 — Admin readiness indicators", () => {
 
     const listRes = await request(app)
       .get(`/api/posters?storeKey=${STORE_KEY}&status=draft`)
-      .set(adminHeaders);
+      .set("Cookie", adminCookie).set("Content-Type", "application/json");
     expect(listRes.status).toBe(200);
 
     const found = listRes.body.posters.find((p: any) => p.id === poster.id);
@@ -129,7 +128,7 @@ describe("POLISH 8 — Admin readiness indicators", () => {
   it("poster with master file and active sizes shows no readiness issues", async () => {
     const createRes = await request(app)
       .post("/api/posters")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send({
         storeKey: STORE_KEY,
         title: "Readiness Test — All Set",
@@ -149,7 +148,7 @@ describe("POLISH 8 — Admin readiness indicators", () => {
 
     const res = await request(app)
       .get(`/api/posters/${poster.id}?storeKey=${STORE_KEY}`)
-      .set(adminHeaders);
+      .set("Cookie", adminCookie).set("Content-Type", "application/json");
     expect(res.status).toBe(200);
     expect(res.body.masterPrintImageUrl).toBeTruthy();
     const activeSizes = (res.body.posterSizes ?? []).filter((s: any) => s.active);
@@ -170,7 +169,7 @@ describe("POLISH 9 — Public mockup gallery placeholder safety", () => {
   beforeAll(async () => {
     const posterRes = await request(app)
       .post("/api/posters")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send({
         storeKey: STORE_KEY,
         title: "Mockup Placeholder Test Poster",
@@ -311,7 +310,7 @@ describe("POLISH 2 + 3 — Checkout / cart API", () => {
 
     const posterRes = await request(app)
       .post("/api/posters")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send({
         storeKey: STORE_KEY,
         title: "Cart Clarity Test Poster",

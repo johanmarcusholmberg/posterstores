@@ -8,19 +8,19 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function AdminStoreEdit() {
   const { storeKey } = useParams<{ storeKey: string }>();
-  const { token } = useAdminToken();
+  useAdminToken();
   const [store, setStore] = useState<AdminStore | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!token || !storeKey) return;
+    if (!storeKey) return;
     setLoading(true);
-    adminGetStore(token, storeKey)
+    adminGetStore(storeKey)
       .then(setStore)
       .catch((e) => setError(e?.message ?? "Failed to load store"))
       .finally(() => setLoading(false));
-  }, [token, storeKey]);
+  }, [storeKey]);
 
   return (
     <AdminDashboardLayout

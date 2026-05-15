@@ -17,10 +17,14 @@ import {
   getFirstActiveSizeForPoster,
   addCartItem,
   TEST_STORE_KEY,
+  getAdminCookie,
 } from "./setup";
 
-const ADMIN_TOKEN = process.env.ADMIN_API_TOKEN ?? "test-admin-token";
+let adminCookie = "";
+
 const TEST_EMAIL = "order-test-vitest@example.com";
+
+beforeAll(async () => { adminCookie = await getAdminCookie(); });
 
 const VALID_CHECKOUT = {
   storeKey: TEST_STORE_KEY,
@@ -322,7 +326,7 @@ describe("GET /api/admin/orders", () => {
 
     const res = await request(app)
       .get(`/api/admin/orders?storeKey=${TEST_STORE_KEY}`)
-      .set("X-Admin-Token", ADMIN_TOKEN);
+      .set("Cookie", adminCookie);
 
     expect(res.status).toBe(200);
     expect(res.body.orders).toBeDefined();
@@ -334,7 +338,7 @@ describe("GET /api/admin/orders", () => {
   it("only returns orders for the requested store", async () => {
     const res = await request(app)
       .get("/api/admin/orders?storeKey=nonexistent-store-xyz")
-      .set("X-Admin-Token", ADMIN_TOKEN);
+      .set("Cookie", adminCookie);
 
     expect(res.status).toBe(200);
     expect(res.body.orders).toHaveLength(0);
@@ -350,7 +354,7 @@ describe("GET /api/admin/orders", () => {
 
     const res = await request(app)
       .get(`/api/admin/orders?storeKey=${TEST_STORE_KEY}&status=pending_payment`)
-      .set("X-Admin-Token", ADMIN_TOKEN);
+      .set("Cookie", adminCookie);
 
     expect(res.status).toBe(200);
     expect(res.body.orders.every((o: any) => o.status === "pending_payment")).toBe(true);
@@ -372,7 +376,7 @@ describe("GET /api/admin/orders/:id", () => {
 
     const res = await request(app)
       .get(`/api/admin/orders/${orderId}`)
-      .set("X-Admin-Token", ADMIN_TOKEN);
+      .set("Cookie", adminCookie);
 
     expect(res.status).toBe(200);
     expect(res.body.id).toBe(orderId);
@@ -387,7 +391,7 @@ describe("GET /api/admin/orders/:id", () => {
   it("returns 404 for unknown order", async () => {
     const res = await request(app)
       .get("/api/admin/orders/99999999")
-      .set("X-Admin-Token", ADMIN_TOKEN);
+      .set("Cookie", adminCookie);
     expect(res.status).toBe(404);
   });
 });
@@ -407,7 +411,7 @@ describe("PATCH /api/admin/orders/:id/status", () => {
 
     const res = await request(app)
       .patch(`/api/admin/orders/${orderId}/status`)
-      .set("X-Admin-Token", ADMIN_TOKEN)
+      .set("Cookie", adminCookie)
       .send({ status: "paid" });
 
     expect(res.status).toBe(200);
@@ -432,7 +436,7 @@ describe("PATCH /api/admin/orders/:id/status", () => {
 
       const res = await request(app)
         .patch(`/api/admin/orders/${orderId}/status`)
-        .set("X-Admin-Token", ADMIN_TOKEN)
+        .set("Cookie", adminCookie)
         .send({ status });
 
       expect(res.status).toBe(200);
@@ -455,7 +459,7 @@ describe("PATCH /api/admin/orders/:id/status", () => {
 
     const res = await request(app)
       .patch(`/api/admin/orders/${orderId}/status`)
-      .set("X-Admin-Token", ADMIN_TOKEN)
+      .set("Cookie", adminCookie)
       .send({ status: "invalid-status" });
 
     expect(res.status).toBe(400);
@@ -464,7 +468,7 @@ describe("PATCH /api/admin/orders/:id/status", () => {
   it("returns 404 for unknown order", async () => {
     const res = await request(app)
       .patch("/api/admin/orders/99999999/status")
-      .set("X-Admin-Token", ADMIN_TOKEN)
+      .set("Cookie", adminCookie)
       .send({ status: "paid" });
     expect(res.status).toBe(404);
   });
@@ -540,7 +544,7 @@ describe("Regression: existing endpoints still work", () => {
   it("Admin poster CRUD still works (list)", async () => {
     const res = await request(app)
       .get(`/api/posters?storeKey=${TEST_STORE_KEY}&status=all`)
-      .set("X-Admin-Token", ADMIN_TOKEN);
+      .set("Cookie", adminCookie);
 
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.posters)).toBe(true);

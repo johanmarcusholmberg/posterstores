@@ -52,7 +52,7 @@ function splitList(val: string): string[] {
 }
 
 export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
-  const { token } = useAdminToken();
+  useAdminToken();
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const isEdit = !!existing;
@@ -135,7 +135,6 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
       return;
     }
     setErrors([]);
-    if (!token) return;
     setSaving(true);
 
     const homepageConfig: AdminStoreHomepageConfig = {
@@ -173,7 +172,7 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
           domainAliases: aliases.length > 0 ? aliases : null,
           routePrefix: routePrefix || null,
         };
-        await adminUpdateStore(token, existing.storeKey, payload);
+        await adminUpdateStore(existing.storeKey, payload);
         toast({ title: "Store updated", description: `${name} has been saved.` });
         navigate("/admin/stores");
       } else {
@@ -191,7 +190,7 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
           domainAliases: aliases.length > 0 ? aliases : null,
           routePrefix: routePrefix || null,
         };
-        await adminCreateStore(token, payload);
+        await adminCreateStore(payload);
         toast({ title: "Store created", description: `${name} (${storeKey}) is ready.` });
         navigate("/admin/stores");
       }

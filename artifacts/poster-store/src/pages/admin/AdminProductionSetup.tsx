@@ -126,18 +126,18 @@ const TOC_SECTIONS = [
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function AdminProductionSetup() {
-  const { token, adminStoreKey } = useAdminToken();
+  const { adminStoreKey } = useAdminToken();
   const [store, setStore] = useState<AdminStore | null>(null);
   const [loadingStore, setLoadingStore] = useState(false);
 
   useEffect(() => {
-    if (!token || !adminStoreKey) return;
+    if (!adminStoreKey) return;
     setLoadingStore(true);
-    adminGetStore(token, adminStoreKey)
+    adminGetStore(adminStoreKey)
       .then(setStore)
       .catch(() => setStore(null))
       .finally(() => setLoadingStore(false));
-  }, [token, adminStoreKey]);
+  }, [adminStoreKey]);
 
   const storeName = store?.name ?? adminStoreKey;
   const currency = store?.defaultCurrency ?? "—";

@@ -5,12 +5,10 @@ import { db } from "@workspace/db";
 import { storesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { seedPostsofSpain } from "../lib/seedPostsofSpain";
+import { getAdminCookie } from "./setup";
 
-const ADMIN_TOKEN = process.env.ADMIN_API_TOKEN ?? "test-admin-token";
-const adminHeaders = {
-  "Content-Type": "application/json",
-  "X-Admin-Token": ADMIN_TOKEN,
-};
+let adminCookie = "";
+beforeAll(async () => { adminCookie = await getAdminCookie(); });
 
 // ── Task 1: PostsofSpain DB seeding ───────────────────────────────────────────
 
@@ -80,7 +78,7 @@ describe("/api/admin/launch-checklist — email provider warnings", () => {
 
     const res = await request(app)
       .get("/api/admin/launch-checklist?storeKey=postsofspain")
-      .set(adminHeaders);
+      .set("Cookie", adminCookie).set("Content-Type", "application/json");
 
     process.env.EMAIL_PROVIDER = savedProvider;
 
@@ -107,7 +105,7 @@ describe("/api/admin/launch-checklist — email provider warnings", () => {
 
     const res = await request(app)
       .get("/api/admin/launch-checklist?storeKey=postsofspain")
-      .set(adminHeaders);
+      .set("Cookie", adminCookie).set("Content-Type", "application/json");
 
     process.env.EMAIL_PROVIDER = savedProvider;
     if (savedKey !== undefined) process.env.RESEND_API_KEY = savedKey;
@@ -133,7 +131,7 @@ describe("/api/admin/launch-checklist — email provider warnings", () => {
 
     const res = await request(app)
       .get("/api/admin/launch-checklist?storeKey=postsofspain")
-      .set(adminHeaders);
+      .set("Cookie", adminCookie).set("Content-Type", "application/json");
 
     if (savedProvider !== undefined) process.env.EMAIL_PROVIDER = savedProvider;
     else delete process.env.EMAIL_PROVIDER;
@@ -157,7 +155,7 @@ describe("/api/admin/launch-checklist — email provider warnings", () => {
 
     const res = await request(app)
       .get("/api/admin/launch-checklist?storeKey=postsofspain")
-      .set(adminHeaders);
+      .set("Cookie", adminCookie).set("Content-Type", "application/json");
 
     if (saved !== undefined) process.env.ADMIN_ORDER_NOTIFICATION_EMAIL = saved;
 

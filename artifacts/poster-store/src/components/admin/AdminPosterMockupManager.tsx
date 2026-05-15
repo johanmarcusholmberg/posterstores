@@ -53,7 +53,7 @@ export const AdminPosterMockupManager = ({
   poster,
   storeKey,
 }: AdminPosterMockupManagerProps) => {
-  const { token } = useAdminToken();
+  useAdminToken();
   const { toast } = useToast();
 
   const [templates, setTemplates] = useState<MockupTemplate[]>([]);
@@ -64,7 +64,6 @@ export const AdminPosterMockupManager = ({
   const [dragIdx, setDragIdx] = useState<number | null>(null);
 
   const load = useCallback(async () => {
-    if (!token) return;
     setLoading(true);
     try {
       const [tmpl, mockups] = await Promise.all([
@@ -93,7 +92,7 @@ export const AdminPosterMockupManager = ({
     } finally {
       setLoading(false);
     }
-  }, [token, poster.id, storeKey]);
+  }, [poster.id, storeKey]);
 
   useEffect(() => {
     load();
@@ -174,7 +173,6 @@ export const AdminPosterMockupManager = ({
   const handleDragEnd = () => setDragIdx(null);
 
   const save = async () => {
-    if (!token) return;
     setSaving(true);
     try {
       const items: BatchMockupItem[] = drafts.map((d) => ({
@@ -183,7 +181,7 @@ export const AdminPosterMockupManager = ({
         sortOrder: d.sortOrder,
         isPrimary: d.isPrimary,
       }));
-      await adminSavePosterMockupsBatch(token, poster.id, storeKey, items);
+      await adminSavePosterMockupsBatch(poster.id, storeKey, items);
       toast({ title: "Mockups saved" });
       await load();
     } catch (e: any) {

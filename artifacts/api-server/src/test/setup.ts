@@ -1,3 +1,5 @@
+import request from "supertest";
+import app from "../app";
 import { db } from "@workspace/db";
 import {
   ordersTable,
@@ -12,6 +14,24 @@ const TEST_SESSION_ID = "test-session-" + Date.now();
 const TEST_STORE_KEY = "postsofspain";
 
 export { TEST_SESSION_ID, TEST_STORE_KEY };
+
+/**
+ * Login with the ADMIN_API_TOKEN and return the Set-Cookie header value
+ * so tests can attach it with `.set("Cookie", adminCookie)`.
+ */
+export async function getAdminCookie(): Promise<string> {
+  const token = process.env.ADMIN_API_TOKEN ?? "test-admin-token";
+  const res = await request(app)
+    .post("/api/admin/login")
+    .send({ token })
+    .set("Content-Type", "application/json");
+  if (res.status !== 200) {
+    throw new Error(`Admin login failed in test setup: ${res.status} ${JSON.stringify(res.body)}`);
+  }
+  const cookie = res.headers["set-cookie"];
+  if (!cookie) throw new Error("No Set-Cookie header in admin login response");
+  return Array.isArray(cookie) ? cookie[0] : cookie;
+}
 
 export async function cleanupTestOrders(email: string) {
   const orders = await db

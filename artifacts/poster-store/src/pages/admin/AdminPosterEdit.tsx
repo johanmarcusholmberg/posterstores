@@ -11,20 +11,20 @@ import { LayoutTemplate } from "lucide-react";
 export default function AdminPosterEdit() {
   const params = useParams<{ id: string }>();
   const id = Number(params.id);
-  const { token, adminStoreKey } = useAdminToken();
+  const { adminStoreKey } = useAdminToken();
 
   const [poster, setPoster] = useState<AdminPoster | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!token || !id) return;
+    if (!id) return;
     setLoading(true);
-    adminGetPoster(token, id, adminStoreKey)
+    adminGetPoster(id, adminStoreKey)
       .then(setPoster)
       .catch(e => setError(e?.message ?? "Failed to load poster"))
       .finally(() => setLoading(false));
-  }, [token, id, adminStoreKey]);
+  }, [id, adminStoreKey]);
 
   if (loading) {
     return (

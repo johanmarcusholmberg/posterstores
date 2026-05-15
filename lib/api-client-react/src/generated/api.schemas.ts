@@ -109,6 +109,8 @@ export interface CreatePosterBody {
   isFeatured?: boolean;
   isNew?: boolean;
   status?: CreatePosterBodyStatus;
+  /** SEO-friendly URL slug (lowercase letters, numbers, and hyphens only). Auto-generated from title if omitted. */
+  slug?: string;
 }
 
 export type UpdatePosterBodyStatus =
@@ -137,6 +139,8 @@ export interface UpdatePosterBody {
   isFeatured?: boolean;
   isNew?: boolean;
   status?: UpdatePosterBodyStatus;
+  /** Update the SEO-friendly URL slug (lowercase letters, numbers, and hyphens only). Must be unique within the store. */
+  slug?: string;
 }
 
 export interface CartItem {

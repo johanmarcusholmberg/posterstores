@@ -4,14 +4,9 @@ import { posterSizesTable, postersTable } from "@workspace/db";
 import { eq, and, asc } from "drizzle-orm";
 import { requireAdmin } from "../middleware/requireAdmin";
 import { adminLimiter } from "../middleware/rateLimiter";
+import { isAdminRequest } from "../middleware/isAdminRequest";
 
 const router = Router();
-
-function isAdminRequest(req: import("express").Request): boolean {
-  const token = process.env.ADMIN_API_TOKEN;
-  if (!token) return false;
-  return req.headers["x-admin-token"] === token;
-}
 
 export function serializePosterSize(s: typeof posterSizesTable.$inferSelect) {
   return {

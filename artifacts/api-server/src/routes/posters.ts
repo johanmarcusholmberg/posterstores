@@ -13,16 +13,11 @@ import {
 import { requireAdmin } from "../middleware/requireAdmin";
 import { adminLimiter } from "../middleware/rateLimiter";
 import { generateSlug } from "../lib/migrateSlugField";
+import { isAdminRequest } from "../middleware/isAdminRequest";
 
 const router = Router();
 
 const SLUG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-
-function isAdminRequest(req: import("express").Request): boolean {
-  const token = process.env.ADMIN_API_TOKEN;
-  if (!token) return false;
-  return req.headers["x-admin-token"] === token;
-}
 
 function serializePosterSize(s: typeof posterSizesTable.$inferSelect) {
   return {
@@ -150,7 +145,7 @@ router.get("/posters", async (req, res) => {
   const adminRequest = isAdminRequest(req);
 
   if (requestedStatus && requestedStatus !== "published" && !adminRequest) {
-    return res.status(401).json({ error: "Unauthorized: admin token required to view non-published posters" });
+    return res.status(401).json({ error: "Unauthorized: admin session required to view non-published posters" });
   }
 
   let conditions: ReturnType<typeof eq>[] = [];
@@ -208,7 +203,7 @@ router.post("/posters", requireAdmin, async (req, res) => {
   const body = CreatePosterBody.safeParse(req.body);
   if (!body.success) return res.status(400).json({ error: body.error.flatten() });
 
-  const { price, posterSizes: posterSizesInput, slug: rawSlug, ...rest } = body.data as typeof body.data & { slug?: string };
+  const { price, posterSizes: posterSizesInput, slug: rawSlug, ...rest } = body.data;
 
   if (rawSlug !== undefined) {
     if (!SLUG_REGEX.test(rawSlug)) {
@@ -300,7 +295,7 @@ router.put("/posters/:id", requireAdmin, async (req, res) => {
     return res.status(403).json({ error: "storeKey mismatch: cannot edit poster from another store" });
   }
 
-  const { price, posterSizes: posterSizesInput, slug: rawSlug, ...rest } = body.data as typeof body.data & { slug?: string };
+  const { price, posterSizes: posterSizesInput, slug: rawSlug, ...rest } = body.data;
 
   if (rawSlug !== undefined) {
     if (!SLUG_REGEX.test(rawSlug)) {
@@ -315,6 +310,10 @@ router.put("/posters/:id", requireAdmin, async (req, res) => {
   const updateData: Record<string, unknown> = { ...rest };
   if (price !== undefined) updateData.price = String(price);
   if (rawSlug !== undefined) updateData.slug = rawSlug;
+
+  if (Object.keys(updateData).length === 0 && posterSizesInput === undefined) {
+    return res.status(400).json({ error: "No fields to update" });
+  }
 
   const [poster] = await db
     .update(postersTable)

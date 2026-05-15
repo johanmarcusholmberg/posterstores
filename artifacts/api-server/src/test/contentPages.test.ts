@@ -1,15 +1,13 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, beforeAll } from "vitest";
+import { getAdminCookie } from "./setup";
 import request from "supertest";
 import app from "../app";
 import { db } from "@workspace/db";
 import { storeContentPagesTable, storesTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 
-const ADMIN_TOKEN = process.env.ADMIN_API_TOKEN ?? "test-admin-token";
-const adminHeaders = {
-  "Content-Type": "application/json",
-  "X-Admin-Token": ADMIN_TOKEN,
-};
+let adminCookie = "";
+beforeAll(async () => { adminCookie = await getAdminCookie(); });
 
 const TEST_STORE_KEY = "contentteststore";
 const TEST_STORE_KEY_2 = "contentteststore2";
@@ -17,7 +15,7 @@ const TEST_STORE_KEY_2 = "contentteststore2";
 async function createTestStore(storeKey: string) {
   await request(app)
     .post("/api/admin/stores")
-    .set(adminHeaders)
+    .set("Cookie", adminCookie).set("Content-Type", "application/json")
     .send({
       storeKey,
       name: "Content Test Store",
@@ -54,7 +52,7 @@ describe("GET /api/admin/content — auth", () => {
   });
 
   it("requires storeKey parameter", async () => {
-    const res = await request(app).get("/api/admin/content").set(adminHeaders);
+    const res = await request(app).get("/api/admin/content").set("Cookie", adminCookie).set("Content-Type", "application/json");
     expect(res.status).toBe(400);
   });
 });
@@ -77,7 +75,7 @@ describe("PUT /api/admin/content/:pageKey — create and update", () => {
 
     const res = await request(app)
       .put(`/api/admin/content/about?storeKey=${TEST_STORE_KEY}`)
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send({
         title: "About Us",
         subtitle: "Our story",
@@ -100,12 +98,12 @@ describe("PUT /api/admin/content/:pageKey — create and update", () => {
 
     await request(app)
       .put(`/api/admin/content/about?storeKey=${TEST_STORE_KEY}`)
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send({ title: "About Us", content: "First version.", published: false });
 
     const res = await request(app)
       .put(`/api/admin/content/about?storeKey=${TEST_STORE_KEY}`)
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send({ title: "About Us Updated", content: "Second version.", published: true });
 
     expect(res.status).toBe(200);
@@ -119,7 +117,7 @@ describe("PUT /api/admin/content/:pageKey — create and update", () => {
 
     const res = await request(app)
       .put(`/api/admin/content/fakekey?storeKey=${TEST_STORE_KEY}`)
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send({ title: "Fake", content: "Content", published: true });
 
     expect(res.status).toBe(400);
@@ -130,7 +128,7 @@ describe("PUT /api/admin/content/:pageKey — create and update", () => {
 
     const res = await request(app)
       .put(`/api/admin/content/about?storeKey=${TEST_STORE_KEY}`)
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send({ title: "", content: "Some content", published: false });
 
     expect(res.status).toBe(400);
@@ -141,7 +139,7 @@ describe("PUT /api/admin/content/:pageKey — create and update", () => {
 
     const res = await request(app)
       .put(`/api/admin/content/about?storeKey=${TEST_STORE_KEY}`)
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send({ title: "About", content: "", published: false });
 
     expect(res.status).toBe(400);
@@ -150,7 +148,7 @@ describe("PUT /api/admin/content/:pageKey — create and update", () => {
   it("returns 404 for non-existent store", async () => {
     const res = await request(app)
       .put("/api/admin/content/about?storeKey=nonexistentstore999")
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send({ title: "About", content: "Content", published: true });
 
     expect(res.status).toBe(404);
@@ -166,7 +164,7 @@ describe("Content pages are store-scoped", () => {
 
     await request(app)
       .put(`/api/admin/content/about?storeKey=${TEST_STORE_KEY}`)
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send({ title: "Store1 About", content: "Store 1 content.", published: true });
 
     const res = await request(app)
@@ -182,12 +180,12 @@ describe("Content pages are store-scoped", () => {
 
     await request(app)
       .put(`/api/admin/content/shipping?storeKey=${TEST_STORE_KEY}`)
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send({ title: "Shipping S1", content: "Ships from Spain.", published: true });
 
     await request(app)
       .put(`/api/admin/content/shipping?storeKey=${TEST_STORE_KEY_2}`)
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send({ title: "Shipping S2", content: "Ships from Sweden.", published: true });
 
     const res1 = await request(app).get(`/api/content/shipping?storeKey=${TEST_STORE_KEY}`);
@@ -206,7 +204,7 @@ describe("GET /api/content/:pageKey — public", () => {
 
     await request(app)
       .put(`/api/admin/content/about?storeKey=${TEST_STORE_KEY}`)
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send({ title: "About", content: "Public content.", published: true });
 
     const res = await request(app).get(`/api/content/about?storeKey=${TEST_STORE_KEY}`);
@@ -230,7 +228,7 @@ describe("GET /api/content/:pageKey — public", () => {
 
     await request(app)
       .put(`/api/admin/content/returns?storeKey=${TEST_STORE_KEY}`)
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send({ title: "Returns", content: "Draft returns policy.", published: false });
 
     const res = await request(app).get(`/api/content/returns?storeKey=${TEST_STORE_KEY}`);
@@ -252,7 +250,7 @@ describe("GET /api/admin/content — list pages", () => {
 
     const res = await request(app)
       .get(`/api/admin/content?storeKey=${TEST_STORE_KEY}`)
-      .set(adminHeaders);
+      .set("Cookie", adminCookie).set("Content-Type", "application/json");
 
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
@@ -272,12 +270,12 @@ describe("GET /api/admin/content — list pages", () => {
 
     await request(app)
       .put(`/api/admin/content/about?storeKey=${TEST_STORE_KEY}`)
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send({ title: "About", content: "Real content.", published: true });
 
     const res = await request(app)
       .get(`/api/admin/content?storeKey=${TEST_STORE_KEY}`)
-      .set(adminHeaders);
+      .set("Cookie", adminCookie).set("Content-Type", "application/json");
 
     const about = res.body.find((p: { pageKey: string }) => p.pageKey === "about");
     const shipping = res.body.find((p: { pageKey: string }) => p.pageKey === "shipping");
@@ -291,12 +289,12 @@ describe("GET /api/admin/content — list pages", () => {
 
     await request(app)
       .put(`/api/admin/content/privacy?storeKey=${TEST_STORE_KEY}`)
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send({ title: "Privacy Draft", content: "Draft content.", published: false });
 
     const res = await request(app)
       .get(`/api/admin/content/privacy?storeKey=${TEST_STORE_KEY}`)
-      .set(adminHeaders);
+      .set("Cookie", adminCookie).set("Content-Type", "application/json");
 
     expect(res.status).toBe(200);
     expect(res.body.exists).toBe(true);
@@ -313,7 +311,7 @@ describe("Launch checklist — content pages section", () => {
 
     const res = await request(app)
       .get(`/api/admin/launch-checklist?storeKey=${TEST_STORE_KEY}`)
-      .set(adminHeaders);
+      .set("Cookie", adminCookie).set("Content-Type", "application/json");
 
     expect(res.status).toBe(200);
     const legalSection = res.body.sections.find((s: { id: string }) => s.id === "legal");
@@ -329,12 +327,12 @@ describe("Launch checklist — content pages section", () => {
 
     await request(app)
       .put(`/api/admin/content/shipping?storeKey=${TEST_STORE_KEY}`)
-      .set(adminHeaders)
+      .set("Cookie", adminCookie).set("Content-Type", "application/json")
       .send({ title: "Shipping", content: "Our shipping policy.", published: true });
 
     const res = await request(app)
       .get(`/api/admin/launch-checklist?storeKey=${TEST_STORE_KEY}`)
-      .set(adminHeaders);
+      .set("Cookie", adminCookie).set("Content-Type", "application/json");
 
     expect(res.status).toBe(200);
     const legalSection = res.body.sections.find((s: { id: string }) => s.id === "legal");

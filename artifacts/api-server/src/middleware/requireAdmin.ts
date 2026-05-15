@@ -1,18 +1,18 @@
 import { Request, Response, NextFunction } from "express";
 import { adminLimiter } from "./rateLimiter";
+import { adminSessionStore } from "../routes/adminAuth";
 
 export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
   adminLimiter(req, res, () => {
-    const token = process.env.ADMIN_API_TOKEN;
-    if (!token) {
-      res.status(500).json({ error: "ADMIN_API_TOKEN not configured on server" });
-      return;
+    const sessionId = req.cookies?.admin_session as string | undefined;
+    if (sessionId) {
+      const session = adminSessionStore.get(sessionId);
+      if (session && session.expiresAt > Date.now()) {
+        next();
+        return;
+      }
+      if (session) adminSessionStore.delete(sessionId);
     }
-    const provided = req.headers["x-admin-token"];
-    if (!provided || provided !== token) {
-      res.status(401).json({ error: "Unauthorized: valid X-Admin-Token header required" });
-      return;
-    }
-    next();
+    res.status(401).json({ error: "Unauthorized" });
   });
 }

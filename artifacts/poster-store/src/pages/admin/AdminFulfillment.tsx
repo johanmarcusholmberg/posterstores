@@ -48,7 +48,7 @@ function formatDate(iso: string) {
 }
 
 export default function AdminFulfillment() {
-  const { token, adminStoreKey } = useAdminToken();
+  const { adminStoreKey } = useAdminToken();
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -60,10 +60,9 @@ export default function AdminFulfillment() {
   const LIMIT = 25;
 
   useEffect(() => {
-    if (!token) return;
     setLoading(true);
     setError("");
-    adminListFulfillment(token, adminStoreKey, {
+    adminListFulfillment(adminStoreKey, {
       fulfillmentStatus: fulfillmentFilter === "all" ? undefined : fulfillmentFilter as FulfillmentStatus,
       orderStatus: orderStatusFilter === "all" ? undefined : orderStatusFilter,
       limit: LIMIT,
@@ -75,10 +74,9 @@ export default function AdminFulfillment() {
       })
       .catch((e) => setError(e?.message ?? "Failed to load fulfillment queue"))
       .finally(() => setLoading(false));
-  }, [token, adminStoreKey, fulfillmentFilter, orderStatusFilter, page]);
+  }, [adminStoreKey, fulfillmentFilter, orderStatusFilter, page]);
 
   const handleExport = async () => {
-    if (!token) return;
     setExporting(true);
     try {
       const qs = new URLSearchParams();
@@ -87,7 +85,7 @@ export default function AdminFulfillment() {
       if (orderStatusFilter !== "all") qs.set("orderStatus", orderStatusFilter);
 
       const res = await fetch(`/api/admin/fulfillment/export.csv?${qs}`, {
-        headers: { "X-Admin-Token": token },
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Export failed");
       const blob = await res.blob();

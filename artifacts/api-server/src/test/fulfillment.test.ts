@@ -11,10 +11,14 @@ import {
   getFirstActiveSizeForPoster,
   addCartItem,
   TEST_STORE_KEY,
+  getAdminCookie,
 } from "./setup";
 
-const ADMIN_TOKEN = process.env.ADMIN_API_TOKEN ?? "test-admin-token";
+let adminCookie = "";
+
 const TEST_EMAIL = "fulfillment-vitest@example.com";
+
+beforeAll(async () => { adminCookie = await getAdminCookie(); });
 
 const VALID_CHECKOUT = {
   storeKey: TEST_STORE_KEY,
@@ -94,7 +98,7 @@ describe("GET /api/admin/fulfillment", () => {
 
     const res = await request(app)
       .get(`/api/admin/fulfillment?storeKey=${TEST_STORE_KEY}`)
-      .set("X-Admin-Token", ADMIN_TOKEN);
+      .set("Cookie", adminCookie);
 
     expect(res.status).toBe(200);
     expect(res.body.orders).toBeDefined();
@@ -105,7 +109,7 @@ describe("GET /api/admin/fulfillment", () => {
   it("is scoped to requested store only", async () => {
     const res = await request(app)
       .get("/api/admin/fulfillment?storeKey=nonexistent-store-xyz")
-      .set("X-Admin-Token", ADMIN_TOKEN);
+      .set("Cookie", adminCookie);
 
     expect(res.status).toBe(200);
     expect(res.body.orders).toHaveLength(0);
@@ -123,7 +127,7 @@ describe("GET /api/admin/fulfillment", () => {
 
     const res = await request(app)
       .get(`/api/admin/fulfillment?storeKey=${TEST_STORE_KEY}`)
-      .set("X-Admin-Token", ADMIN_TOKEN);
+      .set("Cookie", adminCookie);
 
     expect(res.status).toBe(200);
     expect(res.body.orders.some((o: any) => o.id === orderId)).toBe(false);
@@ -140,7 +144,7 @@ describe("GET /api/admin/fulfillment", () => {
 
     const res = await request(app)
       .get(`/api/admin/fulfillment?storeKey=${TEST_STORE_KEY}&fulfillmentStatus=ready_for_production`)
-      .set("X-Admin-Token", ADMIN_TOKEN);
+      .set("Cookie", adminCookie);
 
     expect(res.status).toBe(200);
     expect(res.body.orders.some((o: any) => o.id === orderId)).toBe(true);
@@ -158,7 +162,7 @@ describe("GET /api/admin/fulfillment", () => {
 
     const res = await request(app)
       .get(`/api/admin/fulfillment?storeKey=${TEST_STORE_KEY}`)
-      .set("X-Admin-Token", ADMIN_TOKEN);
+      .set("Cookie", adminCookie);
 
     expect(res.status).toBe(200);
     expect(res.body.orders.some((o: any) => o.id === orderId)).toBe(false);
@@ -175,7 +179,7 @@ describe("GET /api/admin/fulfillment", () => {
 
     const res = await request(app)
       .get(`/api/admin/fulfillment?storeKey=${TEST_STORE_KEY}&fulfillmentStatus=shipped&orderStatus=shipped`)
-      .set("X-Admin-Token", ADMIN_TOKEN);
+      .set("Cookie", adminCookie);
 
     expect(res.status).toBe(200);
     expect(res.body.orders.some((o: any) => o.id === orderId)).toBe(true);
@@ -191,7 +195,7 @@ describe("PATCH /api/admin/orders/:id/fulfillment", () => {
 
     const res = await request(app)
       .patch(`/api/admin/orders/${orderId}/fulfillment`)
-      .set("X-Admin-Token", ADMIN_TOKEN)
+      .set("Cookie", adminCookie)
       .send({ fulfillmentStatus: "ready_for_production" });
 
     expect(res.status).toBe(200);
@@ -204,7 +208,7 @@ describe("PATCH /api/admin/orders/:id/fulfillment", () => {
 
     const res = await request(app)
       .patch(`/api/admin/orders/${orderId}/fulfillment`)
-      .set("X-Admin-Token", ADMIN_TOKEN)
+      .set("Cookie", adminCookie)
       .send({
         trackingNumber: "1Z999AA10123456784",
         trackingUrl: "https://track.example.com/1Z999AA10123456784",
@@ -221,7 +225,7 @@ describe("PATCH /api/admin/orders/:id/fulfillment", () => {
 
     const res = await request(app)
       .patch(`/api/admin/orders/${orderId}/fulfillment`)
-      .set("X-Admin-Token", ADMIN_TOKEN)
+      .set("Cookie", adminCookie)
       .send({ fulfillmentNotes: "Print at 300dpi, matte finish" });
 
     expect(res.status).toBe(200);
@@ -234,7 +238,7 @@ describe("PATCH /api/admin/orders/:id/fulfillment", () => {
 
     const res = await request(app)
       .patch(`/api/admin/orders/${orderId}/fulfillment`)
-      .set("X-Admin-Token", ADMIN_TOKEN)
+      .set("Cookie", adminCookie)
       .send({ markShipped: true });
 
     expect(res.status).toBe(200);
@@ -249,7 +253,7 @@ describe("PATCH /api/admin/orders/:id/fulfillment", () => {
 
     const res = await request(app)
       .patch(`/api/admin/orders/${orderId}/fulfillment`)
-      .set("X-Admin-Token", ADMIN_TOKEN)
+      .set("Cookie", adminCookie)
       .send({
         markShipped: true,
         trackingNumber: "TRACK123",
@@ -268,7 +272,7 @@ describe("PATCH /api/admin/orders/:id/fulfillment", () => {
 
     const res = await request(app)
       .patch(`/api/admin/orders/${orderId}/fulfillment`)
-      .set("X-Admin-Token", ADMIN_TOKEN)
+      .set("Cookie", adminCookie)
       .send({ markInProduction: true });
 
     expect(res.status).toBe(200);
@@ -279,7 +283,7 @@ describe("PATCH /api/admin/orders/:id/fulfillment", () => {
   it("returns 404 for unknown order", async () => {
     const res = await request(app)
       .patch("/api/admin/orders/99999999/fulfillment")
-      .set("X-Admin-Token", ADMIN_TOKEN)
+      .set("Cookie", adminCookie)
       .send({ fulfillmentStatus: "ready_for_production" });
     expect(res.status).toBe(404);
   });
@@ -290,7 +294,7 @@ describe("PATCH /api/admin/orders/:id/fulfillment", () => {
 
     const res = await request(app)
       .patch(`/api/admin/orders/${orderId}/fulfillment`)
-      .set("X-Admin-Token", ADMIN_TOKEN)
+      .set("Cookie", adminCookie)
       .send({ fulfillmentStatus: "invalid-status" });
 
     expect(res.status).toBe(400);
@@ -311,7 +315,7 @@ describe("GET /api/admin/orders/:id — print file snapshot", () => {
 
     const res = await request(app)
       .get(`/api/admin/orders/${orderId}`)
-      .set("X-Admin-Token", ADMIN_TOKEN);
+      .set("Cookie", adminCookie);
 
     expect(res.status).toBe(200);
     expect(res.body.items).toBeDefined();
@@ -329,17 +333,17 @@ describe("GET /api/admin/orders/:id — print file snapshot", () => {
 
     await request(app)
       .patch(`/api/admin/orders/${orderId}/fulfillment`)
-      .set("X-Admin-Token", ADMIN_TOKEN)
+      .set("Cookie", adminCookie)
       .send({ markInProduction: true });
 
     await request(app)
       .patch(`/api/admin/orders/${orderId}/fulfillment`)
-      .set("X-Admin-Token", ADMIN_TOKEN)
+      .set("Cookie", adminCookie)
       .send({ markShipped: true });
 
     const res = await request(app)
       .get(`/api/admin/orders/${orderId}`)
-      .set("X-Admin-Token", ADMIN_TOKEN);
+      .set("Cookie", adminCookie);
 
     expect(res.status).toBe(200);
     expect(res.body.productionStartedAt).toBeTruthy();
@@ -358,7 +362,7 @@ describe("GET /api/admin/fulfillment/export.csv", () => {
   it("returns CSV content type", async () => {
     const res = await request(app)
       .get(`/api/admin/fulfillment/export.csv?storeKey=${TEST_STORE_KEY}`)
-      .set("X-Admin-Token", ADMIN_TOKEN);
+      .set("Cookie", adminCookie);
 
     expect(res.status).toBe(200);
     expect(res.headers["content-type"]).toMatch(/text\/csv/);
@@ -367,7 +371,7 @@ describe("GET /api/admin/fulfillment/export.csv", () => {
   it("returns CSV with human-readable headers", async () => {
     const res = await request(app)
       .get(`/api/admin/fulfillment/export.csv?storeKey=${TEST_STORE_KEY}`)
-      .set("X-Admin-Token", ADMIN_TOKEN);
+      .set("Cookie", adminCookie);
 
     expect(res.status).toBe(200);
     const firstLine = res.text.replace(/^\uFEFF/, "").split("\r\n")[0];
@@ -386,7 +390,7 @@ describe("GET /api/admin/fulfillment/export.csv", () => {
   it("is store-scoped (nonexistent store returns only header row)", async () => {
     const res = await request(app)
       .get("/api/admin/fulfillment/export.csv?storeKey=nonexistent-store-xyz")
-      .set("X-Admin-Token", ADMIN_TOKEN);
+      .set("Cookie", adminCookie);
 
     expect(res.status).toBe(200);
     const lines = res.text.replace(/^\uFEFF/, "").trim().split("\r\n");
@@ -399,7 +403,7 @@ describe("GET /api/admin/fulfillment/export.csv", () => {
 
     const res = await request(app)
       .get(`/api/admin/fulfillment/export.csv?storeKey=${TEST_STORE_KEY}`)
-      .set("X-Admin-Token", ADMIN_TOKEN);
+      .set("Cookie", adminCookie);
 
     expect(res.status).toBe(200);
     expect(res.text).toContain(String(orderId));
@@ -427,7 +431,7 @@ describe("Regression: fulfillment additions do not break existing flows", () => 
   it("GET /api/admin/orders still works with fulfillmentStatus field", async () => {
     const res = await request(app)
       .get(`/api/admin/orders?storeKey=${TEST_STORE_KEY}`)
-      .set("X-Admin-Token", ADMIN_TOKEN);
+      .set("Cookie", adminCookie);
 
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.orders)).toBe(true);
@@ -439,7 +443,7 @@ describe("Regression: fulfillment additions do not break existing flows", () => 
   it("GET /api/admin/orders can filter by fulfillmentStatus", async () => {
     const res = await request(app)
       .get(`/api/admin/orders?storeKey=${TEST_STORE_KEY}&fulfillmentStatus=not_started`)
-      .set("X-Admin-Token", ADMIN_TOKEN);
+      .set("Cookie", adminCookie);
 
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.orders)).toBe(true);
@@ -451,7 +455,7 @@ describe("Regression: fulfillment additions do not break existing flows", () => 
 
     const res = await request(app)
       .patch(`/api/admin/orders/${orderId}/status`)
-      .set("X-Admin-Token", ADMIN_TOKEN)
+      .set("Cookie", adminCookie)
       .send({ status: "processing" });
 
     expect(res.status).toBe(200);

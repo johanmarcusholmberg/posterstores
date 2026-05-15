@@ -7,21 +7,51 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ShieldCheck, Lock } from "lucide-react";
 
 export const AdminTokenGate = ({ children }: { children: React.ReactNode }) => {
-  const { token, setToken } = useAdminToken();
+  const { isAuthenticated, login } = useAdminToken();
   const [input, setInput] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  if (token) return <>{children}</>;
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen bg-muted/30 flex items-center justify-center p-4">
+        <p className="text-muted-foreground">Checking session…</p>
+      </div>
+    );
+  }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  if (isAuthenticated) {
+    return <>{children}</>;
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = input.trim();
     if (!trimmed) {
       setError("Please enter your admin token.");
       return;
     }
-    setToken(trimmed);
+    setLoading(true);
     setError("");
+    try {
+      const res = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ token: trimmed }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError((body as { error?: string }).error ?? "Invalid token. Please try again.");
+        return;
+      }
+      setInput("");
+      login();
+    } catch {
+      setError("Failed to connect to server. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -34,8 +64,6 @@ export const AdminTokenGate = ({ children }: { children: React.ReactNode }) => {
           <CardTitle className="text-2xl">Admin Access</CardTitle>
           <CardDescription>
             Enter your admin token to access the poster management area.
-            The token is stored locally in your browser and never sent to any server except
-            for authenticating admin API calls.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -53,12 +81,13 @@ export const AdminTokenGate = ({ children }: { children: React.ReactNode }) => {
                   onChange={e => { setInput(e.target.value); setError(""); }}
                   autoFocus
                   data-testid="admin-token-input"
+                  disabled={loading}
                 />
               </div>
               {error && <p className="text-sm text-destructive">{error}</p>}
             </div>
-            <Button type="submit" className="w-full" data-testid="admin-token-submit">
-              Enter Admin Area
+            <Button type="submit" className="w-full" data-testid="admin-token-submit" disabled={loading}>
+              {loading ? "Signing in…" : "Enter Admin Area"}
             </Button>
           </form>
         </CardContent>

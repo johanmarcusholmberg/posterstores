@@ -112,6 +112,12 @@ export const CreatePosterBody = zod.object({
   isFeatured: zod.boolean().optional(),
   isNew: zod.boolean().optional(),
   status: zod.enum(["draft", "published", "archived"]).optional(),
+  slug: zod
+    .string()
+    .optional()
+    .describe(
+      "SEO-friendly URL slug (lowercase letters, numbers, and hyphens only). Auto-generated from title if omitted.",
+    ),
 });
 
 /**
@@ -200,6 +206,12 @@ export const UpdatePosterBody = zod.object({
   isFeatured: zod.boolean().optional(),
   isNew: zod.boolean().optional(),
   status: zod.enum(["draft", "published", "archived"]).optional(),
+  slug: zod
+    .string()
+    .optional()
+    .describe(
+      "Update the SEO-friendly URL slug (lowercase letters, numbers, and hyphens only). Must be unique within the store.",
+    ),
 });
 
 export const UpdatePosterResponse = zod.object({

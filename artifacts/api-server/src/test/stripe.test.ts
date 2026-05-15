@@ -16,11 +16,15 @@ import {
   getFirstActiveSizeForPoster,
   addCartItem,
   TEST_STORE_KEY,
+  getAdminCookie,
 } from "./setup";
 import Stripe from "stripe";
 
-const ADMIN_TOKEN = process.env.ADMIN_API_TOKEN ?? "test-admin-token";
+let adminCookie = "";
+
 const TEST_EMAIL = "stripe-test-vitest@example.com";
+
+beforeAll(async () => { adminCookie = await getAdminCookie(); });
 
 const VALID_CHECKOUT = {
   storeKey: TEST_STORE_KEY,
@@ -426,7 +430,7 @@ describe("Regression after Stripe integration", () => {
 
     const res = await request(app)
       .get(`/api/admin/orders/${order.id}`)
-      .set("X-Admin-Token", ADMIN_TOKEN);
+      .set("Cookie", adminCookie);
 
     expect(res.status).toBe(200);
     expect(res.body.stripeCheckoutSessionId).toBe(sessionId);

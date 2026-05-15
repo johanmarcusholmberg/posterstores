@@ -134,7 +134,6 @@ function getConfidenceBadge(confidence: number): {
 }
 
 interface MockupTemplateFormProps {
-  token: string;
   storeKey: string;
   template?: MockupTemplate;
   onSaved: (template: MockupTemplate) => void;
@@ -142,7 +141,6 @@ interface MockupTemplateFormProps {
 }
 
 export function MockupTemplateForm({
-  token,
   storeKey,
   template,
   onSaved,
@@ -274,7 +272,7 @@ export function MockupTemplateForm({
       setHadDetectionBeforeEdit(false);
 
       try {
-        const result = await analyzeMockupPlacement(token, imageUrl);
+        const result = await analyzeMockupPlacement(imageUrl);
         if (
           result.detected &&
           result.x != null &&
@@ -317,7 +315,7 @@ export function MockupTemplateForm({
         applyFallbackPlacement(orientation);
       }
     },
-    [token, orientation, applyFallbackPlacement]
+    [orientation, applyFallbackPlacement]
   );
 
   const handleFileUpload = async (file: File) => {
@@ -335,7 +333,7 @@ export function MockupTemplateForm({
     setAnalysisState("idle");
     lastAnalyzedUrlRef.current = "";
     try {
-      const { uploadURL, objectPath } = await requestMockupImageUploadUrl(token, {
+      const { uploadURL, objectPath } = await requestMockupImageUploadUrl({
         name: file.name,
         size: file.size,
         contentType: file.type,
@@ -433,9 +431,9 @@ export function MockupTemplateForm({
 
       let saved: MockupTemplate;
       if (isEdit && template) {
-        saved = await adminUpdateMockupTemplate(token, template.id, payload);
+        saved = await adminUpdateMockupTemplate(template.id, payload);
       } else {
-        saved = await adminCreateMockupTemplate(token, payload);
+        saved = await adminCreateMockupTemplate(payload);
       }
       toast({ title: isEdit ? "Template updated" : "Template created" });
       onSaved(saved);

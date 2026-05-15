@@ -191,20 +191,19 @@ function SectionCard({ section }: { section: CheckSection }) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function AdminLaunchChecklist() {
-  const { token, adminStoreKey } = useAdminToken();
+  const { adminStoreKey } = useAdminToken();
   const [data, setData] = useState<LaunchChecklistResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const load = useCallback(() => {
-    if (!token) return;
     setLoading(true);
     setError("");
-    adminGetLaunchChecklist(token, adminStoreKey)
+    adminGetLaunchChecklist(adminStoreKey)
       .then(setData)
       .catch(e => setError(e?.message ?? "Failed to load checklist"))
       .finally(() => setLoading(false));
-  }, [token, adminStoreKey]);
+  }, [adminStoreKey]);
 
   useEffect(() => {
     load();

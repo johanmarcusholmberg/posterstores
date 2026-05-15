@@ -10,19 +10,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Pencil, Globe } from "lucide-react";
 
 export default function AdminStores() {
-  const { token } = useAdminToken();
+  useAdminToken();
   const [stores, setStores] = useState<AdminStore[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!token) return;
     setLoading(true);
-    adminListStores(token)
+    adminListStores()
       .then(setStores)
       .catch((e) => setError(e?.message ?? "Failed to load stores"))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, []);
 
   return (
     <AdminDashboardLayout

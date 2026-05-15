@@ -34,7 +34,7 @@ function formatDate(iso: string) {
 }
 
 export default function AdminOrders() {
-  const { token, adminStoreKey } = useAdminToken();
+  const { adminStoreKey } = useAdminToken();
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -44,10 +44,9 @@ export default function AdminOrders() {
   const LIMIT = 25;
 
   useEffect(() => {
-    if (!token) return;
     setLoading(true);
     setError("");
-    adminListOrders(token, adminStoreKey, {
+    adminListOrders(adminStoreKey, {
       status: statusFilter === "all" ? undefined : statusFilter,
       limit: LIMIT,
       offset: page * LIMIT,
@@ -58,7 +57,7 @@ export default function AdminOrders() {
       })
       .catch((e) => setError(e?.message ?? "Failed to load orders"))
       .finally(() => setLoading(false));
-  }, [token, adminStoreKey, statusFilter, page]);
+  }, [adminStoreKey, statusFilter, page]);
 
   return (
     <AdminDashboardLayout

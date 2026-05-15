@@ -151,11 +151,8 @@ export interface UpdateFulfillmentPayload {
   markInProduction?: boolean;
 }
 
-function headers(token: string): HeadersInit {
-  return {
-    "Content-Type": "application/json",
-    "X-Admin-Token": token,
-  };
+function jsonHeaders(): HeadersInit {
+  return { "Content-Type": "application/json" };
 }
 
 function extractErrorMessage(body: unknown): string {
@@ -177,7 +174,6 @@ function extractErrorMessage(body: unknown): string {
 }
 
 export async function adminListPosters(
-  token: string,
   storeKey: string,
   params: { status?: string; search?: string; category?: string; region?: string; limit?: number; offset?: number } = {}
 ): Promise<AdminPosterListResponse> {
@@ -189,7 +185,7 @@ export async function adminListPosters(
   if (params.limit !== undefined) qs.set("limit", String(params.limit));
   if (params.offset !== undefined) qs.set("offset", String(params.offset));
 
-  const res = await fetch(`${BASE}/posters?${qs}`, { headers: headers(token) });
+  const res = await fetch(`${BASE}/posters?${qs}`, { credentials: "include" });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(extractErrorMessage(body));
@@ -198,11 +194,10 @@ export async function adminListPosters(
 }
 
 export async function adminGetPosterMeta(
-  token: string,
   storeKey: string
 ): Promise<{ categories: string[]; regions: string[] }> {
   const qs = new URLSearchParams({ storeKey });
-  const res = await fetch(`${BASE}/admin/poster-meta?${qs}`, { headers: headers(token) });
+  const res = await fetch(`${BASE}/admin/poster-meta?${qs}`, { credentials: "include" });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(extractErrorMessage(body));
@@ -210,9 +205,9 @@ export async function adminGetPosterMeta(
   return res.json();
 }
 
-export async function adminGetPoster(token: string, id: number, storeKey: string): Promise<AdminPoster> {
+export async function adminGetPoster(id: number, storeKey: string): Promise<AdminPoster> {
   const res = await fetch(`${BASE}/posters/${id}?storeKey=${encodeURIComponent(storeKey)}`, {
-    headers: headers(token),
+    credentials: "include",
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
@@ -221,10 +216,11 @@ export async function adminGetPoster(token: string, id: number, storeKey: string
   return res.json();
 }
 
-export async function adminCreatePoster(token: string, payload: CreatePosterPayload): Promise<AdminPoster> {
+export async function adminCreatePoster(payload: CreatePosterPayload): Promise<AdminPoster> {
   const res = await fetch(`${BASE}/posters`, {
     method: "POST",
-    headers: headers(token),
+    headers: jsonHeaders(),
+    credentials: "include",
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
@@ -235,14 +231,14 @@ export async function adminCreatePoster(token: string, payload: CreatePosterPayl
 }
 
 export async function adminUpdatePoster(
-  token: string,
   id: number,
   storeKey: string,
   payload: UpdatePosterPayload
 ): Promise<AdminPoster> {
   const res = await fetch(`${BASE}/posters/${id}?storeKey=${encodeURIComponent(storeKey)}`, {
     method: "PUT",
-    headers: headers(token),
+    headers: jsonHeaders(),
+    credentials: "include",
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
@@ -252,10 +248,10 @@ export async function adminUpdatePoster(
   return res.json();
 }
 
-export async function adminDeletePoster(token: string, id: number, storeKey: string): Promise<void> {
+export async function adminDeletePoster(id: number, storeKey: string): Promise<void> {
   const res = await fetch(`${BASE}/posters/${id}?storeKey=${encodeURIComponent(storeKey)}`, {
     method: "DELETE",
-    headers: headers(token),
+    credentials: "include",
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
@@ -263,9 +259,9 @@ export async function adminDeletePoster(token: string, id: number, storeKey: str
   }
 }
 
-export async function adminGetStats(token: string, storeKey: string) {
+export async function adminGetStats(storeKey: string) {
   const res = await fetch(`${BASE}/stats/store?storeKey=${encodeURIComponent(storeKey)}`, {
-    headers: headers(token),
+    credentials: "include",
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
@@ -281,7 +277,6 @@ export async function adminGetStats(token: string, storeKey: string) {
 }
 
 export async function adminListOrders(
-  token: string,
   storeKey: string,
   params: { status?: string; fulfillmentStatus?: string; limit?: number; offset?: number } = {}
 ): Promise<AdminOrderListResponse> {
@@ -292,7 +287,7 @@ export async function adminListOrders(
   if (params.limit !== undefined) qs.set("limit", String(params.limit));
   if (params.offset !== undefined) qs.set("offset", String(params.offset));
 
-  const res = await fetch(`${BASE}/admin/orders?${qs}`, { headers: headers(token) });
+  const res = await fetch(`${BASE}/admin/orders?${qs}`, { credentials: "include" });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(extractErrorMessage(body));
@@ -300,8 +295,8 @@ export async function adminListOrders(
   return res.json();
 }
 
-export async function adminGetOrder(token: string, id: number): Promise<AdminOrder> {
-  const res = await fetch(`${BASE}/admin/orders/${id}`, { headers: headers(token) });
+export async function adminGetOrder(id: number): Promise<AdminOrder> {
+  const res = await fetch(`${BASE}/admin/orders/${id}`, { credentials: "include" });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(extractErrorMessage(body));
@@ -309,10 +304,11 @@ export async function adminGetOrder(token: string, id: number): Promise<AdminOrd
   return res.json();
 }
 
-export async function adminUpdateOrderStatus(token: string, id: number, status: string): Promise<AdminOrder> {
+export async function adminUpdateOrderStatus(id: number, status: string): Promise<AdminOrder> {
   const res = await fetch(`${BASE}/admin/orders/${id}/status`, {
     method: "PATCH",
-    headers: headers(token),
+    headers: jsonHeaders(),
+    credentials: "include",
     body: JSON.stringify({ status }),
   });
   if (!res.ok) {
@@ -323,13 +319,13 @@ export async function adminUpdateOrderStatus(token: string, id: number, status: 
 }
 
 export async function adminUpdateFulfillment(
-  token: string,
   id: number,
   payload: UpdateFulfillmentPayload
 ): Promise<AdminOrder> {
   const res = await fetch(`${BASE}/admin/orders/${id}/fulfillment`, {
     method: "PATCH",
-    headers: headers(token),
+    headers: jsonHeaders(),
+    credentials: "include",
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
@@ -340,7 +336,6 @@ export async function adminUpdateFulfillment(
 }
 
 export async function adminListFulfillment(
-  token: string,
   storeKey: string,
   params: { fulfillmentStatus?: string; orderStatus?: string; limit?: number; offset?: number } = {}
 ): Promise<AdminOrderListResponse> {
@@ -351,25 +346,12 @@ export async function adminListFulfillment(
   if (params.limit !== undefined) qs.set("limit", String(params.limit));
   if (params.offset !== undefined) qs.set("offset", String(params.offset));
 
-  const res = await fetch(`${BASE}/admin/fulfillment?${qs}`, { headers: headers(token) });
+  const res = await fetch(`${BASE}/admin/fulfillment?${qs}`, { credentials: "include" });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(extractErrorMessage(body));
   }
   return res.json();
-}
-
-export function adminFulfillmentExportUrl(
-  token: string,
-  storeKey: string,
-  params: { fulfillmentStatus?: string; orderStatus?: string } = {}
-): string {
-  const qs = new URLSearchParams();
-  if (storeKey) qs.set("storeKey", storeKey);
-  if (params.fulfillmentStatus) qs.set("fulfillmentStatus", params.fulfillmentStatus);
-  if (params.orderStatus) qs.set("orderStatus", params.orderStatus);
-  qs.set("x-admin-token", token);
-  return `${BASE}/admin/fulfillment/export.csv?${qs}`;
 }
 
 // ─── Store management ─────────────────────────────────────────────────────────
@@ -441,8 +423,8 @@ export type CreateStorePayload = {
 
 export type UpdateStorePayload = Partial<Omit<CreateStorePayload, "storeKey">>;
 
-export async function adminListStores(token: string): Promise<AdminStore[]> {
-  const res = await fetch(`${BASE}/admin/stores`, { headers: headers(token) });
+export async function adminListStores(): Promise<AdminStore[]> {
+  const res = await fetch(`${BASE}/admin/stores`, { credentials: "include" });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(extractErrorMessage(body));
@@ -450,9 +432,9 @@ export async function adminListStores(token: string): Promise<AdminStore[]> {
   return res.json();
 }
 
-export async function adminGetStore(token: string, storeKey: string): Promise<AdminStore> {
+export async function adminGetStore(storeKey: string): Promise<AdminStore> {
   const res = await fetch(`${BASE}/admin/stores/${encodeURIComponent(storeKey)}`, {
-    headers: headers(token),
+    credentials: "include",
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
@@ -462,12 +444,12 @@ export async function adminGetStore(token: string, storeKey: string): Promise<Ad
 }
 
 export async function adminCreateStore(
-  token: string,
   payload: CreateStorePayload
 ): Promise<AdminStore> {
   const res = await fetch(`${BASE}/admin/stores`, {
     method: "POST",
-    headers: headers(token),
+    headers: jsonHeaders(),
+    credentials: "include",
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
@@ -478,13 +460,13 @@ export async function adminCreateStore(
 }
 
 export async function adminUpdateStore(
-  token: string,
   storeKey: string,
   payload: UpdateStorePayload
 ): Promise<AdminStore> {
   const res = await fetch(`${BASE}/admin/stores/${encodeURIComponent(storeKey)}`, {
     method: "PUT",
-    headers: headers(token),
+    headers: jsonHeaders(),
+    credentials: "include",
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
@@ -525,11 +507,10 @@ export interface UpsertContentPagePayload {
 }
 
 export async function adminListContentPages(
-  token: string,
   storeKey: string
 ): Promise<AdminContentPageSummary[]> {
   const res = await fetch(`${BASE}/admin/content?storeKey=${encodeURIComponent(storeKey)}`, {
-    headers: headers(token),
+    credentials: "include",
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
@@ -539,13 +520,12 @@ export async function adminListContentPages(
 }
 
 export async function adminGetContentPage(
-  token: string,
   storeKey: string,
   pageKey: string
 ): Promise<AdminContentPage> {
   const res = await fetch(
     `${BASE}/admin/content/${encodeURIComponent(pageKey)}?storeKey=${encodeURIComponent(storeKey)}`,
-    { headers: headers(token) }
+    { credentials: "include" }
   );
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
@@ -555,7 +535,6 @@ export async function adminGetContentPage(
 }
 
 export async function adminUpsertContentPage(
-  token: string,
   storeKey: string,
   pageKey: string,
   payload: UpsertContentPagePayload
@@ -564,7 +543,8 @@ export async function adminUpsertContentPage(
     `${BASE}/admin/content/${encodeURIComponent(pageKey)}?storeKey=${encodeURIComponent(storeKey)}`,
     {
       method: "PUT",
-      headers: headers(token),
+      headers: jsonHeaders(),
+      credentials: "include",
       body: JSON.stringify(payload),
     }
   );
@@ -613,11 +593,10 @@ export interface LaunchChecklistResponse {
 }
 
 export async function adminGetLaunchChecklist(
-  token: string,
   storeKey: string
 ): Promise<LaunchChecklistResponse> {
   const res = await fetch(`${BASE}/admin/launch-checklist?storeKey=${encodeURIComponent(storeKey)}`, {
-    headers: headers(token),
+    credentials: "include",
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
@@ -626,10 +605,10 @@ export async function adminGetLaunchChecklist(
   return res.json();
 }
 
-export async function adminDeactivateStore(token: string, storeKey: string): Promise<AdminStore> {
+export async function adminDeactivateStore(storeKey: string): Promise<AdminStore> {
   const res = await fetch(`${BASE}/admin/stores/${encodeURIComponent(storeKey)}/deactivate`, {
     method: "PATCH",
-    headers: headers(token),
+    credentials: "include",
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));

@@ -111,7 +111,7 @@ function DetectionBadge({ source, confidence, manuallyAdjusted }: {
 export const AdminMockupTemplateList = ({
   storeKey,
 }: AdminMockupTemplateListProps) => {
-  const { token } = useAdminToken();
+  useAdminToken();
   const { toast } = useToast();
   const [templates, setTemplates] = useState<MockupTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -126,9 +126,8 @@ export const AdminMockupTemplateList = ({
   const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(() => {
-    if (!token) return;
     setLoading(true);
-    adminListAllMockupTemplates(token, storeKey)
+    adminListAllMockupTemplates(storeKey)
       .then(setTemplates)
       .catch((e) =>
         toast({
@@ -138,17 +137,16 @@ export const AdminMockupTemplateList = ({
         })
       )
       .finally(() => setLoading(false));
-  }, [token, storeKey]);
+  }, [storeKey]);
 
   useEffect(() => {
     load();
   }, [load]);
 
   const toggleActive = async (template: MockupTemplate) => {
-    if (!token) return;
     setToggling(template.id);
     try {
-      const updated = await adminUpdateMockupTemplate(token, template.id, {
+      const updated = await adminUpdateMockupTemplate(template.id, {
         active: !template.active,
       });
       setTemplates((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
@@ -164,10 +162,10 @@ export const AdminMockupTemplateList = ({
   };
 
   const handleDelete = async () => {
-    if (!token || !deleteTarget) return;
+    if (!deleteTarget) return;
     setDeleting(true);
     try {
-      await adminDeleteMockupTemplate(token, deleteTarget.id);
+      await adminDeleteMockupTemplate(deleteTarget.id);
       setTemplates((prev) => prev.filter((t) => t.id !== deleteTarget.id));
       toast({ title: `"${deleteTarget.name}" deleted` });
       setDeleteTarget(null);
@@ -284,8 +282,8 @@ export const AdminMockupTemplateList = ({
           </div>
         ) : (
           <div className="space-y-6">
-            {renderGroup(globalTemplates, "Global templates", token!, toggleActive, toggling, setEditTemplate, setDeleteTarget)}
-            {renderGroup(storeTemplates, `Templates for ${storeKey}`, token!, toggleActive, toggling, setEditTemplate, setDeleteTarget)}
+            {renderGroup(globalTemplates, "Global templates", toggleActive, toggling, setEditTemplate, setDeleteTarget)}
+            {renderGroup(storeTemplates, `Templates for ${storeKey}`, toggleActive, toggling, setEditTemplate, setDeleteTarget)}
           </div>
         )}
       </div>
@@ -299,7 +297,6 @@ export const AdminMockupTemplateList = ({
             </DialogDescription>
           </DialogHeader>
           <MockupTemplateForm
-            token={token!}
             storeKey={storeKey}
             onSaved={handleSaved}
             onCancel={() => setCreateOpen(false)}
@@ -317,7 +314,6 @@ export const AdminMockupTemplateList = ({
           </DialogHeader>
           {editTemplate && (
             <MockupTemplateForm
-              token={token!}
               storeKey={storeKey}
               template={editTemplate}
               onSaved={handleSaved}
@@ -358,7 +354,6 @@ export const AdminMockupTemplateList = ({
 function renderGroup(
   list: MockupTemplate[],
   label: string,
-  token: string,
   toggleActive: (t: MockupTemplate) => void,
   toggling: number | null,
   onEdit: (t: MockupTemplate) => void,

@@ -133,7 +133,7 @@ function PrintFileSection({ item }: { item: AdminOrderItem }) {
 export default function AdminOrderDetail() {
   const { id } = useParams();
   const orderId = Number(id);
-  const { token } = useAdminToken();
+  useAdminToken();
   const { toast } = useToast();
 
   const [order, setOrder] = useState<AdminOrder | null>(null);
@@ -149,9 +149,9 @@ export default function AdminOrderDetail() {
   const [trackingUrl, setTrackingUrl] = useState("");
 
   useEffect(() => {
-    if (!token || !orderId) return;
+    if (!orderId) return;
     setLoading(true);
-    adminGetOrder(token, orderId)
+    adminGetOrder(orderId)
       .then((o) => {
         setOrder(o);
         setSelectedStatus(o.status);
@@ -162,13 +162,13 @@ export default function AdminOrderDetail() {
       })
       .catch((e) => setError(e?.message ?? "Failed to load order"))
       .finally(() => setLoading(false));
-  }, [token, orderId]);
+  }, [orderId]);
 
   const handleStatusUpdate = async () => {
-    if (!token || !order || selectedStatus === order.status) return;
+    if (!order || selectedStatus === order.status) return;
     setStatusUpdating(true);
     try {
-      const updated = await adminUpdateOrderStatus(token, order.id, selectedStatus);
+      const updated = await adminUpdateOrderStatus(order.id, selectedStatus);
       setOrder(updated);
       setSelectedStatus(updated.status);
       toast({ title: "Status updated" });
@@ -180,10 +180,10 @@ export default function AdminOrderDetail() {
   };
 
   const handleFulfillmentSave = async () => {
-    if (!token || !order) return;
+    if (!order) return;
     setFulfillmentUpdating(true);
     try {
-      const updated = await adminUpdateFulfillment(token, order.id, {
+      const updated = await adminUpdateFulfillment(order.id, {
         fulfillmentStatus: selectedFulfillmentStatus as FulfillmentStatus || undefined,
         fulfillmentNotes: fulfillmentNotes || null,
         trackingNumber: trackingNumber || null,
@@ -199,10 +199,10 @@ export default function AdminOrderDetail() {
   };
 
   const handleMarkReadyForProduction = async () => {
-    if (!token || !order) return;
+    if (!order) return;
     setFulfillmentUpdating(true);
     try {
-      const updated = await adminUpdateFulfillment(token, order.id, {
+      const updated = await adminUpdateFulfillment(order.id, {
         fulfillmentStatus: "ready_for_production",
       });
       setOrder(updated);
@@ -216,10 +216,10 @@ export default function AdminOrderDetail() {
   };
 
   const handleMarkInProduction = async () => {
-    if (!token || !order) return;
+    if (!order) return;
     setFulfillmentUpdating(true);
     try {
-      const updated = await adminUpdateFulfillment(token, order.id, {
+      const updated = await adminUpdateFulfillment(order.id, {
         markInProduction: true,
       });
       setOrder(updated);
@@ -233,10 +233,10 @@ export default function AdminOrderDetail() {
   };
 
   const handleMarkShipped = async () => {
-    if (!token || !order) return;
+    if (!order) return;
     setFulfillmentUpdating(true);
     try {
-      const updated = await adminUpdateFulfillment(token, order.id, {
+      const updated = await adminUpdateFulfillment(order.id, {
         markShipped: true,
         trackingNumber: trackingNumber || null,
         trackingUrl: trackingUrl || null,
@@ -253,10 +253,10 @@ export default function AdminOrderDetail() {
   };
 
   const handleMarkCancelled = async () => {
-    if (!token || !order) return;
+    if (!order) return;
     setFulfillmentUpdating(true);
     try {
-      const updated = await adminUpdateFulfillment(token, order.id, {
+      const updated = await adminUpdateFulfillment(order.id, {
         fulfillmentStatus: "cancelled",
       });
       setOrder(updated);
