@@ -106,14 +106,17 @@ export const StorefrontProvider = ({ children }: { children: ReactNode }) => {
         setResolvedRoutePrefix(routePrefix);
       }
 
+      const { storefronts } = await import('../config/storefronts');
+      const staticFallback = storefronts[storeKey];
+
       const dbConfig = await fetchDbStoreConfig(storeKey);
 
       if (!cancelled) {
         if (dbConfig) {
-          setStoreConfig(dbConfig);
+          // Merge: static config provides defaults for fields not stored in DB (e.g. shop),
+          // DB config takes precedence for everything it provides.
+          setStoreConfig({ ...staticFallback, ...dbConfig });
         } else {
-          const { storefronts } = await import('../config/storefronts');
-          const staticFallback = storefronts[storeKey];
           if (staticFallback) setStoreConfig(staticFallback);
         }
         setIsLoadingFromDb(false);

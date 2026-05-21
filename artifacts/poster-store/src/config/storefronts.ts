@@ -26,6 +26,21 @@ export interface StorefrontConfig {
     newsletterSubtitle?: string;
     brandStory?: string;
   };
+  shop?: {
+    introTitle?: string;
+    introSubtitle?: string;
+    introTrustNotes?: string[];
+    trustLine?: string;
+    regionFilterLabel?: string;
+    allRegionsLabel?: string;
+    categoryFilterLabel?: string;
+    allCategoriesLabel?: string;
+    collectionBanner?: {
+      title: string;
+      text: string;
+      ctaText?: string;
+    };
+  };
   regions: string[];
   cities: string[];
   categories?: string[];
@@ -60,6 +75,21 @@ export const storefronts: Record<string, StorefrontConfig> = {
       secondaryCta: "Explore regions",
       newsletterTitle: "Get new Spanish poster releases in your inbox",
       newsletterSubtitle: "Be the first to see new collections, city drops and seasonal releases."
+    },
+    shop: {
+      introTitle: "Posters inspired by Spain's regions, cities and coastlines",
+      introSubtitle: "Curated wall art from Valencia, Andalucía, Madrid, Galicia and beyond — designed for warm, Mediterranean interiors.",
+      introTrustNotes: ["Premium matte paper", "Multiple sizes available", "Printed for modern homes"],
+      trustLine: "Free EU shipping over €60 · Secure checkout · Printed on demand",
+      regionFilterLabel: "Explore Spain",
+      allRegionsLabel: "All of Spain",
+      categoryFilterLabel: "Shop by style",
+      allCategoriesLabel: "All styles",
+      collectionBanner: {
+        title: "Mediterranean Walls",
+        text: "Warm-toned prints inspired by Spanish streets, terraces and coastlines.",
+        ctaText: "Explore coastal posters",
+      },
     },
     regions: ["Valencia","Andalusia","Catalonia","Madrid","Balearic Islands","Basque Country","Galicia","Canary Islands"],
     cities: ["Valencia","Barcelona","Madrid","Sevilla","Málaga","Alicante","Granada","Bilbao","Cádiz","Palma"],

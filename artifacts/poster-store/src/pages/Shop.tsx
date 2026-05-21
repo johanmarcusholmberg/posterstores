@@ -27,22 +27,36 @@ function FilterSidebar({
   clearAllFilters: () => void;
 }) {
   const hasFilters = regionFilters.length > 0 || categoryFilters.length > 0;
+  const shopCfg = store.shop;
+
+  const regionLabel = shopCfg?.regionFilterLabel ?? "Region";
+  const allRegionsLabel = shopCfg?.allRegionsLabel ?? "All Regions";
+  const categoryLabel = shopCfg?.categoryFilterLabel ?? "Categories";
+  const allCategoriesLabel = shopCfg?.allCategoriesLabel ?? "All Categories";
 
   return (
     <div className="space-y-8">
       <div>
-        <h3 className="font-serif font-bold text-lg mb-4">Region</h3>
-        <div className="space-y-1">
+        <h3 className="font-serif font-bold text-lg mb-4">{regionLabel}</h3>
+        <div className="space-y-0.5">
           <button
-            className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${regionFilters.length === 0 ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted text-foreground"}`}
+            className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${
+              regionFilters.length === 0
+                ? "text-primary font-semibold"
+                : "hover:bg-muted/60 text-foreground/70"
+            }`}
             onClick={() => clearSection("region")}
           >
-            All Regions
+            {allRegionsLabel}
           </button>
           {store.regions.map(region => (
             <button
               key={region}
-              className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors flex items-center justify-between gap-2 ${regionFilters.includes(region) ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted text-foreground"}`}
+              className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors flex items-center justify-between gap-2 ${
+                regionFilters.includes(region)
+                  ? "text-primary font-semibold"
+                  : "hover:bg-muted/60 text-foreground/70"
+              }`}
               onClick={() => toggleFilter("region", region)}
             >
               <span>{region}</span>
@@ -54,18 +68,26 @@ function FilterSidebar({
 
       {store.categories && store.categories.length > 0 && (
         <div>
-          <h3 className="font-serif font-bold text-lg mb-4">Categories</h3>
-          <div className="space-y-1">
+          <h3 className="font-serif font-bold text-lg mb-4">{categoryLabel}</h3>
+          <div className="space-y-0.5">
             <button
-              className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${categoryFilters.length === 0 ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted text-foreground"}`}
+              className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${
+                categoryFilters.length === 0
+                  ? "text-primary font-semibold"
+                  : "hover:bg-muted/60 text-foreground/70"
+              }`}
               onClick={() => clearSection("category")}
             >
-              All Categories
+              {allCategoriesLabel}
             </button>
             {store.categories.map(category => (
               <button
                 key={category}
-                className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors flex items-center justify-between gap-2 ${categoryFilters.includes(category) ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted text-foreground"}`}
+                className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors flex items-center justify-between gap-2 ${
+                  categoryFilters.includes(category)
+                    ? "text-primary font-semibold"
+                    : "hover:bg-muted/60 text-foreground/70"
+                }`}
                 onClick={() => toggleFilter("category", category)}
               >
                 <span>{category}</span>
@@ -90,6 +112,82 @@ function FilterSidebar({
   );
 }
 
+function ShopEditorialIntro({
+  title,
+  subtitle,
+  trustNotes,
+  trustLine,
+}: {
+  title?: string;
+  subtitle?: string;
+  trustNotes?: string[];
+  trustLine?: string;
+}) {
+  if (!title && !subtitle) return null;
+  return (
+    <div className="mb-8 pb-7 border-b border-border/60">
+      {title && (
+        <h2 className="font-serif text-xl sm:text-2xl font-bold text-foreground leading-snug mb-2">
+          {title}
+        </h2>
+      )}
+      {subtitle && (
+        <p className="text-sm sm:text-base text-muted-foreground max-w-xl leading-relaxed">
+          {subtitle}
+        </p>
+      )}
+      {trustNotes && trustNotes.length > 0 && (
+        <div className="flex flex-wrap gap-3 mt-4">
+          {trustNotes.map(note => (
+            <span
+              key={note}
+              className="inline-flex items-center gap-1.5 text-xs text-foreground/70 bg-muted/60 px-3 py-1 rounded-full border border-border/50"
+            >
+              <span className="w-1 h-1 rounded-full bg-primary/60 shrink-0" />
+              {note}
+            </span>
+          ))}
+        </div>
+      )}
+      {trustLine && (
+        <p className="mt-3 text-xs text-muted-foreground/80 tracking-wide">{trustLine}</p>
+      )}
+    </div>
+  );
+}
+
+function CollectionBanner({
+  title,
+  text,
+  ctaText,
+  onCtaClick,
+}: {
+  title: string;
+  text: string;
+  ctaText?: string;
+  onCtaClick?: () => void;
+}) {
+  return (
+    <div className="col-span-full my-2">
+      <div className="rounded-lg bg-secondary/10 border border-secondary/20 px-6 py-5 flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-widest text-secondary/80 mb-1">Collection</p>
+          <h3 className="font-serif text-lg sm:text-xl font-bold text-foreground leading-snug">{title}</h3>
+          <p className="text-sm text-muted-foreground mt-1 leading-relaxed max-w-lg">{text}</p>
+        </div>
+        {ctaText && (
+          <button
+            onClick={onCtaClick}
+            className="shrink-0 text-sm font-medium text-secondary hover:text-secondary/80 transition-colors underline-offset-2 hover:underline whitespace-nowrap"
+          >
+            {ctaText} →
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Shop() {
   const store = useStorefront();
   const searchString = useSearch();
@@ -110,12 +208,10 @@ export default function Shop() {
   const searchQuery = searchParams.get("search") || undefined;
   const sortFilter = (searchParams.get("sort") as any) || "newest";
 
-  // Pagination state
   const [page, setPage] = useState(0);
   const [accumulated, setAccumulated] = useState<Poster[]>([]);
   const [grandTotal, setGrandTotal] = useState(0);
 
-  // Build a filter signature to detect when filters change
   const filterSig = `${store.storeKey}|${regionFilters.join(",")}|${categoryFilters.join(",")}|${cityFilter ?? ""}|${tagFilter ?? ""}|${searchQuery ?? ""}|${sortFilter}`;
   const prevFilterSig = useRef<string | null>(null);
 
@@ -150,8 +246,6 @@ export default function Shop() {
     }
   );
 
-  // Accumulate posters; reset when filter signature changes or when cached data
-  // is returned unchanged (same reference) after a filter reset.
   useEffect(() => {
     if (!pageData) {
       setAccumulated([]);
@@ -168,7 +262,6 @@ export default function Shop() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageData, filterSig]);
 
-  // When the filter signature changes, reset to page 0 only.
   const isFirstRender = useRef(true);
   useEffect(() => {
     if (isFirstRender.current) {
@@ -217,7 +310,6 @@ export default function Shop() {
     setMobileFiltersOpen(false);
   };
 
-  // Build active filter chips list
   const activeFilters: { label: string; key: string; value: string }[] = [];
   regionFilters.forEach(r => activeFilters.push({ label: r, key: "region", value: r }));
   categoryFilters.forEach(c => activeFilters.push({ label: c, key: "category", value: c }));
@@ -227,17 +319,30 @@ export default function Shop() {
   const hasAnyFilter = activeFilters.length > 0;
   const total = grandTotal || pageData?.total || 0;
 
-  // Heading: "All Posters" when no filters active, "Showing X posters" otherwise
-  const headingLabel = hasAnyFilter ? `Showing ${total} poster${total !== 1 ? "s" : ""}` : "All Posters";
-
   const hasMore = accumulated.length < grandTotal;
   const isLoadingFirstPage = isLoading || (isFetching && page === 0 && accumulated.length === 0);
   const isLoadingMore = isFetching && page > 0;
 
-  // Compact filter chips: show at most 2, then "+X more"
   const CHIP_LIMIT = 2;
   const visibleChips = activeFilters.slice(0, CHIP_LIMIT);
   const hiddenCount = activeFilters.length - CHIP_LIMIT;
+
+  const shopCfg = store.shop;
+  const collectionBanner = shopCfg?.collectionBanner;
+  const BANNER_AFTER = 4;
+  const showBanner = !hasAnyFilter && !!collectionBanner && accumulated.length >= BANNER_AFTER;
+  const firstBatch = showBanner ? accumulated.slice(0, BANNER_AFTER) : accumulated;
+  const restBatch = showBanner ? accumulated.slice(BANNER_AFTER) : [];
+
+  const handleBannerCta = () => {
+    if (!collectionBanner) return;
+    const params = new URLSearchParams();
+    params.set("category", "Coastal Posters");
+    setLocation(`/shop?${params.toString()}`);
+    window.scrollTo({ top: 0, behavior: "instant" });
+  };
+
+  const gridClasses = "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6";
 
   return (
     <div className="container mx-auto px-4 py-12">
@@ -364,8 +469,18 @@ export default function Shop() {
             </div>
           </div>
 
+          {/* Editorial shop intro — shown only when no filters active */}
+          {!hasAnyFilter && shopCfg && (
+            <ShopEditorialIntro
+              title={shopCfg.introTitle}
+              subtitle={shopCfg.introSubtitle}
+              trustNotes={shopCfg.introTrustNotes}
+              trustLine={shopCfg.trustLine}
+            />
+          )}
+
           {isLoadingFirstPage ? (
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+            <div className={gridClasses}>
               {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
                 <div key={i} className="h-[190px] sm:aspect-[3/4] sm:h-auto bg-muted animate-pulse rounded-md" />
               ))}
@@ -380,36 +495,57 @@ export default function Shop() {
                 Clear filters
               </Button>
             </div>
-          ) : (
+          ) : showBanner ? (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-                {accumulated.map(poster => (
+              <div className={gridClasses}>
+                {firstBatch.map(poster => (
                   <PosterCard key={poster.id} poster={poster} />
                 ))}
               </div>
-
-              {hasMore && (
-                <div className="mt-10 flex justify-center">
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    onClick={() => setPage(p => p + 1)}
-                    disabled={isLoadingMore}
-                    data-testid="btn-load-more"
-                    className="min-w-[160px]"
-                  >
-                    {isLoadingMore ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Loading…
-                      </>
-                    ) : (
-                      `Load more (${grandTotal - accumulated.length} remaining)`
-                    )}
-                  </Button>
+              <div className="my-6">
+                <CollectionBanner
+                  title={collectionBanner!.title}
+                  text={collectionBanner!.text}
+                  ctaText={collectionBanner!.ctaText}
+                  onCtaClick={handleBannerCta}
+                />
+              </div>
+              {restBatch.length > 0 && (
+                <div className={gridClasses}>
+                  {restBatch.map(poster => (
+                    <PosterCard key={poster.id} poster={poster} />
+                  ))}
                 </div>
               )}
             </>
+          ) : (
+            <div className={gridClasses}>
+              {accumulated.map(poster => (
+                <PosterCard key={poster.id} poster={poster} />
+              ))}
+            </div>
+          )}
+
+          {hasMore && (
+            <div className="mt-10 flex justify-center">
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => setPage(p => p + 1)}
+                disabled={isLoadingMore}
+                data-testid="btn-load-more"
+                className="min-w-[160px]"
+              >
+                {isLoadingMore ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Loading…
+                  </>
+                ) : (
+                  `Load more (${grandTotal - accumulated.length} remaining)`
+                )}
+              </Button>
+            </div>
           )}
         </main>
       </div>

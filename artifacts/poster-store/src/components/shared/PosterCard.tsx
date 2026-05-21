@@ -99,6 +99,11 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
     ? `From ${formatPrice(displayPrice, displayCurrency)}`
     : formatPrice(displayPrice, displayCurrency);
 
+  const sizeNames: string[] = activeSizes
+    .map((s: any) => s.name || s.label || s.size || "")
+    .filter((n: string) => n.length > 0);
+  const sizeLabel = sizeNames.length > 0 ? sizeNames.join(" · ") : null;
+
   const href = (poster as any).slug ? `/posters/${(poster as any).slug}` : `/poster/${poster.id}`;
 
   return (
@@ -147,7 +152,13 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
         <div className="flex justify-between items-start gap-2">
           <div className="min-w-0 flex-1">
             <h3 className="font-serif font-semibold text-base sm:text-lg text-foreground line-clamp-2 leading-snug">{poster.title}</h3>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">{poster.city || poster.region}</p>
+            {(poster.city || poster.region) && (
+              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">{poster.city || poster.region}</p>
+            )}
+            {sizeLabel && (
+              <p className="text-xs text-muted-foreground/70 mt-0.5 tracking-wide">{sizeLabel}</p>
+            )}
+            <p className="text-xs text-muted-foreground/60 mt-0.5">Premium matte print</p>
           </div>
           <p className="font-medium text-foreground text-sm whitespace-nowrap mt-0.5 shrink-0">
             {priceLabel}
