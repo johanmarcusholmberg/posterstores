@@ -1,0 +1,101 @@
+Update the Poster Store header search UX.
+
+Current behavior:
+- Clicking the search icon opens a full-width search row below the Navbar.
+
+Desired behavior:
+- Do not use a pop-down search row below the header.
+- The search should pop out / expand inside the header itself.
+- Keep the header clean by default.
+
+Scope:
+- Frontend only.
+- Focus on artifacts/poster-store/src/components/layout/Navbar.tsx and related styling/components if needed.
+- Do not change backend/API/database/payment/checkout logic.
+- Do not add dependencies.
+- Do not commit or push unless explicitly asked.
+
+Requested UX:
+
+1. Desktop header search behavior
+- Default desktop header:
+  - Logo on the left
+  - Icons on the right: favorites, cart, account, search
+  - No visible search input by default
+- When the search icon is clicked:
+  - A search input should expand/pop out inside the header area, preferably between the logo and the icons.
+  - The input should not appear as a separate row below the header.
+  - Keep the header height stable if possible.
+  - The search input should feel integrated into the Navbar.
+
+Example layout:
+
+Default:
+PostersOfSpain                                      ♡  🛍  👤  🔍
+
+Expanded:
+PostersOfSpain          [ Search posters...          × ]   ♡  🛍  👤
+
+2. Mobile behavior
+- Do not create a large pop-down row below the header.
+- On mobile, use one of these clean approaches:
+  - Preferred: when tapping the search icon, the search input expands inside the header and temporarily takes over the available space between logo and icons.
+  - If space is too tight, allow the search input to temporarily replace the logo area while active, with a clear X/back action.
+- Keep the header visually clean and avoid wrapping.
+- Do not let icons overflow or create awkward spacing.
+
+3. Search functionality
+- Preserve the existing search behavior:
+  - Debounced search
+  - URL param update
+  - Navigation to /shop when searching from another page
+  - Auto-open if a search query is active
+  - Escape closes/clears
+  - X closes/clears and removes the search param correctly
+- Do not regress the corrected close behavior from the previous change.
+
+4. Remove old pop-down structure
+- Remove or disable the below-header expanded search row.
+- Clean up any CSS/classes/state that only existed for the pop-down row if no longer needed.
+- Keep the implementation simple and maintainable.
+
+5. Visual design
+- The expanded search input should match the store style:
+  - Soft border
+  - Cream/white background
+  - Rounded shape
+  - Subtle focus ring
+  - Not marketplace-heavy
+- The search icon should remain visible in default state.
+- In expanded state, the search input should have an X/close control.
+
+6. Accessibility
+- Search icon button should have a clear aria-label.
+- Search input should autofocus when opened.
+- Escape should close/clear search consistently.
+- Keyboard focus should work without trapping the user.
+
+Testing/checks:
+- Verify desktop:
+  - search opens inside the header, not below it
+  - header does not jump vertically
+  - existing icons remain usable
+  - typing search still navigates/filters correctly
+  - X and Escape clear/close correctly
+- Verify mobile:
+  - search does not wrap awkwardly
+  - input is usable
+  - icons/logo behavior looks intentional
+  - no below-header pop-down remains
+- Verify /shop:
+  - existing search param opens the header search
+  - clearing search removes the URL param
+- Verify non-shop pages:
+  - typing search navigates to /shop as before
+  - closing empty search does not unexpectedly redirect
+
+After completing:
+- Report changed files.
+- Summarize the exact desktop and mobile search behavior.
+- Mention any limitations or follow-up recommendations.
+- Do not commit or push unless explicitly asked.

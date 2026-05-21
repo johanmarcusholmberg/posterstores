@@ -54,7 +54,7 @@ export const Navbar = () => {
     if (currentSearch) setSearchOpen(true);
   }, [currentSearch]);
 
-  // Focus input when search row opens
+  // Autofocus when search opens
   useEffect(() => {
     if (searchOpen) {
       setTimeout(() => searchInputRef.current?.focus(), 50);
@@ -87,45 +87,84 @@ export const Navbar = () => {
     }
   };
 
-  const toggleSearch = () => {
-    if (searchOpen && !currentSearch) {
-      closeSearch();
-    } else {
-      setSearchOpen((o) => !o);
-    }
+  const openSearch = () => {
+    setMobileOpen(false);
+    setSearchOpen(true);
   };
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-6">
-          <Link href="/" className="flex items-center gap-2" data-testid="link-home" onClick={closeMobile}>
-            <span className="font-serif text-2xl font-bold tracking-tight text-primary">
-              {store.storeName}
-            </span>
-          </Link>
-        </div>
+      <div className="container mx-auto px-4 h-16 flex items-center gap-2">
 
-        <div className="flex items-center gap-2">
+        {/* Logo — hidden on mobile when search is open to give input room */}
+        <Link
+          href="/"
+          className={`flex items-center gap-2 shrink-0 mr-2 ${searchOpen ? "hidden sm:flex" : "flex"}`}
+          data-testid="link-home"
+          onClick={closeMobile}
+        >
+          <span className="font-serif text-2xl font-bold tracking-tight text-primary">
+            {store.storeName}
+          </span>
+        </Link>
+
+        {/* Inline expanding search input */}
+        {searchOpen && (
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Search posters…"
+              value={searchInputValue}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="pl-9 pr-9 h-9 bg-background/90"
+              data-testid="input-search"
+              onKeyDown={(e) => {
+                if (e.key === "Escape") closeSearch();
+              }}
+            />
+            {searchInputValue && (
+              <button
+                onClick={closeSearch}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Clear search"
+                data-testid="btn-clear-search"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Right-side icons */}
+        <div className={`flex items-center gap-2 ${searchOpen ? "" : "ml-auto"}`}>
+          {/* Search toggle */}
           <Button
             variant="ghost"
             size="icon"
-            className="text-muted-foreground hover:text-primary"
-            onClick={toggleSearch}
-            aria-label={searchOpen ? "Close search" : "Open search"}
+            className="text-muted-foreground hover:text-primary shrink-0"
+            onClick={searchOpen ? closeSearch : openSearch}
+            aria-label={searchOpen ? "Close search" : "Search posters"}
             aria-expanded={searchOpen}
             data-testid="btn-search-toggle"
           >
             {searchOpen ? <X className="h-5 w-5" /> : <Search className="h-5 w-5" />}
           </Button>
 
-          <Link href="/favorites" data-testid="link-favorites">
+          {/* Favorites — hidden on mobile when search is open */}
+          <Link
+            href="/favorites"
+            data-testid="link-favorites"
+            className={searchOpen ? "hidden sm:block" : "block"}
+          >
             <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary">
               <Heart className="h-5 w-5" />
               <span className="sr-only">Saved posters</span>
             </Button>
           </Link>
 
+          {/* Cart */}
           <Link href="/cart" data-testid="link-cart">
             <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-primary">
               <ShoppingBag className="h-5 w-5" />
@@ -138,10 +177,16 @@ export const Navbar = () => {
             </Button>
           </Link>
 
+          {/* Account — desktop only */}
           {user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary hidden md:flex" data-testid="btn-account">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground hover:text-primary hidden md:flex"
+                  data-testid="btn-account"
+                >
                   <User className="h-5 w-5" />
                   <span className="sr-only">Account</span>
                 </Button>
@@ -183,54 +228,23 @@ export const Navbar = () => {
             </Link>
           )}
 
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden"
-            onClick={() => setMobileOpen((o) => !o)}
-            aria-label={mobileOpen ? "Close menu" : "Open menu"}
-            data-testid="btn-mobile-menu"
-          >
-            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </Button>
+          {/* Mobile hamburger — hidden when search open to avoid crowding */}
+          {!searchOpen && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              onClick={() => setMobileOpen((o) => !o)}
+              aria-label={mobileOpen ? "Close menu" : "Open menu"}
+              data-testid="btn-mobile-menu"
+            >
+              {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Expandable search row */}
-      <div
-        className={`overflow-hidden transition-all duration-200 ease-in-out ${searchOpen ? "max-h-20 opacity-100" : "max-h-0 opacity-0"}`}
-        aria-hidden={!searchOpen}
-      >
-        <div className="border-t border-border/40 bg-background/95 backdrop-blur px-4 py-3">
-          <div className="container mx-auto relative max-w-2xl">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-            <Input
-              ref={searchInputRef}
-              type="text"
-              placeholder="Search posters…"
-              value={searchInputValue}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              className="pl-9 pr-9"
-              data-testid="input-search"
-              tabIndex={searchOpen ? 0 : -1}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") closeSearch();
-              }}
-            />
-            {searchInputValue && (
-              <button
-                onClick={closeSearch}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Clear search"
-                data-testid="btn-clear-search"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
+      {/* Mobile menu drawer */}
       {mobileOpen && (
         <div className="md:hidden border-t border-border/40 bg-background/95 backdrop-blur px-4 py-4 space-y-1">
           <Link href="/shop" onClick={closeMobile} data-testid="link-shop-mobile">
