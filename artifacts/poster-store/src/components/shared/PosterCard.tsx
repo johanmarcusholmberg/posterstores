@@ -40,7 +40,6 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
   }, [favoritedIds, poster.id]);
 
   useEffect(() => {
-    // If the list response already includes the primary display image, use it directly
     const preloaded = (poster as any).primaryDisplayImageUrl as string | null | undefined;
     if (preloaded) {
       setDisplayImage(preloaded);
@@ -51,7 +50,6 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
     getPosterMockups(poster.id, store.storeKey)
       .then((mockups: PosterMockup[]) => {
         if (!cancelled) {
-          // Filter out inactive template mockups before resolving the display image
           const activeMockups = mockups.filter((m) => {
             if (!m.mockupTemplateId) return !!m.mockupImageUrl;
             if (m.template && m.template.active === false) return false;
@@ -121,6 +119,17 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
               NEW
             </div>
           )}
+
+          {/* Hover CTA — desktop only, hidden on touch devices */}
+          <div
+            className="absolute inset-x-0 bottom-0 hidden sm:flex items-end justify-center pb-4 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-200 pointer-events-none"
+            aria-hidden="true"
+          >
+            <span className="bg-background/90 backdrop-blur-sm text-foreground text-xs font-medium px-4 py-1.5 rounded-full shadow-sm border border-border/40 tracking-wide">
+              View poster
+            </span>
+          </div>
+
           <Button
             variant="ghost"
             size="icon"
@@ -135,12 +144,12 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
             />
           </Button>
         </div>
-        <div className="flex justify-between items-start">
-          <div>
-            <h3 className="font-serif font-semibold text-base sm:text-lg text-foreground line-clamp-1">{poster.title}</h3>
-            <p className="text-xs sm:text-sm text-muted-foreground">{poster.city || poster.region}</p>
+        <div className="flex justify-between items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <h3 className="font-serif font-semibold text-base sm:text-lg text-foreground line-clamp-2 leading-snug">{poster.title}</h3>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">{poster.city || poster.region}</p>
           </div>
-          <p className="font-medium text-foreground text-sm whitespace-nowrap ml-2">
+          <p className="font-medium text-foreground text-sm whitespace-nowrap mt-0.5 shrink-0">
             {priceLabel}
           </p>
         </div>

@@ -3,12 +3,11 @@ import { useStorefront } from "@/context/StorefrontContext";
 import { useListPosters, getListPostersQueryKey, Poster } from "@workspace/api-client-react";
 import { PosterCard } from "@/components/shared/PosterCard";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { useLocation, useSearch } from "wouter";
-import { SlidersHorizontal, X, Check, Search, Loader2 } from "lucide-react";
+import { SlidersHorizontal, X, Check, Loader2 } from "lucide-react";
 
 const PAGE_LIMIT = 24;
 
@@ -111,15 +110,6 @@ export default function Shop() {
   const searchQuery = searchParams.get("search") || undefined;
   const sortFilter = (searchParams.get("sort") as any) || "newest";
 
-  // Search input local state with debounce
-  const [searchInputValue, setSearchInputValue] = useState(searchQuery ?? "");
-  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Keep input in sync when URL changes externally (e.g. chip removal)
-  useEffect(() => {
-    setSearchInputValue(searchQuery ?? "");
-  }, [searchQuery]);
-
   // Pagination state
   const [page, setPage] = useState(0);
   const [accumulated, setAccumulated] = useState<Poster[]>([]);
@@ -179,8 +169,6 @@ export default function Shop() {
   }, [pageData, filterSig]);
 
   // When the filter signature changes, reset to page 0 only.
-  // Do NOT clear accumulated here — the effect above handles repopulation
-  // (including the case where TanStack Query returns the same cached reference).
   const isFirstRender = useRef(true);
   useEffect(() => {
     if (isFirstRender.current) {
@@ -189,28 +177,6 @@ export default function Shop() {
     }
     setPage(0);
   }, [filterSig]);
-
-  const handleSearchChange = (value: string) => {
-    setSearchInputValue(value);
-    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    searchDebounceRef.current = setTimeout(() => {
-      const params = new URLSearchParams(searchString);
-      if (value) {
-        params.set("search", value);
-      } else {
-        params.delete("search");
-      }
-      setLocation(`/shop?${params.toString()}`);
-    }, 300);
-  };
-
-  const clearSearch = () => {
-    setSearchInputValue("");
-    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    const params = new URLSearchParams(searchString);
-    params.delete("search");
-    setLocation(`/shop?${params.toString()}`);
-  };
 
   const setFilter = (key: string, value: string | undefined) => {
     const params = new URLSearchParams(searchString);
@@ -251,24 +217,27 @@ export default function Shop() {
     setMobileFiltersOpen(false);
   };
 
-  const headingLabel = useMemo(() => {
-    const parts: string[] = [];
-    if (categoryFilters.length === 1) parts.push(categoryFilters[0]);
-    else if (categoryFilters.length > 1) parts.push(`${categoryFilters.length} Categories`);
-    if (regionFilters.length === 1) parts.push(regionFilters[0]);
-    else if (regionFilters.length > 1) parts.push(`${regionFilters.length} Regions`);
-    return parts.length > 0 ? parts.join(" · ") : "All Posters";
-  }, [categoryFilters, regionFilters]);
-
+  // Build active filter chips list
   const activeFilters: { label: string; key: string; value: string }[] = [];
   regionFilters.forEach(r => activeFilters.push({ label: r, key: "region", value: r }));
   categoryFilters.forEach(c => activeFilters.push({ label: c, key: "category", value: c }));
   if (tagFilter) activeFilters.push({ label: tagFilter, key: "tag", value: tagFilter });
   if (searchQuery) activeFilters.push({ label: `"${searchQuery}"`, key: "search", value: searchQuery });
 
+  const hasAnyFilter = activeFilters.length > 0;
+  const total = grandTotal || pageData?.total || 0;
+
+  // Heading: "All Posters" when no filters active, "Showing X posters" otherwise
+  const headingLabel = hasAnyFilter ? `Showing ${total} poster${total !== 1 ? "s" : ""}` : "All Posters";
+
   const hasMore = accumulated.length < grandTotal;
   const isLoadingFirstPage = isLoading || (isFetching && page === 0 && accumulated.length === 0);
   const isLoadingMore = isFetching && page > 0;
+
+  // Compact filter chips: show at most 2, then "+X more"
+  const CHIP_LIMIT = 2;
+  const visibleChips = activeFilters.slice(0, CHIP_LIMIT);
+  const hiddenCount = activeFilters.length - CHIP_LIMIT;
 
   return (
     <div className="container mx-auto px-4 py-12">
@@ -287,41 +256,37 @@ export default function Shop() {
 
         {/* Main Content */}
         <main className="flex-1">
-          {/* Search input */}
-          <div className="relative mb-5">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-            <Input
-              type="text"
-              placeholder="Search posters…"
-              value={searchInputValue}
-              onChange={e => handleSearchChange(e.target.value)}
-              className="pl-9 pr-9"
-              data-testid="input-search"
-            />
-            {searchInputValue && (
-              <button
-                onClick={clearSearch}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Clear search"
-                data-testid="btn-clear-search"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
             <div>
               <h1 className="font-serif text-3xl font-bold text-foreground">
-                {headingLabel}
-                <span className="text-muted-foreground text-lg ml-2 font-sans font-normal">
-                  ({grandTotal || pageData?.total || 0})
-                </span>
+                {hasAnyFilter ? (
+                  <>
+                    {isLoadingFirstPage ? (
+                      <span>Searching…</span>
+                    ) : (
+                      <>
+                        Showing{" "}
+                        <span className="text-foreground">{total}</span>{" "}
+                        <span className="text-muted-foreground font-sans font-normal text-2xl">
+                          poster{total !== 1 ? "s" : ""}
+                        </span>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    All Posters
+                    <span className="text-muted-foreground text-lg ml-2 font-sans font-normal">
+                      ({total})
+                    </span>
+                  </>
+                )}
               </h1>
-              {/* Active filter chips */}
+
+              {/* Compact active filter chips */}
               {activeFilters.length > 0 && (
                 <div className="flex flex-wrap items-center gap-2 mt-2">
-                  {activeFilters.map(f => (
+                  {visibleChips.map(f => (
                     <Badge
                       key={`${f.key}-${f.value}`}
                       variant="secondary"
@@ -339,15 +304,22 @@ export default function Shop() {
                       <X className="h-3 w-3" />
                     </Badge>
                   ))}
-                  {activeFilters.length > 1 && (
-                    <button
-                      onClick={clearAllFilters}
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors underline-offset-2 hover:underline"
-                      data-testid="btn-clear-all-filters"
+                  {hiddenCount > 0 && (
+                    <span
+                      className="text-xs text-muted-foreground bg-muted rounded-full px-2.5 py-1 font-medium select-none"
+                      title={activeFilters.slice(CHIP_LIMIT).map(f => f.label).join(", ")}
+                      data-testid="filter-chips-overflow"
                     >
-                      Clear all
-                    </button>
+                      +{hiddenCount} more
+                    </span>
                   )}
+                  <button
+                    onClick={clearAllFilters}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors underline-offset-2 hover:underline"
+                    data-testid="btn-clear-all-filters"
+                  >
+                    Clear all
+                  </button>
                 </div>
               )}
             </div>
@@ -380,7 +352,7 @@ export default function Shop() {
                   />
                   <div className="mt-8">
                     <Button className="w-full" onClick={() => setMobileFiltersOpen(false)} data-testid="btn-show-results">
-                      Show results ({grandTotal || pageData?.total || 0})
+                      Show results ({total})
                     </Button>
                   </div>
                 </SheetContent>

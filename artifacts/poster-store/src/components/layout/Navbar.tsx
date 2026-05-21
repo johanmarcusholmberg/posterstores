@@ -1,11 +1,12 @@
-import React, { useState } from "react";
-import { Link, useLocation } from "wouter";
+import React, { useState, useRef, useEffect } from "react";
+import { Link, useLocation, useSearch } from "wouter";
 import { useStorefront } from "@/context/StorefrontContext";
 import { useAuth } from "@/context/AuthContext";
-import { ShoppingBag, Heart, Menu, X, User, LogOut, LayoutDashboard } from "lucide-react";
+import { ShoppingBag, Heart, Menu, X, User, LogOut, LayoutDashboard, Search } from "lucide-react";
 import { useGetCart, getGetCartQueryKey } from "@workspace/api-client-react";
 import { getSessionId } from "@/lib/session";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,7 +20,8 @@ export const Navbar = () => {
   const { user, logout } = useAuth();
   const sessionId = getSessionId();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
+  const searchString = useSearch();
 
   const cartParams = { sessionId, storeKey: store.storeKey };
 
@@ -38,6 +40,62 @@ export const Navbar = () => {
     closeMobile();
   };
 
+  // Search state
+  const searchParams = new URLSearchParams(searchString);
+  const currentSearch = searchParams.get("search") || "";
+  const [searchOpen, setSearchOpen] = useState(!!currentSearch);
+  const [searchInputValue, setSearchInputValue] = useState(currentSearch);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Keep input in sync when URL changes externally
+  useEffect(() => {
+    setSearchInputValue(currentSearch);
+    if (currentSearch) setSearchOpen(true);
+  }, [currentSearch]);
+
+  // Focus input when search row opens
+  useEffect(() => {
+    if (searchOpen) {
+      setTimeout(() => searchInputRef.current?.focus(), 50);
+    }
+  }, [searchOpen]);
+
+  const handleSearchChange = (value: string) => {
+    setSearchInputValue(value);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      const params = new URLSearchParams(searchString);
+      if (value) {
+        params.set("search", value);
+      } else {
+        params.delete("search");
+      }
+      setLocation(`/shop?${params.toString()}`);
+    }, 300);
+  };
+
+  const closeSearch = () => {
+    // Only collapse if no active query
+    setSearchInputValue("");
+    setSearchOpen(false);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    const params = new URLSearchParams(searchString);
+    params.delete("search");
+    const qs = params.toString();
+    if (location.startsWith("/shop")) {
+      setLocation(qs ? `/shop?${qs}` : "/shop");
+    }
+  };
+
+  const toggleSearch = () => {
+    if (searchOpen && !currentSearch) {
+      closeSearch();
+    } else {
+      setSearchOpen((o) => !o);
+    }
+  };
+
   return (
     <nav className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
@@ -50,6 +108,18 @@ export const Navbar = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground hover:text-primary"
+            onClick={toggleSearch}
+            aria-label={searchOpen ? "Close search" : "Open search"}
+            aria-expanded={searchOpen}
+            data-testid="btn-search-toggle"
+          >
+            {searchOpen ? <X className="h-5 w-5" /> : <Search className="h-5 w-5" />}
+          </Button>
+
           <Link href="/favorites" data-testid="link-favorites">
             <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary">
               <Heart className="h-5 w-5" />
@@ -124,6 +194,41 @@ export const Navbar = () => {
           >
             {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
+        </div>
+      </div>
+
+      {/* Expandable search row */}
+      <div
+        className={`overflow-hidden transition-all duration-200 ease-in-out ${searchOpen ? "max-h-20 opacity-100" : "max-h-0 opacity-0"}`}
+        aria-hidden={!searchOpen}
+      >
+        <div className="border-t border-border/40 bg-background/95 backdrop-blur px-4 py-3">
+          <div className="container mx-auto relative max-w-2xl">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Search posters…"
+              value={searchInputValue}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="pl-9 pr-9"
+              data-testid="input-search"
+              tabIndex={searchOpen ? 0 : -1}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") closeSearch();
+              }}
+            />
+            {searchInputValue && (
+              <button
+                onClick={closeSearch}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Clear search"
+                data-testid="btn-clear-search"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
