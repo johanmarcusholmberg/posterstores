@@ -1320,15 +1320,15 @@ export function MockupTemplateForm({
                   </div>
                   <div className="space-y-1">
                     <Label className="text-[11px] text-muted-foreground">Blur (px)</Label>
-                    <Input type="number" value={shadowBlur} onChange={(e) => setShadowBlur(e.target.value)} className="h-7 text-xs" min={0} max={60} step={1} />
+                    <Input type="number" value={shadowBlur} onChange={(e) => setShadowBlur(e.target.value)} className="h-7 text-xs" min={0} max={80} step={1} />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-[11px] text-muted-foreground">Offset X (px)</Label>
-                    <Input type="number" value={shadowOffsetX} onChange={(e) => setShadowOffsetX(e.target.value)} className="h-7 text-xs" min={-30} max={30} step={1} />
+                    <Input type="number" value={shadowOffsetX} onChange={(e) => setShadowOffsetX(e.target.value)} className="h-7 text-xs" min={-50} max={50} step={1} />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-[11px] text-muted-foreground">Offset Y (px)</Label>
-                    <Input type="number" value={shadowOffsetY} onChange={(e) => setShadowOffsetY(e.target.value)} className="h-7 text-xs" min={-30} max={30} step={1} />
+                    <Input type="number" value={shadowOffsetY} onChange={(e) => setShadowOffsetY(e.target.value)} className="h-7 text-xs" min={-50} max={50} step={1} />
                   </div>
                 </>
               )}
@@ -1360,7 +1360,7 @@ export function MockupTemplateForm({
               </div>
               <div className="space-y-1 col-span-3">
                 <Label className="text-[11px] text-muted-foreground">Blur (px, subtle softening)</Label>
-                <Input type="number" value={compositeBlur} onChange={(e) => setCompositeBlur(e.target.value)} className="h-7 text-xs" min={0} max={5} step={0.1} />
+                <Input type="number" value={compositeBlur} onChange={(e) => setCompositeBlur(e.target.value)} className="h-7 text-xs" min={0} max={3} step={0.1} />
               </div>
             </div>
           </div>

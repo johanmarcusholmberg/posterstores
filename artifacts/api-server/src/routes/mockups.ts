@@ -280,6 +280,24 @@ function coercePlacementField(
 }
 
 /**
+ * Like coercePlacementField but also enforces an inclusive [min, max] range.
+ * Throws on out-of-range values so the caller's catch block returns 400.
+ */
+function coerceRanged(
+  val: unknown,
+  fieldName: string,
+  min: number,
+  max: number
+): number | null | undefined {
+  const n = coercePlacementField(val, fieldName);
+  if (n === undefined || n === null) return n;
+  if (n < min || n > max) {
+    throw new Error(`${fieldName} must be between ${min} and ${max}, got: ${n}`);
+  }
+  return n;
+}
+
+/**
  * Validate that percentage placement values don't go out of bounds.
  */
 function validatePlacementBounds(body: Record<string, unknown>): void {
@@ -440,16 +458,16 @@ router.post("/mockup-templates", requireAdmin, async (req, res) => {
         return v;
       })(),
       shadowEnabled: rest.shadowEnabled ?? true,
-      shadowOpacity: coercePlacementField(rest.shadowOpacity, "shadowOpacity") ?? 0.4,
-      shadowBlur: coercePlacementField(rest.shadowBlur, "shadowBlur") ?? 20,
-      shadowOffsetX: coercePlacementField(rest.shadowOffsetX, "shadowOffsetX") ?? 2,
-      shadowOffsetY: coercePlacementField(rest.shadowOffsetY, "shadowOffsetY") ?? 6,
+      shadowOpacity: coerceRanged(rest.shadowOpacity, "shadowOpacity", 0, 1) ?? 0.4,
+      shadowBlur: coerceRanged(rest.shadowBlur, "shadowBlur", 0, 80) ?? 20,
+      shadowOffsetX: coerceRanged(rest.shadowOffsetX, "shadowOffsetX", -50, 50) ?? 2,
+      shadowOffsetY: coerceRanged(rest.shadowOffsetY, "shadowOffsetY", -50, 50) ?? 6,
       innerShadowEnabled: rest.innerShadowEnabled ?? true,
-      innerShadowOpacity: coercePlacementField(rest.innerShadowOpacity, "innerShadowOpacity") ?? 0.25,
-      brightness: coercePlacementField(rest.brightness, "brightness") ?? 0.94,
-      contrast: coercePlacementField(rest.contrast, "contrast") ?? 0.97,
-      saturation: coercePlacementField(rest.saturation, "saturation") ?? 0.92,
-      compositeBlur: coercePlacementField(rest.compositeBlur, "compositeBlur") ?? 0,
+      innerShadowOpacity: coerceRanged(rest.innerShadowOpacity, "innerShadowOpacity", 0, 1) ?? 0.25,
+      brightness: coerceRanged(rest.brightness, "brightness", 0.5, 1.5) ?? 0.94,
+      contrast: coerceRanged(rest.contrast, "contrast", 0.5, 1.5) ?? 0.97,
+      saturation: coerceRanged(rest.saturation, "saturation", 0, 2) ?? 0.92,
+      compositeBlur: coerceRanged(rest.compositeBlur, "compositeBlur", 0, 3) ?? 0,
       detectedAt: coerceDate(rest.detectedAt) ?? null,
       sourceImageWidth: rest.sourceImageWidth != null ? Math.round(Number(rest.sourceImageWidth)) : null,
       sourceImageHeight: rest.sourceImageHeight != null ? Math.round(Number(rest.sourceImageHeight)) : null,
@@ -498,21 +516,22 @@ router.put("/mockup-templates/:id", requireAdmin, async (req, res) => {
         key === "rotation" ||
         key === "borderRadius" ||
         key === "shadowStrength" ||
-        key === "shadowOpacity" ||
-        key === "shadowBlur" ||
-        key === "shadowOffsetX" ||
-        key === "shadowOffsetY" ||
-        key === "innerShadowOpacity" ||
-        key === "brightness" ||
-        key === "contrast" ||
-        key === "saturation" ||
-        key === "compositeBlur" ||
         key === "detectionConfidence"
       ) {
         const coerced = coercePlacementField(req.body[key], key);
         if (coerced !== undefined) (updates as any)[key] = coerced;
         continue;
       }
+
+      if (key === "shadowOpacity") { const c = coerceRanged(req.body[key], key, 0, 1); if (c !== undefined) (updates as any)[key] = c; continue; }
+      if (key === "shadowBlur") { const c = coerceRanged(req.body[key], key, 0, 80); if (c !== undefined) (updates as any)[key] = c; continue; }
+      if (key === "shadowOffsetX") { const c = coerceRanged(req.body[key], key, -50, 50); if (c !== undefined) (updates as any)[key] = c; continue; }
+      if (key === "shadowOffsetY") { const c = coerceRanged(req.body[key], key, -50, 50); if (c !== undefined) (updates as any)[key] = c; continue; }
+      if (key === "innerShadowOpacity") { const c = coerceRanged(req.body[key], key, 0, 1); if (c !== undefined) (updates as any)[key] = c; continue; }
+      if (key === "brightness") { const c = coerceRanged(req.body[key], key, 0.5, 1.5); if (c !== undefined) (updates as any)[key] = c; continue; }
+      if (key === "contrast") { const c = coerceRanged(req.body[key], key, 0.5, 1.5); if (c !== undefined) (updates as any)[key] = c; continue; }
+      if (key === "saturation") { const c = coerceRanged(req.body[key], key, 0, 2); if (c !== undefined) (updates as any)[key] = c; continue; }
+      if (key === "compositeBlur") { const c = coerceRanged(req.body[key], key, 0, 3); if (c !== undefined) (updates as any)[key] = c; continue; }
 
       if (key === "fitMode") {
         const v = req.body[key];
