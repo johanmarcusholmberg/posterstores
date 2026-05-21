@@ -160,9 +160,13 @@ export default function Shop() {
     }
   );
 
-  // Accumulate posters; reset when filter signature changes
+  // Accumulate posters; reset when filter signature changes or when cached data
+  // is returned unchanged (same reference) after a filter reset.
   useEffect(() => {
-    if (!pageData) return;
+    if (!pageData) {
+      setAccumulated([]);
+      return;
+    }
     const isFilterChange = prevFilterSig.current !== null && prevFilterSig.current !== filterSig;
     prevFilterSig.current = filterSig;
     if (page === 0 || isFilterChange) {
@@ -171,9 +175,12 @@ export default function Shop() {
       setAccumulated(prev => [...prev, ...(pageData.posters as Poster[])]);
     }
     setGrandTotal(pageData.total);
-  }, [pageData]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageData, filterSig]);
 
-  // When the filter signature changes, reset to page 0
+  // When the filter signature changes, reset to page 0 only.
+  // Do NOT clear accumulated here — the effect above handles repopulation
+  // (including the case where TanStack Query returns the same cached reference).
   const isFirstRender = useRef(true);
   useEffect(() => {
     if (isFirstRender.current) {
@@ -181,7 +188,6 @@ export default function Shop() {
       return;
     }
     setPage(0);
-    setAccumulated([]);
   }, [filterSig]);
 
   const handleSearchChange = (value: string) => {
