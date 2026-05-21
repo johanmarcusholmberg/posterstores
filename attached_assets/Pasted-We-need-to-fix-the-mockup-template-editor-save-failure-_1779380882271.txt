@@ -1,0 +1,172 @@
+We need to fix the mockup template editor save failure and improve poster placement precision.
+
+Context:
+In Admin → Mockups / mockup template editor, when editing the poster placement area for a mockup template and clicking save, the UI shows:
+
+“Save failed”
+“Internal Server Error”
+
+The failing area is the “Poster placement area” / placement rectangle for mockup templates. The current UI stores/edits placement as percentages, e.g. left/top/width/height, but I also want pixel-level precision for accurate placement.
+
+Goal:
+1. Fix the Internal Server Error when saving mockup template placement.
+2. Improve the placement editor so admin users can set poster placement precisely using pixels as well as percentages.
+3. Keep backward compatibility with existing percentage-based placement data.
+4. Make the editor easier to use accurately.
+
+Tasks:
+
+1. Reproduce and trace the save error
+- Find the frontend save handler for the mockup template editor.
+- Find the API endpoint used to update/save mockup templates.
+- Check the request payload sent when saving placement.
+- Check the backend validation/schema/database update for placement fields.
+- Identify why the server returns 500 instead of accepting the save or returning a clear validation error.
+- Fix the actual cause, not just the toast.
+
+Important:
+- The API should never return a generic 500 for normal validation problems.
+- If the placement payload is invalid, return a clear 400 response with a useful error message.
+- The frontend should display that useful message.
+
+2. Support both percentage and pixel placement
+Currently placement appears to be percentage-based. Add support for pixel-accurate editing while preserving the existing normalized percentage placement.
+
+Recommended model:
+- Continue storing canonical placement as normalized percentages for responsive mockup rendering:
+  - placementLeftPct
+  - placementTopPct
+  - placementWidthPct
+  - placementHeightPct
+- Also allow the admin editor to show and edit pixel values based on the actual natural dimensions of the background image:
+  - placementLeftPx
+  - placementTopPx
+  - placementWidthPx
+  - placementHeightPx
+
+If the database already has a JSON placement object, extend it safely rather than breaking existing data. For example:
+{
+  "x": 36,
+  "y": 10,
+  "width": 22,
+  "height": 35,
+  "unit": "percent",
+  "sourceImageWidth": 1200,
+  "sourceImageHeight": 1600
+}
+
+Or, if current code already has another naming convention, keep that convention and extend it consistently.
+
+The important behavior:
+- Percentages remain the canonical saved values used for rendering.
+- Pixel fields are derived from the image’s natural width/height.
+- When the user changes pixel values, update the corresponding percentages.
+- When the user changes percentages, update the corresponding pixel values.
+- Store image dimensions with the placement metadata when available, so future edits can accurately convert between px and %.
+
+Conversion:
+leftPct = leftPx / imageNaturalWidth * 100
+topPct = topPx / imageNaturalHeight * 100
+widthPct = widthPx / imageNaturalWidth * 100
+heightPct = heightPx / imageNaturalHeight * 100
+
+And reverse:
+leftPx = round(leftPct / 100 * imageNaturalWidth)
+topPx = round(topPct / 100 * imageNaturalHeight)
+widthPx = round(widthPct / 100 * imageNaturalWidth)
+heightPx = round(heightPct / 100 * imageNaturalHeight)
+
+3. Improve the placement editor UI
+In the mockup template edit modal, improve the “Poster placement area” section:
+
+Add input fields for:
+- Left %
+- Top %
+- Width %
+- Height %
+- Left px
+- Top px
+- Width px
+- Height px
+
+Behavior:
+- Inputs should be numeric.
+- Percentage inputs should allow decimals, e.g. 36.25.
+- Pixel inputs should use whole numbers.
+- Clamp values so the poster area cannot go outside the image.
+- If the user drags/resizes the overlay, update both % and px fields live.
+- If the user types values manually, update the overlay live.
+- Keep the existing buttons:
+  - Reset to detected
+  - Fallback
+  - Auto-detect
+- Add a small note explaining:
+  “Percent values are used for responsive rendering. Pixel values are calculated from the original mockup image size for precision.”
+
+4. Make placement dragging/resizing more precise
+Improve the overlay interaction:
+- The poster placement rectangle should be draggable.
+- It should be resizable from corners/edges if not already.
+- Add keyboard nudging when the rectangle is selected:
+  - Arrow keys move by 1 px
+  - Shift + Arrow moves by 10 px
+  - Alt + Arrow, if feasible, moves by 0.1% or a finer amount
+- Show a live label on or near the overlay with both:
+  - percentage values
+  - pixel values
+Example:
+“x 436px / 36.3%, y 120px / 10.0%, w 268px / 22.3%, h 420px / 35.0%”
+
+5. Backend/API validation
+Update the backend validation so placement accepts the intended shape.
+
+Validation rules:
+- left/top/x/y must be >= 0
+- width/height must be > 0
+- right edge must not exceed image width if validating px
+- bottom edge must not exceed image height if validating px
+- percentage x + width must not exceed 100
+- percentage y + height must not exceed 100
+- allow small decimal precision
+- reject NaN, null, undefined, empty strings, and non-numeric values
+
+If the frontend sends both px and %, backend should trust/canonicalize percentages but may store source image dimensions and metadata.
+
+6. Database compatibility
+Check the database schema/migration for mockup templates and poster placement.
+- Do not break existing seeded templates.
+- Existing templates with only percentage placement should still load and save.
+- If adding columns or JSON fields, provide a safe migration.
+- Do not require re-detecting all old templates.
+
+7. Error handling and logging
+- Add server-side logging around failed mockup template updates, but do not leak secrets.
+- Return useful error messages to the frontend.
+- Frontend toast should show the API error message when available.
+- Avoid generic “Internal Server Error” for known validation/save issues.
+
+8. Testing
+Please test:
+- Open existing mockup template.
+- Move/resize poster area.
+- Manually edit % fields.
+- Manually edit px fields.
+- Save.
+- Reopen template and verify saved placement is preserved.
+- Use “Reset to detected”, save, reopen.
+- Use “Fallback”, save, reopen.
+- Test an old template that only has percentage placement.
+- Test invalid values and confirm a clear validation error, not a 500.
+
+Constraints:
+- Keep changes targeted to the mockup template editor, mockup template API, validation/schema, and related types only.
+- Do not redesign the whole admin mockup page.
+- Do not change unrelated checkout, poster, cart, Stripe, or store routing logic.
+- Do not make broad refactors.
+- Keep the current percentage-based rendering behavior working.
+- After implementation, give me:
+  1. root cause of the save failure,
+  2. files changed,
+  3. exact payload shape before/after if relevant,
+  4. how pixel precision now works,
+  5. what you tested.
