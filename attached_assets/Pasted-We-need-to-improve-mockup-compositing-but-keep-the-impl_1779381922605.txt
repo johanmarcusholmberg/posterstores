@@ -1,0 +1,146 @@
+We need to improve mockup compositing, but keep the implementation pragmatic because our current mockup backgrounds are not final production-quality assets yet.
+
+Current issue:
+Posters currently look pasted onto mockup images. They are too sharp/bright, may show white edges, and do not visually integrate with the frame/wall.
+
+Important product direction:
+Do not overbuild a complex final mockup engine yet. Our mockup backgrounds are temporary and may be replaced later with better purpose-made empty-frame mockups. For now, improve the existing compositing enough that it looks acceptable, while keeping the data model and rendering approach compatible with better mockup assets later.
+
+Goal:
+Add a lightweight “realistic compositing” layer for mockups:
+1. Correct poster crop/masking.
+2. Remove unwanted white edges where possible.
+3. Add subtle shadow and inner shadow.
+4. Slightly adjust poster brightness/contrast/saturation to match the room.
+5. Keep existing percentage/pixel placement working.
+6. Avoid broad architecture changes.
+
+Scope:
+Focus only on:
+- mockup rendering/compositing
+- mockup template editor controls if needed
+- mockup template validation/types if needed
+
+Do not touch:
+- checkout
+- cart
+- Stripe
+- poster listing
+- store routing
+- unrelated admin pages
+
+Tasks:
+
+1. Investigate current compositing
+- Find where poster mockups are rendered.
+- Identify whether the poster is drawn as a simple flat overlay.
+- Identify why white margins/edges appear.
+- Identify whether the current fit behavior is contain, cover, stretch, or custom.
+
+2. Add fit mode support
+Add support for:
+- cover: fill the full placement area, cropping if needed
+- contain: fit entire poster inside the area
+- stretch: exact fill, mainly for debugging/admin
+
+Default should be cover for realistic mockups.
+
+Existing templates should default safely to cover unless the current behavior clearly depends on another mode.
+
+3. Add simple realism settings
+Add lightweight compositing settings, preferably as template metadata or explicit fields if that matches the existing schema.
+
+Suggested fields:
+- fitMode: "cover" | "contain" | "stretch"
+- shadowEnabled: boolean
+- shadowOpacity: number
+- shadowBlur: number
+- shadowOffsetX: number
+- shadowOffsetY: number
+- innerShadowEnabled: boolean
+- innerShadowOpacity: number
+- brightness: number
+- contrast: number
+- saturation: number
+- blur: number
+
+Use conservative defaults:
+- fitMode: cover
+- subtle shadow enabled
+- subtle inner shadow enabled
+- brightness slightly reduced
+- contrast slightly reduced
+- saturation unchanged or slightly reduced
+- blur very small or zero by default
+
+4. Improve rendering
+When rendering a poster in a mockup:
+- Clip/mask the poster exactly to the placement rectangle.
+- Apply cover fit by default so no accidental white background appears.
+- Apply subtle shadow behind the poster area.
+- Apply subtle inner shadow around the poster/frame edge.
+- Apply brightness/contrast/saturation adjustments to the poster layer.
+- Avoid heavy fake effects.
+
+Important:
+The result should look less pasted-on, not overly stylized.
+
+5. Admin controls
+Add a small “Realism” or “Compositing” section in the mockup template editor.
+
+Controls:
+- Fit mode
+- Shadow on/off
+- Shadow opacity
+- Shadow blur
+- Shadow offset X/Y
+- Inner shadow on/off
+- Inner shadow opacity
+- Brightness
+- Contrast
+- Saturation
+- Blur
+- Reset to recommended defaults
+
+Keep this section compact and optional. Do not redesign the whole modal.
+
+6. Backward compatibility
+- Existing templates with only placement percentages must still load.
+- Existing templates should receive default compositing values at render time if no values are saved.
+- Do not require re-detecting or reconfiguring all old templates.
+
+7. Validation/error handling
+- Validate fit mode.
+- Clamp numeric realism values to safe ranges.
+- Invalid values should return 400 with clear messages, not 500.
+- Do not introduce broad API changes.
+
+8. Do not implement advanced perspective yet
+Do not implement four-corner perspective placement in this phase unless the current code already makes it very easy.
+
+Instead, leave the code structured so corner/perspective support can be added later when we have better production mockup backgrounds.
+
+9. Testing
+Test:
+- Existing mockup templates still render.
+- Editing placement still works.
+- Pixel/% placement still works.
+- Fit mode cover removes accidental white edge issues.
+- Shadow and inner shadow make the poster look more integrated.
+- Saving/reopening preserves settings.
+- Invalid values return 400, not 500.
+
+Constraints:
+- Keep this targeted and cost-conscious.
+- Avoid broad refactors.
+- Do not add heavy dependencies unless absolutely necessary.
+- Do not commit or push until I explicitly approve.
+
+After implementation, report:
+1. Current compositing root cause.
+2. Files changed.
+3. Fields/settings added.
+4. Default realism settings.
+5. What visual improvements were made.
+6. What was tested.
+7. What should wait until we have better mockup backgrounds.
