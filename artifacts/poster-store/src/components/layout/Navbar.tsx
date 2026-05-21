@@ -118,22 +118,12 @@ export const Navbar = () => {
               placeholder="Search posters…"
               value={searchInputValue}
               onChange={(e) => handleSearchChange(e.target.value)}
-              className="pl-9 pr-9 h-9 bg-background/90"
+              className="pl-9 h-9 bg-background/90"
               data-testid="input-search"
               onKeyDown={(e) => {
                 if (e.key === "Escape") closeSearch();
               }}
             />
-            {searchInputValue && (
-              <button
-                onClick={closeSearch}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Clear search"
-                data-testid="btn-clear-search"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
           </div>
         )}
 
