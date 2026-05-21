@@ -27,17 +27,6 @@ function FilterSidebar({
 
   return (
     <div className="space-y-8">
-      {hasFilters && (
-        <button
-          onClick={clearAllFilters}
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          data-testid="btn-clear-all-filters"
-        >
-          <X className="h-3.5 w-3.5" />
-          Clear all filters
-        </button>
-      )}
-
       <div>
         <h3 className="font-serif font-bold text-lg mb-4">Region</h3>
         <div className="space-y-1">
@@ -80,6 +69,17 @@ function FilterSidebar({
             ))}
           </div>
         </div>
+      )}
+
+      {hasFilters && (
+        <button
+          onClick={clearAllFilters}
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          data-testid="btn-clear-all-filters"
+        >
+          <X className="h-3.5 w-3.5" />
+          Clear all filters
+        </button>
       )}
     </div>
   );
