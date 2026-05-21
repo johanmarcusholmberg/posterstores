@@ -65,6 +65,8 @@ export const mockupTemplatesTable = pgTable("mockup_templates", {
   detectionModel: text("detection_model"),
   detectedAt: timestamp("detected_at", { withTimezone: true }),
   placementWasManuallyAdjusted: boolean("placement_was_manually_adjusted").default(false),
+  sourceImageWidth: integer("source_image_width"),
+  sourceImageHeight: integer("source_image_height"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

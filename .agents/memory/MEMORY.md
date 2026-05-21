@@ -1,0 +1,1 @@
+- [Drizzle timestamp coercion bug](drizzle-timestamp-coercion.md) — Drizzle timestamp columns require Date objects; passing ISO strings causes a runtime 500.

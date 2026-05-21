@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -110,6 +110,28 @@ function validatePlacement(
   return errors;
 }
 
+function clamp(v: number, min: number, max: number): number {
+  return Math.min(Math.max(v, min), max);
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+function pctToPx(pct: string, dim: number | null): string {
+  if (!dim || pct === "") return "";
+  const p = parseFloat(pct);
+  if (isNaN(p)) return "";
+  return Math.round((p / 100) * dim).toString();
+}
+
+function pxToPct(px: string, dim: number | null): string {
+  if (!dim || px === "") return "";
+  const p = parseInt(px, 10);
+  if (isNaN(p)) return "";
+  return round2((p / dim) * 100).toString();
+}
+
 function getConfidenceBadge(confidence: number): {
   label: string;
   className: string;
@@ -202,9 +224,29 @@ export function MockupTemplateForm({
   );
   const [hadDetectionBeforeEdit, setHadDetectionBeforeEdit] = useState(false);
 
+  const [imgNaturalWidth, setImgNaturalWidth] = useState<number | null>(
+    template?.sourceImageWidth ?? null
+  );
+  const [imgNaturalHeight, setImgNaturalHeight] = useState<number | null>(
+    template?.sourceImageHeight ?? null
+  );
+
   const lastAnalyzedUrlRef = useRef<string>("");
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  type DragType = "move" | "nw" | "ne" | "sw" | "se";
+  const dragState = useRef<{
+    type: DragType;
+    startMx: number;
+    startMy: number;
+    startX: number;
+    startY: number;
+    startW: number;
+    startH: number;
+  } | null>(null);
 
   const placementErrors = validatePlacement(posterX, posterY, posterWidth, posterHeight);
   const hasPlacementErrors = Object.keys(placementErrors).length > 0;
@@ -222,6 +264,148 @@ export function MockupTemplateForm({
       setPlacementWasManuallyAdjusted(true);
     }
   };
+
+  const handleImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+      setImgNaturalWidth(img.naturalWidth);
+      setImgNaturalHeight(img.naturalHeight);
+    }
+  }, []);
+
+  const handlePxChange = useCallback(
+    (
+      value: string,
+      dim: number | null,
+      setPct: (v: string) => void,
+      axisMax: number,
+      currentOther: string,
+      otherLabel?: string
+    ) => {
+      if (!dim) return;
+      const pct = pxToPct(value, dim);
+      handlePlacementFieldChange(setPct, pct);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [analysisState, hadDetectionBeforeEdit]
+  );
+
+  const startDrag = useCallback(
+    (e: React.MouseEvent, type: "move" | "nw" | "ne" | "sw" | "se") => {
+      e.preventDefault();
+      e.stopPropagation();
+      dragState.current = {
+        type,
+        startMx: e.clientX,
+        startMy: e.clientY,
+        startX: parseFloat(posterX) || 0,
+        startY: parseFloat(posterY) || 0,
+        startW: parseFloat(posterWidth) || 0,
+        startH: parseFloat(posterHeight) || 0,
+      };
+      overlayRef.current?.focus();
+    },
+    [posterX, posterY, posterWidth, posterHeight]
+  );
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      const ds = dragState.current;
+      if (!ds || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+      const dx = ((e.clientX - ds.startMx) / rect.width) * 100;
+      const dy = ((e.clientY - ds.startMy) / rect.height) * 100;
+
+      let nx = ds.startX;
+      let ny = ds.startY;
+      let nw = ds.startW;
+      let nh = ds.startH;
+
+      if (ds.type === "move") {
+        nx = clamp(ds.startX + dx, 0, 100 - ds.startW);
+        ny = clamp(ds.startY + dy, 0, 100 - ds.startH);
+      } else if (ds.type === "se") {
+        nw = clamp(ds.startW + dx, 1, 100 - ds.startX);
+        nh = clamp(ds.startH + dy, 1, 100 - ds.startY);
+      } else if (ds.type === "sw") {
+        const right = ds.startX + ds.startW;
+        nw = clamp(ds.startW - dx, 1, right);
+        nx = right - nw;
+        nh = clamp(ds.startH + dy, 1, 100 - ds.startY);
+      } else if (ds.type === "ne") {
+        nw = clamp(ds.startW + dx, 1, 100 - ds.startX);
+        const bottom = ds.startY + ds.startH;
+        nh = clamp(ds.startH - dy, 1, bottom);
+        ny = bottom - nh;
+      } else if (ds.type === "nw") {
+        const right = ds.startX + ds.startW;
+        const bottom = ds.startY + ds.startH;
+        nw = clamp(ds.startW - dx, 1, right);
+        nh = clamp(ds.startH - dy, 1, bottom);
+        nx = right - nw;
+        ny = bottom - nh;
+      }
+
+      setPosterX(round2(nx).toString());
+      setPosterY(round2(ny).toString());
+      setPosterWidth(round2(nw).toString());
+      setPosterHeight(round2(nh).toString());
+      setPlacementWasManuallyAdjusted(true);
+    };
+
+    const onMouseUp = () => {
+      dragState.current = null;
+    };
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, []);
+
+  const handleOverlayKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      const arrows = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
+      if (!arrows.includes(e.key)) return;
+      e.preventDefault();
+
+      const w = imgNaturalWidth;
+      const h = imgNaturalHeight;
+      let stepX: number;
+      let stepY: number;
+
+      if (e.altKey) {
+        stepX = 0.1;
+        stepY = 0.1;
+      } else if (e.shiftKey) {
+        stepX = w ? round2((10 / w) * 100) : 1;
+        stepY = h ? round2((10 / h) * 100) : 1;
+      } else {
+        stepX = w ? round2((1 / w) * 100) : 0.1;
+        stepY = h ? round2((1 / h) * 100) : 0.1;
+      }
+
+      const cx = parseFloat(posterX) || 0;
+      const cy = parseFloat(posterY) || 0;
+      const cw = parseFloat(posterWidth) || 0;
+      const ch = parseFloat(posterHeight) || 0;
+
+      let nx = cx;
+      let ny = cy;
+      if (e.key === "ArrowLeft") nx = clamp(cx - stepX, 0, 100 - cw);
+      if (e.key === "ArrowRight") nx = clamp(cx + stepX, 0, 100 - cw);
+      if (e.key === "ArrowUp") ny = clamp(cy - stepY, 0, 100 - ch);
+      if (e.key === "ArrowDown") ny = clamp(cy + stepY, 0, 100 - ch);
+
+      setPosterX(round2(nx).toString());
+      setPosterY(round2(ny).toString());
+      setPlacementWasManuallyAdjusted(true);
+    },
+    [posterX, posterY, posterWidth, posterHeight, imgNaturalWidth, imgNaturalHeight]
+  );
 
   const toggleFormat = (fmt: string) => {
     setSelectedFormats((prev) =>
@@ -417,6 +601,8 @@ export function MockupTemplateForm({
         rotation: rotation !== "" ? parseFloat(rotation) : undefined,
         borderRadius: borderRadius !== "" ? parseFloat(borderRadius) : undefined,
         shadowStrength: shadowStrength !== "" ? parseFloat(shadowStrength) : undefined,
+        sourceImageWidth: imgNaturalWidth ?? undefined,
+        sourceImageHeight: imgNaturalHeight ?? undefined,
         ...(detectionMetadata
           ? {
               detectionConfidence: detectionMetadata.confidence,
@@ -596,12 +782,16 @@ export function MockupTemplateForm({
           <div className="space-y-2">
             <Label>Background image</Label>
             <div
+              ref={containerRef}
               className={cn(
                 "relative rounded-lg border-2 border-dashed transition-colors overflow-hidden",
                 "border-border hover:border-primary/50",
                 displayImageUrl ? "aspect-[3/4]" : "aspect-[3/4] flex flex-col items-center justify-center bg-muted/30"
               )}
-              onClick={() => fileInputRef.current?.click()}
+              onClick={(e) => {
+                if ((e.target as HTMLElement).closest("[data-overlay]")) return;
+                fileInputRef.current?.click();
+              }}
               style={{ cursor: "pointer" }}
             >
               {displayImageUrl ? (
@@ -610,27 +800,59 @@ export function MockupTemplateForm({
                     src={displayImageUrl}
                     alt="Preview"
                     className="w-full h-full object-cover"
+                    onLoad={handleImageLoad}
                     onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                   />
                   {hasPosterArea && (
                     <div
-                      className="absolute border-2 border-dashed border-white bg-white/15 pointer-events-none"
+                      ref={overlayRef}
+                      data-overlay
+                      tabIndex={0}
+                      className="absolute border-2 border-white bg-white/15 focus:outline-none focus:ring-2 focus:ring-primary"
                       style={{
                         left: `${posterX}%`,
                         top: `${posterY}%`,
                         width: `${posterWidth}%`,
                         height: `${posterHeight}%`,
                         boxShadow: "0 0 0 1px rgba(0,0,0,0.6)",
+                        cursor: "move",
                         transform: rotation && parseFloat(rotation) !== 0 ? `rotate(${rotation}deg)` : undefined,
                         borderRadius: borderRadius && parseFloat(borderRadius) > 0 ? `${borderRadius}px` : undefined,
                       }}
+                      onMouseDown={(e) => startDrag(e, "move")}
+                      onKeyDown={handleOverlayKeyDown}
                     >
-                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5">
+                      {/* Corner resize handles */}
+                      {(["nw", "ne", "sw", "se"] as const).map((corner) => (
+                        <div
+                          key={corner}
+                          className="absolute w-3 h-3 bg-white border border-black/50 rounded-sm z-10"
+                          style={{
+                            top: corner.startsWith("n") ? -6 : undefined,
+                            bottom: corner.startsWith("s") ? -6 : undefined,
+                            left: corner.endsWith("w") ? -6 : undefined,
+                            right: corner.endsWith("e") ? -6 : undefined,
+                            cursor: `${corner}-resize`,
+                          }}
+                          onMouseDown={(e) => { e.stopPropagation(); startDrag(e, corner); }}
+                        />
+                      ))}
+                      {/* Live label */}
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 pointer-events-none">
                         <span className="text-white text-xs font-semibold drop-shadow bg-black/60 px-1.5 py-0.5 rounded">
                           Poster area
                         </span>
-                        <span className="text-white/80 text-[10px] drop-shadow bg-black/50 px-1 py-0.5 rounded">
-                          {posterX}%, {posterY}% · {posterWidth}×{posterHeight}
+                        <span className="text-white/80 text-[9px] drop-shadow bg-black/50 px-1 py-0.5 rounded font-mono leading-tight text-center">
+                          {imgNaturalWidth && imgNaturalHeight ? (
+                            <>
+                              x {pctToPx(posterX, imgNaturalWidth)}px/{posterX}%{" "}
+                              y {pctToPx(posterY, imgNaturalHeight)}px/{posterY}%<br />
+                              w {pctToPx(posterWidth, imgNaturalWidth)}px/{posterWidth}%{" "}
+                              h {pctToPx(posterHeight, imgNaturalHeight)}px/{posterHeight}%
+                            </>
+                          ) : (
+                            <>{posterX}%, {posterY}% · {posterWidth}×{posterHeight}</>
+                          )}
                         </span>
                       </div>
                     </div>
@@ -640,7 +862,9 @@ export function MockupTemplateForm({
                       Fallback values
                     </div>
                   )}
-                  <div className="absolute inset-0 bg-black/0 hover:bg-black/25 transition-colors flex items-center justify-center opacity-0 hover:opacity-100">
+                  <div
+                    className="absolute inset-0 bg-black/0 hover:bg-black/25 transition-colors flex items-center justify-center opacity-0 hover:opacity-100 pointer-events-none"
+                  >
                     <div className="bg-white/90 rounded-md px-3 py-1.5 text-sm font-medium text-foreground flex items-center gap-1.5">
                       <Upload className="w-3.5 h-3.5" />
                       Replace image
@@ -845,9 +1069,14 @@ export function MockupTemplateForm({
               </p>
             )}
 
-            <div className="grid grid-cols-2 gap-2">
+            {/* Header row */}
+            <div className="grid grid-cols-[auto_1fr_1fr] gap-x-2 gap-y-1 items-end">
+              <div className="text-[10px] text-muted-foreground font-medium pb-1 pr-1" />
+              <div className="text-[10px] text-muted-foreground font-medium text-center">Left / X</div>
+              <div className="text-[10px] text-muted-foreground font-medium text-center">Top / Y</div>
+
+              <div className="text-[10px] text-muted-foreground self-center">%</div>
               <div className="space-y-1">
-                <Label className="text-xs">Left (X %)</Label>
                 <Input
                   type="number"
                   value={posterX}
@@ -860,12 +1089,9 @@ export function MockupTemplateForm({
                   )}
                   min={0} max={100}
                 />
-                {placementErrors.x && (
-                  <p className="text-[11px] text-destructive">{placementErrors.x}</p>
-                )}
+                {placementErrors.x && <p className="text-[11px] text-destructive">{placementErrors.x}</p>}
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Top (Y %)</Label>
                 <Input
                   type="number"
                   value={posterY}
@@ -878,12 +1104,37 @@ export function MockupTemplateForm({
                   )}
                   min={0} max={100}
                 />
-                {placementErrors.y && (
-                  <p className="text-[11px] text-destructive">{placementErrors.y}</p>
-                )}
+                {placementErrors.y && <p className="text-[11px] text-destructive">{placementErrors.y}</p>}
               </div>
+
+              <div className="text-[10px] text-muted-foreground self-center">px</div>
+              <Input
+                type="number"
+                value={pctToPx(posterX, imgNaturalWidth)}
+                onChange={(e) => handlePxChange(e.target.value, imgNaturalWidth, setPosterX, 100, posterWidth)}
+                placeholder={imgNaturalWidth ? "—" : "load image"}
+                disabled={!imgNaturalWidth}
+                className="h-8 text-sm"
+                min={0}
+              />
+              <Input
+                type="number"
+                value={pctToPx(posterY, imgNaturalHeight)}
+                onChange={(e) => handlePxChange(e.target.value, imgNaturalHeight, setPosterY, 100, posterHeight)}
+                placeholder={imgNaturalHeight ? "—" : "load image"}
+                disabled={!imgNaturalHeight}
+                className="h-8 text-sm"
+                min={0}
+              />
+            </div>
+
+            <div className="grid grid-cols-[auto_1fr_1fr] gap-x-2 gap-y-1 items-end mt-1">
+              <div className="text-[10px] text-muted-foreground font-medium pb-1 pr-1" />
+              <div className="text-[10px] text-muted-foreground font-medium text-center">Width</div>
+              <div className="text-[10px] text-muted-foreground font-medium text-center">Height</div>
+
+              <div className="text-[10px] text-muted-foreground self-center">%</div>
               <div className="space-y-1">
-                <Label className="text-xs">Width %</Label>
                 <Input
                   type="number"
                   value={posterWidth}
@@ -896,12 +1147,9 @@ export function MockupTemplateForm({
                   )}
                   min={1} max={100}
                 />
-                {placementErrors.width && (
-                  <p className="text-[11px] text-destructive">{placementErrors.width}</p>
-                )}
+                {placementErrors.width && <p className="text-[11px] text-destructive">{placementErrors.width}</p>}
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Height %</Label>
                 <Input
                   type="number"
                   value={posterHeight}
@@ -914,10 +1162,46 @@ export function MockupTemplateForm({
                   )}
                   min={1} max={100}
                 />
-                {placementErrors.height && (
-                  <p className="text-[11px] text-destructive">{placementErrors.height}</p>
-                )}
+                {placementErrors.height && <p className="text-[11px] text-destructive">{placementErrors.height}</p>}
               </div>
+
+              <div className="text-[10px] text-muted-foreground self-center">px</div>
+              <Input
+                type="number"
+                value={pctToPx(posterWidth, imgNaturalWidth)}
+                onChange={(e) => handlePxChange(e.target.value, imgNaturalWidth, setPosterWidth, 100, posterX)}
+                placeholder={imgNaturalWidth ? "—" : "load image"}
+                disabled={!imgNaturalWidth}
+                className="h-8 text-sm"
+                min={1}
+              />
+              <Input
+                type="number"
+                value={pctToPx(posterHeight, imgNaturalHeight)}
+                onChange={(e) => handlePxChange(e.target.value, imgNaturalHeight, setPosterHeight, 100, posterY)}
+                placeholder={imgNaturalHeight ? "—" : "load image"}
+                disabled={!imgNaturalHeight}
+                className="h-8 text-sm"
+                min={1}
+              />
+            </div>
+
+            <p className="text-[11px] text-muted-foreground flex items-start gap-1 mt-1">
+              <Info className="w-3 h-3 shrink-0 mt-0.5" />
+              Percent values are used for responsive rendering. Pixel values are calculated from the original mockup image size for precision.
+              {imgNaturalWidth && imgNaturalHeight ? (
+                <span className="text-muted-foreground/70 ml-auto shrink-0">
+                  {imgNaturalWidth}×{imgNaturalHeight}px
+                </span>
+              ) : null}
+            </p>
+
+            <p className="text-[11px] text-muted-foreground/70 flex items-center gap-1">
+              <Info className="w-3 h-3 shrink-0" />
+              Drag the overlay to move · drag corners to resize · arrow keys to nudge (Shift = 10px, Alt = 0.1%)
+            </p>
+
+            <div className="grid grid-cols-2 gap-2 mt-1">
               <div className="space-y-1">
                 <Label className="text-xs">Rotation (°)</Label>
                 <Input

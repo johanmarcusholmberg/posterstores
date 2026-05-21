@@ -11,6 +11,7 @@ import { migrateExistingPosterSizes } from "./lib/migrateExistingPosterSizes";
 import { migrateSlugField } from "./lib/migrateSlugField";
 import { migrateUserAuth } from "./lib/migrateUserAuth";
 import { migrateShipping } from "./lib/migrateShipping";
+import { migrateMockupPlacement } from "./lib/migrateMockupPlacement";
 import { seedPostsofSpain } from "./lib/seedPostsofSpain";
 
 const app: Express = express();
@@ -87,10 +88,6 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/api", stripeRouter);
 app.use("/api", router);
 
-seedMockupTemplates().catch((err) =>
-  logger.error(err, "Failed to seed mockup templates")
-);
-
 seedPostsofSpain().catch((err) =>
   logger.error(err, "Failed to seed PostsofSpain store")
 );
@@ -99,6 +96,8 @@ migrateSlugField()
   .then(() => migrateExistingPosterSizes())
   .then(() => migrateUserAuth())
   .then(() => migrateShipping())
+  .then(() => migrateMockupPlacement())
+  .then(() => seedMockupTemplates())
   .catch((err) =>
     logger.error(err, "Failed to run startup migrations")
   );

@@ -31,6 +31,8 @@ export interface MockupTemplate {
   detectionModel: string | null;
   detectedAt: string | null;
   placementWasManuallyAdjusted: boolean | null;
+  sourceImageWidth: number | null;
+  sourceImageHeight: number | null;
   createdAt: string;
   updatedAt: string;
 }

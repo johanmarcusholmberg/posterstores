@@ -246,7 +246,64 @@ const ALLOWED_TEMPLATE_FIELDS = [
   "detectionModel",
   "detectedAt",
   "placementWasManuallyAdjusted",
+  "sourceImageWidth",
+  "sourceImageHeight",
 ] as const;
+
+/**
+ * Coerce and validate placement fields from request body.
+ * Returns null if the values look invalid, otherwise the cleaned numeric values.
+ */
+function coercePlacementField(
+  val: unknown,
+  fieldName: string
+): number | null | undefined {
+  if (val === undefined) return undefined;
+  if (val === null || val === "") return null;
+  const n = typeof val === "number" ? val : parseFloat(String(val));
+  if (!isFinite(n) || isNaN(n)) {
+    throw new Error(`${fieldName} must be a finite number, got: ${JSON.stringify(val)}`);
+  }
+  return n;
+}
+
+/**
+ * Validate that percentage placement values don't go out of bounds.
+ */
+function validatePlacementBounds(body: Record<string, unknown>): void {
+  const toNum = (k: string) => {
+    const v = body[k];
+    if (v === undefined || v === null || v === "") return null;
+    return parseFloat(String(v));
+  };
+
+  const x = toNum("posterX");
+  const y = toNum("posterY");
+  const w = toNum("posterWidth");
+  const h = toNum("posterHeight");
+
+  if (x !== null && (x < 0 || x > 100)) throw new Error(`posterX must be between 0 and 100, got ${x}`);
+  if (y !== null && (y < 0 || y > 100)) throw new Error(`posterY must be between 0 and 100, got ${y}`);
+  if (w !== null && w <= 0) throw new Error(`posterWidth must be > 0, got ${w}`);
+  if (h !== null && h <= 0) throw new Error(`posterHeight must be > 0, got ${h}`);
+  if (x !== null && w !== null && x + w > 100.001) throw new Error(`posterX (${x}) + posterWidth (${w}) exceeds 100%`);
+  if (y !== null && h !== null && y + h > 100.001) throw new Error(`posterY (${y}) + posterHeight (${h}) exceeds 100%`);
+}
+
+/**
+ * Coerce a detectedAt value (string ISO or Date) into a proper Date for Drizzle.
+ */
+function coerceDate(val: unknown): Date | null | undefined {
+  if (val === undefined) return undefined;
+  if (val === null || val === "") return null;
+  if (val instanceof Date) return val;
+  if (typeof val === "string") {
+    const d = new Date(val);
+    if (isNaN(d.getTime())) throw new Error(`detectedAt is not a valid date: ${val}`);
+    return d;
+  }
+  throw new Error(`detectedAt must be a date string or null, got: ${typeof val}`);
+}
 
 // ─── Template routes ─────────────────────────────────────────────────────────
 
@@ -337,61 +394,117 @@ router.post("/mockup-templates", requireAdmin, async (req, res) => {
     return res.status(400).json({ error: "name and templateKey are required" });
   }
 
-  const values: any = {
-    name,
-    templateKey,
-    frameType: rest.frameType ?? "none",
-    description: rest.description ?? null,
-    storeKey: rest.storeKey ?? null,
-    supportedOrientation: rest.supportedOrientation ?? null,
-    supportedAspectRatio: rest.supportedAspectRatio ?? null,
-    previewThumbnailUrl: rest.previewThumbnailUrl ?? null,
-    backgroundImageUrl: rest.backgroundImageUrl ?? null,
-    storagePath: rest.storagePath ?? null,
-    active: rest.active ?? true,
-    sortOrder: rest.sortOrder ?? 0,
-    category: rest.category ?? null,
-    orientation: rest.orientation ?? null,
-    supportedFormats: rest.supportedFormats ?? null,
-    isFeatured: rest.isFeatured ?? false,
-    posterX: rest.posterX ?? null,
-    posterY: rest.posterY ?? null,
-    posterWidth: rest.posterWidth ?? null,
-    posterHeight: rest.posterHeight ?? null,
-    rotation: rest.rotation ?? null,
-    borderRadius: rest.borderRadius ?? null,
-    shadowStrength: rest.shadowStrength ?? null,
-  };
+  try {
+    validatePlacementBounds(rest);
 
-  const [template] = await db
-    .insert(mockupTemplatesTable)
-    .values(values)
-    .returning();
+    const values: any = {
+      name,
+      templateKey,
+      frameType: rest.frameType ?? "none",
+      description: rest.description ?? null,
+      storeKey: rest.storeKey ?? null,
+      supportedOrientation: rest.supportedOrientation ?? null,
+      supportedAspectRatio: rest.supportedAspectRatio ?? null,
+      previewThumbnailUrl: rest.previewThumbnailUrl ?? null,
+      backgroundImageUrl: rest.backgroundImageUrl ?? null,
+      storagePath: rest.storagePath ?? null,
+      active: rest.active ?? true,
+      sortOrder: rest.sortOrder ?? 0,
+      category: rest.category ?? null,
+      orientation: rest.orientation ?? null,
+      supportedFormats: rest.supportedFormats ?? null,
+      isFeatured: rest.isFeatured ?? false,
+      posterX: coercePlacementField(rest.posterX, "posterX") ?? null,
+      posterY: coercePlacementField(rest.posterY, "posterY") ?? null,
+      posterWidth: coercePlacementField(rest.posterWidth, "posterWidth") ?? null,
+      posterHeight: coercePlacementField(rest.posterHeight, "posterHeight") ?? null,
+      rotation: coercePlacementField(rest.rotation, "rotation") ?? null,
+      borderRadius: coercePlacementField(rest.borderRadius, "borderRadius") ?? null,
+      shadowStrength: coercePlacementField(rest.shadowStrength, "shadowStrength") ?? null,
+      detectedAt: coerceDate(rest.detectedAt) ?? null,
+      sourceImageWidth: rest.sourceImageWidth != null ? Math.round(Number(rest.sourceImageWidth)) : null,
+      sourceImageHeight: rest.sourceImageHeight != null ? Math.round(Number(rest.sourceImageHeight)) : null,
+    };
 
-  return res.status(201).json(template);
+    const [template] = await db
+      .insert(mockupTemplatesTable)
+      .values(values)
+      .returning();
+
+    return res.status(201).json(template);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to create template";
+    req.log.error({ err }, "POST /mockup-templates failed");
+    const isValidation = msg.length < 300;
+    return res.status(isValidation ? 400 : 500).json({ error: msg });
+  }
 });
 
 router.put("/mockup-templates/:id", requireAdmin, async (req, res) => {
   const id = Number(req.params.id);
   if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
 
-  const [existing] = await db.select().from(mockupTemplatesTable).where(eq(mockupTemplatesTable.id, id));
-  if (!existing) return res.status(404).json({ error: "Not found" });
+  try {
+    const [existing] = await db.select().from(mockupTemplatesTable).where(eq(mockupTemplatesTable.id, id));
+    if (!existing) return res.status(404).json({ error: "Not found" });
 
-  const updates: Partial<typeof mockupTemplatesTable.$inferInsert> = {};
-  for (const key of ALLOWED_TEMPLATE_FIELDS) {
-    if (req.body[key] !== undefined) {
+    validatePlacementBounds(req.body);
+
+    const updates: Partial<typeof mockupTemplatesTable.$inferInsert> = {};
+
+    for (const key of ALLOWED_TEMPLATE_FIELDS) {
+      if (req.body[key] === undefined) continue;
+
+      if (key === "detectedAt") {
+        const coerced = coerceDate(req.body[key]);
+        if (coerced !== undefined) (updates as any)[key] = coerced;
+        continue;
+      }
+
+      if (
+        key === "posterX" ||
+        key === "posterY" ||
+        key === "posterWidth" ||
+        key === "posterHeight" ||
+        key === "rotation" ||
+        key === "borderRadius" ||
+        key === "shadowStrength" ||
+        key === "detectionConfidence"
+      ) {
+        const coerced = coercePlacementField(req.body[key], key);
+        if (coerced !== undefined) (updates as any)[key] = coerced;
+        continue;
+      }
+
+      if (key === "sourceImageWidth" || key === "sourceImageHeight") {
+        const raw = req.body[key];
+        (updates as any)[key] = raw != null ? Math.round(Number(raw)) : null;
+        continue;
+      }
+
       (updates as any)[key] = req.body[key];
     }
+
+    const [updated] = await db
+      .update(mockupTemplatesTable)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(mockupTemplatesTable.id, id))
+      .returning();
+
+    return res.json(updated);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to update template";
+    req.log.error({ err }, `PUT /mockup-templates/${id} failed`);
+    const isValidation =
+      msg.startsWith("posterX") ||
+      msg.startsWith("posterY") ||
+      msg.startsWith("posterW") ||
+      msg.startsWith("posterH") ||
+      msg.startsWith("detectedAt") ||
+      msg.includes("must be") ||
+      msg.includes("exceeds");
+    return res.status(isValidation ? 400 : 500).json({ error: msg });
   }
-
-  const [updated] = await db
-    .update(mockupTemplatesTable)
-    .set({ ...updates, updatedAt: new Date() })
-    .where(eq(mockupTemplatesTable.id, id))
-    .returning();
-
-  return res.json(updated);
 });
 
 router.delete("/mockup-templates/:id", requireAdmin, async (req, res) => {
