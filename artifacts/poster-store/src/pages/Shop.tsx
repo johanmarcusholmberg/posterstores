@@ -261,17 +261,11 @@ export default function Shop() {
               <h1 className="font-serif text-3xl font-bold text-foreground">
                 {hasAnyFilter ? (
                   <>
-                    {isLoadingFirstPage ? (
-                      <span>Searching…</span>
-                    ) : (
-                      <>
-                        Showing{" "}
-                        <span className="text-foreground">{total}</span>{" "}
-                        <span className="text-muted-foreground font-sans font-normal text-2xl">
-                          poster{total !== 1 ? "s" : ""}
-                        </span>
-                      </>
-                    )}
+                    Showing{" "}
+                    <span className="text-foreground">{total}</span>{" "}
+                    <span className="text-muted-foreground font-sans font-normal text-2xl">
+                      poster{total !== 1 ? "s" : ""}
+                    </span>
                   </>
                 ) : (
                   <>
