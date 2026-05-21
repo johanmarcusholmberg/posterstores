@@ -1,0 +1,124 @@
+We need a focused UX polish pass for the Poster Store listing/header experience.
+
+Repository/project context:
+- This is the Poster stores project.
+- Keep changes small and targeted.
+- Do not change backend/API/database/schema/payment/checkout logic.
+- Do not add new dependencies unless absolutely necessary.
+- Do not run broad rebuilds or large exploratory refactors.
+- Preserve current store-aware behavior, filters, cart, favorites, account, and existing routes.
+- Work on the current frontend components only.
+
+Goal:
+Improve the poster listing UX so the store feels cleaner, more premium, and easier to browse.
+
+Requested changes:
+
+1. Clean header with expandable search
+- Keep the header visually clean.
+- Header should show:
+  - PostersOfSpain logo on the left
+  - Existing icons on the right: favorites, cart, account, plus a search icon
+- Do not add a full navigation menu.
+- Add a search icon in the header.
+- When the search icon is clicked/tapped, reveal a full-width search row directly below the header.
+- The expanded search row should contain the existing poster search input.
+- Include a close/clear “X” action to collapse the search row.
+- Search behavior should remain the same as today.
+- Remove the large search bar from the main listing page body once the header search row exists.
+- The search row should work on both desktop and mobile.
+- Avoid layout jumps as much as possible; use a smooth but simple transition if easy.
+
+Preferred behavior:
+- Default state: clean header, no visible search input.
+- Expanded state: search input appears below the header, above the listing content.
+- If the user types a search, keep the row open.
+- If the user clears/closes search, collapse the row unless a query is active.
+
+2. Listing page title logic
+Change the listing heading logic:
+- If no filters and no search query are active, show: “All Posters”
+- If any filter or search query is active, show: “Showing X posters”
+- Do not include selected filter names in the page title.
+- Keep the result count accurate based on current filtered products.
+
+3. Improve active filter display
+Current behavior lists selected filters as chips, which becomes messy when many filters are active.
+
+Change active filter display to a compact summary:
+- Show a maximum of 2 selected filter chips.
+- If more than 2 filters are selected, show a compact “+X more” item after the first two chips.
+- Keep “Clear all” visible when any filter/search is active.
+- Clicking individual visible chips should still remove that filter if current functionality supports it.
+- If implementing a popover/drawer for “+X more” is simple, make it show all active filters with remove actions.
+- If that is too much for this pass, “+X more” can be non-interactive or simple text, but structure the code so it can be upgraded later.
+- Make sure this looks good on mobile and does not wrap awkwardly.
+
+Example:
+Valencia ×   Andalusia ×   +3 more   Clear all
+
+4. Product card title/layout polish
+Improve product card readability:
+- Avoid overly aggressive truncation like “Cádiz — Lan...” or “Paella...”
+- Allow product titles to use up to 2 lines.
+- Keep the region/location label visible under the title.
+- Keep price aligned cleanly and consistently.
+- Preserve current product-card click behavior.
+- Do not change product data.
+
+5. Hover-only product CTA
+On desktop hover:
+- Add a subtle overlay or button saying “View poster”.
+- Keep it elegant and not too sales-heavy.
+- The CTA should only appear on hover/focus for desktop-style interactions.
+- On mobile, do not show a permanent CTA; the card should remain tappable.
+- Add keyboard/focus accessibility if practical, so the hover action is also visible on focus.
+
+6. Poster artwork first
+For listing cards:
+- Continue showing poster artwork as the primary image.
+- Do not switch listing cards to framed/mockup images in this pass.
+- Make sure image sizing/cropping remains consistent and premium-looking.
+- Avoid changing mockup/product-detail behavior unless necessary.
+
+7. Mobile behavior
+- Search row should appear below the header when search icon is tapped.
+- Filters should remain usable.
+- Active filters should not create a long messy row.
+- Product cards should remain clean and scroll-friendly.
+- Do not add horizontal scrolling for the main product grid.
+- If there are existing mobile filter patterns, preserve them unless small polish is needed.
+
+Design direction:
+- Premium curated poster shop, not marketplace-heavy.
+- Clean, calm, elegant.
+- Keep the cream background, serif headings, blue logo, and muted green/orange accent direction.
+- Avoid adding visual clutter.
+
+Testing/checks:
+- Verify desktop listing page:
+  - header search opens/closes
+  - search still filters products
+  - title changes between “All Posters” and “Showing X posters”
+  - filters still work
+  - active filters collapse after 2 chips
+  - product card titles are readable
+  - hover CTA appears
+- Verify mobile/responsive layout:
+  - header remains clean
+  - search row appears below header
+  - filters and sort still usable
+  - active filter summary does not overflow badly
+  - product cards remain tappable
+- Run only the minimal relevant checks available in the project, such as typecheck/lint/build if already configured and reasonably fast.
+
+Before making changes:
+- Inspect the current components for header, listing page, filter chips, search input, and product card.
+- Reuse existing components and styling as much as possible.
+- Keep the diff focused.
+
+After completing:
+- Report changed files.
+- Summarize the UX changes.
+- Mention any limitations or follow-up recommendations.
+- Do not commit or push unless explicitly asked.
