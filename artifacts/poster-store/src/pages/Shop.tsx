@@ -217,7 +217,7 @@ export default function Shop() {
               </h1>
               {/* Active filter chips */}
               {activeFilters.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2">
+                <div className="flex flex-wrap items-center gap-2 mt-2">
                   {activeFilters.map(f => (
                     <Badge
                       key={`${f.key}-${f.value}`}
@@ -236,6 +236,15 @@ export default function Shop() {
                       <X className="h-3 w-3" />
                     </Badge>
                   ))}
+                  {activeFilters.length > 1 && (
+                    <button
+                      onClick={clearAllFilters}
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors underline-offset-2 hover:underline"
+                      data-testid="btn-clear-all-filters"
+                    >
+                      Clear all
+                    </button>
+                  )}
                 </div>
               )}
             </div>
