@@ -73,6 +73,7 @@ export interface Poster {
   isNew?: boolean;
   status?: PosterStatus;
   createdAt: string;
+  primaryDisplayImageUrl?: string | null;
 }
 
 export interface PosterListResponse {

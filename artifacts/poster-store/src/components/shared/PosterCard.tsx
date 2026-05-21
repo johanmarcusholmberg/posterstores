@@ -40,6 +40,13 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
   }, [favoritedIds, poster.id]);
 
   useEffect(() => {
+    // If the list response already includes the primary display image, use it directly
+    const preloaded = (poster as any).primaryDisplayImageUrl as string | null | undefined;
+    if (preloaded) {
+      setDisplayImage(preloaded);
+      return;
+    }
+
     let cancelled = false;
     getPosterMockups(poster.id, store.storeKey)
       .then((mockups: PosterMockup[]) => {
@@ -55,7 +62,7 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [poster.id, poster.imageUrl, store.storeKey]);
+  }, [poster.id, poster.imageUrl, store.storeKey, (poster as any).primaryDisplayImageUrl]);
 
   const toggleFavorite = async (e: React.MouseEvent) => {
     e.preventDefault();

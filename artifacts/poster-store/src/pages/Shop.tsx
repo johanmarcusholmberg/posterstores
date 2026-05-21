@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useStorefront } from "@/context/StorefrontContext";
-import { useListPosters, getListPostersQueryKey } from "@workspace/api-client-react";
+import { useListPosters, getListPostersQueryKey, Poster } from "@workspace/api-client-react";
 import { PosterCard } from "@/components/shared/PosterCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { useLocation, useSearch } from "wouter";
-import { SlidersHorizontal, X, Check } from "lucide-react";
+import { SlidersHorizontal, X, Check, Search, Loader2 } from "lucide-react";
+
+const PAGE_LIMIT = 24;
 
 function FilterSidebar({
   store,
@@ -93,7 +95,7 @@ export default function Shop() {
   const store = useStorefront();
   const searchString = useSearch();
   const searchParams = new URLSearchParams(searchString);
-  const [location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   const regionFilters = useMemo(
@@ -109,7 +111,27 @@ export default function Shop() {
   const searchQuery = searchParams.get("search") || undefined;
   const sortFilter = (searchParams.get("sort") as any) || "newest";
 
-  const { data: listResponse, isLoading } = useListPosters(
+  // Search input local state with debounce
+  const [searchInputValue, setSearchInputValue] = useState(searchQuery ?? "");
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Keep input in sync when URL changes externally (e.g. chip removal)
+  useEffect(() => {
+    setSearchInputValue(searchQuery ?? "");
+  }, [searchQuery]);
+
+  // Pagination state
+  const [page, setPage] = useState(0);
+  const [accumulated, setAccumulated] = useState<Poster[]>([]);
+  const [grandTotal, setGrandTotal] = useState(0);
+
+  // Build a filter signature to detect when filters change
+  const filterSig = `${store.storeKey}|${regionFilters.join(",")}|${categoryFilters.join(",")}|${cityFilter ?? ""}|${tagFilter ?? ""}|${searchQuery ?? ""}|${sortFilter}`;
+  const prevFilterSig = useRef<string | null>(null);
+
+  const offset = page * PAGE_LIMIT;
+
+  const { data: pageData, isLoading, isFetching } = useListPosters(
     {
       storeKey: store.storeKey,
       region: regionFilters.length > 0 ? regionFilters.join(",") : undefined,
@@ -118,7 +140,8 @@ export default function Shop() {
       tag: tagFilter,
       search: searchQuery,
       sort: sortFilter,
-      limit: 50,
+      limit: PAGE_LIMIT,
+      offset,
     },
     {
       query: {
@@ -130,11 +153,58 @@ export default function Shop() {
           tag: tagFilter,
           search: searchQuery,
           sort: sortFilter,
-          limit: 50,
+          limit: PAGE_LIMIT,
+          offset,
         }),
       },
     }
   );
+
+  // Accumulate posters; reset when filter signature changes
+  useEffect(() => {
+    if (!pageData) return;
+    const isFilterChange = prevFilterSig.current !== null && prevFilterSig.current !== filterSig;
+    prevFilterSig.current = filterSig;
+    if (page === 0 || isFilterChange) {
+      setAccumulated(pageData.posters as Poster[]);
+    } else {
+      setAccumulated(prev => [...prev, ...(pageData.posters as Poster[])]);
+    }
+    setGrandTotal(pageData.total);
+  }, [pageData]);
+
+  // When the filter signature changes, reset to page 0
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    setPage(0);
+    setAccumulated([]);
+  }, [filterSig]);
+
+  const handleSearchChange = (value: string) => {
+    setSearchInputValue(value);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      const params = new URLSearchParams(searchString);
+      if (value) {
+        params.set("search", value);
+      } else {
+        params.delete("search");
+      }
+      setLocation(`/shop?${params.toString()}`);
+    }, 300);
+  };
+
+  const clearSearch = () => {
+    setSearchInputValue("");
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    const params = new URLSearchParams(searchString);
+    params.delete("search");
+    setLocation(`/shop?${params.toString()}`);
+  };
 
   const setFilter = (key: string, value: string | undefined) => {
     const params = new URLSearchParams(searchString);
@@ -190,6 +260,10 @@ export default function Shop() {
   if (tagFilter) activeFilters.push({ label: tagFilter, key: "tag", value: tagFilter });
   if (searchQuery) activeFilters.push({ label: `"${searchQuery}"`, key: "search", value: searchQuery });
 
+  const hasMore = accumulated.length < grandTotal;
+  const isLoadingFirstPage = isLoading || (isFetching && page === 0 && accumulated.length === 0);
+  const isLoadingMore = isFetching && page > 0;
+
   return (
     <div className="container mx-auto px-4 py-12">
       <div className="flex flex-col md:flex-row gap-8">
@@ -207,12 +281,35 @@ export default function Shop() {
 
         {/* Main Content */}
         <main className="flex-1">
+          {/* Search input */}
+          <div className="relative mb-5">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              type="text"
+              placeholder="Search posters…"
+              value={searchInputValue}
+              onChange={e => handleSearchChange(e.target.value)}
+              className="pl-9 pr-9"
+              data-testid="input-search"
+            />
+            {searchInputValue && (
+              <button
+                onClick={clearSearch}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Clear search"
+                data-testid="btn-clear-search"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
             <div>
               <h1 className="font-serif text-3xl font-bold text-foreground">
                 {headingLabel}
                 <span className="text-muted-foreground text-lg ml-2 font-sans font-normal">
-                  ({listResponse?.total || 0})
+                  ({grandTotal || pageData?.total || 0})
                 </span>
               </h1>
               {/* Active filter chips */}
@@ -277,7 +374,7 @@ export default function Shop() {
                   />
                   <div className="mt-8">
                     <Button className="w-full" onClick={() => setMobileFiltersOpen(false)} data-testid="btn-show-results">
-                      Show results ({listResponse?.total || 0})
+                      Show results ({grandTotal || pageData?.total || 0})
                     </Button>
                   </div>
                 </SheetContent>
@@ -297,13 +394,13 @@ export default function Shop() {
             </div>
           </div>
 
-          {isLoading ? (
+          {isLoadingFirstPage ? (
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
               {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
                 <div key={i} className="h-[190px] sm:aspect-[3/4] sm:h-auto bg-muted animate-pulse rounded-md" />
               ))}
             </div>
-          ) : listResponse?.posters.length === 0 ? (
+          ) : accumulated.length === 0 ? (
             <div className="text-center py-20 bg-muted/30 rounded-lg" data-testid="shop-empty-state">
               <h2 className="font-serif text-2xl font-bold text-foreground mb-2">No posters found</h2>
               <p className="text-muted-foreground mb-6 text-sm">
@@ -314,11 +411,35 @@ export default function Shop() {
               </Button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-              {listResponse?.posters.map(poster => (
-                <PosterCard key={poster.id} poster={poster} />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+                {accumulated.map(poster => (
+                  <PosterCard key={poster.id} poster={poster} />
+                ))}
+              </div>
+
+              {hasMore && (
+                <div className="mt-10 flex justify-center">
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    onClick={() => setPage(p => p + 1)}
+                    disabled={isLoadingMore}
+                    data-testid="btn-load-more"
+                    className="min-w-[160px]"
+                  >
+                    {isLoadingMore ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Loading…
+                      </>
+                    ) : (
+                      `Load more (${grandTotal - accumulated.length} remaining)`
+                    )}
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </main>
       </div>

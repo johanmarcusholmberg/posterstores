@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { postersTable, posterSizesTable } from "@workspace/db";
+import { postersTable, posterSizesTable, posterMockupsTable, mockupTemplatesTable } from "@workspace/db";
 import { eq, and, ilike, gte, lte, desc, asc, sql, inArray, ne } from "drizzle-orm";
 import {
   ListPostersQueryParams,
@@ -26,6 +26,37 @@ function serializePosterSize(s: typeof posterSizesTable.$inferSelect) {
     createdAt: s.createdAt.toISOString(),
     updatedAt: s.updatedAt.toISOString(),
   };
+}
+
+async function attachPrimaryDisplayImages(posters: { id: number; imageUrl: string }[]): Promise<Map<number, string | null>> {
+  const imageMap = new Map<number, string | null>();
+  if (posters.length === 0) return imageMap;
+
+  const ids = posters.map(p => p.id);
+
+  const primaryMockups = await db
+    .select({
+      posterId: posterMockupsTable.posterId,
+      mockupImageUrl: posterMockupsTable.mockupImageUrl,
+      templateId: posterMockupsTable.mockupTemplateId,
+      templateActive: mockupTemplatesTable.active,
+      previewThumbnailUrl: mockupTemplatesTable.previewThumbnailUrl,
+      backgroundImageUrl: mockupTemplatesTable.backgroundImageUrl,
+    })
+    .from(posterMockupsTable)
+    .leftJoin(mockupTemplatesTable, eq(posterMockupsTable.mockupTemplateId, mockupTemplatesTable.id))
+    .where(and(
+      inArray(posterMockupsTable.posterId, ids),
+      eq(posterMockupsTable.isPrimary, true)
+    ));
+
+  for (const m of primaryMockups) {
+    if (m.templateId !== null && m.templateActive === false) continue;
+    const url = m.mockupImageUrl ?? m.previewThumbnailUrl ?? m.backgroundImageUrl ?? null;
+    if (url) imageMap.set(m.posterId, url);
+  }
+
+  return imageMap;
 }
 
 async function attachSizesToPosters(
@@ -194,13 +225,19 @@ router.get("/posters", async (req, res) => {
   }
 
   const withSizes = await attachSizesToPosters(result, adminRequest);
+  const displayImageMap = await attachPrimaryDisplayImages(withSizes);
+
+  const postersWithDisplayImages = withSizes.map(p => ({
+    ...p,
+    primaryDisplayImageUrl: displayImageMap.get(p.id) ?? null,
+  }));
 
   if (tag) {
-    return res.json({ posters: withSizes, total: withSizes.length, offset, limit });
+    return res.json({ posters: postersWithDisplayImages, total: postersWithDisplayImages.length, offset, limit });
   }
 
   return res.json({
-    posters: withSizes,
+    posters: postersWithDisplayImages,
     total: Number(countResult[0]?.count ?? 0),
     offset,
     limit,

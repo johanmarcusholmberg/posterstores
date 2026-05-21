@@ -782,6 +782,9 @@ components:
           enum: [draft, published, archived]
         createdAt:
           type: string
+        primaryDisplayImageUrl:
+          type: string
+          nullable: true
       required: [id, storeKey, title, imageUrl, price, currency, category, createdAt]
 
     PosterListResponse:
