@@ -1,0 +1,43 @@
+Improve the poster store end-user shop experience with a small, low-risk UX/performance pass.
+
+Scope:
+1. Add a visible search input to the Shop page.
+   - The page already reads `search` from the URL.
+   - Render a clear “Search posters” input above/near the filter/sort controls.
+   - Sync input changes to `?search=...`.
+   - Debounce updates lightly if needed.
+   - Include an easy way to clear the search.
+   - Preserve existing region/category/tag/sort query params when search changes.
+
+2. Add a “Load more” or pagination improvement.
+   - Current list uses `limit: 50`.
+   - Do not silently hide posters beyond the first 50.
+   - Prefer a simple “Load more” button if the API supports offset/page params.
+   - If the API does not support it yet, inspect the existing API contract and add the smallest safe backend/client change needed.
+   - Keep current filters and sort working.
+
+3. Reduce PosterCard mockup-fetch performance cost.
+   - Currently every PosterCard fetches mockups individually.
+   - Investigate the cleanest low-risk fix.
+   - Prefer adding/using a primary display image in the list response if already available.
+   - Otherwise add a small batch endpoint or query strategy so the shop grid does not trigger one network request per card.
+   - Keep existing poster detail/mockup gallery behavior unchanged.
+
+Constraints:
+- Do not redesign the whole shop.
+- Do not change admin workflows unless required for data compatibility.
+- Do not create branches, PRs, or GitHub automation.
+- Do not commit or push yet.
+- Make changes only, then summarize files changed and ask me before committing.
+- Keep changes compatible with the existing pnpm monorepo and Replit setup.
+
+Validation:
+- Run the narrowest relevant checks:
+  - poster-store typecheck
+  - affected API/server typecheck if backend changes are made
+- Manually verify:
+  - Search updates URL and results.
+  - Clearing search works.
+  - Filters + sort + search work together.
+  - Load more/pagination keeps filters and sort.
+  - Shop grid does not create one mockup request per card anymore.
