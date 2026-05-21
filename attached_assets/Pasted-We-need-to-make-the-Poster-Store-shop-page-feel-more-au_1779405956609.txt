@@ -1,0 +1,131 @@
+We need to make the Poster Store shop page feel more authentic, curated, and less like a generic ecommerce template.
+
+Context:
+- Project: posterstores
+- Repo: https://github.com/johanmarcusholmberg/posterstores
+- Current active shop is PostersOfSpain.
+- Images are placeholders right now, so do NOT focus on image quality or replacing images.
+- Focus only on UX/content/layout improvements that make the shop feel like a real curated regional poster store.
+- Keep this as a focused frontend UX pass. Avoid backend/database/schema changes unless absolutely necessary.
+- Do not make broad architectural changes.
+
+Goals:
+1. Improve the Shop page experience so it feels more like a curated poster brand.
+2. Add stronger store identity and editorial content.
+3. Make filters feel more boutique/curated and less like a technical sidebar.
+4. Improve product cards with more authentic ecommerce details.
+5. Keep the page clean, responsive, and consistent with the existing design system.
+
+Please inspect the current implementation first, especially:
+- artifacts/poster-store/src/pages/Shop.tsx
+- product/poster card components used by the shop grid
+- filter/sidebar components used by the shop page
+- store/config files if store-specific text already exists
+
+Requested changes:
+
+1. Add an editorial shop intro above the product grid
+Add a compact intro block near the top of the shop content area, above the poster grid and near the “All Posters” heading.
+
+For PostersOfSpain, use copy similar to:
+Title/subtitle:
+“Posters inspired by Spain’s regions, cities and coastlines”
+
+Supporting text:
+“Curated wall art from Valencia, Andalucía, Madrid, Galicia and beyond — designed for warm, Mediterranean interiors.”
+
+Add 2–3 small trust/value notes, for example:
+- Premium matte paper
+- Multiple sizes available
+- Printed for modern homes
+
+Keep it elegant and not too large. It should improve authenticity without pushing products too far down.
+
+2. Improve product card metadata
+Update the shop product cards so they feel more like real poster products.
+
+Each card should show, where possible:
+- poster title
+- region/location
+- price/from price
+- small metadata line such as: “30×40 · 50×70 · A2”
+- small material/quality line such as: “Premium matte print”
+
+If real size data already exists, use it. If not, use a safe static display for now, but keep it easy to replace later.
+
+Do not clutter the card. The visual hierarchy should be:
+Title > region > price/sizes/material.
+
+Keep existing badges like NEW if present.
+
+3. Make sidebar labels feel more curated
+Rename or restyle the filter/sidebar copy so it feels less technical.
+
+Examples:
+- “Region” can become “Explore Spain”
+- “Categories” can become “Shop by style”
+- “All Regions” can become “All of Spain”
+- “All Categories” can become “All styles”
+
+Keep filter behavior exactly the same.
+
+Improve selected state slightly if appropriate:
+- less gray/admin-like
+- more brand-aligned
+- still accessible and clear
+
+4. Add one lightweight editorial collection banner between product rows
+Add a simple collection callout after the first row of products, if the grid has enough products.
+
+Example copy:
+Title:
+“Mediterranean Walls”
+
+Text:
+“Warm-toned prints inspired by Spanish streets, terraces and coastlines.”
+
+Optional CTA text:
+“Explore coastal posters”
+
+The CTA can either be decorative/no-op if routing is not ready, or link to an existing category/filter only if that is already easy and safe.
+
+Important:
+- Do not break pagination/filtering/sorting.
+- The banner should not appear in a confusing way when a user has active filters/search if that would feel irrelevant. Prefer showing it only on the default unfiltered shop view.
+
+5. Add or improve a small trust/announcement line in the header or shop area
+If there is already a place for a store announcement/trust bar, improve it.
+Otherwise add a subtle line in the shop intro area, not a global intrusive banner.
+
+Example:
+“Free EU shipping over €60 · Secure checkout · Printed on demand”
+
+Use only if it fits cleanly. Do not overdo it.
+
+Implementation constraints:
+- Keep the search behavior unchanged.
+- Do not touch checkout logic.
+- Do not touch admin pages.
+- Do not touch API/server code unless required by TypeScript imports.
+- Do not introduce new dependencies.
+- Maintain responsive behavior.
+- Keep TypeScript strictness and existing lint/style conventions.
+- Prefer small reusable components only if it makes the change cleaner.
+- Avoid over-engineering store-specific content. If there is already a store config pattern, use it. If not, keep the copy local and simple for now.
+
+Validation:
+After changes:
+- Run the relevant frontend checks/build if available, for example pnpm check, pnpm lint, pnpm build, or the project’s existing commands.
+- Manually verify:
+  - default /shop page
+  - filtered region/category state
+  - search results state
+  - mobile layout
+  - sort dropdown still works
+  - cart/favorites/search header behavior unchanged
+
+Deliverable:
+- Summarize files changed.
+- Explain what changed visually/UX-wise.
+- Mention any checks run and results.
+- Do not commit or push unless I explicitly ask.
