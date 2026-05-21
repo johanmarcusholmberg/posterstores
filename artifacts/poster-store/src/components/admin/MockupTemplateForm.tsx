@@ -197,6 +197,19 @@ export function MockupTemplateForm({
   const [borderRadius, setBorderRadius] = useState<string>(template?.borderRadius?.toString() ?? "0");
   const [shadowStrength, setShadowStrength] = useState<string>(template?.shadowStrength?.toString() ?? "0");
 
+  const [fitMode, setFitMode] = useState<string>(template?.fitMode ?? "cover");
+  const [shadowEnabled, setShadowEnabled] = useState<boolean>(template?.shadowEnabled ?? true);
+  const [shadowOpacity, setShadowOpacity] = useState<string>((template?.shadowOpacity ?? 0.4).toString());
+  const [shadowBlur, setShadowBlur] = useState<string>((template?.shadowBlur ?? 20).toString());
+  const [shadowOffsetX, setShadowOffsetX] = useState<string>((template?.shadowOffsetX ?? 2).toString());
+  const [shadowOffsetY, setShadowOffsetY] = useState<string>((template?.shadowOffsetY ?? 6).toString());
+  const [innerShadowEnabled, setInnerShadowEnabled] = useState<boolean>(template?.innerShadowEnabled ?? true);
+  const [innerShadowOpacity, setInnerShadowOpacity] = useState<string>((template?.innerShadowOpacity ?? 0.25).toString());
+  const [brightness, setBrightness] = useState<string>((template?.brightness ?? 0.94).toString());
+  const [contrast, setContrast] = useState<string>((template?.contrast ?? 0.97).toString());
+  const [saturation, setSaturation] = useState<string>((template?.saturation ?? 0.92).toString());
+  const [compositeBlur, setCompositeBlur] = useState<string>((template?.compositeBlur ?? 0).toString());
+
   const [analysisState, setAnalysisState] = useState<AnalysisState>("idle");
   const [analysisDescription, setAnalysisDescription] = useState<string>("");
 
@@ -601,6 +614,18 @@ export function MockupTemplateForm({
         rotation: rotation !== "" ? parseFloat(rotation) : undefined,
         borderRadius: borderRadius !== "" ? parseFloat(borderRadius) : undefined,
         shadowStrength: shadowStrength !== "" ? parseFloat(shadowStrength) : undefined,
+        fitMode,
+        shadowEnabled,
+        shadowOpacity: shadowOpacity !== "" ? parseFloat(shadowOpacity) : undefined,
+        shadowBlur: shadowBlur !== "" ? parseFloat(shadowBlur) : undefined,
+        shadowOffsetX: shadowOffsetX !== "" ? parseFloat(shadowOffsetX) : undefined,
+        shadowOffsetY: shadowOffsetY !== "" ? parseFloat(shadowOffsetY) : undefined,
+        innerShadowEnabled,
+        innerShadowOpacity: innerShadowOpacity !== "" ? parseFloat(innerShadowOpacity) : undefined,
+        brightness: brightness !== "" ? parseFloat(brightness) : undefined,
+        contrast: contrast !== "" ? parseFloat(contrast) : undefined,
+        saturation: saturation !== "" ? parseFloat(saturation) : undefined,
+        compositeBlur: compositeBlur !== "" ? parseFloat(compositeBlur) : undefined,
         sourceImageWidth: imgNaturalWidth ?? undefined,
         sourceImageHeight: imgNaturalHeight ?? undefined,
         ...(detectionMetadata
@@ -1225,7 +1250,7 @@ export function MockupTemplateForm({
               </div>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Shadow strength (0–1)</Label>
+              <Label className="text-xs">Shadow strength (0–1, legacy)</Label>
               <Input
                 type="number"
                 value={shadowStrength}
@@ -1234,6 +1259,109 @@ export function MockupTemplateForm({
                 className="h-8 text-sm"
                 min={0} max={1} step={0.1}
               />
+              <p className="text-[10px] text-muted-foreground/60">Legacy field — use Compositing section below for full control</p>
+            </div>
+          </div>
+
+          {/* Compositing section */}
+          <div className="space-y-3 rounded-md border p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">Compositing</p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs gap-1"
+                onClick={() => {
+                  setFitMode("cover");
+                  setShadowEnabled(true);
+                  setShadowOpacity("0.4");
+                  setShadowBlur("20");
+                  setShadowOffsetX("2");
+                  setShadowOffsetY("6");
+                  setInnerShadowEnabled(true);
+                  setInnerShadowOpacity("0.25");
+                  setBrightness("0.94");
+                  setContrast("0.97");
+                  setSaturation("0.92");
+                  setCompositeBlur("0");
+                }}
+              >
+                <RotateCcw className="w-3 h-3" />
+                Reset to defaults
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">Controls how the poster image is rendered over the background. Applied at display time — no re-upload needed.</p>
+
+            <div className="space-y-1">
+              <Label className="text-xs">Fit mode</Label>
+              <Select value={fitMode} onValueChange={setFitMode}>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cover">Cover (fill area, crop if needed)</SelectItem>
+                  <SelectItem value="contain">Contain (show full poster)</SelectItem>
+                  <SelectItem value="stretch">Stretch (exact fill, debug only)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex items-center justify-between rounded border px-2.5 py-2 col-span-2">
+                <Label className="text-xs font-medium">Drop shadow</Label>
+                <Switch checked={shadowEnabled} onCheckedChange={setShadowEnabled} />
+              </div>
+              {shadowEnabled && (
+                <>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-muted-foreground">Opacity</Label>
+                    <Input type="number" value={shadowOpacity} onChange={(e) => setShadowOpacity(e.target.value)} className="h-7 text-xs" min={0} max={1} step={0.05} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-muted-foreground">Blur (px)</Label>
+                    <Input type="number" value={shadowBlur} onChange={(e) => setShadowBlur(e.target.value)} className="h-7 text-xs" min={0} max={60} step={1} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-muted-foreground">Offset X (px)</Label>
+                    <Input type="number" value={shadowOffsetX} onChange={(e) => setShadowOffsetX(e.target.value)} className="h-7 text-xs" min={-30} max={30} step={1} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-muted-foreground">Offset Y (px)</Label>
+                    <Input type="number" value={shadowOffsetY} onChange={(e) => setShadowOffsetY(e.target.value)} className="h-7 text-xs" min={-30} max={30} step={1} />
+                  </div>
+                </>
+              )}
+
+              <div className="flex items-center justify-between rounded border px-2.5 py-2 col-span-2">
+                <Label className="text-xs font-medium">Inner shadow</Label>
+                <Switch checked={innerShadowEnabled} onCheckedChange={setInnerShadowEnabled} />
+              </div>
+              {innerShadowEnabled && (
+                <div className="space-y-1 col-span-2">
+                  <Label className="text-[11px] text-muted-foreground">Inner opacity</Label>
+                  <Input type="number" value={innerShadowOpacity} onChange={(e) => setInnerShadowOpacity(e.target.value)} className="h-7 text-xs" min={0} max={1} step={0.05} />
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1">
+                <Label className="text-[11px] text-muted-foreground">Brightness</Label>
+                <Input type="number" value={brightness} onChange={(e) => setBrightness(e.target.value)} className="h-7 text-xs" min={0.5} max={1.5} step={0.01} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[11px] text-muted-foreground">Contrast</Label>
+                <Input type="number" value={contrast} onChange={(e) => setContrast(e.target.value)} className="h-7 text-xs" min={0.5} max={1.5} step={0.01} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[11px] text-muted-foreground">Saturation</Label>
+                <Input type="number" value={saturation} onChange={(e) => setSaturation(e.target.value)} className="h-7 text-xs" min={0} max={2} step={0.01} />
+              </div>
+              <div className="space-y-1 col-span-3">
+                <Label className="text-[11px] text-muted-foreground">Blur (px, subtle softening)</Label>
+                <Input type="number" value={compositeBlur} onChange={(e) => setCompositeBlur(e.target.value)} className="h-7 text-xs" min={0} max={5} step={0.1} />
+              </div>
             </div>
           </div>
         </div>

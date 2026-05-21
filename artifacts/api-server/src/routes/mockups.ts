@@ -240,6 +240,18 @@ const ALLOWED_TEMPLATE_FIELDS = [
   "rotation",
   "borderRadius",
   "shadowStrength",
+  "fitMode",
+  "shadowEnabled",
+  "shadowOpacity",
+  "shadowBlur",
+  "shadowOffsetX",
+  "shadowOffsetY",
+  "innerShadowEnabled",
+  "innerShadowOpacity",
+  "brightness",
+  "contrast",
+  "saturation",
+  "compositeBlur",
   "detectionConfidence",
   "detectionDescription",
   "detectionSource",
@@ -421,6 +433,23 @@ router.post("/mockup-templates", requireAdmin, async (req, res) => {
       rotation: coercePlacementField(rest.rotation, "rotation") ?? null,
       borderRadius: coercePlacementField(rest.borderRadius, "borderRadius") ?? null,
       shadowStrength: coercePlacementField(rest.shadowStrength, "shadowStrength") ?? null,
+      fitMode: (() => {
+        const v = rest.fitMode;
+        if (v == null) return "cover";
+        if (!["cover", "contain", "stretch"].includes(v)) throw new Error(`fitMode must be 'cover', 'contain', or 'stretch', got: ${v}`);
+        return v;
+      })(),
+      shadowEnabled: rest.shadowEnabled ?? true,
+      shadowOpacity: coercePlacementField(rest.shadowOpacity, "shadowOpacity") ?? 0.4,
+      shadowBlur: coercePlacementField(rest.shadowBlur, "shadowBlur") ?? 20,
+      shadowOffsetX: coercePlacementField(rest.shadowOffsetX, "shadowOffsetX") ?? 2,
+      shadowOffsetY: coercePlacementField(rest.shadowOffsetY, "shadowOffsetY") ?? 6,
+      innerShadowEnabled: rest.innerShadowEnabled ?? true,
+      innerShadowOpacity: coercePlacementField(rest.innerShadowOpacity, "innerShadowOpacity") ?? 0.25,
+      brightness: coercePlacementField(rest.brightness, "brightness") ?? 0.94,
+      contrast: coercePlacementField(rest.contrast, "contrast") ?? 0.97,
+      saturation: coercePlacementField(rest.saturation, "saturation") ?? 0.92,
+      compositeBlur: coercePlacementField(rest.compositeBlur, "compositeBlur") ?? 0,
       detectedAt: coerceDate(rest.detectedAt) ?? null,
       sourceImageWidth: rest.sourceImageWidth != null ? Math.round(Number(rest.sourceImageWidth)) : null,
       sourceImageHeight: rest.sourceImageHeight != null ? Math.round(Number(rest.sourceImageHeight)) : null,
@@ -469,10 +498,30 @@ router.put("/mockup-templates/:id", requireAdmin, async (req, res) => {
         key === "rotation" ||
         key === "borderRadius" ||
         key === "shadowStrength" ||
+        key === "shadowOpacity" ||
+        key === "shadowBlur" ||
+        key === "shadowOffsetX" ||
+        key === "shadowOffsetY" ||
+        key === "innerShadowOpacity" ||
+        key === "brightness" ||
+        key === "contrast" ||
+        key === "saturation" ||
+        key === "compositeBlur" ||
         key === "detectionConfidence"
       ) {
         const coerced = coercePlacementField(req.body[key], key);
         if (coerced !== undefined) (updates as any)[key] = coerced;
+        continue;
+      }
+
+      if (key === "fitMode") {
+        const v = req.body[key];
+        if (v !== undefined) {
+          if (v !== null && !["cover", "contain", "stretch"].includes(v)) {
+            return res.status(400).json({ error: `fitMode must be 'cover', 'contain', or 'stretch', got: ${v}` });
+          }
+          (updates as any)[key] = v;
+        }
         continue;
       }
 
@@ -563,6 +612,18 @@ router.get("/posters/:id/mockups", async (req, res) => {
         rotation: mockupTemplatesTable.rotation,
         borderRadius: mockupTemplatesTable.borderRadius,
         shadowStrength: mockupTemplatesTable.shadowStrength,
+        fitMode: mockupTemplatesTable.fitMode,
+        shadowEnabled: mockupTemplatesTable.shadowEnabled,
+        shadowOpacity: mockupTemplatesTable.shadowOpacity,
+        shadowBlur: mockupTemplatesTable.shadowBlur,
+        shadowOffsetX: mockupTemplatesTable.shadowOffsetX,
+        shadowOffsetY: mockupTemplatesTable.shadowOffsetY,
+        innerShadowEnabled: mockupTemplatesTable.innerShadowEnabled,
+        innerShadowOpacity: mockupTemplatesTable.innerShadowOpacity,
+        brightness: mockupTemplatesTable.brightness,
+        contrast: mockupTemplatesTable.contrast,
+        saturation: mockupTemplatesTable.saturation,
+        compositeBlur: mockupTemplatesTable.compositeBlur,
       },
     })
     .from(posterMockupsTable)

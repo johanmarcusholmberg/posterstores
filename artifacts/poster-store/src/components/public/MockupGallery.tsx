@@ -53,6 +53,19 @@ interface CompositedMockupProps {
   className?: string;
 }
 
+function buildPosterFilter(t: PosterMockupTemplate): string | undefined {
+  const brightness = t.brightness ?? 0.94;
+  const contrast = t.contrast ?? 0.97;
+  const saturation = t.saturation ?? 0.92;
+  const blur = t.compositeBlur ?? 0;
+  const parts: string[] = [];
+  if (brightness !== 1) parts.push(`brightness(${brightness})`);
+  if (contrast !== 1) parts.push(`contrast(${contrast})`);
+  if (saturation !== 1) parts.push(`saturate(${saturation})`);
+  if (blur > 0) parts.push(`blur(${blur}px)`);
+  return parts.length > 0 ? parts.join(" ") : undefined;
+}
+
 function CompositedMockup({ backgroundUrl, posterImageUrl, template, alt, className }: CompositedMockupProps) {
   const [bgLoaded, setBgLoaded] = useState(false);
   const x = template.posterX!;
@@ -61,7 +74,26 @@ function CompositedMockup({ backgroundUrl, posterImageUrl, template, alt, classN
   const h = template.posterHeight!;
   const rot = template.rotation ?? 0;
   const br = template.borderRadius ?? 0;
-  const shadow = template.shadowStrength ?? 0;
+
+  const fitMode = template.fitMode ?? "cover";
+  const objectFit: React.CSSProperties["objectFit"] =
+    fitMode === "contain" ? "contain" : fitMode === "stretch" ? "fill" : "cover";
+
+  const shadowEnabled = template.shadowEnabled ?? true;
+  const shadowOpacity = template.shadowOpacity ?? 0.4;
+  const shadowBlur = template.shadowBlur ?? 20;
+  const shadowOffsetX = template.shadowOffsetX ?? 2;
+  const shadowOffsetY = template.shadowOffsetY ?? 6;
+
+  const innerShadowEnabled = template.innerShadowEnabled ?? true;
+  const innerShadowOpacity = template.innerShadowOpacity ?? 0.25;
+  const innerShadowBlur = Math.max(shadowBlur * 0.6, 8);
+
+  const posterFilter = buildPosterFilter(template);
+
+  const dropShadow = shadowEnabled
+    ? `drop-shadow(${shadowOffsetX}px ${shadowOffsetY}px ${shadowBlur}px rgba(0,0,0,${shadowOpacity}))`
+    : undefined;
 
   return (
     <div className={cn("relative w-full h-full", className)}>
@@ -80,25 +112,39 @@ function CompositedMockup({ backgroundUrl, posterImageUrl, template, alt, classN
       />
       {bgLoaded && (
         <div
-          className="absolute overflow-hidden"
+          className="absolute"
           style={{
             left: `${x}%`,
             top: `${y}%`,
             width: `${w}%`,
             height: `${h}%`,
             transform: rot ? `rotate(${rot}deg)` : undefined,
-            borderRadius: br ? `${br}px` : undefined,
-            boxShadow: shadow > 0
-              ? `0 ${shadow * 20}px ${shadow * 40}px rgba(0,0,0,${shadow * 0.5})`
-              : undefined,
+            filter: dropShadow,
           }}
         >
-          <img
-            src={posterImageUrl}
-            alt={alt}
-            className="w-full h-full object-cover"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-          />
+          <div
+            className="relative w-full h-full overflow-hidden"
+            style={{
+              borderRadius: br ? `${br}px` : undefined,
+            }}
+          >
+            <img
+              src={posterImageUrl}
+              alt={alt}
+              className="w-full h-full"
+              style={{ objectFit, filter: posterFilter, display: "block" }}
+              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+            />
+            {innerShadowEnabled && (
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  borderRadius: br ? `${br}px` : undefined,
+                  boxShadow: `inset 0 0 ${innerShadowBlur}px rgba(0,0,0,${innerShadowOpacity})`,
+                }}
+              />
+            )}
+          </div>
         </div>
       )}
     </div>

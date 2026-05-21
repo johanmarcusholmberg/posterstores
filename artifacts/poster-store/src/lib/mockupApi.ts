@@ -25,6 +25,18 @@ export interface MockupTemplate {
   rotation: number | null;
   borderRadius: number | null;
   shadowStrength: number | null;
+  fitMode: string | null;
+  shadowEnabled: boolean | null;
+  shadowOpacity: number | null;
+  shadowBlur: number | null;
+  shadowOffsetX: number | null;
+  shadowOffsetY: number | null;
+  innerShadowEnabled: boolean | null;
+  innerShadowOpacity: number | null;
+  brightness: number | null;
+  contrast: number | null;
+  saturation: number | null;
+  compositeBlur: number | null;
   detectionConfidence: number | null;
   detectionDescription: string | null;
   detectionSource: string | null;
@@ -57,6 +69,18 @@ export interface PosterMockupTemplate {
   rotation: number | null;
   borderRadius: number | null;
   shadowStrength: number | null;
+  fitMode: string | null;
+  shadowEnabled: boolean | null;
+  shadowOpacity: number | null;
+  shadowBlur: number | null;
+  shadowOffsetX: number | null;
+  shadowOffsetY: number | null;
+  innerShadowEnabled: boolean | null;
+  innerShadowOpacity: number | null;
+  brightness: number | null;
+  contrast: number | null;
+  saturation: number | null;
+  compositeBlur: number | null;
 }
 
 export interface PosterMockup {
