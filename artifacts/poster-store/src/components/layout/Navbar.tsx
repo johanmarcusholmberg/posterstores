@@ -76,7 +76,6 @@ export const Navbar = () => {
   };
 
   const closeSearch = () => {
-    // Only collapse if no active query
     setSearchInputValue("");
     setSearchOpen(false);
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);

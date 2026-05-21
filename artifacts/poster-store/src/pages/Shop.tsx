@@ -268,14 +268,12 @@ export default function Shop() {
                     </span>
                   </>
                 ) : (
-                  <>
-                    All Posters
-                    <span className="text-muted-foreground text-lg ml-2 font-sans font-normal">
-                      ({total})
-                    </span>
-                  </>
+                  "All Posters"
                 )}
               </h1>
+              {!hasAnyFilter && total > 0 && (
+                <p className="text-sm text-muted-foreground mt-1">{total} posters</p>
+              )}
 
               {/* Compact active filter chips */}
               {activeFilters.length > 0 && (
