@@ -158,9 +158,17 @@ router.get("/posters", async (req, res) => {
     conditions.push(eq(postersTable.status, "published"));
   }
 
-  if (region) conditions.push(eq(postersTable.region, region));
+  if (region) {
+    const regionValues = region.split(",").map(v => v.trim()).filter(Boolean);
+    if (regionValues.length === 1) conditions.push(eq(postersTable.region, regionValues[0]));
+    else if (regionValues.length > 1) conditions.push(inArray(postersTable.region, regionValues));
+  }
   if (city) conditions.push(eq(postersTable.city, city));
-  if (category) conditions.push(eq(postersTable.category, category));
+  if (category) {
+    const categoryValues = category.split(",").map(v => v.trim()).filter(Boolean);
+    if (categoryValues.length === 1) conditions.push(eq(postersTable.category, categoryValues[0]));
+    else if (categoryValues.length > 1) conditions.push(inArray(postersTable.category, categoryValues));
+  }
   if (search) conditions.push(ilike(postersTable.title, `%${search}%`));
   if (minPrice !== undefined) conditions.push(gte(postersTable.price, String(minPrice)));
   if (maxPrice !== undefined) conditions.push(lte(postersTable.price, String(maxPrice)));

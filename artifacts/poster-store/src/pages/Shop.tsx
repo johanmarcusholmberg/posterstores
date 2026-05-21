@@ -8,22 +8,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { useLocation, useSearch } from "wouter";
-import { SlidersHorizontal, X } from "lucide-react";
+import { SlidersHorizontal, X, Check } from "lucide-react";
 
 function FilterSidebar({
   store,
-  regionFilter,
-  categoryFilter,
-  setFilter,
+  regionFilters,
+  categoryFilters,
+  toggleFilter,
+  clearSection,
   clearAllFilters,
 }: {
   store: ReturnType<typeof useStorefront>;
-  regionFilter: string | undefined;
-  categoryFilter: string | undefined;
-  setFilter: (key: string, value: string | undefined) => void;
+  regionFilters: string[];
+  categoryFilters: string[];
+  toggleFilter: (key: string, value: string) => void;
+  clearSection: (key: string) => void;
   clearAllFilters: () => void;
 }) {
-  const hasFilters = !!(regionFilter || categoryFilter);
+  const hasFilters = regionFilters.length > 0 || categoryFilters.length > 0;
 
   return (
     <div className="space-y-8">
@@ -31,18 +33,19 @@ function FilterSidebar({
         <h3 className="font-serif font-bold text-lg mb-4">Region</h3>
         <div className="space-y-1">
           <button
-            className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${!regionFilter ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted text-foreground"}`}
-            onClick={() => setFilter("region", undefined)}
+            className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${regionFilters.length === 0 ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted text-foreground"}`}
+            onClick={() => clearSection("region")}
           >
             All Regions
           </button>
           {store.regions.map(region => (
             <button
               key={region}
-              className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${regionFilter === region ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted text-foreground"}`}
-              onClick={() => setFilter("region", region)}
+              className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors flex items-center justify-between gap-2 ${regionFilters.includes(region) ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted text-foreground"}`}
+              onClick={() => toggleFilter("region", region)}
             >
-              {region}
+              <span>{region}</span>
+              {regionFilters.includes(region) && <Check className="h-3.5 w-3.5 shrink-0" />}
             </button>
           ))}
         </div>
@@ -53,18 +56,19 @@ function FilterSidebar({
           <h3 className="font-serif font-bold text-lg mb-4">Categories</h3>
           <div className="space-y-1">
             <button
-              className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${!categoryFilter ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted text-foreground"}`}
-              onClick={() => setFilter("category", undefined)}
+              className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${categoryFilters.length === 0 ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted text-foreground"}`}
+              onClick={() => clearSection("category")}
             >
               All Categories
             </button>
             {store.categories.map(category => (
               <button
                 key={category}
-                className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${categoryFilter === category ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted text-foreground"}`}
-                onClick={() => setFilter("category", category)}
+                className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors flex items-center justify-between gap-2 ${categoryFilters.includes(category) ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted text-foreground"}`}
+                onClick={() => toggleFilter("category", category)}
               >
-                {category}
+                <span>{category}</span>
+                {categoryFilters.includes(category) && <Check className="h-3.5 w-3.5 shrink-0" />}
               </button>
             ))}
           </div>
@@ -92,9 +96,15 @@ export default function Shop() {
   const [location, setLocation] = useLocation();
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
-  const regionFilter = searchParams.get("region") || undefined;
+  const regionFilters = useMemo(
+    () => searchParams.get("region")?.split(",").map(v => v.trim()).filter(Boolean) ?? [],
+    [searchString]
+  );
+  const categoryFilters = useMemo(
+    () => searchParams.get("category")?.split(",").map(v => v.trim()).filter(Boolean) ?? [],
+    [searchString]
+  );
   const cityFilter = searchParams.get("city") || undefined;
-  const categoryFilter = searchParams.get("category") || undefined;
   const tagFilter = searchParams.get("tag") || undefined;
   const searchQuery = searchParams.get("search") || undefined;
   const sortFilter = (searchParams.get("sort") as any) || "newest";
@@ -102,9 +112,9 @@ export default function Shop() {
   const { data: listResponse, isLoading } = useListPosters(
     {
       storeKey: store.storeKey,
-      region: regionFilter,
+      region: regionFilters.length > 0 ? regionFilters.join(",") : undefined,
       city: cityFilter,
-      category: categoryFilter,
+      category: categoryFilters.length > 0 ? categoryFilters.join(",") : undefined,
       tag: tagFilter,
       search: searchQuery,
       sort: sortFilter,
@@ -114,9 +124,9 @@ export default function Shop() {
       query: {
         queryKey: getListPostersQueryKey({
           storeKey: store.storeKey,
-          region: regionFilter,
+          region: regionFilters.length > 0 ? regionFilters.join(",") : undefined,
           city: cityFilter,
-          category: categoryFilter,
+          category: categoryFilters.length > 0 ? categoryFilters.join(",") : undefined,
           tag: tagFilter,
           search: searchQuery,
           sort: sortFilter,
@@ -138,17 +148,47 @@ export default function Shop() {
     setMobileFiltersOpen(false);
   };
 
+  const toggleFilter = (key: string, value: string) => {
+    const params = new URLSearchParams(searchString);
+    const current = params.get(key)?.split(",").map(v => v.trim()).filter(Boolean) ?? [];
+    const idx = current.indexOf(value);
+    const next = idx >= 0 ? current.filter((_, i) => i !== idx) : [...current, value];
+    if (next.length === 0) {
+      params.delete(key);
+    } else {
+      params.set(key, next.join(","));
+    }
+    setLocation(`/shop?${params.toString()}`);
+    window.scrollTo({ top: 0, behavior: "instant" });
+  };
+
+  const clearSection = (key: string) => {
+    const params = new URLSearchParams(searchString);
+    params.delete(key);
+    setLocation(`/shop?${params.toString()}`);
+    window.scrollTo({ top: 0, behavior: "instant" });
+  };
+
   const clearAllFilters = () => {
     setLocation("/shop");
     window.scrollTo({ top: 0, behavior: "instant" });
     setMobileFiltersOpen(false);
   };
 
-  const activeFilters: { label: string; key: string }[] = [];
-  if (regionFilter) activeFilters.push({ label: regionFilter, key: "region" });
-  if (categoryFilter) activeFilters.push({ label: categoryFilter, key: "category" });
-  if (tagFilter) activeFilters.push({ label: tagFilter, key: "tag" });
-  if (searchQuery) activeFilters.push({ label: `"${searchQuery}"`, key: "search" });
+  const headingLabel = useMemo(() => {
+    const parts: string[] = [];
+    if (categoryFilters.length === 1) parts.push(categoryFilters[0]);
+    else if (categoryFilters.length > 1) parts.push(`${categoryFilters.length} Categories`);
+    if (regionFilters.length === 1) parts.push(regionFilters[0]);
+    else if (regionFilters.length > 1) parts.push(`${regionFilters.length} Regions`);
+    return parts.length > 0 ? parts.join(" · ") : "All Posters";
+  }, [categoryFilters, regionFilters]);
+
+  const activeFilters: { label: string; key: string; value: string }[] = [];
+  regionFilters.forEach(r => activeFilters.push({ label: r, key: "region", value: r }));
+  categoryFilters.forEach(c => activeFilters.push({ label: c, key: "category", value: c }));
+  if (tagFilter) activeFilters.push({ label: tagFilter, key: "tag", value: tagFilter });
+  if (searchQuery) activeFilters.push({ label: `"${searchQuery}"`, key: "search", value: searchQuery });
 
   return (
     <div className="container mx-auto px-4 py-12">
@@ -157,9 +197,10 @@ export default function Shop() {
         <aside className="hidden md:block w-64 shrink-0">
           <FilterSidebar
             store={store}
-            regionFilter={regionFilter}
-            categoryFilter={categoryFilter}
-            setFilter={setFilter}
+            regionFilters={regionFilters}
+            categoryFilters={categoryFilters}
+            toggleFilter={toggleFilter}
+            clearSection={clearSection}
             clearAllFilters={clearAllFilters}
           />
         </aside>
@@ -169,7 +210,7 @@ export default function Shop() {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
             <div>
               <h1 className="font-serif text-3xl font-bold text-foreground">
-                {categoryFilter || regionFilter || "All Posters"}
+                {headingLabel}
                 <span className="text-muted-foreground text-lg ml-2 font-sans font-normal">
                   ({listResponse?.total || 0})
                 </span>
@@ -179,11 +220,17 @@ export default function Shop() {
                 <div className="flex flex-wrap gap-2 mt-2">
                   {activeFilters.map(f => (
                     <Badge
-                      key={f.key}
+                      key={`${f.key}-${f.value}`}
                       variant="secondary"
                       className="flex items-center gap-1 cursor-pointer hover:bg-secondary/80 pr-1.5"
-                      onClick={() => setFilter(f.key, undefined)}
-                      data-testid={`filter-chip-${f.key}`}
+                      onClick={() => {
+                        if (f.key === "region" || f.key === "category") {
+                          toggleFilter(f.key, f.value);
+                        } else {
+                          setFilter(f.key, undefined);
+                        }
+                      }}
+                      data-testid={`filter-chip-${f.key}-${f.value}`}
                     >
                       {f.label}
                       <X className="h-3 w-3" />
@@ -213,9 +260,10 @@ export default function Shop() {
                   </SheetHeader>
                   <FilterSidebar
                     store={store}
-                    regionFilter={regionFilter}
-                    categoryFilter={categoryFilter}
-                    setFilter={setFilter}
+                    regionFilters={regionFilters}
+                    categoryFilters={categoryFilters}
+                    toggleFilter={toggleFilter}
+                    clearSection={clearSection}
                     clearAllFilters={clearAllFilters}
                   />
                   <div className="mt-8">
