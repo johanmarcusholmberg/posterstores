@@ -95,6 +95,7 @@ export const posterMockupsTable = pgTable("poster_mockups", {
   mockupImageUrl: text("mockup_image_url"),
   sortOrder: integer("sort_order").default(0).notNull(),
   isPrimary: boolean("is_primary").default(false).notNull(),
+  isHoverMockup: boolean("is_hover_mockup").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

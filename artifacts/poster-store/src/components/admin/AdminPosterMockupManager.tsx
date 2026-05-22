@@ -8,6 +8,7 @@ import {
   type PosterMockup,
   type BatchMockupItem,
 } from "@/lib/mockupApi";
+
 import { type AdminPoster } from "@/lib/adminApi";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ import {
   Globe,
   Store,
   ImagePlus,
+  MousePointerClick,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +42,7 @@ interface DraftMockup {
   mockupTemplateId: number | null;
   mockupImageUrl: string | null;
   isPrimary: boolean;
+  isHoverMockup: boolean;
   sortOrder: number;
   templateName?: string;
   templateFrameType?: string;
@@ -77,6 +80,7 @@ export const AdminPosterMockupManager = ({
         mockupTemplateId: m.mockupTemplateId,
         mockupImageUrl: m.mockupImageUrl,
         isPrimary: m.isPrimary,
+        isHoverMockup: m.isHoverMockup,
         sortOrder: m.sortOrder,
         templateName: m.template?.name ?? undefined,
         templateFrameType: m.template?.frameType ?? undefined,
@@ -108,6 +112,7 @@ export const AdminPosterMockupManager = ({
       mockupTemplateId: template.id,
       mockupImageUrl: null,
       isPrimary: drafts.length === 0,
+      isHoverMockup: false,
       sortOrder: drafts.length,
       templateName: template.name,
       templateFrameType: template.frameType,
@@ -142,6 +147,12 @@ export const AdminPosterMockupManager = ({
     );
   };
 
+  const setHoverInDraft = (key: string) => {
+    setDrafts((prev) =>
+      prev.map((d) => ({ ...d, isHoverMockup: d.key === key ? !d.isHoverMockup : false }))
+    );
+  };
+
   const addCustomUrl = () => {
     const url = customUrl.trim();
     if (!url) return;
@@ -150,6 +161,7 @@ export const AdminPosterMockupManager = ({
       mockupTemplateId: null,
       mockupImageUrl: url,
       isPrimary: drafts.length === 0,
+      isHoverMockup: false,
       sortOrder: drafts.length,
       templateName: "Custom image",
       previewUrl: url,
@@ -180,6 +192,7 @@ export const AdminPosterMockupManager = ({
         mockupImageUrl: d.mockupImageUrl,
         sortOrder: d.sortOrder,
         isPrimary: d.isPrimary,
+        isHoverMockup: d.isHoverMockup,
       }));
       await adminSavePosterMockupsBatch(poster.id, storeKey, items);
       toast({ title: "Mockups saved" });
@@ -403,6 +416,12 @@ export const AdminPosterMockupManager = ({
                         </p>
                       )}
                       {draft.isPrimary && <PrimaryMockupBadge />}
+                      {draft.isHoverMockup && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+                          <MousePointerClick className="w-2.5 h-2.5" />
+                          Hover
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0">
@@ -412,13 +431,29 @@ export const AdminPosterMockupManager = ({
                         size="icon"
                         className="h-7 w-7"
                         onClick={() => setPrimary(draft.key)}
-                        title="Set as primary"
+                        title="Set as primary display image"
                         data-testid={`set-primary-${idx}`}
                       >
                         <Star
                           className={cn(
                             "w-3.5 h-3.5",
                             draft.isPrimary && "fill-white"
+                          )}
+                        />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={draft.isHoverMockup ? "secondary" : "ghost"}
+                        size="icon"
+                        className={cn("h-7 w-7", draft.isHoverMockup && "ring-1 ring-amber-400")}
+                        onClick={() => setHoverInDraft(draft.key)}
+                        title={draft.isHoverMockup ? "Clear shop hover mockup" : "Set as shop card hover image"}
+                        data-testid={`set-hover-${idx}`}
+                      >
+                        <MousePointerClick
+                          className={cn(
+                            "w-3.5 h-3.5",
+                            draft.isHoverMockup ? "text-amber-500" : "text-muted-foreground"
                           )}
                         />
                       </Button>

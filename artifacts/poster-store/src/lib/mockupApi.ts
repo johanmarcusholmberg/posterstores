@@ -90,6 +90,7 @@ export interface PosterMockup {
   mockupImageUrl: string | null;
   sortOrder: number;
   isPrimary: boolean;
+  isHoverMockup: boolean;
   createdAt: string;
   template: PosterMockupTemplate | null;
 }
@@ -99,6 +100,7 @@ export interface BatchMockupItem {
   mockupImageUrl?: string | null;
   sortOrder?: number;
   isPrimary?: boolean;
+  isHoverMockup?: boolean;
 }
 
 function jsonHeaders(): HeadersInit {
@@ -277,6 +279,38 @@ export async function adminSetPrimaryMockup(
   );
   if (!res.ok) await handleError(res);
   return res.json();
+}
+
+export async function adminSetHoverMockup(
+  posterId: number,
+  mockupId: number,
+  storeKey: string
+): Promise<PosterMockup> {
+  const res = await fetch(
+    `${BASE}/posters/${posterId}/mockups/${mockupId}/hover?storeKey=${encodeURIComponent(storeKey)}`,
+    {
+      method: "PATCH",
+      headers: jsonHeaders(),
+      credentials: "include",
+    }
+  );
+  if (!res.ok) await handleError(res);
+  return res.json();
+}
+
+export async function adminClearHoverMockup(
+  posterId: number,
+  storeKey: string
+): Promise<void> {
+  const res = await fetch(
+    `${BASE}/posters/${posterId}/mockups/0/hover/clear?storeKey=${encodeURIComponent(storeKey)}`,
+    {
+      method: "PATCH",
+      headers: jsonHeaders(),
+      credentials: "include",
+    }
+  );
+  if (!res.ok) await handleError(res);
 }
 
 export async function adminDeletePosterMockup(

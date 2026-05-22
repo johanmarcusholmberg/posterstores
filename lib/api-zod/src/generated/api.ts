@@ -75,6 +75,7 @@ export const ListPostersResponse = zod.object({
       status: zod.enum(["draft", "published", "archived"]).optional(),
       createdAt: zod.string(),
       primaryDisplayImageUrl: zod.string().nullish(),
+      hoverDisplayImageUrl: zod.string().nullish(),
     }),
   ),
   total: zod.number(),
@@ -168,6 +169,7 @@ export const GetPosterResponse = zod.object({
   status: zod.enum(["draft", "published", "archived"]).optional(),
   createdAt: zod.string(),
   primaryDisplayImageUrl: zod.string().nullish(),
+  hoverDisplayImageUrl: zod.string().nullish(),
 });
 
 /**
@@ -252,6 +254,7 @@ export const UpdatePosterResponse = zod.object({
   status: zod.enum(["draft", "published", "archived"]).optional(),
   createdAt: zod.string(),
   primaryDisplayImageUrl: zod.string().nullish(),
+  hoverDisplayImageUrl: zod.string().nullish(),
 });
 
 /**
@@ -380,6 +383,7 @@ export const GetCartResponse = zod.object({
           status: zod.enum(["draft", "published", "archived"]).optional(),
           createdAt: zod.string(),
           primaryDisplayImageUrl: zod.string().nullish(),
+          hoverDisplayImageUrl: zod.string().nullish(),
         })
         .optional(),
       posterSize: zod
@@ -463,6 +467,7 @@ export const AddCartItemResponse = zod.object({
           status: zod.enum(["draft", "published", "archived"]).optional(),
           createdAt: zod.string(),
           primaryDisplayImageUrl: zod.string().nullish(),
+          hoverDisplayImageUrl: zod.string().nullish(),
         })
         .optional(),
       posterSize: zod
@@ -545,6 +550,7 @@ export const UpdateCartItemResponse = zod.object({
           status: zod.enum(["draft", "published", "archived"]).optional(),
           createdAt: zod.string(),
           primaryDisplayImageUrl: zod.string().nullish(),
+          hoverDisplayImageUrl: zod.string().nullish(),
         })
         .optional(),
       posterSize: zod
@@ -623,6 +629,7 @@ export const RemoveCartItemResponse = zod.object({
           status: zod.enum(["draft", "published", "archived"]).optional(),
           createdAt: zod.string(),
           primaryDisplayImageUrl: zod.string().nullish(),
+          hoverDisplayImageUrl: zod.string().nullish(),
         })
         .optional(),
       posterSize: zod
@@ -693,6 +700,7 @@ export const GetFavoritesResponseItem = zod.object({
   status: zod.enum(["draft", "published", "archived"]).optional(),
   createdAt: zod.string(),
   primaryDisplayImageUrl: zod.string().nullish(),
+  hoverDisplayImageUrl: zod.string().nullish(),
 });
 export const GetFavoritesResponse = zod.array(GetFavoritesResponseItem);
 
@@ -741,6 +749,7 @@ export const AddFavoriteResponseItem = zod.object({
   status: zod.enum(["draft", "published", "archived"]).optional(),
   createdAt: zod.string(),
   primaryDisplayImageUrl: zod.string().nullish(),
+  hoverDisplayImageUrl: zod.string().nullish(),
 });
 export const AddFavoriteResponse = zod.array(AddFavoriteResponseItem);
 
@@ -789,6 +798,7 @@ export const RemoveFavoriteResponseItem = zod.object({
   status: zod.enum(["draft", "published", "archived"]).optional(),
   createdAt: zod.string(),
   primaryDisplayImageUrl: zod.string().nullish(),
+  hoverDisplayImageUrl: zod.string().nullish(),
 });
 export const RemoveFavoriteResponse = zod.array(RemoveFavoriteResponseItem);
 
@@ -1125,6 +1135,7 @@ export const GetFeaturedPostersResponseItem = zod.object({
   status: zod.enum(["draft", "published", "archived"]).optional(),
   createdAt: zod.string(),
   primaryDisplayImageUrl: zod.string().nullish(),
+  hoverDisplayImageUrl: zod.string().nullish(),
 });
 export const GetFeaturedPostersResponse = zod.array(
   GetFeaturedPostersResponseItem,
@@ -1174,5 +1185,6 @@ export const GetNewArrivalsResponseItem = zod.object({
   status: zod.enum(["draft", "published", "archived"]).optional(),
   createdAt: zod.string(),
   primaryDisplayImageUrl: zod.string().nullish(),
+  hoverDisplayImageUrl: zod.string().nullish(),
 });
 export const GetNewArrivalsResponse = zod.array(GetNewArrivalsResponseItem);

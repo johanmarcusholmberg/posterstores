@@ -610,6 +610,7 @@ router.get("/posters/:id/mockups", async (req, res) => {
       mockupImageUrl: posterMockupsTable.mockupImageUrl,
       sortOrder: posterMockupsTable.sortOrder,
       isPrimary: posterMockupsTable.isPrimary,
+      isHoverMockup: posterMockupsTable.isHoverMockup,
       createdAt: posterMockupsTable.createdAt,
       template: {
         id: mockupTemplatesTable.id,
@@ -668,12 +669,19 @@ router.post("/posters/:id/mockups", requireAdmin, async (req, res) => {
 
   if (!poster) return res.status(404).json({ error: "Poster not found or store mismatch" });
 
-  const { mockupTemplateId, mockupImageUrl, sortOrder, isPrimary } = req.body;
+  const { mockupTemplateId, mockupImageUrl, sortOrder, isPrimary, isHoverMockup } = req.body;
 
   if (isPrimary) {
     await db
       .update(posterMockupsTable)
       .set({ isPrimary: false, updatedAt: new Date() })
+      .where(eq(posterMockupsTable.posterId, posterId));
+  }
+
+  if (isHoverMockup) {
+    await db
+      .update(posterMockupsTable)
+      .set({ isHoverMockup: false, updatedAt: new Date() })
       .where(eq(posterMockupsTable.posterId, posterId));
   }
 
@@ -685,6 +693,7 @@ router.post("/posters/:id/mockups", requireAdmin, async (req, res) => {
       mockupImageUrl: mockupImageUrl ?? null,
       sortOrder: sortOrder ?? 0,
       isPrimary: isPrimary ?? false,
+      isHoverMockup: isHoverMockup ?? false,
     })
     .returning();
 
@@ -719,6 +728,7 @@ router.put("/posters/:id/mockups/batch", requireAdmin, async (req, res) => {
       mockupImageUrl: m.mockupImageUrl ?? null,
       sortOrder: m.sortOrder ?? idx,
       isPrimary: hasPrimary ? (m.isPrimary ?? false) : idx === 0,
+      isHoverMockup: m.isHoverMockup ?? false,
     }));
 
     await db.insert(posterMockupsTable).values(toInsert);
@@ -732,6 +742,7 @@ router.put("/posters/:id/mockups/batch", requireAdmin, async (req, res) => {
       mockupImageUrl: posterMockupsTable.mockupImageUrl,
       sortOrder: posterMockupsTable.sortOrder,
       isPrimary: posterMockupsTable.isPrimary,
+      isHoverMockup: posterMockupsTable.isHoverMockup,
       template: {
         id: mockupTemplatesTable.id,
         name: mockupTemplatesTable.name,
@@ -760,6 +771,58 @@ router.put("/posters/:id/mockups/batch", requireAdmin, async (req, res) => {
     .orderBy(asc(posterMockupsTable.sortOrder), asc(posterMockupsTable.id));
 
   return res.json(result);
+});
+
+router.patch("/posters/:id/mockups/:mockupId/hover", requireAdmin, async (req, res) => {
+  const posterId = Number(req.params.id);
+  const mockupId = Number(req.params.mockupId);
+  if (isNaN(posterId) || isNaN(mockupId)) return res.status(400).json({ error: "Invalid id" });
+
+  const storeKey =
+    typeof req.query.storeKey === "string" ? req.query.storeKey : undefined;
+  if (!storeKey) return res.status(400).json({ error: "storeKey is required" });
+
+  const [poster] = await db
+    .select()
+    .from(postersTable)
+    .where(and(eq(postersTable.id, posterId), eq(postersTable.storeKey, storeKey)));
+  if (!poster) return res.status(404).json({ error: "Poster not found or store mismatch" });
+
+  await db
+    .update(posterMockupsTable)
+    .set({ isHoverMockup: false, updatedAt: new Date() })
+    .where(eq(posterMockupsTable.posterId, posterId));
+
+  const [updated] = await db
+    .update(posterMockupsTable)
+    .set({ isHoverMockup: true, updatedAt: new Date() })
+    .where(and(eq(posterMockupsTable.id, mockupId), eq(posterMockupsTable.posterId, posterId)))
+    .returning();
+
+  if (!updated) return res.status(404).json({ error: "Mockup not found" });
+  return res.json(updated);
+});
+
+router.patch("/posters/:id/mockups/:mockupId/hover/clear", requireAdmin, async (req, res) => {
+  const posterId = Number(req.params.id);
+  if (isNaN(posterId)) return res.status(400).json({ error: "Invalid id" });
+
+  const storeKey =
+    typeof req.query.storeKey === "string" ? req.query.storeKey : undefined;
+  if (!storeKey) return res.status(400).json({ error: "storeKey is required" });
+
+  const [poster] = await db
+    .select()
+    .from(postersTable)
+    .where(and(eq(postersTable.id, posterId), eq(postersTable.storeKey, storeKey)));
+  if (!poster) return res.status(404).json({ error: "Poster not found or store mismatch" });
+
+  await db
+    .update(posterMockupsTable)
+    .set({ isHoverMockup: false, updatedAt: new Date() })
+    .where(eq(posterMockupsTable.posterId, posterId));
+
+  return res.json({ ok: true });
 });
 
 router.patch("/posters/:id/mockups/:mockupId/primary", requireAdmin, async (req, res) => {

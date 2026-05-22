@@ -714,9 +714,11 @@ components:
           type: integer
         isPrimary:
           type: boolean
+        isHoverMockup:
+          type: boolean
         createdAt:
           type: string
-      required: [id, posterId, sortOrder, isPrimary, createdAt]
+      required: [id, posterId, sortOrder, isPrimary, isHoverMockup, createdAt]
 
     SavePosterSizesBody:
       type: object
@@ -783,6 +785,9 @@ components:
         createdAt:
           type: string
         primaryDisplayImageUrl:
+          type: string
+          nullable: true
+        hoverDisplayImageUrl:
           type: string
           nullable: true
       required: [id, storeKey, title, imageUrl, price, currency, category, createdAt]

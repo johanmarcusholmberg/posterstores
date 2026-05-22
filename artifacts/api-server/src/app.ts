@@ -13,6 +13,7 @@ import { migrateUserAuth } from "./lib/migrateUserAuth";
 import { migrateShipping } from "./lib/migrateShipping";
 import { migrateMockupPlacement } from "./lib/migrateMockupPlacement";
 import { migrateCompositingSettings } from "./lib/migrateCompositingSettings";
+import { migrateHoverMockup } from "./lib/migrateHoverMockup";
 import { seedPostsofSpain } from "./lib/seedPostsofSpain";
 
 const app: Express = express();
@@ -99,6 +100,7 @@ migrateSlugField()
   .then(() => migrateShipping())
   .then(() => migrateMockupPlacement())
   .then(() => migrateCompositingSettings())
+  .then(() => migrateHoverMockup())
   .then(() => seedMockupTemplates())
   .catch((err) =>
     logger.error(err, "Failed to run startup migrations")

@@ -36,6 +36,7 @@ export interface PosterMockup {
   mockupImageUrl?: string | null;
   sortOrder: number;
   isPrimary: boolean;
+  isHoverMockup: boolean;
   createdAt: string;
 }
 
@@ -74,6 +75,7 @@ export interface Poster {
   status?: PosterStatus;
   createdAt: string;
   primaryDisplayImageUrl?: string | null;
+  hoverDisplayImageUrl?: string | null;
 }
 
 export interface PosterListResponse {

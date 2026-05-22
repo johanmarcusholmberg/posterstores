@@ -59,6 +59,37 @@ async function attachPrimaryDisplayImages(posters: { id: number; imageUrl: strin
   return imageMap;
 }
 
+async function attachHoverDisplayImages(posters: { id: number }[]): Promise<Map<number, string | null>> {
+  const imageMap = new Map<number, string | null>();
+  if (posters.length === 0) return imageMap;
+
+  const ids = posters.map(p => p.id);
+
+  const hoverMockups = await db
+    .select({
+      posterId: posterMockupsTable.posterId,
+      mockupImageUrl: posterMockupsTable.mockupImageUrl,
+      templateId: posterMockupsTable.mockupTemplateId,
+      templateActive: mockupTemplatesTable.active,
+      previewThumbnailUrl: mockupTemplatesTable.previewThumbnailUrl,
+      backgroundImageUrl: mockupTemplatesTable.backgroundImageUrl,
+    })
+    .from(posterMockupsTable)
+    .leftJoin(mockupTemplatesTable, eq(posterMockupsTable.mockupTemplateId, mockupTemplatesTable.id))
+    .where(and(
+      inArray(posterMockupsTable.posterId, ids),
+      eq(posterMockupsTable.isHoverMockup, true)
+    ));
+
+  for (const m of hoverMockups) {
+    if (m.templateId !== null && m.templateActive === false) continue;
+    const url = m.mockupImageUrl ?? m.previewThumbnailUrl ?? m.backgroundImageUrl ?? null;
+    if (url) imageMap.set(m.posterId, url);
+  }
+
+  return imageMap;
+}
+
 async function attachSizesToPosters(
   posters: (typeof postersTable.$inferSelect)[],
   adminRequest: boolean
@@ -225,11 +256,15 @@ router.get("/posters", async (req, res) => {
   }
 
   const withSizes = await attachSizesToPosters(result, adminRequest);
-  const displayImageMap = await attachPrimaryDisplayImages(withSizes);
+  const [displayImageMap, hoverImageMap] = await Promise.all([
+    attachPrimaryDisplayImages(withSizes),
+    attachHoverDisplayImages(withSizes),
+  ]);
 
   const postersWithDisplayImages = withSizes.map(p => ({
     ...p,
     primaryDisplayImageUrl: displayImageMap.get(p.id) ?? null,
+    hoverDisplayImageUrl: hoverImageMap.get(p.id) ?? null,
   }));
 
   if (tag) {
