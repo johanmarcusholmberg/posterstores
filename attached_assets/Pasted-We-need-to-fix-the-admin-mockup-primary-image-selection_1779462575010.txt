@@ -1,0 +1,143 @@
+We need to fix the admin mockup/primary image selection logic so the poster’s own image can be used as the primary shop image, and mockups are only optional alternatives.
+
+Context:
+- Project: posterstores
+- Repo: https://github.com/johanmarcusholmberg/posterstores
+- Active shop: PostersOfSpain
+- Recent work added hover mockups using poster_mockups.is_hover_mockup.
+- Current issue: when selecting mockups and primary image in admin, there is no option to keep/use the poster image itself as the primary image. One mockup is always pre-selected as the primary image.
+- Desired behavior: the poster’s own image should be a valid primary image option. Mockups should be optional alternatives, not mandatory.
+- The primary image shown in the shop grid should default to the poster’s own image unless the admin explicitly chooses a mockup as primary.
+
+Please inspect:
+- artifacts/poster-store/src/components/admin/AdminMockupEditor.tsx
+- artifacts/poster-store/src/components/admin/AdminPosterMockupManager.tsx
+- artifacts/poster-store/src/lib/mockupApi.ts
+- artifacts/poster-store/src/components/shared/PosterCard.tsx
+- artifacts/api-server/src/routes/posters.ts
+- artifacts/api-server/src/routes/mockups.ts
+- lib/db/src/schema/mockups.ts
+- poster image fields such as primaryDisplayImageUrl, original poster image URL, generated image URL, or similar
+- existing mockup fields such as isPrimary, isFeatured, isHoverMockup
+
+Goal:
+Admins must be able to choose either:
+1. the poster image itself as the primary shop image, or
+2. one of the poster mockups as the primary shop image.
+
+Mockups should never be forced as primary.
+
+Expected behavior:
+
+1. Default primary image should be the poster image
+If no poster_mockups row is marked isPrimary=true for a poster:
+- the API should use the poster’s own image as primaryDisplayImageUrl
+- the shop card should show the poster image by default
+- hoverDisplayImageUrl can still use the selected hover mockup if one exists
+
+2. Admin UI should show “Poster image” as a selectable primary option
+In the admin mockup selection UI, add a clear option/card for the poster’s own image.
+
+Suggested label:
+“Poster image”
+or
+“Original poster”
+
+This option should:
+- show the poster’s own image thumbnail
+- be selectable as the primary shop image
+- show an active/selected state when no mockup is selected as primary
+- clear any mockup isPrimary flags when selected
+- not affect hover mockup selection unless intentionally changed
+
+3. Mockup primary selection should be optional
+If the admin chooses a mockup as primary:
+- that mockup becomes isPrimary=true
+- other mockups for the same poster become isPrimary=false
+- shop primaryDisplayImageUrl uses that mockup image
+
+If the admin chooses “Poster image”:
+- all mockups for that poster should have isPrimary=false
+- shop primaryDisplayImageUrl falls back to the poster’s own image
+
+4. Keep hover mockup separate
+The selected hover mockup is independent from the selected primary image.
+
+Important:
+- A mockup can be selected as hover image without being primary.
+- A mockup can be selected as primary without being hover image.
+- The poster image can be primary while a mockup appears on hover.
+- Clearing/changing primary should not clear hover unless the existing data model requires it, which it should not.
+
+5. Add/adjust API endpoints if needed
+If current endpoints only allow setting a mockup as primary, add a way to clear primary mockup selection for a poster.
+
+Possible endpoint:
+PATCH /admin/posters/:id/mockups/primary/clear
+
+Or reuse an existing batch save endpoint if cleaner.
+
+Requirements:
+- Store scoping must remain respected.
+- Only admin routes should change.
+- Use existing auth/admin protection patterns.
+- Do not add a new poster-table field unless absolutely necessary.
+- Prefer representing “poster image is primary” as “no poster mockup has isPrimary=true”.
+
+6. Fix automatic preselection
+If any frontend code automatically preselects the first mockup as primary when mockups exist, remove that behavior.
+
+Do not auto-mark any mockup as primary just because it exists.
+
+7. Preserve shop card behavior
+The simplified shop card should remain:
+- default image = primaryDisplayImageUrl
+- hover image = hoverDisplayImageUrl if present
+- text = category, title, From €X only
+- no location/sizes/material lines
+
+8. Preserve existing admin mockup features
+Do not break:
+- upload/edit/delete mockups
+- batch save
+- placement/manual adjustment
+- isFeatured
+- isHoverMockup
+- hover mockup badge/button
+- mockup preview thumbnails
+
+Constraints:
+- Keep changes focused.
+- Do not redesign the entire admin page.
+- Avoid broad database changes.
+- Do not introduce dependencies.
+- Keep TypeScript clean.
+- Do not commit or push unless I explicitly ask.
+
+Validation:
+Run relevant checks, including:
+pnpm --filter @workspace/poster-store run typecheck
+
+If API/OpenAPI/client code changes:
+- update OpenAPI if needed
+- regenerate clients if that is the project pattern
+- run API/server typecheck/build if available
+
+Manual verification:
+- poster with no mockups: shop card uses poster image
+- poster with mockups but no primary mockup: shop card still uses poster image
+- admin shows “Poster image” as selected primary in that state
+- choose a mockup as primary: shop card uses mockup as default image
+- choose “Poster image” again: shop card goes back to poster image
+- choose hover mockup while poster image is primary: shop default is poster image, hover swaps to mockup
+- choose same/different mockup as hover and primary: behavior remains predictable
+- no automatic primary mockup selection occurs
+- filters/search/sort/card navigation still work
+
+Deliverable:
+- Summarize files changed.
+- Explain how “Poster image” primary selection works.
+- Explain how primary and hover mockup selections remain independent.
+- Mention whether API/database changes were required.
+- Mention checks run and results.
+- Do not commit or push.
