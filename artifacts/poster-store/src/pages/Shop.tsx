@@ -188,6 +188,46 @@ function CollectionBanner({
   );
 }
 
+function HiddenFiltersPopover({
+  hiddenFilters,
+  onRemove,
+}: {
+  hiddenFilters: { label: string; key: string; value: string }[];
+  onRemove: (f: { label: string; key: string; value: string }) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  return (
+    <div
+      ref={ref}
+      className="relative"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      data-testid="filter-chips-overflow"
+    >
+      <span className="text-xs text-muted-foreground bg-muted hover:bg-muted/80 rounded-full px-2.5 py-1 font-medium select-none cursor-pointer transition-colors">
+        +{hiddenFilters.length} more
+      </span>
+
+      {open && (
+        <div className="absolute left-0 top-full mt-1.5 z-50 bg-background border border-border rounded-lg shadow-lg p-2 flex flex-col gap-1 min-w-[140px]">
+          {hiddenFilters.map(f => (
+            <button
+              key={`${f.key}-${f.value}`}
+              onClick={() => onRemove(f)}
+              className="flex items-center justify-between gap-3 text-xs text-foreground hover:bg-muted/60 rounded px-2.5 py-1.5 text-left w-full transition-colors group"
+            >
+              <span>{f.label}</span>
+              <X className="h-3 w-3 text-muted-foreground group-hover:text-foreground shrink-0" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Shop() {
   const store = useStorefront();
   const searchString = useSearch();
@@ -402,13 +442,16 @@ export default function Shop() {
                     </Badge>
                   ))}
                   {hiddenCount > 0 && (
-                    <span
-                      className="text-xs text-muted-foreground bg-muted rounded-full px-2.5 py-1 font-medium select-none"
-                      title={activeFilters.slice(CHIP_LIMIT).map(f => f.label).join(", ")}
-                      data-testid="filter-chips-overflow"
-                    >
-                      +{hiddenCount} more
-                    </span>
+                    <HiddenFiltersPopover
+                      hiddenFilters={activeFilters.slice(CHIP_LIMIT)}
+                      onRemove={(f) => {
+                        if (f.key === "region" || f.key === "category") {
+                          toggleFilter(f.key, f.value);
+                        } else {
+                          setFilter(f.key, undefined);
+                        }
+                      }}
+                    />
                   )}
                   <button
                     onClick={clearAllFilters}
