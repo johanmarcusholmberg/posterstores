@@ -612,14 +612,18 @@ export async function adminGetLaunchChecklist(
 
 export async function adminUploadStoreLogo(
   storeKey: string,
-  objectPath: string,
+  file: File,
   logoAltText?: string
 ): Promise<{ logoUrl: string; logoStoragePath: string; logoAltText: string | null }> {
+  const form = new FormData();
+  form.append("logo", file);
+  if (logoAltText !== undefined) form.append("logoAltText", logoAltText);
+
   const res = await fetch(`${BASE}/admin/stores/${encodeURIComponent(storeKey)}/logo`, {
     method: "POST",
-    headers: jsonHeaders(),
     credentials: "include",
-    body: JSON.stringify({ objectPath, logoAltText }),
+    body: form,
+    // Do NOT set Content-Type — browser sets it with the multipart boundary automatically
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));

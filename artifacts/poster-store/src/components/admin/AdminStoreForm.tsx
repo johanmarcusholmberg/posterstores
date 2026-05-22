@@ -225,6 +225,7 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
     if (!file) return;
     setLogoError("");
 
+    // Client-side pre-checks (server enforces the same rules)
     if (!ALLOWED_LOGO_TYPES.includes(file.type)) {
       setLogoError("Please upload a PNG, JPEG, or WebP image.");
       if (logoFileInputRef.current) logoFileInputRef.current.value = "";
@@ -238,26 +239,8 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
 
     setLogoUploading(true);
     try {
-      const urlRes = await fetch("/api/storage/uploads/request-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
-      });
-      if (!urlRes.ok) {
-        const body = await urlRes.json().catch(() => ({}));
-        throw new Error((body as any).error ?? "Failed to get upload URL");
-      }
-      const { uploadURL, objectPath } = await urlRes.json() as { uploadURL: string; objectPath: string };
-
-      const putRes = await fetch(uploadURL, {
-        method: "PUT",
-        body: file,
-        headers: { "Content-Type": file.type },
-      });
-      if (!putRes.ok) throw new Error("File upload failed");
-
-      const result = await adminUploadStoreLogo(existing!.storeKey, objectPath, logoAltText || undefined);
+      // Send file directly to backend — server validates MIME/size and uploads to storage
+      const result = await adminUploadStoreLogo(existing!.storeKey, file, logoAltText || undefined);
       setLogoUrl(result.logoUrl);
       toast({ title: "Logo uploaded", description: "Store logo has been updated." });
     } catch (err: unknown) {

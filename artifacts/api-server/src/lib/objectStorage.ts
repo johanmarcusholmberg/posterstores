@@ -189,6 +189,25 @@ export class ObjectStorageService {
     return normalizedPath;
   }
 
+  /**
+   * Upload a Buffer directly to the private object dir at the given sub-path.
+   * subPath must NOT start with '/'. Example: "store-assets/postsofspain/logo/1234-logo.png"
+   * Returns the normalised objectPath: "/objects/store-assets/postsofspain/logo/1234-logo.png"
+   */
+  async uploadBuffer(
+    subPath: string,
+    buffer: Buffer,
+    contentType: string
+  ): Promise<string> {
+    const privateObjectDir = this.getPrivateObjectDir();
+    const fullPath = `${privateObjectDir}/${subPath}`;
+    const { bucketName, objectName } = parseObjectPath(fullPath);
+    const bucket = objectStorageClient.bucket(bucketName);
+    const file = bucket.file(objectName);
+    await file.save(buffer, { contentType, resumable: false });
+    return `/objects/${subPath}`;
+  }
+
   async canAccessObjectEntity({
     userId,
     objectFile,

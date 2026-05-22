@@ -6,6 +6,22 @@ import { requireAdmin } from "../middleware/requireAdmin";
 import { adminLimiter } from "../middleware/rateLimiter";
 import { z } from "zod";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
+import multer from "multer";
+
+const ALLOWED_LOGO_MIME_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const MAX_LOGO_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB
+
+const logoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_LOGO_SIZE_BYTES, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_LOGO_MIME_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only PNG, JPEG, or WebP images are allowed for store logos"));
+    }
+  },
+});
 
 const objectStorageService = new ObjectStorageService();
 
@@ -327,50 +343,84 @@ router.put("/admin/stores/:storeKey", requireAdmin, async (req, res) => {
   return res.json(serializeStore(updated));
 });
 
-// POST /api/admin/stores/:storeKey/logo — upload/replace store logo
-router.post("/admin/stores/:storeKey/logo", requireAdmin, async (req, res) => {
-  const storeKey = String(req.params.storeKey);
+// POST /api/admin/stores/:storeKey/logo — multipart file upload; validates MIME+size server-side
+router.post(
+  "/admin/stores/:storeKey/logo",
+  requireAdmin,
+  (req, res, next) => {
+    logoUpload.single("logo")(req, res, (err) => {
+      if (err) {
+        if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
+          res.status(413).json({ error: "Logo must be under 2 MB" });
+          return;
+        }
+        res.status(400).json({ error: (err as Error).message ?? "File upload error" });
+        return;
+      }
+      next();
+    });
+  },
+  async (req, res) => {
+    const storeKey = String(req.params.storeKey);
 
-  const [store] = await db
-    .select()
-    .from(storesTable)
-    .where(eq(storesTable.storeKey, storeKey))
-    .limit(1);
+    const [store] = await db
+      .select()
+      .from(storesTable)
+      .where(eq(storesTable.storeKey, storeKey))
+      .limit(1);
 
-  if (!store) {
-    return res.status(404).json({ error: "Store not found" });
-  }
-
-  const { objectPath, logoAltText } = req.body as { objectPath?: string; logoAltText?: string };
-
-  if (!objectPath || typeof objectPath !== "string" || !objectPath.startsWith("/objects/")) {
-    return res.status(400).json({ error: "A valid objectPath (starting with /objects/) is required" });
-  }
-
-  if (store.logoStoragePath && store.logoStoragePath !== objectPath) {
-    try {
-      const oldFile = await objectStorageService.getObjectEntityFile(store.logoStoragePath);
-      await oldFile.delete();
-    } catch (err) {
-      req.log.warn({ err }, "Failed to delete previous store logo from storage, continuing");
+    if (!store) {
+      return res.status(404).json({ error: "Store not found" });
     }
+
+    const file = (req as any).file as Express.Multer.File | undefined;
+    if (!file) {
+      return res.status(400).json({ error: "A logo file is required (field name: logo)" });
+    }
+
+    // Double-check MIME type (fileFilter already checked, but belt-and-suspenders)
+    if (!ALLOWED_LOGO_MIME_TYPES.includes(file.mimetype)) {
+      return res.status(400).json({ error: "Only PNG, JPEG, or WebP images are allowed" });
+    }
+
+    // Build a deterministic, sanitized storage path
+    const ext = file.mimetype === "image/png" ? "png" : file.mimetype === "image/webp" ? "webp" : "jpg";
+    const sanitizedName = file.originalname
+      .replace(/[^a-zA-Z0-9._-]/g, "_")
+      .replace(/\s+/g, "_")
+      .slice(0, 80);
+    const subPath = `store-assets/${storeKey}/logo/${Date.now()}-${sanitizedName}.${ext}`;
+
+    // Delete previous logo from storage if there is one
+    if (store.logoStoragePath) {
+      try {
+        const oldFile = await objectStorageService.getObjectEntityFile(store.logoStoragePath);
+        await oldFile.delete();
+      } catch (err) {
+        req.log.warn({ err }, "Failed to delete previous store logo from storage, continuing");
+      }
+    }
+
+    let objectPath: string;
+    try {
+      objectPath = await objectStorageService.uploadBuffer(subPath, file.buffer, file.mimetype);
+    } catch (err) {
+      req.log.error({ err }, "Failed to upload store logo to object storage");
+      return res.status(500).json({ error: "Failed to upload logo to storage" });
+    }
+
+    const logoUrl = `/api/storage${objectPath}`;
+    const logoAltText = typeof req.body.logoAltText === "string" ? req.body.logoAltText || null : store.logoAltText;
+
+    const [updated] = await db
+      .update(storesTable)
+      .set({ logoUrl, logoStoragePath: objectPath, logoAltText, updatedAt: new Date() })
+      .where(eq(storesTable.storeKey, storeKey))
+      .returning();
+
+    return res.json({ logoUrl: updated.logoUrl, logoStoragePath: updated.logoStoragePath, logoAltText: updated.logoAltText });
   }
-
-  const logoUrl = `/api/storage${objectPath}`;
-
-  const [updated] = await db
-    .update(storesTable)
-    .set({
-      logoUrl,
-      logoStoragePath: objectPath,
-      logoAltText: typeof logoAltText === "string" ? logoAltText || null : store.logoAltText,
-      updatedAt: new Date(),
-    })
-    .where(eq(storesTable.storeKey, storeKey))
-    .returning();
-
-  return res.json({ logoUrl: updated.logoUrl, logoStoragePath: updated.logoStoragePath, logoAltText: updated.logoAltText });
-});
+);
 
 // DELETE /api/admin/stores/:storeKey/logo — remove store logo
 router.delete("/admin/stores/:storeKey/logo", requireAdmin, async (req, res) => {
