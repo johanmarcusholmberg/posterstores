@@ -107,24 +107,51 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
 
   return (
     <>
-      <Link href={href} className="group block" data-testid={`link-poster-${poster.id}`}>
-        <div className="relative h-[190px] sm:h-auto sm:aspect-[3/4] overflow-hidden bg-muted rounded-md mb-1.5 sm:mb-2 shadow-sm group-hover:shadow-md transition-shadow">
+      <Link
+        href={href}
+        className="group block rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        data-testid={`link-poster-${poster.id}`}
+      >
+        {/*
+          Image container — styled to evoke a physical print:
+          warm paper background, restrained corners, layered print shadow,
+          subtle lift on hover.
+        */}
+        <div
+          className={[
+            "relative h-[190px] sm:h-auto sm:aspect-[3/4] overflow-hidden",
+            "bg-[#f4f0eb]",
+            "rounded-sm",
+            "mb-2 sm:mb-3",
+            "shadow-[0_1px_3px_rgba(0,0,0,0.07),0_2px_10px_rgba(0,0,0,0.05)]",
+            "group-hover:shadow-[0_4px_18px_rgba(0,0,0,0.11),0_1px_4px_rgba(0,0,0,0.07)]",
+            "group-hover:-translate-y-px",
+            "transition-[box-shadow,transform] duration-300 ease-out",
+          ].join(" ")}
+        >
           <img
             src={displayImage}
             alt={poster.title}
-            className="object-cover w-full h-full transition-transform duration-500 group-hover:scale-105"
+            className="object-cover w-full h-full transition-transform duration-500 ease-out group-hover:scale-[1.03]"
             data-testid={`img-poster-${poster.id}`}
             onError={(e) => {
               (e.target as HTMLImageElement).src = poster.imageUrl;
             }}
           />
+
+          {/* Subtle inset ring — gives the image a "print edge" depth cue */}
+          <div
+            className="absolute inset-0 ring-1 ring-inset ring-black/[0.07] rounded-sm pointer-events-none"
+            aria-hidden="true"
+          />
+
           {poster.isNew && (
             <div className="absolute top-2 left-2 bg-secondary text-secondary-foreground text-xs font-bold px-2 py-1 rounded">
               NEW
             </div>
           )}
 
-          {/* Hover CTA — desktop only, hidden on touch devices */}
+          {/* Hover CTA — desktop only */}
           <div
             className="absolute inset-x-0 bottom-0 hidden sm:flex items-end justify-center pb-4 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-200 pointer-events-none"
             aria-hidden="true"
@@ -137,7 +164,7 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
           <Button
             variant="ghost"
             size="icon"
-            className="absolute top-2 right-2 bg-white/50 backdrop-blur hover:bg-white/80 rounded-full"
+            className="absolute top-2 right-2 bg-white/50 backdrop-blur hover:bg-white/80 rounded-full transition-colors"
             onClick={toggleFavorite}
             disabled={isPending}
             aria-label={isFavorite ? "Remove from wishlist" : "Add to wishlist"}

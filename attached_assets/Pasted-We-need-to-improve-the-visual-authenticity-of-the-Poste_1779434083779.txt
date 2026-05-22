@@ -1,0 +1,127 @@
+We need to improve the visual authenticity of the Poster Store shop grid and poster image containers.
+
+Context:
+- Project: posterstores
+- Repo: https://github.com/johanmarcusholmberg/posterstores
+- Active shop: PostersOfSpain
+- Current /shop page layout is good and should not be broadly redesigned.
+- Product card information hierarchy is now good and should mostly be preserved.
+- Images are placeholders right now, so do NOT focus on replacing images or image quality.
+- Focus on making the grid and image containers feel more like a real poster shop and less like a generic product catalog.
+
+Please inspect:
+- artifacts/poster-store/src/pages/Shop.tsx
+- artifacts/poster-store/src/components/shared/PosterCard.tsx
+- any image/mockup-related components or utilities
+- existing Tailwind/design tokens
+- existing responsive grid behavior
+
+Goals:
+1. Make the poster grid feel more like a curated poster shop.
+2. Make each card image area feel more like a physical print/poster product.
+3. Add subtle visual polish without making the design busy.
+4. Preserve all existing shopping/filtering behavior.
+
+Requested changes:
+
+1. Improve the poster image container
+Update the image area inside PosterCard so it feels more like a poster/print presentation.
+
+Ideas to implement carefully:
+- use a warm off-white/paper-like background behind the image
+- add a subtle inner border or paper edge
+- add a very light shadow or depth effect around the poster image
+- keep rounded corners restrained and premium, not app-like
+- make the image feel like a print sitting inside a product frame/container
+- keep hover interaction subtle, for example a very slight image scale or lift
+
+Important:
+- Do not overdo shadows.
+- Do not add fake frames around every poster unless it looks elegant.
+- The result should feel clean, Scandinavian/poster-shop inspired, not heavy.
+- Maintain existing aspect ratio and image loading behavior.
+
+2. Add subtle product-shop visual rhythm to the grid
+The grid should feel less like a database of cards and more like a curated poster shop.
+
+Consider small visual refinements such as:
+- slightly improved card spacing
+- softer card background treatment
+- more intentional hover state
+- consistent image-to-text spacing
+- subtle transition effects
+- slightly more premium borders/dividers if already aligned with the design system
+
+Do not add large editorial blocks above the first poster row. The shop should stay poster-focused.
+
+3. Add optional variation without breaking the grid
+If safe and simple, add very subtle visual variation that makes the grid feel more alive, for example:
+- some products can use a slightly different warm neutral image background based on category/region
+- or use one consistent premium paper background for all cards
+
+Only do this if it remains clean and deterministic. Avoid random styling that changes on every render.
+
+4. Preserve current product card information hierarchy
+Keep the recent improvements:
+- category micro-label
+- title with 2-line clamp
+- location
+- sizes from poster.posterSizes[].sizeLabel
+- “Premium matte print”
+- bottom price line using lowestActivePrice
+- existing badges such as NEW
+- existing favorite/cart/click behavior
+
+Do not reintroduce the old price placement next to the title.
+
+5. Improve perceived ecommerce quality
+Review the card hover/focus states.
+
+The card should feel clickable and shoppable:
+- accessible focus state
+- subtle hover state on desktop
+- no distracting movement on mobile
+- image area and text should still feel connected as one product card
+
+6. Keep responsive behavior stable
+Check:
+- desktop grid
+- tablet grid
+- mobile one-column/two-column behavior, depending on current design
+- long titles
+- posters with many sizes
+- posters with no size data
+- placeholder/missing image fallback
+
+Do not make the cards much taller than they are now. The first row should still be visible without unnecessary scrolling.
+
+Constraints:
+- Frontend only.
+- Do not touch backend/API/database.
+- Do not change search, filters, sorting, cart, favorites, or product detail routing.
+- Do not introduce new dependencies.
+- Keep changes localized, preferably mostly in PosterCard and minimal Shop grid styling if needed.
+- Maintain existing TypeScript/design conventions.
+- Avoid broad refactors.
+- Do not commit or push unless I explicitly ask.
+
+Validation:
+Run the relevant frontend typecheck/build command, for example:
+pnpm --filter @workspace/poster-store run typecheck
+
+Manually verify:
+- default /shop
+- filtered region/category views
+- search results view
+- mobile layout
+- hover/focus states
+- card click behavior
+- favorites/cart behavior if present
+- products with and without size data
+
+Deliverable:
+- Summarize files changed.
+- Explain what changed visually.
+- Explain how the grid now feels more like a poster shop.
+- Mention checks run and results.
+- Do not commit or push.
