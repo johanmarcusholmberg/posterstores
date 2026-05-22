@@ -291,7 +291,6 @@ export default function Shop() {
       params.delete(key);
     }
     setLocation(`/shop?${params.toString()}`);
-    window.scrollTo({ top: 0, behavior: "instant" });
     setMobileFiltersOpen(false);
   };
 
@@ -306,19 +305,16 @@ export default function Shop() {
       params.set(key, next.join(","));
     }
     setLocation(`/shop?${params.toString()}`);
-    window.scrollTo({ top: 0, behavior: "instant" });
   };
 
   const clearSection = (key: string) => {
     const params = new URLSearchParams(searchString);
     params.delete(key);
     setLocation(`/shop?${params.toString()}`);
-    window.scrollTo({ top: 0, behavior: "instant" });
   };
 
   const clearAllFilters = () => {
     setLocation("/shop");
-    window.scrollTo({ top: 0, behavior: "instant" });
     setMobileFiltersOpen(false);
   };
 
@@ -351,7 +347,6 @@ export default function Shop() {
     const params = new URLSearchParams();
     params.set("category", "Coastal Posters");
     setLocation(`/shop?${params.toString()}`);
-    window.scrollTo({ top: 0, behavior: "instant" });
   };
 
   const gridClasses = "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6";

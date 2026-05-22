@@ -47,9 +47,10 @@ const queryClient = new QueryClient();
 
 function ScrollToTop() {
   const [location] = useLocation();
+  const pathname = location.split("?")[0];
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, [location]);
+  }, [pathname]);
   return null;
 }
 
