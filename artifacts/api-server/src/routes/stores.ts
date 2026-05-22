@@ -5,6 +5,9 @@ import { eq, sql, and, ne } from "drizzle-orm";
 import { requireAdmin } from "../middleware/requireAdmin";
 import { adminLimiter } from "../middleware/rateLimiter";
 import { z } from "zod";
+import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
+
+const objectStorageService = new ObjectStorageService();
 
 const router = Router();
 
@@ -91,6 +94,7 @@ const updateStoreSchema = createStoreSchema
   .extend({
     active: z.boolean().optional(),
     ...domainRoutingSchema.shape,
+    logoAltText: z.string().nullable().optional(),
   });
 
 function serializeStore(
@@ -312,10 +316,88 @@ router.put("/admin/stores/:storeKey", requireAdmin, async (req, res) => {
   if ("primaryDomain" in parsed.data) updates.primaryDomain = parsed.data.primaryDomain ?? null;
   if ("domainAliases" in parsed.data) updates.domainAliases = (parsed.data.domainAliases as string[] | null | undefined) ?? null;
   if ("routePrefix" in parsed.data) updates.routePrefix = parsed.data.routePrefix ?? null;
+  if ("logoAltText" in parsed.data) updates.logoAltText = parsed.data.logoAltText ?? null;
 
   const [updated] = await db
     .update(storesTable)
     .set(updates)
+    .where(eq(storesTable.storeKey, storeKey))
+    .returning();
+
+  return res.json(serializeStore(updated));
+});
+
+// POST /api/admin/stores/:storeKey/logo — upload/replace store logo
+router.post("/admin/stores/:storeKey/logo", requireAdmin, async (req, res) => {
+  const storeKey = String(req.params.storeKey);
+
+  const [store] = await db
+    .select()
+    .from(storesTable)
+    .where(eq(storesTable.storeKey, storeKey))
+    .limit(1);
+
+  if (!store) {
+    return res.status(404).json({ error: "Store not found" });
+  }
+
+  const { objectPath, logoAltText } = req.body as { objectPath?: string; logoAltText?: string };
+
+  if (!objectPath || typeof objectPath !== "string" || !objectPath.startsWith("/objects/")) {
+    return res.status(400).json({ error: "A valid objectPath (starting with /objects/) is required" });
+  }
+
+  if (store.logoStoragePath && store.logoStoragePath !== objectPath) {
+    try {
+      const oldFile = await objectStorageService.getObjectEntityFile(store.logoStoragePath);
+      await oldFile.delete();
+    } catch (err) {
+      req.log.warn({ err }, "Failed to delete previous store logo from storage, continuing");
+    }
+  }
+
+  const logoUrl = `/api/storage${objectPath}`;
+
+  const [updated] = await db
+    .update(storesTable)
+    .set({
+      logoUrl,
+      logoStoragePath: objectPath,
+      logoAltText: typeof logoAltText === "string" ? logoAltText || null : store.logoAltText,
+      updatedAt: new Date(),
+    })
+    .where(eq(storesTable.storeKey, storeKey))
+    .returning();
+
+  return res.json({ logoUrl: updated.logoUrl, logoStoragePath: updated.logoStoragePath, logoAltText: updated.logoAltText });
+});
+
+// DELETE /api/admin/stores/:storeKey/logo — remove store logo
+router.delete("/admin/stores/:storeKey/logo", requireAdmin, async (req, res) => {
+  const storeKey = String(req.params.storeKey);
+
+  const [store] = await db
+    .select()
+    .from(storesTable)
+    .where(eq(storesTable.storeKey, storeKey))
+    .limit(1);
+
+  if (!store) {
+    return res.status(404).json({ error: "Store not found" });
+  }
+
+  if (store.logoStoragePath) {
+    try {
+      const file = await objectStorageService.getObjectEntityFile(store.logoStoragePath);
+      await file.delete();
+    } catch (err) {
+      req.log.warn({ err }, "Failed to delete store logo from storage, continuing");
+    }
+  }
+
+  const [updated] = await db
+    .update(storesTable)
+    .set({ logoUrl: null, logoStoragePath: null, logoAltText: null, updatedAt: new Date() })
     .where(eq(storesTable.storeKey, storeKey))
     .returning();
 
@@ -460,6 +542,8 @@ router.get("/stores/:storeKey/config", async (req, res) => {
     seo: seo
       ? { defaultTitle: seo.defaultTitle ?? "", defaultDescription: seo.defaultDescription ?? "" }
       : undefined,
+    logoUrl: store.logoUrl ?? null,
+    logoAltText: store.logoAltText ?? null,
   });
 });
 

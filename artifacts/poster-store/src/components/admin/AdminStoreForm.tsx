@@ -1,9 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { useAdminToken } from "@/context/AdminTokenContext";
 import {
   adminCreateStore,
   adminUpdateStore,
+  adminUploadStoreLogo,
+  adminDeleteStoreLogo,
   type AdminStore,
   type CreateStorePayload,
   type UpdateStorePayload,
@@ -18,12 +20,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Save, ArrowLeft, Loader2 } from "lucide-react";
+import { Save, ArrowLeft, Loader2, Upload, X, ImageIcon } from "lucide-react";
 
 const HEX_COLOR_RE = /^#[0-9A-Fa-f]{6}$/;
 const STORE_KEY_RE = /^[a-z][a-z0-9]*$/;
 const ROUTE_PREFIX_RE = /^[a-z][a-z0-9-]*$/;
 const DOMAIN_RE = /^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
+
+const ALLOWED_LOGO_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const MAX_LOGO_SIZE = 2 * 1024 * 1024;
 
 const DEFAULT_THEME: AdminStoreThemeConfig = {
   background: "#FAF6EF",
@@ -93,6 +98,13 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
   const seo = existing?.seoConfig ?? {};
   const [seoTitle, setSeoTitle] = useState(seo.defaultTitle ?? "");
   const [seoDescription, setSeoDescription] = useState(seo.defaultDescription ?? "");
+
+  // Logo / branding
+  const [logoUrl, setLogoUrl] = useState(existing?.logoUrl ?? null);
+  const [logoAltText, setLogoAltText] = useState(existing?.logoAltText ?? "");
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoError, setLogoError] = useState("");
+  const logoFileInputRef = useRef<HTMLInputElement>(null);
 
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
@@ -171,6 +183,7 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
           primaryDomain: primaryDomain || null,
           domainAliases: aliases.length > 0 ? aliases : null,
           routePrefix: routePrefix || null,
+          logoAltText: logoAltText || null,
         };
         await adminUpdateStore(existing.storeKey, payload);
         toast({ title: "Store updated", description: `${name} has been saved.` });
@@ -205,6 +218,73 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
 
   function updateThemeColor(key: keyof AdminStoreThemeConfig, val: string) {
     setTheme((prev) => ({ ...prev, [key]: val }));
+  }
+
+  async function handleLogoFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogoError("");
+
+    if (!ALLOWED_LOGO_TYPES.includes(file.type)) {
+      setLogoError("Please upload a PNG, JPEG, or WebP image.");
+      if (logoFileInputRef.current) logoFileInputRef.current.value = "";
+      return;
+    }
+    if (file.size > MAX_LOGO_SIZE) {
+      setLogoError("Logo must be under 2 MB.");
+      if (logoFileInputRef.current) logoFileInputRef.current.value = "";
+      return;
+    }
+
+    setLogoUploading(true);
+    try {
+      const urlRes = await fetch("/api/storage/uploads/request-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+      });
+      if (!urlRes.ok) {
+        const body = await urlRes.json().catch(() => ({}));
+        throw new Error((body as any).error ?? "Failed to get upload URL");
+      }
+      const { uploadURL, objectPath } = await urlRes.json() as { uploadURL: string; objectPath: string };
+
+      const putRes = await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+      if (!putRes.ok) throw new Error("File upload failed");
+
+      const result = await adminUploadStoreLogo(existing!.storeKey, objectPath, logoAltText || undefined);
+      setLogoUrl(result.logoUrl);
+      toast({ title: "Logo uploaded", description: "Store logo has been updated." });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Upload failed";
+      setLogoError(msg);
+      toast({ title: "Upload failed", description: msg, variant: "destructive" });
+    } finally {
+      setLogoUploading(false);
+      if (logoFileInputRef.current) logoFileInputRef.current.value = "";
+    }
+  }
+
+  async function handleLogoRemove() {
+    if (!existing) return;
+    setLogoUploading(true);
+    setLogoError("");
+    try {
+      await adminDeleteStoreLogo(existing.storeKey);
+      setLogoUrl(null);
+      toast({ title: "Logo removed", description: "Store logo has been removed." });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to remove logo";
+      setLogoError(msg);
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally {
+      setLogoUploading(false);
+    }
   }
 
   const THEME_FIELDS: { key: keyof AdminStoreThemeConfig; label: string }[] = [
@@ -307,6 +387,103 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Branding — only shown in edit mode since storeKey is needed for logo upload */}
+      {isEdit && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Branding</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Current logo preview */}
+            <div>
+              <Label className="mb-2 block">Store logo</Label>
+              {logoUrl ? (
+                <div className="mb-3 flex items-center gap-4 p-3 rounded-lg border border-border bg-muted/30">
+                  <img
+                    src={logoUrl}
+                    alt={logoAltText || name}
+                    className="max-h-12 max-w-[180px] object-contain"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).style.display = "none";
+                    }}
+                  />
+                  <span className="text-xs text-muted-foreground">Current logo</span>
+                </div>
+              ) : (
+                <div className="mb-3 flex items-center gap-3 p-3 rounded-lg border border-dashed border-border text-muted-foreground">
+                  <ImageIcon className="w-5 h-5 shrink-0" />
+                  <span className="text-sm">No logo uploaded yet</span>
+                </div>
+              )}
+
+              {/* Upload / Remove actions */}
+              <div className="flex flex-wrap gap-2">
+                <input
+                  ref={logoFileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={handleLogoFileChange}
+                  disabled={logoUploading}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => logoFileInputRef.current?.click()}
+                  disabled={logoUploading}
+                  data-testid="logo-upload-btn"
+                >
+                  {logoUploading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Upload className="w-4 h-4" />
+                  )}
+                  {logoUrl ? "Replace logo" : "Upload logo"}
+                </Button>
+
+                {logoUrl && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="gap-2 text-destructive hover:text-destructive"
+                    onClick={handleLogoRemove}
+                    disabled={logoUploading}
+                    data-testid="logo-remove-btn"
+                  >
+                    <X className="w-4 h-4" />
+                    Remove logo
+                  </Button>
+                )}
+              </div>
+
+              {logoError && (
+                <p className="mt-2 text-xs text-destructive">{logoError}</p>
+              )}
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                PNG, JPEG, or WebP · max 2 MB · transparent backgrounds work best
+              </p>
+            </div>
+
+            {/* Logo alt text */}
+            <div className="space-y-1.5">
+              <Label htmlFor="logo-alt-text">Logo alt text</Label>
+              <Input
+                id="logo-alt-text"
+                value={logoAltText}
+                onChange={(e) => setLogoAltText(e.target.value)}
+                placeholder={name || "Store logo"}
+              />
+              <p className="text-xs text-muted-foreground">
+                Descriptive text for screen readers and when the image cannot load.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Domain & routing */}
       <Card>

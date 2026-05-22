@@ -400,6 +400,9 @@ export interface AdminStore {
   primaryDomain: string | null;
   domainAliases: string[] | null;
   routePrefix: string | null;
+  logoUrl: string | null;
+  logoStoragePath: string | null;
+  logoAltText: string | null;
   posterCount: number;
   orderCount: number;
   createdAt: string;
@@ -421,7 +424,9 @@ export type CreateStorePayload = {
   routePrefix?: string | null;
 };
 
-export type UpdateStorePayload = Partial<Omit<CreateStorePayload, "storeKey">>;
+export type UpdateStorePayload = Partial<Omit<CreateStorePayload, "storeKey">> & {
+  logoAltText?: string | null;
+};
 
 export async function adminListStores(): Promise<AdminStore[]> {
   const res = await fetch(`${BASE}/admin/stores`, { credentials: "include" });
@@ -596,6 +601,36 @@ export async function adminGetLaunchChecklist(
   storeKey: string
 ): Promise<LaunchChecklistResponse> {
   const res = await fetch(`${BASE}/admin/launch-checklist?storeKey=${encodeURIComponent(storeKey)}`, {
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(extractErrorMessage(body));
+  }
+  return res.json();
+}
+
+export async function adminUploadStoreLogo(
+  storeKey: string,
+  objectPath: string,
+  logoAltText?: string
+): Promise<{ logoUrl: string; logoStoragePath: string; logoAltText: string | null }> {
+  const res = await fetch(`${BASE}/admin/stores/${encodeURIComponent(storeKey)}/logo`, {
+    method: "POST",
+    headers: jsonHeaders(),
+    credentials: "include",
+    body: JSON.stringify({ objectPath, logoAltText }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(extractErrorMessage(body));
+  }
+  return res.json();
+}
+
+export async function adminDeleteStoreLogo(storeKey: string): Promise<AdminStore> {
+  const res = await fetch(`${BASE}/admin/stores/${encodeURIComponent(storeKey)}/logo`, {
+    method: "DELETE",
     credentials: "include",
   });
   if (!res.ok) {

@@ -48,11 +48,19 @@ export const Navbar = () => {
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  // Logo image error fallback
+  const [logoImgError, setLogoImgError] = useState(false);
+
   // Keep input in sync when URL changes externally
   useEffect(() => {
     setSearchInputValue(currentSearch);
     if (currentSearch) setSearchOpen(true);
   }, [currentSearch]);
+
+  // Reset logo error when store changes
+  useEffect(() => {
+    setLogoImgError(false);
+  }, [store.logoUrl]);
 
   // Autofocus when search opens
   useEffect(() => {
@@ -92,6 +100,8 @@ export const Navbar = () => {
     setSearchOpen(true);
   };
 
+  const showLogoImage = !!store.logoUrl && !logoImgError;
+
   return (
     <nav className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto px-4 h-16 flex items-center gap-2">
@@ -103,9 +113,18 @@ export const Navbar = () => {
           data-testid="link-home"
           onClick={closeMobile}
         >
-          <span className="font-serif text-2xl font-bold tracking-tight text-primary">
-            {store.storeName}
-          </span>
+          {showLogoImage ? (
+            <img
+              src={store.logoUrl!}
+              alt={store.logoAltText || store.storeName}
+              className="h-[30px] sm:h-[36px] w-auto max-w-[140px] sm:max-w-[180px] object-contain"
+              onError={() => setLogoImgError(true)}
+            />
+          ) : (
+            <span className="font-serif text-2xl font-bold tracking-tight text-primary">
+              {store.storeName}
+            </span>
+          )}
         </Link>
 
         {/* Inline expanding search input */}

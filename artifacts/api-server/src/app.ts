@@ -14,6 +14,7 @@ import { migrateShipping } from "./lib/migrateShipping";
 import { migrateMockupPlacement } from "./lib/migrateMockupPlacement";
 import { migrateCompositingSettings } from "./lib/migrateCompositingSettings";
 import { migrateHoverMockup } from "./lib/migrateHoverMockup";
+import { migrateStoreLogo } from "./lib/migrateStoreLogo";
 import { seedPostsofSpain } from "./lib/seedPostsofSpain";
 
 const app: Express = express();
@@ -101,6 +102,7 @@ migrateSlugField()
   .then(() => migrateMockupPlacement())
   .then(() => migrateCompositingSettings())
   .then(() => migrateHoverMockup())
+  .then(() => migrateStoreLogo())
   .then(() => seedMockupTemplates())
   .catch((err) =>
     logger.error(err, "Failed to run startup migrations")

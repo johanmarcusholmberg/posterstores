@@ -52,6 +52,8 @@ export interface StorefrontConfig {
     defaultTitle: string;
     defaultDescription: string;
   };
+  logoUrl?: string | null;
+  logoAltText?: string | null;
 }
 
 export const storefronts: Record<string, StorefrontConfig> = {

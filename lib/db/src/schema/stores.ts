@@ -17,6 +17,9 @@ export const storesTable = pgTable("stores", {
   primaryDomain: text("primary_domain"),
   domainAliases: jsonb("domain_aliases").$type<string[]>(),
   routePrefix: text("route_prefix"),
+  logoUrl: text("logo_url"),
+  logoStoragePath: text("logo_storage_path"),
+  logoAltText: text("logo_alt_text"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

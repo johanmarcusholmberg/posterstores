@@ -57,24 +57,24 @@ export default function Home() {
 
   return (
     <div className="min-h-screen pb-16">
-      {/* Hero Section */}
-      <section className="relative bg-sand h-[calc(100vh-64px)] flex items-stretch overflow-hidden">
-        <div className="container mx-auto px-6 lg:px-10 flex items-stretch">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 w-full items-center py-10 lg:py-0">
+      {/* ── Hero Section ── */}
+      <section className="relative bg-sand overflow-hidden">
+        <div className="container mx-auto px-6 lg:px-10">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-12 py-10 lg:py-0 lg:min-h-[580px] items-center">
 
             {/* Left: Headline + CTA */}
-            <div className="flex flex-col justify-center order-2 lg:order-1 text-center lg:text-left">
-              <h1 className="font-serif text-5xl md:text-6xl xl:text-7xl font-bold text-primary mb-6 leading-[1.1]">
+            <div className="flex flex-col order-2 lg:order-1 text-center lg:text-left justify-center">
+              <h1 className="font-serif text-4xl md:text-5xl xl:text-6xl font-bold text-primary mb-4 leading-[1.1]">
                 {store.homepage.heroTitle}
               </h1>
-              <p className="text-lg md:text-xl text-foreground/65 mb-10 max-w-md mx-auto lg:mx-0 leading-relaxed">
+              <p className="text-base md:text-lg text-foreground/65 mb-7 max-w-md mx-auto lg:mx-0 leading-relaxed">
                 {store.homepage.heroSubtitle}
               </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+              <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
                 <Link href="/shop">
                   <Button
                     size="lg"
-                    className="w-full sm:w-auto text-lg h-14 px-8"
+                    className="w-full sm:w-auto h-12 px-7 text-base"
                     data-testid="btn-hero-primary"
                   >
                     {store.homepage.primaryCta || "Browse posters"}
@@ -84,7 +84,7 @@ export default function Home() {
                   <Button
                     size="lg"
                     variant="outline"
-                    className="w-full sm:w-auto text-lg h-14 px-8 border-primary/30 text-primary hover:bg-primary/5"
+                    className="w-full sm:w-auto h-12 px-7 text-base border-primary/30 text-primary hover:bg-primary/5"
                   >
                     View all regions
                   </Button>
@@ -92,73 +92,103 @@ export default function Home() {
               </div>
 
               {/* Trust indicators */}
-              <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-2 justify-center lg:justify-start text-sm text-foreground/50">
+              <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-2 justify-center lg:justify-start text-xs text-foreground/50">
                 <span>✦ Fine art prints</span>
                 <span>✦ Ships worldwide</span>
                 <span>✦ Sustainably made</span>
               </div>
             </div>
 
-            {/* Right: Staggered poster collage */}
-            <div className="order-1 lg:order-2 h-full flex items-center overflow-hidden">
-              {heroPosters.length > 0 ? (
-                <div className="grid grid-cols-2 gap-3 lg:gap-4 w-full h-full">
-                  <div className="flex flex-col gap-3 lg:gap-4 pt-4">
-                    {heroPosters.slice(0, 2).map((poster) => (
-                      <Link
-                        key={poster.id}
-                        href={(poster as any).slug ? `/posters/${(poster as any).slug}` : `/poster/${poster.id}`}
-                        className="flex-1 block min-h-0"
-                      >
-                        <div className="overflow-hidden rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 group h-full">
-                          <img
-                            src={poster.imageUrl ?? ""}
-                            alt={poster.title}
-                            className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500"
-                          />
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                  <div className="flex flex-col gap-3 lg:gap-4 pt-4">
-                    {heroPosters.slice(2, 4).map((poster) => (
-                      <Link
-                        key={poster.id}
-                        href={(poster as any).slug ? `/posters/${(poster as any).slug}` : `/poster/${poster.id}`}
-                        className="flex-1 block min-h-0"
-                      >
-                        <div className="overflow-hidden rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 group h-full">
-                          <img
-                            src={poster.imageUrl ?? ""}
-                            alt={poster.title}
-                            className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500"
-                          />
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-3 lg:gap-4 w-full h-[110%]">
-                  <div className="flex flex-col gap-3 lg:gap-4 -mt-[8%]">
-                    <div className="flex-1 bg-muted/60 animate-pulse rounded-xl" />
-                    <div className="flex-1 bg-muted/60 animate-pulse rounded-xl" />
-                  </div>
-                  <div className="flex flex-col gap-3 lg:gap-4 mt-[8%]">
-                    <div className="flex-1 bg-muted/60 animate-pulse rounded-xl" />
-                    <div className="flex-1 bg-muted/60 animate-pulse rounded-xl" />
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* Right: Image collage */}
+            <div className="order-1 lg:order-2">
 
+              {/* ── Mobile: compact 2-image row ── */}
+              <div className="flex gap-2.5 lg:hidden">
+                {heroPosters.length > 0 ? (
+                  heroPosters.slice(0, 2).map((poster) => (
+                    <Link
+                      key={poster.id}
+                      href={(poster as any).slug ? `/posters/${(poster as any).slug}` : `/poster/${poster.id}`}
+                      className="flex-1"
+                    >
+                      <div className="overflow-hidden rounded-xl shadow-md aspect-[3/4]">
+                        <img
+                          src={poster.imageUrl ?? ""}
+                          alt={poster.title}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    </Link>
+                  ))
+                ) : (
+                  <>
+                    <div className="flex-1 aspect-[3/4] bg-muted/60 animate-pulse rounded-xl" />
+                    <div className="flex-1 aspect-[3/4] bg-muted/60 animate-pulse rounded-xl" />
+                  </>
+                )}
+              </div>
+
+              {/* ── Desktop: staggered poster collage ── */}
+              <div className="hidden lg:block h-[480px] overflow-hidden">
+                {heroPosters.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-4 h-full">
+                    <div className="flex flex-col gap-4 pt-8">
+                      {heroPosters.slice(0, 2).map((poster) => (
+                        <Link
+                          key={poster.id}
+                          href={(poster as any).slug ? `/posters/${(poster as any).slug}` : `/poster/${poster.id}`}
+                          className="flex-1 block min-h-0"
+                        >
+                          <div className="overflow-hidden rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 group h-full">
+                            <img
+                              src={poster.imageUrl ?? ""}
+                              alt={poster.title}
+                              className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500"
+                            />
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                    <div className="flex flex-col gap-4">
+                      {heroPosters.slice(2, 4).map((poster) => (
+                        <Link
+                          key={poster.id}
+                          href={(poster as any).slug ? `/posters/${(poster as any).slug}` : `/poster/${poster.id}`}
+                          className="flex-1 block min-h-0"
+                        >
+                          <div className="overflow-hidden rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 group h-full">
+                            <img
+                              src={poster.imageUrl ?? ""}
+                              alt={poster.title}
+                              className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500"
+                            />
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4 h-full">
+                    <div className="flex flex-col gap-4 pt-8">
+                      <div className="flex-1 bg-muted/60 animate-pulse rounded-xl" />
+                      <div className="flex-1 bg-muted/60 animate-pulse rounded-xl" />
+                    </div>
+                    <div className="flex flex-col gap-4">
+                      <div className="flex-1 bg-muted/60 animate-pulse rounded-xl" />
+                      <div className="flex-1 bg-muted/60 animate-pulse rounded-xl" />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+            </div>
           </div>
         </div>
       </section>
 
       {/* Brand story + Value section */}
-      <section className="container mx-auto px-4 py-20" data-testid="brand-story-section">
-        <div className="max-w-2xl mx-auto text-center mb-14">
+      <section className="container mx-auto px-4 py-16" data-testid="brand-story-section">
+        <div className="max-w-2xl mx-auto text-center mb-12">
           <p className="font-serif text-xl md:text-2xl text-foreground/80 leading-relaxed italic">
             "{brandStory}"
           </p>
@@ -180,7 +210,7 @@ export default function Home() {
       </section>
 
       {/* Featured Collection */}
-      <section className="container mx-auto px-4 py-20 border-t border-border">
+      <section className="container mx-auto px-4 py-16 border-t border-border">
         <div className="flex items-center justify-between mb-10">
           <h2 className="font-serif text-3xl font-bold text-foreground">Featured Gallery</h2>
           <Link href="/shop" className="text-primary font-medium hover:underline">
@@ -204,7 +234,7 @@ export default function Home() {
       </section>
 
       {/* Explore by Region */}
-      <section className="bg-primary text-primary-foreground py-24">
+      <section className="bg-primary text-primary-foreground py-20">
         <div className="container mx-auto px-4 text-center">
           <h2 className="font-serif text-3xl font-bold mb-8">Explore by Region</h2>
           <div className="flex flex-wrap justify-center gap-4">
@@ -223,7 +253,7 @@ export default function Home() {
       </section>
 
       {/* New Arrivals */}
-      <section className="container mx-auto px-4 py-20">
+      <section className="container mx-auto px-4 py-16">
         <div className="flex items-center justify-between mb-10">
           <h2 className="font-serif text-3xl font-bold text-foreground">New Arrivals</h2>
         </div>
