@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { type PosterMockup, type PosterMockupTemplate } from "@/lib/mockupApi";
 import { cn } from "@/lib/utils";
-import { X, ChevronLeft, ChevronRight, ZoomIn } from "lucide-react";
+import { X, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface MockupGalleryProps {
   mockups: PosterMockup[];
@@ -220,6 +220,7 @@ export const MockupGallery = ({
   // Touch/swipe state for the main carousel
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
+  const mainImageRef = useRef<HTMLDivElement>(null);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
@@ -241,6 +242,25 @@ export const MockupGallery = ({
     touchStartX.current = null;
     touchStartY.current = null;
   };
+
+  // Non-passive touchmove listener to prevent horizontal page scroll
+  // while swiping inside the gallery. React synthetic events are passive
+  // by default so we attach directly to the DOM element.
+  useEffect(() => {
+    const el = mainImageRef.current;
+    if (!el) return;
+    const onTouchMove = (e: TouchEvent) => {
+      if (touchStartX.current === null || touchStartY.current === null) return;
+      const dx = e.touches[0].clientX - touchStartX.current;
+      const dy = e.touches[0].clientY - touchStartY.current;
+      // If horizontal swipe is dominant, prevent the page from scrolling sideways
+      if (Math.abs(dx) > Math.abs(dy)) {
+        e.preventDefault();
+      }
+    };
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    return () => el.removeEventListener("touchmove", onTouchMove);
+  }, []);
 
   const openLightbox = () => {
     setLightboxIdx(activeIdx);
@@ -273,12 +293,12 @@ export const MockupGallery = ({
     return (
       <div className="space-y-2.5" aria-busy="true">
         <div
-          className="bg-muted animate-pulse rounded-xl"
+          className="bg-muted animate-pulse"
           style={{ aspectRatio: "3/4", maxHeight: "420px" }}
         />
         <div className="flex gap-2">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="w-[68px] h-[68px] bg-muted animate-pulse rounded-lg" />
+            <div key={i} className="w-[68px] h-[68px] bg-muted animate-pulse rounded-sm" />
           ))}
         </div>
       </div>
@@ -317,9 +337,10 @@ export const MockupGallery = ({
   return (
     <>
       <div className="space-y-2.5" data-testid="mockup-gallery">
-        {/* Main image */}
+        {/* Main image — flat poster style, no rounded corners, minimal shadow */}
         <div
-          className="relative bg-muted rounded-xl overflow-hidden shadow-md cursor-zoom-in group select-none"
+          ref={mainImageRef}
+          className="relative bg-[#f4f0eb] overflow-hidden cursor-zoom-in group select-none shadow-[0_1px_4px_rgba(0,0,0,0.06)]"
           style={{ aspectRatio: "3/4", maxHeight: "420px" }}
           onClick={openLightbox}
           onTouchStart={handleTouchStart}
@@ -327,14 +348,13 @@ export const MockupGallery = ({
         >
           {renderMainImage(activeItem)}
 
-          {/* Zoom hint */}
-          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/10 pointer-events-none">
-            <div className="bg-white/80 backdrop-blur-sm rounded-full p-2 shadow">
-              <ZoomIn className="w-5 h-5 text-stone-700" />
-            </div>
-          </div>
+          {/* Subtle inset edge — gives the image a "print edge" depth cue */}
+          <div
+            className="absolute inset-0 ring-1 ring-inset ring-black/[0.06] pointer-events-none"
+            aria-hidden="true"
+          />
 
-          {/* Swipe arrows on mobile when multiple images */}
+          {/* Swipe arrows on desktop when multiple images */}
           {allImages.length > 1 && (
             <>
               <button
@@ -381,9 +401,9 @@ export const MockupGallery = ({
                 aria-label={img.label}
                 aria-pressed={idx === activeIdx}
                 className={cn(
-                  "relative shrink-0 rounded-lg overflow-hidden border-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                  "relative shrink-0 overflow-hidden border-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                   activeIdx === idx
-                    ? "border-primary opacity-100 shadow-sm"
+                    ? "border-primary opacity-100"
                     : "border-transparent opacity-50 hover:opacity-80"
                 )}
                 style={{ width: 68, height: 68 }}
@@ -432,7 +452,7 @@ export const MockupGallery = ({
             </button>
 
             <div
-              className="relative w-full rounded-xl overflow-hidden bg-black/20 shadow-2xl"
+              className="relative w-full overflow-hidden bg-black/20 shadow-2xl"
               style={{ maxHeight: "75vh", aspectRatio: "3/4" }}
             >
               {renderMainImage(allImages[lightboxIdx] ?? { url: fallbackImageUrl, label: "Poster" })}
@@ -471,7 +491,7 @@ export const MockupGallery = ({
                     onClick={() => setLightboxIdx(idx)}
                     aria-label={img.label}
                     className={cn(
-                      "relative shrink-0 rounded-lg overflow-hidden border-2 transition-all",
+                      "relative shrink-0 overflow-hidden border-2 transition-all",
                       lightboxIdx === idx
                         ? "border-white opacity-100"
                         : "border-transparent opacity-40 hover:opacity-70"
