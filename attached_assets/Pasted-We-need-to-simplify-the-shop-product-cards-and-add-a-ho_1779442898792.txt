@@ -1,0 +1,199 @@
+We need to simplify the shop product cards and add a hover mockup image behavior inspired by gallery-style poster shops like Gallerix.
+
+Context:
+- Project: posterstores
+- Repo: https://github.com/johanmarcusholmberg/posterstores
+- Active shop: PostersOfSpain
+- Current product cards have become too information-heavy below the image.
+- The shop grid should feel more like a poster gallery/store:
+  - cleaner poster-focused images
+  - no rounded image corners
+  - less text under each product
+  - hover reveals a selected mockup/lifestyle image
+- Images are still placeholders, so focus on layout/behavior, not replacing image quality.
+- There is already an admin/mockup system in the project. Reuse it if possible.
+
+Please inspect:
+- artifacts/poster-store/src/components/shared/PosterCard.tsx
+- artifacts/poster-store/src/pages/Shop.tsx
+- poster/product frontend types
+- existing poster mockup fields returned by the API
+- existing mockup/admin pages and components, especially anything related to:
+  - mockup templates
+  - poster mockups
+  - selected/default/primary mockup
+  - admin mockup management
+  - poster editing/admin detail forms
+- backend/API only if needed to expose already-existing mockup data
+
+Goal:
+Make poster cards visually simpler and more premium, and allow admins to choose which mockup image appears on hover for each poster.
+
+Requested frontend card changes:
+
+1. Simplify PosterCard text content
+Update PosterCard so the visible product info below the image only shows:
+
+- category name
+- poster name/title
+- price line: “From €X”
+
+Remove from the shop card:
+- location/city/region line
+- sizes line
+- “Premium matte print” line
+- any extra material/quality row
+
+Keep the product detail page free to show richer information later. The shop grid should stay minimal.
+
+Suggested hierarchy:
+CATEGORY NAME — small, muted, uppercase or refined small text
+Poster title — clean serif or current title styling, max 2 lines
+From €X — clear but not too large
+
+Adjust font sizes/spacing if needed so the card feels elegant and less crowded.
+
+2. Make poster image presentation flatter and more gallery-like
+Change the image container styling to look like a clean poster preview, closer to Gallerix-style product grids.
+
+Requested visual direction:
+- no rounded image corners
+- no obvious app-card rounding
+- reduce or remove heavy shadows
+- avoid thick frames
+- image should feel like a flat poster/product image
+- keep a very subtle border/edge only if needed
+- maintain consistent aspect ratio
+- keep the image area clean and poster-focused
+
+Do not add fake decorative frames around every poster.
+
+3. Add hover image swap to selected mockup
+On desktop hover/focus of a product card:
+- default state should show the main poster/product image
+- hover state should show a selected mockup/lifestyle image for that poster, if one exists
+- if no selected mockup exists, keep the main image and do not show a broken/blank state
+
+The transition should be subtle:
+- crossfade between main image and hover mockup
+- no layout shift
+- no aggressive zoom
+- avoid flicker when moving mouse
+
+Mobile/touch:
+- do not rely on hover
+- show the main poster image by default
+- do not break tap/click navigation
+
+Accessibility:
+- keep card link behavior
+- keep keyboard focus state
+- hover mockup should not interfere with screen readers
+- image alt text should remain sensible
+
+4. Use existing mockup data if available
+Inspect current data returned for posters and existing admin/mockup records.
+
+Preferred data model:
+- each poster can have one selected hover mockup image
+- use an existing “primary”, “featured”, “selected”, or similar mockup field if already available
+- if multiple poster mockups exist, use the admin-selected one
+- if no selected one exists, optionally fall back to the first primary/featured mockup
+- if no mockup exists, show only the main poster image
+
+Do not create duplicate systems if one already exists.
+
+5. Add admin ability to choose hover mockup image
+Update the admin UI so admins can select which mockup image should be used as the hover image for each poster.
+
+Please inspect existing admin pages first. Depending on the current structure, implement this in the most natural place, for example:
+- poster edit page
+- poster detail/admin page
+- mockups admin page
+- poster mockup assignment UI
+
+Admin UX requirements:
+- show available mockup images for a poster
+- allow selecting one as “Shop hover mockup” or “Card hover image”
+- clearly show which one is currently selected
+- allow changing the selection
+- allow clearing the selected hover mockup if appropriate
+- persist the selection
+- after saving, the shop card should use that selected mockup on hover
+
+If existing data has fields like isPrimary, isFeatured, placement, poster_mockups, or mockup_templates:
+- reuse them where appropriate
+- avoid adding new database fields unless there is no clean existing way to express “selected hover mockup”
+
+If a backend/database change is necessary:
+- keep it minimal
+- add a clear migration
+- update API types/OpenAPI/clients if this project uses generated clients
+- do not break existing mockup functionality
+- make sure storeKey/store scoping is respected
+
+6. Keep existing shop behavior intact
+Do not break:
+- filters
+- sorting
+- search
+- cart
+- favorites
+- card click to product page
+- NEW badges
+- scroll-position preservation on filter changes
+- responsive grid
+- existing mockup template/admin functionality
+
+7. Remove now-unneeded card complexity carefully
+Since the shop card will no longer show size/material/location:
+- remove only the display from PosterCard
+- do not delete underlying data, types, or backend fields
+- those details may still be useful on product detail pages, cart, checkout, or admin
+
+8. Validate image loading/fallback states
+Handle:
+- poster with selected hover mockup
+- poster without selected hover mockup
+- missing/broken mockup image URL
+- missing primary poster image
+- mobile layout
+- slow image loading
+
+Avoid showing empty beige blocks unless the actual image is missing.
+
+Constraints:
+- Keep changes targeted.
+- Avoid broad redesign of the shop page.
+- Do not introduce new dependencies.
+- Do not change checkout/payment logic.
+- Do not change unrelated admin pages.
+- Preserve TypeScript strictness and existing design conventions.
+- Do not commit or push unless I explicitly ask.
+
+Validation:
+Run relevant checks, for example:
+pnpm --filter @workspace/poster-store run typecheck
+
+If backend/API/client generation is touched, also run the relevant generation/typecheck/build commands used by this repo.
+
+Manual verification:
+- /shop default grid
+- filtered region/category views
+- search results
+- desktop hover: main image crossfades to selected mockup
+- mobile: card remains usable and does not depend on hover
+- poster with no mockup: main image remains visible
+- admin: select/change/clear hover mockup for a poster
+- after saving in admin, /shop uses the selected mockup
+- favorites/cart/card click behavior still works
+- no scroll jump on filters
+
+Deliverable:
+- Summarize files changed.
+- Explain how the shop card was simplified.
+- Explain how hover mockup selection works.
+- Explain where in admin the hover mockup is selected.
+- Mention whether a database/API change was required.
+- Mention checks run and results.
+- Do not commit or push.
