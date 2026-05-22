@@ -1,0 +1,132 @@
+We need to refine the poster product detail page image/gallery UX and make it visually consistent with the updated shop grid.
+
+Context:
+- Project: posterstores
+- Repo: https://github.com/johanmarcusholmberg/posterstores
+- Active shop: PostersOfSpain
+- The shop grid now uses flat poster-style images with no rounded image corners.
+- Product cards are simplified and gallery-like.
+- The product detail page should match the same visual direction.
+- The current size selector selected state is functional and clear, so do not redesign it heavily.
+
+Please inspect:
+- artifacts/poster-store/src/pages/PosterDetail.tsx
+- any product image gallery/carousel component used by PosterDetail
+- any zoom/lightbox behavior
+- mobile gallery/swipe behavior
+- PosterCard image styling for reference
+
+Requested changes:
+
+1. Match product detail image styling with shop card image styling
+Update the main product image area so it feels like the shop grid image presentation.
+
+Visual direction:
+- no rounded corners on the poster image
+- no app-like card rounding around the image
+- remove or reduce heavy shadows
+- use a clean flat poster/gallery presentation
+- allow only a very subtle 1px edge/border if needed
+- do not add fake frames unless they are part of the actual image/mockup
+- keep the poster/image itself as the visual focus
+
+The product detail page should feel like the same brand as the shop grid.
+
+2. Remove centered magnifying glass hover overlay
+Remove the magnifying glass icon that appears in the middle of the image on hover.
+
+Keep image switching and any existing zoom/lightbox behavior only if it can remain unobtrusive.
+
+Acceptable alternatives:
+- clicking the image still opens zoom/lightbox without a centered hover icon
+- a small subtle “View larger” action near thumbnails if already easy
+- or no explicit zoom affordance if the interaction still works naturally
+
+Do not show a centered hover icon over the image.
+
+3. Fix mobile horizontal image swiping / page movement
+On mobile, when the user swipes sideways to browse product images:
+- only the product image/gallery should move horizontally
+- the entire page must not shift sideways
+- there should be no horizontal body/page scroll
+- the page should remain fixed on the x-axis
+- gallery swipe should remain smooth if carousel behavior exists
+
+Investigate and fix likely causes:
+- elements wider than 100vw
+- carousel/track width causing body overflow
+- missing overflow-x-hidden on page wrapper
+- touch/pan behavior not scoped to the gallery
+- image/gallery container not constrained with max-w-full
+- thumbnail row overflow affecting page width
+
+Apply the smallest safe fix that prevents horizontal page movement.
+
+4. Clean up thumbnail styling
+Make thumbnails visually consistent with the flatter poster style:
+- no heavy rounding
+- no heavy shadow
+- clear selected state
+- no layout shift when selecting images
+- labels like “Poster” / “On the wall” can stay if they remain clean
+
+5. Keep size selector functionality but slightly align selected state with brand if simple
+The selected size state is already clear and functional.
+
+Do not redesign the size selector.
+
+If simple and safe, adjust selected state to feel less generic-blue and more aligned with the shop brand:
+- use existing brand teal/green/primary token if available
+- use a subtle warm background
+- keep strong accessible contrast
+- keep keyboard focus state clear
+
+If there is no clean existing token, leave the size selector as-is rather than inventing a new color system.
+
+6. Preserve current product detail behavior
+Do not break:
+- image switching
+- thumbnail selection
+- selected image state
+- add to cart
+- favorites
+- size selection
+- selected size price display
+- back to shop
+- mockup images
+- mobile layout
+- product loading/error states
+
+Constraints:
+- Frontend only.
+- Do not touch backend/API/database.
+- Do not introduce dependencies.
+- Keep changes focused on PosterDetail/image gallery styling and mobile overflow.
+- Do not redesign the whole product page.
+- Do not commit or push unless I explicitly ask.
+
+Validation:
+Run:
+pnpm --filter @workspace/poster-store run typecheck
+
+Manual verification:
+- desktop product detail page
+- main image has no rounded poster/image corners
+- hover over main image: no centered magnifying glass
+- click/switch thumbnails still works
+- selected thumbnail state is clear
+- mobile product detail page
+- swipe image gallery sideways: only gallery/image moves, not the full page
+- no horizontal page scroll
+- selected size remains clear and accessible
+- add to cart still works
+- favorite button still works
+
+Deliverable:
+- Summarize files changed.
+- Explain what changed in product detail image styling.
+- Explain how the centered magnifying glass was removed.
+- Explain how mobile horizontal overflow/page movement was fixed.
+- Mention whether the size selector styling was changed or intentionally left as-is.
+- Mention checks run and results.
+- Do not commit or push.
