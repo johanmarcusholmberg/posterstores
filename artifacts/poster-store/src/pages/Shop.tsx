@@ -196,14 +196,25 @@ function HiddenFiltersPopover({
   onRemove: (f: { label: string; key: string; value: string }) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancelClose = () => {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  };
+
+  const scheduleClose = () => {
+    cancelClose();
+    closeTimer.current = setTimeout(() => setOpen(false), 120);
+  };
 
   return (
     <div
-      ref={ref}
       className="relative"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
+      onMouseEnter={() => { cancelClose(); setOpen(true); }}
+      onMouseLeave={scheduleClose}
       data-testid="filter-chips-overflow"
     >
       <span className="text-xs text-muted-foreground bg-muted hover:bg-muted/80 rounded-full px-2.5 py-1 font-medium select-none cursor-pointer transition-colors">
@@ -211,7 +222,11 @@ function HiddenFiltersPopover({
       </span>
 
       {open && (
-        <div className="absolute left-0 top-full mt-1.5 z-50 bg-background border border-border rounded-lg shadow-lg p-2 flex flex-col gap-1 min-w-[140px]">
+        <div
+          className="absolute left-0 top-full mt-1.5 z-50 bg-background border border-border rounded-lg shadow-lg p-2 flex flex-col gap-1 min-w-[140px]"
+          onMouseEnter={cancelClose}
+          onMouseLeave={scheduleClose}
+        >
           {hiddenFilters.map(f => (
             <button
               key={`${f.key}-${f.value}`}
