@@ -1,0 +1,75 @@
+The homepage hero is still not right. Please refine the hero layout again before commit/push.
+
+Current problem:
+The hero is smaller than before, but it now has too much empty space above the content, the text still feels too large/low, the image collage is cut off at the bottom, and the next section still does not appear in the laptop viewport. This does not yet solve the original issue.
+
+Additional visual issue:
+The homepage image collage currently uses rounded image cards. I do not want that. The hero images should use the same image layout/visual style as the store poster grid/product images, not rounded-edge lifestyle cards. Keep the storefront visually consistent.
+
+Goal:
+Make the homepage feel more like a shop immediately, while keeping the premium/editorial look.
+
+Important:
+- Do not touch the logo upload/storage work unless needed for type errors.
+- Do not redesign the whole site.
+- Only adjust Home.tsx hero layout.
+- Do not commit or push until I approve.
+- Keep the existing store/product image style consistent.
+
+Desktop/laptop hero requirements:
+1. Remove the excessive empty space between the navbar and the hero content.
+2. The hero should start higher on the page.
+3. Do not vertically center the hero in a way that creates a huge blank top area.
+4. Use normal section padding instead of large viewport-based centering.
+5. The image area must not be cut off at the bottom.
+6. The full image area should be visible inside the hero section.
+7. The next section should be visible, or at least clearly start, on a normal laptop viewport.
+8. Reduce the headline slightly more if needed.
+9. Reduce the image area height slightly more if needed.
+10. Keep CTA buttons visible and aligned nicely.
+11. Use the same image/card style as the shop poster grid, not rounded collage cards.
+12. Remove or greatly reduce rounded corners on hero images so they visually match the store images.
+13. Avoid staggered rounded “mood board” styling if it makes the homepage feel disconnected from the actual shop.
+
+Suggested direction:
+- Use a hero section like:
+  - pt-8 or pt-10 after navbar on desktop
+  - pb-8 or pb-10
+  - no full viewport height
+  - no large min-height that forces blank space
+- Use a max-width container with a two-column grid.
+- Align items center, but do not use huge vertical centering.
+- Set the image wrapper height explicitly, for example around 380–440px on laptop.
+- Make sure image cards fit inside that wrapper and are not clipped.
+- Consider reducing the heading to:
+  - text-4xl
+  - md:text-5xl
+  - xl:text-[4.5rem] or similar
+  rather than an oversized display heading.
+- For the image layout, prefer a clean poster/shop-grid-inspired layout:
+  - straight rectangular image tiles
+  - same object-fit behavior as product cards where possible
+  - minimal or no border radius
+  - consistent spacing
+  - no oversized rounded lifestyle collage feel
+
+Mobile requirements:
+- Keep the mobile hero compact.
+- Do not show the full desktop four-image collage on mobile.
+- Use a compact store-like image treatment, such as:
+  - two poster/store images side-by-side,
+  - or a short horizontal strip,
+  - or a small product-grid-style preview.
+- Avoid rounded collage styling on mobile too.
+- Make sure the next section starts quickly after the hero.
+- CTA buttons should remain easy to tap.
+
+Please take a new screenshot at laptop width after the fix and report:
+- what changed in Home.tsx
+- whether the image area is fully visible
+- whether the images now visually match the shop/store image style
+- whether rounded corners were removed/reduced
+- whether the next section is visible or starts in the first viewport
+- typecheck/build/test results if rerun
+
+Do not commit or push until I approve after seeing the updated screenshot.

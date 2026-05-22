@@ -52,31 +52,33 @@ export default function Home() {
 
   const heroPosters = featured?.slice(0, 4) ?? [];
 
-  const brandStory = (store as any).homepage?.brandStory ?? "A curated poster collection inspired by cities, landscapes, food, architecture and everyday moments.";
+  const brandStory =
+    (store as any).homepage?.brandStory ??
+    "A curated poster collection inspired by cities, landscapes, food, architecture and everyday moments.";
   const valueCards = (store as any).homepage?.valueCards ?? DEFAULT_VALUE_CARDS;
 
   return (
     <div className="min-h-screen pb-16">
-      {/* ── Hero Section ── */}
-      <section className="relative bg-sand overflow-hidden">
-        <div className="container mx-auto px-6 lg:px-10">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-12 py-10 lg:py-0 lg:min-h-[580px] items-center">
+      {/* ── Hero ── */}
+      <section className="bg-sand overflow-hidden">
+        <div className="container mx-auto px-6 lg:px-10 py-8 lg:py-10">
+          {/*
+            items-start: both columns align to top, no blank space above text.
+            Section height = max(text height, image height). Both start at y=0 of the grid.
+          */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10 items-start">
 
-            {/* Left: Headline + CTA */}
-            <div className="flex flex-col order-2 lg:order-1 text-center lg:text-left justify-center">
-              <h1 className="font-serif text-4xl md:text-5xl xl:text-6xl font-bold text-primary mb-4 leading-[1.1]">
+            {/* Left: copy */}
+            <div className="order-2 lg:order-1 flex flex-col text-center lg:text-left lg:pt-4">
+              <h1 className="font-serif text-4xl md:text-[2.75rem] font-bold text-primary mb-3 leading-tight">
                 {store.homepage.heroTitle}
               </h1>
-              <p className="text-base md:text-lg text-foreground/65 mb-7 max-w-md mx-auto lg:mx-0 leading-relaxed">
+              <p className="text-base text-foreground/65 mb-6 max-w-md mx-auto lg:mx-0 leading-relaxed">
                 {store.homepage.heroSubtitle}
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
                 <Link href="/shop">
-                  <Button
-                    size="lg"
-                    className="w-full sm:w-auto h-12 px-7 text-base"
-                    data-testid="btn-hero-primary"
-                  >
+                  <Button size="lg" className="w-full sm:w-auto h-11 px-6" data-testid="btn-hero-primary">
                     {store.homepage.primaryCta || "Browse posters"}
                   </Button>
                 </Link>
@@ -84,26 +86,24 @@ export default function Home() {
                   <Button
                     size="lg"
                     variant="outline"
-                    className="w-full sm:w-auto h-12 px-7 text-base border-primary/30 text-primary hover:bg-primary/5"
+                    className="w-full sm:w-auto h-11 px-6 border-primary/30 text-primary hover:bg-primary/5"
                   >
                     View all regions
                   </Button>
                 </Link>
               </div>
-
-              {/* Trust indicators */}
-              <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-2 justify-center lg:justify-start text-xs text-foreground/50">
+              <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-1.5 justify-center lg:justify-start text-xs text-foreground/45">
                 <span>✦ Fine art prints</span>
                 <span>✦ Ships worldwide</span>
                 <span>✦ Sustainably made</span>
               </div>
             </div>
 
-            {/* Right: Image collage */}
+            {/* Right: poster tiles */}
             <div className="order-1 lg:order-2">
 
-              {/* ── Mobile: compact 2-image row ── */}
-              <div className="flex gap-2.5 lg:hidden">
+              {/* Mobile: two posters side-by-side, flat rectangular */}
+              <div className="flex gap-2 lg:hidden">
                 {heroPosters.length > 0 ? (
                   heroPosters.slice(0, 2).map((poster) => (
                     <Link
@@ -111,7 +111,7 @@ export default function Home() {
                       href={(poster as any).slug ? `/posters/${(poster as any).slug}` : `/poster/${poster.id}`}
                       className="flex-1"
                     >
-                      <div className="overflow-hidden rounded-xl shadow-md aspect-[3/4]">
+                      <div className="overflow-hidden aspect-[3/4]">
                         <img
                           src={poster.imageUrl ?? ""}
                           alt={poster.title}
@@ -122,62 +122,39 @@ export default function Home() {
                   ))
                 ) : (
                   <>
-                    <div className="flex-1 aspect-[3/4] bg-muted/60 animate-pulse rounded-xl" />
-                    <div className="flex-1 aspect-[3/4] bg-muted/60 animate-pulse rounded-xl" />
+                    <div className="flex-1 aspect-[3/4] bg-muted/60 animate-pulse" />
+                    <div className="flex-1 aspect-[3/4] bg-muted/60 animate-pulse" />
                   </>
                 )}
               </div>
 
-              {/* ── Desktop: staggered poster collage ── */}
-              <div className="hidden lg:block h-[480px] overflow-hidden">
+              {/* Desktop: 2×2 flat poster grid using CSS grid rows for even distribution */}
+              <div
+                className="hidden lg:grid gap-2"
+                style={{
+                  height: "340px",
+                  gridTemplateColumns: "1fr 1fr",
+                  gridTemplateRows: "1fr 1fr",
+                }}
+              >
                 {heroPosters.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-4 h-full">
-                    <div className="flex flex-col gap-4 pt-8">
-                      {heroPosters.slice(0, 2).map((poster) => (
-                        <Link
-                          key={poster.id}
-                          href={(poster as any).slug ? `/posters/${(poster as any).slug}` : `/poster/${poster.id}`}
-                          className="flex-1 block min-h-0"
-                        >
-                          <div className="overflow-hidden rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 group h-full">
-                            <img
-                              src={poster.imageUrl ?? ""}
-                              alt={poster.title}
-                              className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500"
-                            />
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                    <div className="flex flex-col gap-4">
-                      {heroPosters.slice(2, 4).map((poster) => (
-                        <Link
-                          key={poster.id}
-                          href={(poster as any).slug ? `/posters/${(poster as any).slug}` : `/poster/${poster.id}`}
-                          className="flex-1 block min-h-0"
-                        >
-                          <div className="overflow-hidden rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 group h-full">
-                            <img
-                              src={poster.imageUrl ?? ""}
-                              alt={poster.title}
-                              className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500"
-                            />
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
+                  heroPosters.slice(0, 4).map((poster) => (
+                    <Link
+                      key={poster.id}
+                      href={(poster as any).slug ? `/posters/${(poster as any).slug}` : `/poster/${poster.id}`}
+                      className="overflow-hidden group block"
+                    >
+                      <img
+                        src={poster.imageUrl ?? ""}
+                        alt={poster.title}
+                        className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
+                      />
+                    </Link>
+                  ))
                 ) : (
-                  <div className="grid grid-cols-2 gap-4 h-full">
-                    <div className="flex flex-col gap-4 pt-8">
-                      <div className="flex-1 bg-muted/60 animate-pulse rounded-xl" />
-                      <div className="flex-1 bg-muted/60 animate-pulse rounded-xl" />
-                    </div>
-                    <div className="flex flex-col gap-4">
-                      <div className="flex-1 bg-muted/60 animate-pulse rounded-xl" />
-                      <div className="flex-1 bg-muted/60 animate-pulse rounded-xl" />
-                    </div>
-                  </div>
+                  [0, 1, 2, 3].map((i) => (
+                    <div key={i} className="bg-muted/60 animate-pulse" />
+                  ))
                 )}
               </div>
 
@@ -227,7 +204,7 @@ export default function Home() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="aspect-[3/4] bg-muted animate-pulse rounded-md" />
+              <div key={i} className="aspect-[3/4] bg-muted animate-pulse" />
             ))}
           </div>
         )}
