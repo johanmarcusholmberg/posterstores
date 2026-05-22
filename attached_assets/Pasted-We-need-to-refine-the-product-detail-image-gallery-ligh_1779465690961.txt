@@ -1,0 +1,112 @@
+We need to refine the product detail image gallery/lightbox UX.
+
+Context:
+- Project: posterstores
+- Repo: https://github.com/johanmarcusholmberg/posterstores
+- Active shop: PostersOfSpain
+- The product detail gallery is in/around artifacts/poster-store/src/components/public/MockupGallery.tsx.
+- The product page image styling was recently updated to match the flat shop grid style.
+- Now we need to fix the large-view/lightbox behavior and remove visible image/mockup names.
+
+Please inspect:
+- artifacts/poster-store/src/components/public/MockupGallery.tsx
+- any related lightbox/gallery CSS/classes
+- current poster/mockup image data structure
+
+Requested changes:
+
+1. Fix large-view/lightbox image sizing
+When opening a poster or mockup in large view, the pop-out should harmonize to the actual image/poster shape.
+
+Current issue:
+- the large-view can look too wide/cropped or mismatched to the poster aspect ratio
+- portrait posters such as 50x70 should appear as portrait posters
+- square posters such as 50x50 should appear square
+- mockup images should also fit naturally
+
+Desired behavior:
+- use `object-contain`, not crop/fill
+- preserve the actual image aspect ratio
+- center the image in the modal
+- constrain the image to viewport, e.g. max width/height based on `vw`/`vh`
+- avoid unnecessary white/empty side bands caused by the modal frame
+- do not stretch images
+- do not crop artwork
+- the modal should feel designed for the image, not like a fixed wide slideshow frame
+
+Implementation guidance:
+- Prefer a simple image-centered lightbox layout.
+- The image itself should define the visual size within safe viewport limits.
+- Use classes like `max-h-[85vh]`, `max-w-[90vw]`, `w-auto`, `h-auto`, `object-contain` or equivalent.
+- Avoid fixed aspect-ratio wrappers inside the lightbox if they force the wrong shape.
+- Keep prev/next controls working.
+
+2. Remove visible mockup/image names on product page
+Remove labels such as:
+- “Poster”
+- “On the wall”
+- any other visible mockup/image names
+
+Apply this to:
+- thumbnails under the main image
+- lightbox title/caption area
+- any overlay label on thumbnails
+
+The images should be visual-only. Keep alt text/accessibility labels internally, but do not display the names visibly.
+
+3. Improve lightbox visual polish
+Small refinements only:
+- use a softer dark overlay if currently too harsh
+- avoid large empty caption space after removing names
+- keep close button clear
+- keep arrows usable but not covering important artwork too aggressively
+- make sure arrows remain accessible and keyboard-focusable if they already were
+
+4. Preserve mobile behavior
+On mobile:
+- large-view image should fit within screen
+- no horizontal page overflow
+- no cropping
+- swiping/changing images should still work if supported
+- close button should remain easy to tap
+
+5. Preserve existing behavior
+Do not break:
+- thumbnail switching
+- lightbox open/close
+- prev/next arrows
+- selected image state
+- poster/mockup image list
+- add to cart
+- favorites
+- size selection
+- product loading/error states
+
+Constraints:
+- Frontend only.
+- Do not touch backend/API/database.
+- Do not introduce dependencies.
+- Keep changes focused in MockupGallery unless a tiny related CSS adjustment is necessary.
+- Do not redesign the whole product page.
+- Do not commit or push unless I explicitly ask.
+
+Validation:
+Run:
+pnpm --filter @workspace/poster-store run typecheck
+
+Manual verification:
+- open lightbox for portrait poster image
+- open lightbox for mockup image
+- verify no cropping/stretching
+- verify modal size adapts naturally to image shape
+- verify no visible “Poster” / “On the wall” labels on thumbnails or lightbox
+- desktop prev/next/close still work
+- mobile lightbox fits screen
+- no horizontal overflow
+
+Deliverable:
+- Summarize files changed.
+- Explain how lightbox sizing now preserves poster/mockup aspect ratio.
+- Confirm visible image/mockup names were removed.
+- Mention checks run and results.
+- Do not commit or push.

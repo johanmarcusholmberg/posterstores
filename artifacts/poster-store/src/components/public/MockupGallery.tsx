@@ -423,10 +423,6 @@ export const MockupGallery = ({
                     onError={(e) => { (e.target as HTMLImageElement).src = fallbackImageUrl; }}
                   />
                 )}
-                {/* Friendly label chip */}
-                <span className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[9px] text-center leading-tight py-0.5 px-0.5 truncate">
-                  {img.label}
-                </span>
               </button>
             ))}
           </div>
@@ -436,54 +432,54 @@ export const MockupGallery = ({
       {/* Lightbox */}
       {lightboxOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
           onClick={closeLightbox}
         >
           <div
-            className="relative flex flex-col items-center max-w-3xl w-full mx-4"
+            className="relative flex flex-col items-center w-full px-4"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Close button */}
             <button
               onClick={closeLightbox}
-              className="absolute -top-10 right-0 text-white/80 hover:text-white transition-colors"
+              className="absolute top-0 right-4 text-white/70 hover:text-white transition-colors z-10"
               aria-label="Close"
             >
               <X className="w-7 h-7" />
             </button>
 
-            <div
-              className="relative w-full overflow-hidden bg-black/20 shadow-2xl"
-              style={{ maxHeight: "75vh", aspectRatio: "3/4" }}
-            >
-              {renderMainImage(allImages[lightboxIdx] ?? { url: fallbackImageUrl, label: "Poster" })}
+            {/* Image — let it define its own size within viewport limits */}
+            <div className="relative flex items-center justify-center w-full mt-10">
+              {allImages.length > 1 && (
+                <button
+                  onClick={prevLightbox}
+                  className="absolute left-0 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/55 text-white rounded-full p-2 transition-colors z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                  aria-label="Previous"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+              )}
+
+              <LightboxImage
+                item={allImages[lightboxIdx] ?? { url: fallbackImageUrl, label: "Poster" }}
+                fallbackImageUrl={fallbackImageUrl}
+                alt={alt}
+              />
 
               {allImages.length > 1 && (
-                <>
-                  <button
-                    onClick={prevLightbox}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white rounded-full p-2 transition-colors"
-                    aria-label="Previous"
-                  >
-                    <ChevronLeft className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={nextLightbox}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white rounded-full p-2 transition-colors"
-                    aria-label="Next"
-                  >
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
-                </>
+                <button
+                  onClick={nextLightbox}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/55 text-white rounded-full p-2 transition-colors z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                  aria-label="Next"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
               )}
             </div>
 
-            {/* Lightbox label */}
-            <p className="mt-2 text-white/60 text-sm">
-              {allImages[lightboxIdx]?.label ?? "Poster"}
-            </p>
-
+            {/* Thumbnail strip — no labels */}
             {allImages.length > 1 && (
-              <div className="flex gap-2 mt-2 overflow-x-auto pb-0.5">
+              <div className="flex gap-2 mt-4 overflow-x-auto pb-0.5">
                 {allImages.map((img, idx) => (
                   <button
                     key={idx}
@@ -491,15 +487,15 @@ export const MockupGallery = ({
                     onClick={() => setLightboxIdx(idx)}
                     aria-label={img.label}
                     className={cn(
-                      "relative shrink-0 overflow-hidden border-2 transition-all",
+                      "relative shrink-0 overflow-hidden border-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white",
                       lightboxIdx === idx
                         ? "border-white opacity-100"
                         : "border-transparent opacity-40 hover:opacity-70"
                     )}
-                    style={{ width: 64, height: 64 }}
+                    style={{ width: 56, height: 56 }}
                   >
                     <img
-                      src={img.url}
+                      src={img.isComposited && img.mockup?.template?.backgroundImageUrl ? img.mockup.template.backgroundImageUrl : img.url}
                       alt={img.label}
                       className="w-full h-full object-cover"
                       onError={(e) => {
@@ -516,6 +512,48 @@ export const MockupGallery = ({
     </>
   );
 };
+
+/**
+ * Lightbox image renderer — uses object-contain so portraits/squares/mockups
+ * all display at their natural aspect ratio without cropping or stretching.
+ */
+function LightboxImage({
+  item,
+  fallbackImageUrl,
+  alt,
+}: {
+  item: DisplayImage;
+  fallbackImageUrl: string;
+  alt: string;
+}) {
+  if (
+    item.isComposited &&
+    item.mockup?.template &&
+    hasPlacementData(item.mockup.template) &&
+    item.mockup.template.backgroundImageUrl
+  ) {
+    return (
+      <div className="max-h-[82vh] max-w-[88vw] w-auto h-auto" style={{ aspectRatio: "3/4" }}>
+        <CompositedMockup
+          backgroundUrl={item.mockup.template.backgroundImageUrl!}
+          posterImageUrl={fallbackImageUrl}
+          template={item.mockup.template}
+          alt={alt}
+          className="w-full h-full"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={item.url}
+      alt={alt}
+      className="block max-h-[82vh] max-w-[88vw] w-auto h-auto object-contain"
+      onError={(e) => { (e.target as HTMLImageElement).src = fallbackImageUrl; }}
+    />
+  );
+}
 
 /** Simple image with fade-in and fallback, showing a skeleton while loading. */
 function MainImage({
