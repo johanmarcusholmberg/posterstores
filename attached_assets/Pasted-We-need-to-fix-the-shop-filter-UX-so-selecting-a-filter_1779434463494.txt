@@ -1,0 +1,103 @@
+We need to fix the /shop filter UX so selecting a filter does NOT scroll or jump the user back to the top of the page.
+
+Context:
+- Project: posterstores
+- Repo: https://github.com/johanmarcusholmberg/posterstores
+- Active shop: PostersOfSpain
+- Current /shop visual layout is good.
+- The issue: when a user selects a region/category filter, the page position changes and the user ends up at the top of the page again.
+- Desired behavior: selecting filters should update the visible products and URL/search params if needed, but the viewport scroll position should remain stable.
+
+Please inspect:
+- artifacts/poster-store/src/pages/Shop.tsx
+- filter click handlers / sidebar filter links
+- routing/navigation helpers used for query params
+- any ScrollToTop component or route-change scroll behavior
+- wouter/router usage if relevant
+- search/sort/filter state handling
+
+Goal:
+When a user selects or clears a filter on /shop, the page should not automatically scroll to the top. The user's scroll position should stay where it is, unless they explicitly navigate to a different page/product.
+
+Requested changes:
+
+1. Prevent filter changes from resetting scroll position
+Find why selecting a filter causes the page to jump to the top.
+
+Likely causes to check:
+- using normal anchor links instead of buttons
+- calling navigate/setLocation in a way that triggers scroll reset
+- a ScrollToTop component listening to query-param changes
+- remounting the whole Shop page on query changes
+- manually calling window.scrollTo
+- focus handling that scrolls the page
+
+Update the filter logic so changing filters preserves the current scroll position.
+
+2. Keep URL/query param behavior if currently used
+If filters are represented in the URL, keep that behavior.
+
+But update the navigation method so:
+- query params change
+- browser history still works as before
+- the viewport does not reset to top
+
+Use the safest existing project pattern. If needed, use history.replaceState/pushState carefully, but prefer existing router utilities if they support preserving scroll.
+
+3. Do not break real navigation
+Only preserve scroll for in-page shop filter/sort/search changes.
+
+Do NOT prevent normal top/navigation behavior when:
+- navigating to a product detail page
+- navigating to another main page
+- using browser back/forward if existing behavior is expected
+- loading /shop directly from another route
+
+4. Apply to all shop controls that behave like filters
+Verify this for:
+- region filter
+- category/style filter
+- clearing filters
+- sort dropdown, if it currently jumps
+- search query changes, if handled inside /shop
+- pagination, if present; pagination may scroll to top only if that is the current intentional behavior, but filter clicks specifically should not
+
+5. Preserve existing visual work
+Do not change:
+- product card design
+- image container styling
+- sidebar labels
+- shop tagline
+- collection banner
+- header/search design
+- cart/favorites/product click behavior
+
+Constraints:
+- Frontend only.
+- Do not touch backend/API/database.
+- Do not introduce dependencies.
+- Keep changes small and localized.
+- Avoid broad router refactors.
+- Maintain TypeScript/design conventions.
+- Do not commit or push unless I explicitly ask.
+
+Validation:
+Run the relevant frontend typecheck/build command, for example:
+pnpm --filter @workspace/poster-store run typecheck
+
+Manually verify:
+- scroll halfway down /shop, select a region filter: viewport should stay stable
+- scroll halfway down /shop, select a category/style filter: viewport should stay stable
+- clear filter: viewport should stay stable
+- change sort: viewport should not unexpectedly jump
+- use header search while on /shop: no unexpected jump unless intentionally navigating
+- click a poster card: product page navigation still works
+- browser back/forward still works reasonably with filter URL changes
+- mobile filter interactions still work
+
+Deliverable:
+- Summarize files changed.
+- Explain the root cause of the scroll jump.
+- Explain how the fix preserves scroll position.
+- Mention checks run and results.
+- Do not commit or push.
