@@ -27,6 +27,9 @@ export interface StorefrontConfig {
     brandStory?: string;
   };
   shop?: {
+    /** Short single-line tagline shown under the poster count in /shop (always visible). */
+    shopTagline?: string;
+    /** Longer intro fields — reserved for homepage/landing pages, not used on /shop grid. */
     introTitle?: string;
     introSubtitle?: string;
     introTrustNotes?: string[];
@@ -77,6 +80,7 @@ export const storefronts: Record<string, StorefrontConfig> = {
       newsletterSubtitle: "Be the first to see new collections, city drops and seasonal releases."
     },
     shop: {
+      shopTagline: "Spain-inspired wall art · Premium matte paper · Multiple sizes",
       introTitle: "Posters inspired by Spain's regions, cities and coastlines",
       introSubtitle: "Curated wall art from Valencia, Andalucía, Madrid, Galicia and beyond — designed for warm, Mediterranean interiors.",
       introTrustNotes: ["Premium matte paper", "Multiple sizes available", "Printed for modern homes"],

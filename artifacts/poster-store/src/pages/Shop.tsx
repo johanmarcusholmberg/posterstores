@@ -112,49 +112,6 @@ function FilterSidebar({
   );
 }
 
-function ShopEditorialIntro({
-  title,
-  subtitle,
-  trustNotes,
-  trustLine,
-}: {
-  title?: string;
-  subtitle?: string;
-  trustNotes?: string[];
-  trustLine?: string;
-}) {
-  if (!title && !subtitle) return null;
-  return (
-    <div className="mb-8 pb-7 border-b border-border/60">
-      {title && (
-        <h2 className="font-serif text-xl sm:text-2xl font-bold text-foreground leading-snug mb-2">
-          {title}
-        </h2>
-      )}
-      {subtitle && (
-        <p className="text-sm sm:text-base text-muted-foreground max-w-xl leading-relaxed">
-          {subtitle}
-        </p>
-      )}
-      {trustNotes && trustNotes.length > 0 && (
-        <div className="flex flex-wrap gap-3 mt-4">
-          {trustNotes.map(note => (
-            <span
-              key={note}
-              className="inline-flex items-center gap-1.5 text-xs text-foreground/70 bg-muted/60 px-3 py-1 rounded-full border border-border/50"
-            >
-              <span className="w-1 h-1 rounded-full bg-primary/60 shrink-0" />
-              {note}
-            </span>
-          ))}
-        </div>
-      )}
-      {trustLine && (
-        <p className="mt-3 text-xs text-muted-foreground/80 tracking-wide">{trustLine}</p>
-      )}
-    </div>
-  );
-}
 
 function CollectionBanner({
   title,
@@ -435,6 +392,13 @@ export default function Shop() {
                 <p className="text-sm text-muted-foreground mt-1">{total} posters</p>
               )}
 
+              {/* Compact always-visible tagline — keeps heading area stable height across states */}
+              {shopCfg?.shopTagline && (
+                <p className="text-xs text-muted-foreground/70 mt-1.5 tracking-wide">
+                  {shopCfg.shopTagline}
+                </p>
+              )}
+
               {/* Compact active filter chips */}
               {activeFilters.length > 0 && (
                 <div className="flex flex-wrap items-center gap-2 mt-2">
@@ -526,16 +490,6 @@ export default function Shop() {
               </Select>
             </div>
           </div>
-
-          {/* Editorial shop intro — shown only when no filters active */}
-          {!hasAnyFilter && shopCfg && (
-            <ShopEditorialIntro
-              title={shopCfg.introTitle}
-              subtitle={shopCfg.introSubtitle}
-              trustNotes={shopCfg.introTrustNotes}
-              trustLine={shopCfg.trustLine}
-            />
-          )}
 
           {isLoadingFirstPage ? (
             <div className={gridClasses}>
