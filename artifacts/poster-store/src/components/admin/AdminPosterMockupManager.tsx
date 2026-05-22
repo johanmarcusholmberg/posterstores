@@ -28,6 +28,7 @@ import {
   Globe,
   Store,
   ImagePlus,
+  ImageIcon,
   MousePointerClick,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -111,7 +112,7 @@ export const AdminPosterMockupManager = ({
       key: nextKey(),
       mockupTemplateId: template.id,
       mockupImageUrl: null,
-      isPrimary: drafts.length === 0,
+      isPrimary: false,
       isHoverMockup: false,
       sortOrder: drafts.length,
       templateName: template.name,
@@ -124,9 +125,6 @@ export const AdminPosterMockupManager = ({
   const removeTemplate = (templateId: number) => {
     setDrafts((prev) => {
       const next = prev.filter((d) => d.mockupTemplateId !== templateId);
-      if (next.length > 0 && !next.some((d) => d.isPrimary)) {
-        next[0].isPrimary = true;
-      }
       return next.map((d, i) => ({ ...d, sortOrder: i }));
     });
   };
@@ -134,9 +132,6 @@ export const AdminPosterMockupManager = ({
   const removeDraft = (key: string) => {
     setDrafts((prev) => {
       const next = prev.filter((d) => d.key !== key);
-      if (next.length > 0 && !next.some((d) => d.isPrimary)) {
-        next[0].isPrimary = true;
-      }
       return next.map((d, i) => ({ ...d, sortOrder: i }));
     });
   };
@@ -160,7 +155,7 @@ export const AdminPosterMockupManager = ({
       key: nextKey(),
       mockupTemplateId: null,
       mockupImageUrl: url,
-      isPrimary: drafts.length === 0,
+      isPrimary: false,
       isHoverMockup: false,
       sortOrder: drafts.length,
       templateName: "Custom image",
@@ -346,7 +341,7 @@ export const AdminPosterMockupManager = ({
                 Selected mockups ({drafts.length})
               </h2>
               <p className="text-xs text-muted-foreground">
-                Drag to reorder. Star = primary display image.
+                Drag to reorder. Star = set as primary shop image. Poster image is primary by default.
               </p>
             </div>
             <Button
@@ -365,10 +360,74 @@ export const AdminPosterMockupManager = ({
             </Button>
           </div>
 
+          {/* Poster image — always shown as the default/primary option */}
+          {(() => {
+            const hasPrimaryDraft = drafts.some((d) => d.isPrimary);
+            return (
+              <Card
+                className={cn(
+                  "transition-all",
+                  !hasPrimaryDraft && "ring-2 ring-primary"
+                )}
+              >
+                <CardContent className="flex items-center gap-3 p-3">
+                  <div className="w-12 h-12 shrink-0 rounded overflow-hidden bg-muted">
+                    {poster.imageUrl ? (
+                      <img
+                        src={poster.imageUrl}
+                        alt="Poster image"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                        <ImageIcon className="w-4 h-4" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">Poster image</p>
+                    <p className="text-xs text-muted-foreground">Original poster — default primary</p>
+                    {!hasPrimaryDraft && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary bg-primary/10 border border-primary/20 rounded px-1.5 py-0.5 mt-0.5">
+                        <Star className="w-2.5 h-2.5 fill-current" />
+                        Primary
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="shrink-0">
+                    <Button
+                      type="button"
+                      variant={!hasPrimaryDraft ? "default" : "ghost"}
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() =>
+                        setDrafts((prev) => prev.map((d) => ({ ...d, isPrimary: false })))
+                      }
+                      title="Use poster image as primary display"
+                      disabled={!hasPrimaryDraft}
+                    >
+                      <Star
+                        className={cn(
+                          "w-3.5 h-3.5",
+                          !hasPrimaryDraft && "fill-white"
+                        )}
+                      />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
+
           {drafts.length === 0 ? (
-            <div className="rounded-md border border-dashed p-8 text-center text-muted-foreground text-sm">
-              <Plus className="w-8 h-8 mx-auto mb-2 opacity-30" />
-              No mockups selected. Click templates on the left to add them.
+            <div className="rounded-md border border-dashed p-6 text-center text-muted-foreground text-sm">
+              <Plus className="w-6 h-6 mx-auto mb-1.5 opacity-30" />
+              No mockups yet. Click templates on the left to add alternatives.
             </div>
           ) : (
             <div className="space-y-2">

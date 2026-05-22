@@ -485,6 +485,7 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
                 <AdminMockupEditor
                   posterId={existing.id}
                   storeKey={existing.storeKey}
+                  posterImageUrl={existing.imageUrl}
                   mockups={mockups}
                   onMockupsChange={setMockups}
                 />

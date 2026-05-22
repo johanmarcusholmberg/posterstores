@@ -313,6 +313,21 @@ export async function adminClearHoverMockup(
   if (!res.ok) await handleError(res);
 }
 
+export async function adminClearPrimaryMockup(
+  posterId: number,
+  storeKey: string
+): Promise<void> {
+  const res = await fetch(
+    `${BASE}/posters/${posterId}/mockups/primary/clear?storeKey=${encodeURIComponent(storeKey)}`,
+    {
+      method: "PATCH",
+      headers: jsonHeaders(),
+      credentials: "include",
+    }
+  );
+  if (!res.ok) await handleError(res);
+}
+
 export async function adminDeletePosterMockup(
   posterId: number,
   mockupId: number,
@@ -404,12 +419,15 @@ export function resolvePosterDisplayImage(
 
   if (activeMockups.length === 0) return fallbackImageUrl;
 
-  // Priority: featured+primary > featured > primary > first active
+  // Only use a mockup image when one is explicitly marked primary.
+  // If no mockup is primary, fall back to the poster's own image.
+  const primaryMockup = activeMockups.find((m) => m.isPrimary);
+  if (!primaryMockup) return fallbackImageUrl;
+
+  // Featured primary takes precedence over plain primary.
   const pick =
     activeMockups.find((m) => m.isPrimary && m.template?.isFeatured) ??
-    activeMockups.find((m) => m.template?.isFeatured) ??
-    activeMockups.find((m) => m.isPrimary) ??
-    activeMockups[0];
+    primaryMockup;
 
   if (pick.mockupImageUrl) return pick.mockupImageUrl;
   if (pick.template?.previewThumbnailUrl) return pick.template.previewThumbnailUrl;

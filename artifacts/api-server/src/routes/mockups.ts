@@ -721,13 +721,12 @@ router.put("/posters/:id/mockups/batch", requireAdmin, async (req, res) => {
   await db.delete(posterMockupsTable).where(eq(posterMockupsTable.posterId, posterId));
 
   if (mockups.length > 0) {
-    const hasPrimary = mockups.some((m: any) => m.isPrimary);
     const toInsert = mockups.map((m: any, idx: number) => ({
       posterId,
       mockupTemplateId: m.mockupTemplateId ?? null,
       mockupImageUrl: m.mockupImageUrl ?? null,
       sortOrder: m.sortOrder ?? idx,
-      isPrimary: hasPrimary ? (m.isPrimary ?? false) : idx === 0,
+      isPrimary: m.isPrimary ?? false,
       isHoverMockup: m.isHoverMockup ?? false,
     }));
 
@@ -820,6 +819,28 @@ router.patch("/posters/:id/mockups/:mockupId/hover/clear", requireAdmin, async (
   await db
     .update(posterMockupsTable)
     .set({ isHoverMockup: false, updatedAt: new Date() })
+    .where(eq(posterMockupsTable.posterId, posterId));
+
+  return res.json({ ok: true });
+});
+
+router.patch("/posters/:id/mockups/primary/clear", requireAdmin, async (req, res) => {
+  const posterId = Number(req.params.id);
+  if (isNaN(posterId)) return res.status(400).json({ error: "Invalid id" });
+
+  const storeKey =
+    typeof req.query.storeKey === "string" ? req.query.storeKey : undefined;
+  if (!storeKey) return res.status(400).json({ error: "storeKey is required" });
+
+  const [poster] = await db
+    .select()
+    .from(postersTable)
+    .where(and(eq(postersTable.id, posterId), eq(postersTable.storeKey, storeKey)));
+  if (!poster) return res.status(404).json({ error: "Poster not found or store mismatch" });
+
+  await db
+    .update(posterMockupsTable)
+    .set({ isPrimary: false, updatedAt: new Date() })
     .where(eq(posterMockupsTable.posterId, posterId));
 
   return res.json({ ok: true });
