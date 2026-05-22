@@ -1,0 +1,111 @@
+We need to adjust the recent Shop UX changes to avoid layout jumping and keep the focus on the posters.
+
+Context:
+- Project: posterstores
+- Active store: PostersOfSpain
+- The recent UX pass added a large editorial intro above the poster grid.
+- It looks nice, but it pushes the posters too far down and the shop page should focus more directly on the posters.
+- We also want to avoid the screen jumping around when filters/search states change.
+
+Goal:
+Make the /shop page feel more stable and poster-focused while keeping the authentic curated feel.
+
+Please inspect:
+- artifacts/poster-store/src/pages/Shop.tsx
+- artifacts/poster-store/src/config/storefronts.ts
+- artifacts/poster-store/src/context/StorefrontContext.tsx
+- artifacts/poster-store/src/components/shared/PosterCard.tsx
+
+Requested changes:
+
+1. Remove or replace the large editorial intro on /shop
+The current ShopEditorialIntro block with title/subtitle/trust pills/trust line is too large for the main shop grid page.
+
+Replace it with a much more compact shop context/assurance line directly under the heading/count area.
+
+Suggested layout:
+- Heading: “All Posters”
+- Count: “13 posters”
+- Small muted single-line context below:
+  “Spain-inspired wall art · Premium matte paper · Multiple sizes”
+
+Use store config if possible, but keep it simple.
+
+Important:
+- Do not show a large title like “Posters inspired by Spain’s regions…” inside the shop grid page.
+- That copy can remain in config for future homepage/landing use, but it should not dominate /shop.
+- The posters should appear higher on the page.
+
+2. Avoid layout jumping between default and filtered/search states
+Currently the editorial intro is hidden when filters are active, which changes the vertical layout significantly.
+
+Update the shop page so the heading area has a stable, compact height across states.
+
+Default state:
+- “All Posters”
+- “13 posters”
+- compact assurance/context line
+
+Filtered/search state:
+- appropriate filtered heading/count text
+- either keep the same compact line visible, or reserve similar spacing so the grid does not jump
+
+Do not conditionally render large blocks above the grid.
+
+3. Keep the curated sidebar improvements
+Keep:
+- “Explore Spain”
+- “All of Spain”
+- “Shop by style”
+- “All styles”
+- improved selected state
+
+Do not revert those.
+
+4. Keep product card improvements
+Keep:
+- sizes line if posterSizes exists
+- “Premium matte print” line
+- existing badges
+
+5. Reconsider the collection banner placement
+Keep the “Mediterranean Walls” collection banner only if it appears after the first product row and does not disrupt filtering/search.
+
+Rules:
+- Show it only on the default unfiltered shop view.
+- Never show it above the first posters.
+- If the current implementation causes layout awkwardness, move it lower or remove it for now.
+- Poster grid stability is more important than the banner.
+
+6. Clean up config if needed
+If the shop config now contains unused intro fields, either:
+- keep them for future homepage/landing use with a clear naming/comment, or
+- simplify to only the fields used by /shop
+
+Avoid over-engineering.
+
+Constraints:
+- Frontend only.
+- Do not touch backend/API/database.
+- Do not change search, filters, sorting, cart, or favorites logic.
+- Do not introduce dependencies.
+- Preserve responsive behavior.
+- Keep TypeScript clean.
+
+Validation:
+Run the relevant typecheck/build command.
+Manually verify:
+- default /shop
+- region filtered view
+- category filtered view
+- search results view
+- mobile layout
+- sort dropdown still works
+- no big vertical jump when filters/search activate
+
+Deliverable:
+- Summarize files changed.
+- Explain how the shop is now more poster-focused.
+- Explain how layout jumping was reduced.
+- Mention checks run and results.
+- Do not commit or push unless I explicitly ask.
