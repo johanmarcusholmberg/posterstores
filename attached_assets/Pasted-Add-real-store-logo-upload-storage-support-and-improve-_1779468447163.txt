@@ -1,0 +1,139 @@
+Add real store logo upload/storage support and improve the homepage hero responsiveness.
+
+Context:
+The Poster Stores app currently uses a text logotype in the header, for example “PostersOfSpain”. I want each store to be able to upload and use a real logo image from the admin area. This must not be just a logo URL field. The uploaded logo should be stored properly and persisted for the selected store.
+
+Also improve the homepage hero layout. On laptop, the hero takes too much vertical space: the heading is too large, appears too far down, and the image collage dominates the viewport. On mobile, the homepage is not working well because “Posters inspired by Spain” appears above the example images in a tall stacked layout, which makes the start page feel too large and not shop-focused enough.
+
+Important constraints:
+- Do not create branches, PRs, or GitHub automation.
+- Make changes first; do not commit or push until I approve.
+- Keep the change focused: store logo upload/storage + homepage hero layout adjustments only.
+- Do not build a full media library.
+- Do not redesign the whole store.
+- Do not break existing stores without uploaded logos.
+- Do not break multi-store routePrefix/domain behavior.
+- Reuse existing storage/upload patterns in the repo if available.
+- Keep Replit cost low: avoid broad exploratory rewrites, avoid unnecessary large test rewrites, and keep the implementation targeted.
+
+Part 1 — Investigate existing upload/storage patterns:
+- Check whether the repo already uses Supabase Storage, uploaded poster assets, mockup assets, or any existing file upload endpoints.
+- Reuse the existing storage client, bucket, helper functions, environment variables, and backend conventions if present.
+- If no upload pattern exists, implement a minimal backend upload flow suitable only for store logo assets.
+- Do not introduce a new storage provider unless clearly necessary.
+
+Part 2 — Database/config model:
+- Add store-level logo fields in the appropriate store table/config model:
+  - logoUrl
+  - logoPath or logoStoragePath if useful for replacement/deletion
+  - logoAltText
+- Optional: add mobileLogoUrl/mobileLogoPath only if simple and clean. Do not overbuild this.
+- Add a migration/schema update consistent with the repo’s current DB pattern.
+- Ensure store config returned to the frontend includes these logo fields.
+- Existing stores should continue working with null logo fields.
+- Preserve existing static/default store config fallback behavior.
+
+Part 3 — Backend upload API:
+- Add a protected admin endpoint for uploading/replacing a store logo for a given storeKey.
+- Endpoint must require the same admin auth/protection as the other admin store endpoints.
+- Validate:
+  - storeKey exists
+  - file is present
+  - file type is png, jpg/jpeg, or webp
+  - max file size is reasonable, for example 2MB
+- Do not allow unsafe file types.
+- Store the file under a clean deterministic path, for example:
+  store-assets/{storeKey}/logo/{timestamp-or-hash}-{safe-file-name}
+- Return the public logo URL and storage path.
+- Save the logo URL/path on the store record.
+- If replacing a logo, try to delete the previous stored logo if safe and supported.
+- Add either:
+  - a remove logo endpoint, or
+  - support for clearing logoUrl/logoPath from the store edit page.
+- Ensure upload errors are returned clearly to the admin UI.
+
+Part 4 — Admin UI:
+- Update the admin store create/edit UI to include a clear “Branding” section.
+- Add:
+  - current logo preview
+  - upload button/input
+  - replace logo action
+  - remove logo action
+  - logo alt text field
+- After upload, refresh the store data and show the uploaded logo immediately.
+- Show clear loading/error states.
+- Keep the UI simple and consistent with the existing admin components.
+- Do not add a full media library.
+- Do not require manually pasting image URLs.
+
+Part 5 — Navbar rendering:
+- Update the public Navbar so it renders the uploaded logo image when the active store has logoUrl.
+- Fall back to the existing text logo/store name when logoUrl is missing.
+- Logo should link to the correct store homepage.
+- Respect routePrefix if relevant.
+- Use logoAltText or store name for alt text.
+- Size constraints:
+  - desktop max height around 32–40px
+  - mobile max height around 28–34px
+  - preserve aspect ratio
+  - avoid layout shift
+- Do not make the header taller than it is today.
+- If the image fails to load, the layout should still be acceptable and the text fallback should remain available where practical.
+
+Part 6 — Homepage hero laptop/desktop:
+- Find the homepage hero component/page.
+- Reduce the vertical footprint on laptop screens.
+- The first viewport should ideally show the beginning of the next section below the hero.
+- Reduce the heading size using responsive clamp values.
+- Reduce excessive top/bottom spacing.
+- Reduce the image collage height/size on laptop.
+- Keep the premium/editorial visual feel.
+- Avoid the collage dominating the whole viewport.
+- Suggested target:
+  - laptop collage height around 420–520px
+  - tighter vertical gaps
+  - heading still elegant, but not oversized
+  - CTA buttons remain clearly visible
+- The page should feel more like a shop and less like a full-screen landing page.
+
+Part 7 — Mobile homepage hero:
+- Make the mobile hero much more compact.
+- Do not render the full large desktop collage on mobile.
+- Avoid a tall stacked layout where the title appears first and the user must scroll far before seeing the example images or products.
+- Use a smaller mobile-specific visual treatment:
+  - either a compact two-image collage,
+  - or a horizontal image strip,
+  - or a smaller image preview below the CTA.
+- Keep CTA buttons easy to tap.
+- Ensure the next section starts quickly after the hero.
+- The mobile hero should still feel premium, but it should not consume too much vertical space.
+
+Part 8 — Safety and quality:
+- Keep existing text-logo behavior for stores without logoUrl.
+- Keep existing static/default store config fallback working.
+- Ensure uploaded logo does not break if image fails to load.
+- Ensure admin routes remain protected.
+- Ensure public routes still resolve the correct store by domain/routePrefix/default.
+- Do not change checkout, orders, fulfillment, mockups, or poster CRUD except where required for shared store config types.
+- Avoid unrelated visual changes outside Navbar and homepage hero.
+
+Run:
+- npm run typecheck
+- npm test -- --run
+- npm run build
+
+Report back with:
+- files changed
+- upload/storage approach used
+- bucket/path used for logos
+- database/schema changes
+- how logo replacement/removal works
+- how logo fallback works
+- what changed in Navbar rendering
+- what changed in desktop/laptop hero sizing
+- what changed in mobile hero layout
+- test/build results
+- any setup needed in Supabase/Replit environment
+- any limitations or follow-up recommendations
+
+Do not commit or push until I review and approve the changes.
