@@ -1,0 +1,129 @@
+We need to improve the Poster Store product cards so they feel more like real ecommerce poster products and less like generic placeholder cards.
+
+Context:
+- Project: posterstores
+- Repo: https://github.com/johanmarcusholmberg/posterstores
+- Active shop: PostersOfSpain
+- The current shop page layout is now good and poster-focused.
+- Do NOT change the overall shop page layout/header/sidebar behavior.
+- Do NOT focus on image quality; images are placeholders for now.
+- This task is specifically about improving product card UX and commerce authenticity.
+
+Please inspect:
+- artifacts/poster-store/src/components/shared/PosterCard.tsx
+- artifacts/poster-store/src/pages/Shop.tsx
+- poster/product types used by the frontend
+- any existing size, price, category, region, badge, mockup, or availability fields
+- existing cart/favorites/product detail interactions
+
+Goal:
+Make each poster card communicate more real buying information while staying clean and premium.
+
+Requested improvements:
+
+1. Improve product card information hierarchy
+Each card should clearly show:
+- poster title
+- region/city/location
+- price, ideally “From €X”
+- available sizes, if real size data exists
+- material/quality cue, e.g. “Premium matte print”
+
+The hierarchy should feel like:
+Title
+Location/region
+Sizes/material
+Price/action
+
+Avoid clutter. The cards should still feel elegant and visual.
+
+2. Use real data where available
+If posterSizes or equivalent size data exists:
+- show size names such as “30×40 · 50×70 · A2”
+- avoid duplicate/ugly formatting
+- gracefully hide the line if no sizes exist
+
+If only price data exists:
+- keep “From €X” behavior
+- ensure price alignment is consistent across cards
+
+Do not hardcode misleading data if real data is available.
+
+3. Add subtle commerce/trust cues
+Add one lightweight product-level cue, for example:
+- “Premium matte print”
+- “Printed on demand”
+- “Museum-quality matte paper”
+
+For now, use one consistent static phrase if there is no product-level material field.
+
+Keep it subtle and muted; it should support trust, not dominate the card.
+
+4. Improve price/action area
+Review the card’s price placement and spacing.
+
+The card should make it easy to understand:
+- what the product is
+- where it is from
+- what it costs from
+- that it is available in multiple print sizes
+
+If there are existing hover actions, favorites, quick view, or add-to-cart affordances, keep them working.
+
+Do not add checkout/cart behavior unless it already exists in the card.
+
+5. Improve title truncation
+The current title truncation can feel abrupt, for example “Spanish Lavender...”.
+
+Improve title display so it feels polished:
+- use CSS line clamp if already available or simple Tailwind utilities
+- allow up to 2 lines for titles
+- avoid manual ellipsis if possible
+- keep card heights consistent
+
+6. Optional: add a small category/style label if already available
+If the card already has category/style data, consider showing one subtle label such as:
+“Coastal poster”, “Spanish city”, “Food & drinks”, etc.
+
+Only add this if it can be done cleanly with existing data.
+Do not introduce backend changes just for this.
+
+7. Preserve existing behavior
+Do not break:
+- clicking a card to open the product page
+- favorites
+- cart behavior
+- badges such as NEW
+- image aspect ratio
+- responsive grid
+- search/filter/sort behavior
+
+Constraints:
+- Frontend only.
+- Do not touch backend/API/database.
+- Do not introduce new dependencies.
+- Keep changes small and localized.
+- Prefer improving PosterCard rather than changing the whole Shop page.
+- Maintain existing TypeScript and design conventions.
+- Avoid over-engineering.
+- Do not commit or push unless I explicitly ask.
+
+Validation:
+Run the relevant frontend typecheck/build command.
+
+Manually verify:
+- default /shop grid
+- filtered region/category grid
+- search results
+- mobile card layout
+- long product titles
+- products with and without size data
+- price alignment
+- favorite/cart/card click behavior
+
+Deliverable:
+- Summarize files changed.
+- Explain the visual/UX improvement.
+- Mention what real data is used and what is static fallback.
+- Mention checks run and results.
+- Do not commit or push.
