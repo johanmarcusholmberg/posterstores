@@ -40,9 +40,8 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
   }, [favoritedIds, poster.id]);
 
   useEffect(() => {
-    const preloaded = (poster as any).primaryDisplayImageUrl as string | null | undefined;
-    if (preloaded) {
-      setDisplayImage(preloaded);
+    if (poster.primaryDisplayImageUrl) {
+      setDisplayImage(poster.primaryDisplayImageUrl);
       return;
     }
 
@@ -60,7 +59,7 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [poster.id, poster.imageUrl, store.storeKey, (poster as any).primaryDisplayImageUrl]);
+  }, [poster.id, poster.imageUrl, store.storeKey, poster.primaryDisplayImageUrl]);
 
   const toggleFavorite = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -91,8 +90,8 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
     }
   };
 
-  const activeSizes = (poster as any).posterSizes?.filter((s: any) => s.active) ?? [];
-  const lowestPrice = (poster as any).lowestActivePrice;
+  const activeSizes = poster.posterSizes?.filter((s) => s.active) ?? [];
+  const lowestPrice = poster.lowestActivePrice;
   const displayPrice = lowestPrice != null ? lowestPrice : poster.price;
   const displayCurrency = activeSizes[0]?.currency ?? poster.currency;
   const priceLabel = activeSizes.length > 1
@@ -100,8 +99,8 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
     : formatPrice(displayPrice, displayCurrency);
 
   const sizeNames: string[] = activeSizes
-    .map((s: any) => s.name || s.label || s.size || "")
-    .filter((n: string) => n.length > 0);
+    .map((s) => s.sizeLabel)
+    .filter((n) => n.length > 0);
   const sizeLabel = sizeNames.length > 0 ? sizeNames.join(" · ") : null;
 
   const href = (poster as any).slug ? `/posters/${(poster as any).slug}` : `/poster/${poster.id}`;
@@ -149,18 +148,31 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
             />
           </Button>
         </div>
-        <div className="flex justify-between items-start gap-2">
-          <div className="min-w-0 flex-1">
-            <h3 className="font-serif font-semibold text-base sm:text-lg text-foreground line-clamp-2 leading-snug">{poster.title}</h3>
-            {(poster.city || poster.region) && (
-              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">{poster.city || poster.region}</p>
-            )}
+
+        {/* Info area — Title → Location → Sizes/Material → Price */}
+        <div className="mt-0.5">
+          {poster.category && (
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground/40 mb-0.5 truncate">
+              {poster.category}
+            </p>
+          )}
+          <h3 className="font-serif font-semibold text-base sm:text-lg text-foreground line-clamp-2 leading-snug">
+            {poster.title}
+          </h3>
+          {(poster.city || poster.region) && (
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+              {poster.city || poster.region}
+            </p>
+          )}
+          <div className="mt-1">
             {sizeLabel && (
-              <p className="text-xs text-muted-foreground/70 mt-0.5 tracking-wide">{sizeLabel}</p>
+              <p className="text-xs text-muted-foreground/70 tracking-wide leading-snug">{sizeLabel}</p>
             )}
-            <p className="text-xs text-muted-foreground/60 mt-0.5">Premium matte print</p>
+            <p className="text-[10px] text-muted-foreground/50 tracking-wide mt-0.5">
+              Premium matte print
+            </p>
           </div>
-          <p className="font-medium text-foreground text-sm whitespace-nowrap mt-0.5 shrink-0">
+          <p className="font-medium text-foreground text-sm mt-1.5">
             {priceLabel}
           </p>
         </div>
