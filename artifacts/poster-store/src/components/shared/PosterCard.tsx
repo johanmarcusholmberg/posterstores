@@ -26,8 +26,30 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const mainImage = poster.primaryDisplayImageUrl ?? poster.imageUrl;
-  const hoverImage = poster.hoverDisplayImageUrl ?? null;
+  /*
+    Image strategy:
+    - baseImage: always the raw poster artwork (imageUrl). This is what the
+      customer sees before hovering — clean, flat, product-first.
+    - hoverImage: resolved with priority:
+        1. hoverDisplayImageUrl — a dedicated lifestyle/room mockup
+        2. primaryDisplayImageUrl — the primary assigned mockup, if it's
+           different from imageUrl (i.e. a mockup has been assigned at all)
+        3. null — no hover image; use the scale fallback instead
+
+    This means any poster with at least one mockup assigned gets the crossfade.
+    The previous code showed the mockup as the main image, leaving nothing to
+    reveal on hover — this is the reason "nothing happened".
+  */
+  const baseImage = poster.imageUrl;
+
+  const primaryMockup = poster.primaryDisplayImageUrl ?? null;
+  const dedicatedHover = poster.hoverDisplayImageUrl ?? null;
+
+  // Prefer the dedicated hover mockup; fall back to the primary mockup if it
+  // differs from the raw poster image (crossfade from art → room context).
+  const hoverImage: string | null =
+    dedicatedHover ??
+    (primaryMockup && primaryMockup !== baseImage ? primaryMockup : null);
 
   const [isFavorite, setIsFavorite] = useState(() =>
     favoritedIds ? favoritedIds.includes(poster.id) : false
@@ -101,38 +123,28 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
           ].join(" ")}
         >
           {/*
-            Base poster image.
+            Base poster image (always the raw artwork).
 
-            When a hover mockup is available:
-              Fades cleanly to opacity-0 on hover/focus. No scale — competing
-              transforms are what made the previous version feel barely noticeable.
-              The clean disappearance is what lets the mockup image read clearly.
+            When a hover image exists:
+              Fades fully to opacity-0 on hover. No scale so there is nothing
+              competing with the incoming mockup image.
 
-            When no hover mockup:
-              Stays fully visible but gets a modest scale + brightness lift,
-              which reads as a standard e-commerce "active" state.
+            When no hover image:
+              Scales up to 108% — clearly noticeable inside overflow-hidden —
+              making hover feel interactive even without a second image.
 
-            motion-reduce: transitions are removed entirely. The base image stays
-            at opacity-100 so the card still looks correct with no animation.
+            motion-reduce: transitions removed. Scale stays at 100% so the
+            card looks correct with no animation.
           */}
           <img
-            src={mainImage}
+            src={baseImage}
             alt={poster.title}
             className={[
               "absolute inset-0 object-cover w-full h-full",
               "motion-reduce:transition-none",
               hoverImage
-                ? [
-                    "transition-opacity duration-[280ms] ease-out",
-                    "opacity-100",
-                    "group-hover:opacity-0 group-focus-within:opacity-0",
-                  ].join(" ")
-                : [
-                    "transition-[transform,filter] duration-[300ms] ease-out",
-                    "scale-100 brightness-100",
-                    "group-hover:scale-[1.05] group-hover:brightness-[1.03]",
-                    "group-focus-within:scale-[1.05] group-focus-within:brightness-[1.03]",
-                  ].join(" "),
+                ? "transition-opacity duration-[280ms] ease-out opacity-100 group-hover:opacity-0 group-focus-within:opacity-0"
+                : "transition-transform duration-[300ms] ease-out scale-100 group-hover:scale-[1.08] group-focus-within:scale-[1.08]",
             ].join(" ")}
             data-testid={`img-poster-${poster.id}`}
             onError={(e) => {
@@ -141,19 +153,15 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
           />
 
           {/*
-            Hover mockup image.
+            Hover/mockup image — only rendered when a second image is available.
 
-            Fades from opacity-0 to opacity-100 on hover/focus — a full, clear
-            reveal. No starting scale offset; the clean crossfade is the effect.
-            A gentle scale-[1.03] is applied in the hovered state to add just
-            enough depth without fighting the opacity transition.
+            Fades from opacity-0 to opacity-100 on hover/focus. Starts at
+            scale-100 and holds at scale-[1.03] in the hovered state to add a
+            subtle sense of depth after the reveal, without fighting the
+            opacity transition itself.
 
-            aria-hidden: always true — decorative context image, screen readers
-            already get the poster title from the base image alt.
-
-            motion-reduce: transition removed. Since the base image also has no
-            transition under motion-reduce, this image stays at opacity-0 and is
-            never shown — correct behavior.
+            aria-hidden: always — screen readers use the base image alt text.
+            motion-reduce: transition removed, opacity stays 0 (never shown).
           */}
           {hoverImage && (
             <img
@@ -186,11 +194,7 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
             </div>
           )}
 
-          {/*
-            Hover label — desktop only, hidden on mobile.
-            Shows "View in room" when a lifestyle/mockup image is available,
-            otherwise the generic "View poster".
-          */}
+          {/* Hover label — desktop only */}
           <div
             className="absolute inset-x-0 bottom-0 hidden sm:flex items-end justify-center pb-4 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-200 pointer-events-none"
             aria-hidden="true"
