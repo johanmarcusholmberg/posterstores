@@ -1,0 +1,92 @@
+Add a subtle hover morph effect from poster image to mockup preview on store poster cards.
+
+Context:
+The store currently feels a bit stiff when hovering poster images. I want a smoother, more premium interaction: when hovering a poster card/image, the normal poster image should softly transition into a mockup/lifestyle image if one exists. This should make the store feel more alive and help customers imagine the poster in a room.
+
+Important constraints:
+- Do not create branches, PRs, or GitHub automation.
+- Make changes first; do not commit or push until I approve.
+- Keep the effect subtle and premium, not flashy.
+- Do not redesign the whole card.
+- Do not change checkout, cart, admin, logo upload, or homepage hero work.
+- Focus on public poster cards/grid behavior.
+- Keep performance good.
+- Respect reduced-motion preferences.
+
+Goal:
+When hovering a poster card on desktop:
+- default state shows the normal poster image
+- hover state softly transitions to a mockup image if available
+- transition should feel like a smooth morph/crossfade, not a sudden swap
+- if no mockup exists, keep the existing image with a very subtle zoom/brightness effect only
+- card layout must not shift
+- image aspect ratio must remain stable
+
+Suggested visual behavior:
+- Use two absolutely stacked images inside the existing image container:
+  - base poster image
+  - hover mockup image
+- On hover:
+  - poster image opacity fades down slightly or out
+  - mockup image opacity fades in
+  - add a tiny scale transform, for example scale-105
+  - duration around 300–500ms
+  - easing should be smooth, e.g. ease-out
+- Use overflow-hidden on the image container.
+- Avoid aggressive rotation, distortion, or bouncy animation.
+- Do not use large rounded corners if the shop grid currently uses flat/straight image style.
+- The effect should also work when keyboard focus is on the card, not only mouse hover.
+
+Data/source requirements:
+- Check how PosterCard currently receives poster data.
+- Check whether the list poster API already includes a usable mockup/preview image.
+- If poster cards already have previewImageUrl, primaryMockupUrl, mockupUrl, or similar, use that.
+- If the list API does not include mockup image data, add the smallest safe backend/API change needed to expose one hover image per poster:
+  - prefer primary mockup
+  - otherwise first mockup
+  - otherwise no hover image
+- Do not fetch mockups separately per card if that causes many extra requests.
+- Avoid N+1 requests on the shop grid.
+- Keep the hover image store-scoped.
+
+Likely files:
+- artifacts/poster-store/src/components/shared/PosterCard.tsx
+- poster list API / generated client types if hover image is not already available
+- relevant API route that returns poster list data
+- OpenAPI/Orval generation files if the API contract changes
+
+Accessibility and responsiveness:
+- Respect prefers-reduced-motion:
+  - if reduced motion is enabled, use a simple opacity change or no animation
+- On touch/mobile:
+  - do not require hover
+  - keep the default image stable
+  - optionally show the mockup as the image only if the existing mobile design already supports it, but do not add complex tap behavior
+- Keyboard focus should show the same subtle transition as hover if practical.
+
+Acceptance criteria:
+- Desktop poster card hover smoothly transitions from poster image to mockup image when a mockup exists.
+- No layout shift.
+- No broken images.
+- No extra per-card API calls.
+- Cards without mockups still look good with a subtle hover effect.
+- Mobile layout is not made worse.
+- Existing poster detail gallery/lightbox behavior is unchanged.
+- Existing homepage hero is unchanged.
+- Existing logo upload/storage work is unchanged.
+
+Run:
+- pnpm run typecheck
+- pnpm test -- --run
+- pnpm run build
+
+Report back with:
+- files changed
+- where the hover/mockup image comes from
+- whether any API contract changed
+- how cards behave when no mockup exists
+- how reduced-motion is handled
+- desktop/mobile behavior notes
+- test/build results
+
+Do not commit or push until I review and approve.
