@@ -1,0 +1,113 @@
+Improve the poster card hover effect so it feels more noticeable and commercial, closer to the browsing feel on Gallerix poster grids.
+
+Context:
+The current hover/morph effect is barely noticeable and feels a bit forced. I want the poster grid to feel more alive and premium when browsing. Compare the intended feel with Gallerix poster listing pages: hover should clearly show another visual state, but still feel clean, fast, and shop-like.
+
+Important:
+- Do not touch logo upload/storage.
+- Do not touch homepage hero.
+- Do not touch checkout/cart/admin.
+- Focus only on public poster cards / shop grid hover behavior.
+- Do not commit or push until I approve.
+- Keep performance good.
+- Respect reduced-motion preferences.
+- Avoid per-card extra API calls.
+
+Goal:
+When hovering a poster card on desktop, the image area should clearly transition to the mockup/context image if one exists. The change should be obvious enough that the user understands “this is the poster in context,” but not flashy or distracting.
+
+Current issue:
+The existing effect is too subtle. It feels like almost nothing happens, or like the animation is added but not useful.
+
+Desired behavior:
+1. Default state:
+   - show the normal poster/product image.
+2. Hover/focus state when mockup image exists:
+   - clearly fade/crossfade to the mockup image.
+   - the mockup should become fully visible, not just faintly visible.
+   - use a slightly stronger but still tasteful transition.
+3. Hover/focus state when no mockup exists:
+   - use a simple product-card hover effect:
+     - slight zoom, for example scale-[1.04] or scale-[1.05]
+     - very subtle brightness/contrast lift
+     - no image swap.
+4. No layout shift.
+5. Keep the same flat rectangular product image style.
+6. Do not add rounded corners if the shop grid images are flat.
+7. Do not make the card feel like a playful animation; it should feel like a modern e-commerce product interaction.
+
+Suggested implementation:
+- In PosterCard.tsx, use a group/card hover state.
+- Keep image container relative, overflow-hidden.
+- Stack two images absolutely:
+  - base poster image
+  - hover/mockup image
+- Base image:
+  - opacity-100 normally
+  - group-hover:opacity-0 or group-hover:opacity-10 if a mockup exists
+  - transition-opacity duration-300 or duration-400 ease-out
+- Mockup image:
+  - opacity-0 normally
+  - group-hover:opacity-100
+  - group-focus-within:opacity-100
+  - transition-opacity duration-300 or duration-400 ease-out
+  - small scale on hover, for example group-hover:scale-[1.03]
+- If no mockup image exists:
+  - keep only the base image
+  - use group-hover:scale-[1.04]
+  - transition-transform duration-300 ease-out
+- Add a subtle overlay only if needed:
+  - maybe bg-black/0 to bg-black/[0.03]
+  - do not darken too much.
+- Optional but useful:
+  - show a small “View in room” or “View mockup” label only on hover, but keep it minimal and not too salesy.
+  - If added, it should not appear on mobile and should not cover too much of the image.
+
+Important data requirement:
+- Confirm where the hover/mockup image comes from.
+- Prefer:
+  1. primary mockup image
+  2. first mockup image
+  3. preview image if that is different from base
+  4. no hover image
+- Do not fetch mockups separately for every card.
+- If the list API already includes the hover image, use it.
+- If not, add the smallest safe API change so poster list data includes one hover image per poster.
+
+Reduced motion:
+- Use motion-reduce:transition-none and motion-reduce:transform-none.
+- For users with reduced motion, a simple instant image swap or no animation is acceptable.
+
+Mobile/touch:
+- Do not add complex tap behavior.
+- Keep mobile stable.
+- Hover effect is mainly for desktop pointer devices.
+
+Acceptance criteria:
+- Hover effect is clearly noticeable on desktop.
+- If a mockup exists, hover shows the mockup at full opacity.
+- The transition feels smooth and commercial, not barely visible.
+- No layout shift.
+- No broken images.
+- No extra per-card API requests.
+- Cards without mockups still have a good subtle hover.
+- Mobile layout is unchanged or not made worse.
+- Homepage hero remains unchanged.
+- Logo upload/storage remains unchanged.
+
+Run:
+- pnpm run typecheck
+- pnpm test -- --run
+- pnpm run build
+
+Report back with:
+- files changed
+- exactly where the hover/mockup image comes from
+- whether any API contract changed
+- before/after behavior for posters with mockups
+- behavior for posters without mockups
+- reduced-motion handling
+- desktop/mobile notes
+- test/build results
+
+Do not commit or push until I review and approve.
