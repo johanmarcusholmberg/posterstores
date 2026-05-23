@@ -26,15 +26,14 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const mainImage = (poster as any).primaryDisplayImageUrl ?? poster.imageUrl;
-  const hoverImage = (poster as any).hoverDisplayImageUrl as string | null | undefined;
+  const mainImage = poster.primaryDisplayImageUrl ?? poster.imageUrl;
+  const hoverImage = poster.hoverDisplayImageUrl ?? null;
 
   const [isFavorite, setIsFavorite] = useState(() =>
     favoritedIds ? favoritedIds.includes(poster.id) : false
   );
   const [showPrompt, setShowPrompt] = useState(false);
   const [isPending, setIsPending] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
     if (favoritedIds !== undefined) {
@@ -75,13 +74,13 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
   const lowestPrice = poster.lowestActivePrice;
   const displayPrice = lowestPrice != null ? lowestPrice : poster.price;
   const displayCurrency = activeSizes[0]?.currency ?? poster.currency;
-  const priceLabel = activeSizes.length > 1
-    ? `From ${formatPrice(displayPrice, displayCurrency)}`
-    : formatPrice(displayPrice, displayCurrency);
+  const priceLabel =
+    activeSizes.length > 1
+      ? `From ${formatPrice(displayPrice, displayCurrency)}`
+      : formatPrice(displayPrice, displayCurrency);
 
-  const href = (poster as any).slug ? `/posters/${(poster as any).slug}` : `/poster/${poster.id}`;
-
-  const showHoverImage = !!(hoverImage && isHovered);
+  const slug = (poster as any).slug as string | undefined;
+  const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
 
   return (
     <>
@@ -89,10 +88,6 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
         href={href}
         className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         data-testid={`link-poster-${poster.id}`}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        onFocus={() => setIsHovered(true)}
-        onBlur={() => setIsHovered(false)}
       >
         {/* Image container — flat, gallery-style. No rounded corners, minimal shadow. */}
         <div
@@ -105,23 +100,38 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
             "group-hover:shadow-[0_2px_12px_rgba(0,0,0,0.10)]",
           ].join(" ")}
         >
-          {/* Main poster image */}
+          {/*
+            Main poster image.
+            • When a hover mockup exists: fades out and drifts very slightly on hover/focus.
+            • When no hover mockup: subtle scale + brightness lift as a fallback premium feel.
+            • motion-reduce: all transitions collapse to none — no animation at all.
+          */}
           <img
             src={mainImage}
             alt={poster.title}
             className={[
               "absolute inset-0 object-cover w-full h-full",
-              "transition-opacity duration-400 ease-in-out",
-              showHoverImage ? "opacity-0" : "opacity-100",
+              "transition-[opacity,transform,filter] duration-[400ms] ease-out",
+              "motion-reduce:transition-none",
+              hoverImage
+                ? // Has mockup: fade + slight drift out on hover
+                  "opacity-100 scale-100 group-hover:opacity-0 group-hover:scale-[1.02] group-focus-within:opacity-0 group-focus-within:scale-[1.02]"
+                : // No mockup: subtle zoom + brightness lift
+                  "opacity-100 scale-100 group-hover:scale-[1.03] group-hover:brightness-[1.04] group-focus-within:scale-[1.03] group-focus-within:brightness-[1.04]",
             ].join(" ")}
             data-testid={`img-poster-${poster.id}`}
             onError={(e) => {
               (e.target as HTMLImageElement).src = poster.imageUrl;
             }}
-            aria-hidden={showHoverImage}
           />
 
-          {/* Hover mockup image — crossfades in on hover, only when available */}
+          {/*
+            Hover mockup image — crossfades in on hover/focus, only rendered when available.
+            Starts slightly pre-zoomed (scale-[1.03]) and zooms back to natural size as it fades
+            in, giving a smooth morph feel without a jarring swap.
+            aria-hidden: always decorative — screen readers use the main image alt text.
+            motion-reduce: transition collapses to none (opacity stays 0 so it never shows).
+          */}
           {hoverImage && (
             <img
               src={hoverImage}
@@ -129,8 +139,11 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
               aria-hidden="true"
               className={[
                 "absolute inset-0 object-cover w-full h-full",
-                "transition-opacity duration-400 ease-in-out",
-                showHoverImage ? "opacity-100" : "opacity-0",
+                "transition-[opacity,transform] duration-[400ms] ease-out",
+                "motion-reduce:transition-none",
+                "opacity-0 scale-[1.03]",
+                "group-hover:opacity-100 group-hover:scale-100",
+                "group-focus-within:opacity-100 group-focus-within:scale-100",
               ].join(" ")}
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = "none";
@@ -185,9 +198,7 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
           <h3 className="font-serif font-semibold text-base sm:text-lg text-foreground line-clamp-2 leading-snug">
             {poster.title}
           </h3>
-          <p className="font-medium text-foreground text-sm mt-1">
-            {priceLabel}
-          </p>
+          <p className="font-medium text-foreground text-sm mt-1">{priceLabel}</p>
         </div>
       </Link>
       <LoginPromptModal open={showPrompt} onClose={() => setShowPrompt(false)} />
