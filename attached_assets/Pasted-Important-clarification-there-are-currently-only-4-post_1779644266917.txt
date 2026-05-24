@@ -1,0 +1,42 @@
+Important clarification: there are currently only 4 posters manually marked as featured. The homepage should not stop at 4 if there are more published posters available.
+
+Please debug the featured poster fallback before changing layout further.
+
+Expected behavior:
+- Homepage should show manually featured posters first.
+- If fewer than 8–12 featured posters exist, fill the remaining slots with newest published posters from the same store.
+- Avoid duplicates.
+- Only if the entire active store has only 4 published posters should the homepage show only 4 cards.
+
+Current observed behavior:
+Only 4 posters appear in the featured row. That suggests the fallback may not be working, or the frontend is only rendering the manually featured posters.
+
+Please verify:
+1. How many published posters exist for the active storeKey?
+2. How many posters does GET /api/stats/featured?storeKey=<activeStoreKey>&limit=12 return?
+3. Does the endpoint return only the 4 featured posters, or does it include fallback newest published posters?
+4. Is Home.tsx rendering all posters returned by useGetFeaturedPosters, or slicing/filtering to only featured?
+5. Are fallback posters being removed because of missing images, status, sizes, or another field?
+6. Confirm there are no duplicates.
+
+Fix if needed:
+- Ensure GET /api/stats/featured returns up to limit posters:
+  - featured published posters first
+  - then newest published posters from same store
+  - excluding already-featured IDs
+- Ensure Home.tsx renders the full returned list.
+- Do not require posters to be manually featured to appear as fallback.
+- Keep the row horizontally scrollable.
+- Keep admin featured selection unchanged.
+- Keep layout changes minimal until fallback works.
+
+After fixing, send:
+- active storeKey tested
+- total published poster count for that store
+- number of manually featured posters
+- number returned by /api/stats/featured?limit=12
+- screenshot showing fallback posters included if more than 4 published posters exist
+- files changed
+- typecheck/test/build results
+
+Do not commit or push until I review.

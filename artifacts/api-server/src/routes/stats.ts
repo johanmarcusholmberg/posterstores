@@ -78,18 +78,21 @@ router.get("/stats/featured", async (req, res) => {
     const featuredIds = combined.map(p => p.id);
     const remaining = limit - combined.length;
 
-    const fallbackConditions = [
-      eq(postersTable.storeKey, storeKey),
-      eq(postersTable.status, "published"),
-    ];
-    if (featuredIds.length > 0) {
-      fallbackConditions.push(notInArray(postersTable.id, featuredIds));
-    }
-
     const fallback = await db
       .select()
       .from(postersTable)
-      .where(and(...fallbackConditions))
+      .where(
+        featuredIds.length > 0
+          ? and(
+              eq(postersTable.storeKey, storeKey),
+              eq(postersTable.status, "published"),
+              notInArray(postersTable.id, featuredIds)
+            )
+          : and(
+              eq(postersTable.storeKey, storeKey),
+              eq(postersTable.status, "published")
+            )
+      )
       .orderBy(desc(postersTable.createdAt))
       .limit(remaining);
 
