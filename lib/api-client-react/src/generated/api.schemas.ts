@@ -57,6 +57,11 @@ export interface Poster {
   id: number;
   storeKey: string;
   title: string;
+  /**
+   * Optional short card title (max 28 chars). Used on compact cards; falls back to full title when empty.
+   * @maxLength 28
+   */
+  displayTitle?: string | null;
   description?: string;
   imageUrl: string;
   masterPrintImageUrl?: string | null;
@@ -97,6 +102,11 @@ export const CreatePosterBodyStatus = {
 export interface CreatePosterBody {
   storeKey: string;
   title: string;
+  /**
+   * Optional short card title (max 28 chars). Used on compact cards; falls back to full title when empty.
+   * @maxLength 28
+   */
+  displayTitle?: string | null;
   description?: string;
   imageUrl: string;
   masterPrintImageUrl?: string;
@@ -127,6 +137,11 @@ export const UpdatePosterBodyStatus = {
 
 export interface UpdatePosterBody {
   title?: string;
+  /**
+   * Optional short card title (max 28 chars). Used on compact cards; falls back to full title when empty.
+   * @maxLength 28
+   */
+  displayTitle?: string | null;
   description?: string;
   imageUrl?: string;
   masterPrintImageUrl?: string;

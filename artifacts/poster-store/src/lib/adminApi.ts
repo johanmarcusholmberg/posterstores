@@ -39,6 +39,7 @@ export interface AdminPoster {
   storeKey: string;
   slug?: string | null;
   title: string;
+  displayTitle?: string | null;
   description?: string | null;
   imageUrl: string;
   masterPrintImageUrl?: string | null;

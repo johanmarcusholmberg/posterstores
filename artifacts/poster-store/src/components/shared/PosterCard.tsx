@@ -227,7 +227,7 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
             </p>
           )}
           <h3 className="font-serif font-semibold text-base sm:text-lg text-foreground line-clamp-2 leading-snug">
-            {poster.title}
+            {(poster as any).displayTitle || poster.title}
           </h3>
           <p className="font-medium text-foreground text-sm mt-1">{priceLabel}</p>
         </div>

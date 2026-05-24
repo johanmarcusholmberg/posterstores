@@ -103,8 +103,11 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
   const activeStore = storefronts[adminStoreKey] ?? storefronts["postsofspain"];
   const defaultCurrency = activeStore.defaultCurrency ?? "EUR";
 
+  const DISPLAY_TITLE_MAX = 28;
+
   const [storeKey] = useState(existing?.storeKey ?? adminStoreKey);
   const [title, setTitle] = useState(existing?.title ?? "");
+  const [displayTitle, setDisplayTitle] = useState(existing?.displayTitle ?? "");
   const [slug, setSlug] = useState(existing?.slug ?? "");
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(!!existing?.slug);
   const [description, setDescription] = useState(existing?.description ?? "");
@@ -204,9 +207,12 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
     const slugValue = slug.trim() || undefined;
 
     try {
+      const displayTitleValue = displayTitle.trim() || undefined;
+
       if (existing) {
         const payload: UpdatePosterPayload = {
           title,
+          displayTitle: displayTitleValue ?? null,
           description: description || undefined,
           imageUrl,
           category,
@@ -228,6 +234,7 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
         const payload: CreatePosterPayload = {
           storeKey,
           title,
+          displayTitle: displayTitleValue ?? null,
           description: description || undefined,
           imageUrl,
           category,
@@ -301,10 +308,35 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
                   id="title"
                   value={title}
                   onChange={e => { setTitle(e.target.value); setErrors(p => ({ ...p, title: "" })); }}
-                  placeholder="e.g. Valencia Sunset"
+                  placeholder="e.g. Valencia Cathedral at Golden Hour"
                   data-testid="field-title"
                 />
                 {errors.title && <p className="text-xs text-destructive">{errors.title}</p>}
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="displayTitle">Short card title</Label>
+                  <span className={`text-xs tabular-nums ${displayTitle.length > DISPLAY_TITLE_MAX ? "text-destructive font-medium" : "text-muted-foreground"}`}>
+                    {displayTitle.length}/{DISPLAY_TITLE_MAX}
+                  </span>
+                </div>
+                <Input
+                  id="displayTitle"
+                  value={displayTitle}
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (val.length <= DISPLAY_TITLE_MAX) setDisplayTitle(val);
+                    setErrors(p => ({ ...p, displayTitle: "" }));
+                  }}
+                  placeholder="e.g. Valencia Cathedral"
+                  maxLength={DISPLAY_TITLE_MAX}
+                  data-testid="field-display-title"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Used on homepage and store cards. Keep it short; the full title is still used on the poster page.
+                </p>
+                {errors.displayTitle && <p className="text-xs text-destructive">{errors.displayTitle}</p>}
               </div>
 
               <div className="space-y-1.5">

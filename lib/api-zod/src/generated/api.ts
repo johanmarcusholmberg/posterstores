@@ -37,12 +37,21 @@ export const ListPostersQueryParams = zod.object({
     ),
 });
 
+export const listPostersResponsePostersItemDisplayTitleMax = 28;
+
 export const ListPostersResponse = zod.object({
   posters: zod.array(
     zod.object({
       id: zod.number(),
       storeKey: zod.string(),
       title: zod.string(),
+      displayTitle: zod
+        .string()
+        .max(listPostersResponsePostersItemDisplayTitleMax)
+        .nullish()
+        .describe(
+          "Optional short card title (max 28 chars). Used on compact cards; falls back to full title when empty.",
+        ),
       description: zod.string().optional(),
       imageUrl: zod.string(),
       masterPrintImageUrl: zod.string().nullish(),
@@ -86,9 +95,18 @@ export const ListPostersResponse = zod.object({
 /**
  * @summary Create a new poster (admin only)
  */
+export const createPosterBodyDisplayTitleMax = 28;
+
 export const CreatePosterBody = zod.object({
   storeKey: zod.string(),
   title: zod.string(),
+  displayTitle: zod
+    .string()
+    .max(createPosterBodyDisplayTitleMax)
+    .nullish()
+    .describe(
+      "Optional short card title (max 28 chars). Used on compact cards; falls back to full title when empty.",
+    ),
   description: zod.string().optional(),
   imageUrl: zod.string(),
   masterPrintImageUrl: zod.string().optional(),
@@ -133,10 +151,19 @@ export const GetPosterQueryParams = zod.object({
   storeKey: zod.coerce.string(),
 });
 
+export const getPosterResponseDisplayTitleMax = 28;
+
 export const GetPosterResponse = zod.object({
   id: zod.number(),
   storeKey: zod.string(),
   title: zod.string(),
+  displayTitle: zod
+    .string()
+    .max(getPosterResponseDisplayTitleMax)
+    .nullish()
+    .describe(
+      "Optional short card title (max 28 chars). Used on compact cards; falls back to full title when empty.",
+    ),
   description: zod.string().optional(),
   imageUrl: zod.string(),
   masterPrintImageUrl: zod.string().nullish(),
@@ -183,8 +210,17 @@ export const UpdatePosterQueryParams = zod.object({
   storeKey: zod.coerce.string().optional(),
 });
 
+export const updatePosterBodyDisplayTitleMax = 28;
+
 export const UpdatePosterBody = zod.object({
   title: zod.string().optional(),
+  displayTitle: zod
+    .string()
+    .max(updatePosterBodyDisplayTitleMax)
+    .nullish()
+    .describe(
+      "Optional short card title (max 28 chars). Used on compact cards; falls back to full title when empty.",
+    ),
   description: zod.string().optional(),
   imageUrl: zod.string().optional(),
   masterPrintImageUrl: zod.string().optional(),
@@ -218,10 +254,19 @@ export const UpdatePosterBody = zod.object({
     ),
 });
 
+export const updatePosterResponseDisplayTitleMax = 28;
+
 export const UpdatePosterResponse = zod.object({
   id: zod.number(),
   storeKey: zod.string(),
   title: zod.string(),
+  displayTitle: zod
+    .string()
+    .max(updatePosterResponseDisplayTitleMax)
+    .nullish()
+    .describe(
+      "Optional short card title (max 28 chars). Used on compact cards; falls back to full title when empty.",
+    ),
   description: zod.string().optional(),
   imageUrl: zod.string(),
   masterPrintImageUrl: zod.string().nullish(),
@@ -338,6 +383,8 @@ export const GetCartQueryParams = zod.object({
   storeKey: zod.coerce.string(),
 });
 
+export const getCartResponseItemsItemPosterDisplayTitleMax = 28;
+
 export const GetCartResponse = zod.object({
   sessionId: zod.string(),
   storeKey: zod.string(),
@@ -351,6 +398,13 @@ export const GetCartResponse = zod.object({
           id: zod.number(),
           storeKey: zod.string(),
           title: zod.string(),
+          displayTitle: zod
+            .string()
+            .max(getCartResponseItemsItemPosterDisplayTitleMax)
+            .nullish()
+            .describe(
+              "Optional short card title (max 28 chars). Used on compact cards; falls back to full title when empty.",
+            ),
           description: zod.string().optional(),
           imageUrl: zod.string(),
           masterPrintImageUrl: zod.string().nullish(),
@@ -422,6 +476,8 @@ export const AddCartItemBody = zod.object({
   size: zod.string().optional(),
 });
 
+export const addCartItemResponseItemsItemPosterDisplayTitleMax = 28;
+
 export const AddCartItemResponse = zod.object({
   sessionId: zod.string(),
   storeKey: zod.string(),
@@ -435,6 +491,13 @@ export const AddCartItemResponse = zod.object({
           id: zod.number(),
           storeKey: zod.string(),
           title: zod.string(),
+          displayTitle: zod
+            .string()
+            .max(addCartItemResponseItemsItemPosterDisplayTitleMax)
+            .nullish()
+            .describe(
+              "Optional short card title (max 28 chars). Used on compact cards; falls back to full title when empty.",
+            ),
           description: zod.string().optional(),
           imageUrl: zod.string(),
           masterPrintImageUrl: zod.string().nullish(),
@@ -505,6 +568,8 @@ export const UpdateCartItemBody = zod.object({
   quantity: zod.number(),
 });
 
+export const updateCartItemResponseItemsItemPosterDisplayTitleMax = 28;
+
 export const UpdateCartItemResponse = zod.object({
   sessionId: zod.string(),
   storeKey: zod.string(),
@@ -518,6 +583,13 @@ export const UpdateCartItemResponse = zod.object({
           id: zod.number(),
           storeKey: zod.string(),
           title: zod.string(),
+          displayTitle: zod
+            .string()
+            .max(updateCartItemResponseItemsItemPosterDisplayTitleMax)
+            .nullish()
+            .describe(
+              "Optional short card title (max 28 chars). Used on compact cards; falls back to full title when empty.",
+            ),
           description: zod.string().optional(),
           imageUrl: zod.string(),
           masterPrintImageUrl: zod.string().nullish(),
@@ -584,6 +656,8 @@ export const RemoveCartItemParams = zod.object({
   cartItemId: zod.coerce.number(),
 });
 
+export const removeCartItemResponseItemsItemPosterDisplayTitleMax = 28;
+
 export const RemoveCartItemResponse = zod.object({
   sessionId: zod.string(),
   storeKey: zod.string(),
@@ -597,6 +671,13 @@ export const RemoveCartItemResponse = zod.object({
           id: zod.number(),
           storeKey: zod.string(),
           title: zod.string(),
+          displayTitle: zod
+            .string()
+            .max(removeCartItemResponseItemsItemPosterDisplayTitleMax)
+            .nullish()
+            .describe(
+              "Optional short card title (max 28 chars). Used on compact cards; falls back to full title when empty.",
+            ),
           description: zod.string().optional(),
           imageUrl: zod.string(),
           masterPrintImageUrl: zod.string().nullish(),
@@ -664,10 +745,19 @@ export const GetFavoritesQueryParams = zod.object({
   storeKey: zod.coerce.string(),
 });
 
+export const getFavoritesResponseDisplayTitleMax = 28;
+
 export const GetFavoritesResponseItem = zod.object({
   id: zod.number(),
   storeKey: zod.string(),
   title: zod.string(),
+  displayTitle: zod
+    .string()
+    .max(getFavoritesResponseDisplayTitleMax)
+    .nullish()
+    .describe(
+      "Optional short card title (max 28 chars). Used on compact cards; falls back to full title when empty.",
+    ),
   description: zod.string().optional(),
   imageUrl: zod.string(),
   masterPrintImageUrl: zod.string().nullish(),
@@ -713,10 +803,19 @@ export const AddFavoriteBody = zod.object({
   posterId: zod.number(),
 });
 
+export const addFavoriteResponseDisplayTitleMax = 28;
+
 export const AddFavoriteResponseItem = zod.object({
   id: zod.number(),
   storeKey: zod.string(),
   title: zod.string(),
+  displayTitle: zod
+    .string()
+    .max(addFavoriteResponseDisplayTitleMax)
+    .nullish()
+    .describe(
+      "Optional short card title (max 28 chars). Used on compact cards; falls back to full title when empty.",
+    ),
   description: zod.string().optional(),
   imageUrl: zod.string(),
   masterPrintImageUrl: zod.string().nullish(),
@@ -762,10 +861,19 @@ export const RemoveFavoriteQueryParams = zod.object({
   storeKey: zod.coerce.string(),
 });
 
+export const removeFavoriteResponseDisplayTitleMax = 28;
+
 export const RemoveFavoriteResponseItem = zod.object({
   id: zod.number(),
   storeKey: zod.string(),
   title: zod.string(),
+  displayTitle: zod
+    .string()
+    .max(removeFavoriteResponseDisplayTitleMax)
+    .nullish()
+    .describe(
+      "Optional short card title (max 28 chars). Used on compact cards; falls back to full title when empty.",
+    ),
   description: zod.string().optional(),
   imageUrl: zod.string(),
   masterPrintImageUrl: zod.string().nullish(),
@@ -1099,10 +1207,19 @@ export const GetFeaturedPostersQueryParams = zod.object({
   limit: zod.coerce.number().optional(),
 });
 
+export const getFeaturedPostersResponseDisplayTitleMax = 28;
+
 export const GetFeaturedPostersResponseItem = zod.object({
   id: zod.number(),
   storeKey: zod.string(),
   title: zod.string(),
+  displayTitle: zod
+    .string()
+    .max(getFeaturedPostersResponseDisplayTitleMax)
+    .nullish()
+    .describe(
+      "Optional short card title (max 28 chars). Used on compact cards; falls back to full title when empty.",
+    ),
   description: zod.string().optional(),
   imageUrl: zod.string(),
   masterPrintImageUrl: zod.string().nullish(),
@@ -1149,10 +1266,19 @@ export const GetNewArrivalsQueryParams = zod.object({
   limit: zod.coerce.number().optional(),
 });
 
+export const getNewArrivalsResponseDisplayTitleMax = 28;
+
 export const GetNewArrivalsResponseItem = zod.object({
   id: zod.number(),
   storeKey: zod.string(),
   title: zod.string(),
+  displayTitle: zod
+    .string()
+    .max(getNewArrivalsResponseDisplayTitleMax)
+    .nullish()
+    .describe(
+      "Optional short card title (max 28 chars). Used on compact cards; falls back to full title when empty.",
+    ),
   description: zod.string().optional(),
   imageUrl: zod.string(),
   masterPrintImageUrl: zod.string().nullish(),

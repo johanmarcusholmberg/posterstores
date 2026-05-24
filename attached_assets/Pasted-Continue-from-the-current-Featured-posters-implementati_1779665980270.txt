@@ -1,0 +1,117 @@
+Continue from the current Featured posters implementation and make one combined refinement.
+
+Current state:
+The homepage Featured posters section now shows 6 Polaroid-style cards on desktop, 3×2 on tablet, and 4 cards on mobile. This is the right direction. However:
+1. I do not want the cards/images tilted anymore.
+2. Card heights should stay perfectly aligned.
+3. I want a dedicated short display title field for poster cards instead of relying only on cutting/truncating long full titles.
+
+Important constraints:
+- Keep changes targeted and safe.
+- Do not change poster images.
+- Do not overwrite existing full poster titles.
+- Do not change checkout, cart, favorites, payments, orders, fulfillment, or unrelated admin functionality.
+- Keep this store-aware and compatible with the existing multi-store setup.
+- Do not create branches, PRs, GitHub automation, commits, or pushes unless I explicitly approve.
+
+Part A — Featured poster visual refinement
+
+1. Remove rotation/tilt
+- Remove the subtle per-card rotation from FeaturedPosterCard.
+- All Featured poster Polaroid cards should be straight and aligned.
+- Keep the warm paper background, soft shadow, and subtle hover lift if it still looks good.
+- The look should be calm, premium, and ordered.
+
+2. Keep the responsive Featured poster layout
+- Desktop/laptop: exactly 6 cards in one row.
+- Tablet: 3 columns × 2 rows.
+- Mobile: 2 columns × 2 rows, showing only 4 posters.
+- No partial/cropped cards at any breakpoint.
+- “View all →” remains visible and working.
+
+3. Equal card heights
+- All Featured poster cards should have equal height.
+- Image areas should have consistent aspect ratio.
+- Caption/text areas should have consistent height.
+- Desktop bottom edges should align perfectly.
+
+Part B — Add short display title field
+
+4. Add a separate short card title field
+- Add a new optional poster field for short card titles.
+- Suggested name: displayTitle or cardTitle. Choose the name that best fits the existing project style.
+- This field must be separate from the existing full title/name.
+- Existing posters must continue to work if this field is empty.
+- Add a safe migration if the project uses migrations.
+- Update shared types, validation schemas, API responses, and frontend clients as needed.
+- If this project uses OpenAPI/Orval generation, follow the existing project conventions and regenerate what is needed.
+
+5. Enforce a short max length
+- Enforce a strict max length for the short card title.
+- Suggested max: 28 characters.
+- Enforce in admin UI and server/schema validation if applicable.
+- Show a helpful character counter or validation message in admin.
+- Do not allow saving a short card title above the limit.
+
+6. Admin UI
+- Add the field to the poster create/edit admin form.
+- Label it clearly, for example: “Short card title”.
+- Add helper text:
+  “Used on homepage and store cards. Keep it short; the full title is still used on the poster page.”
+- Keep the existing full title field unchanged.
+
+7. Card usage
+Use the short card title on compact poster cards:
+- Featured poster cards on homepage.
+- New arrivals cards if they are compact homepage cards.
+- Shop/product listing cards if title length affects layout there.
+
+Do not use the short card title for:
+- Poster detail page main heading.
+- Checkout/order confirmation.
+- Admin fulfillment or order screens where full identification matters.
+
+8. Fallback logic
+For card titles:
+- If short card title exists, show it.
+- Otherwise fall back to the existing full poster title.
+- Keep a final visual safety clamp, but the main solution should be the short title field.
+
+9. Existing poster data
+- If safe and consistent with existing seed/demo data, backfill short card titles for current/demo posters.
+- Do not modify full titles.
+- Example short titles:
+  - “Spanish Lavender Fields” → “Spanish Lavender Fields”
+  - “Alicante Harbour at Dusk” → “Alicante Harbour”
+  - “Barcelona Beach, Blue Morning” → “Barceloneta Beach”
+  - “Valencia Cathedral at Golden Hour” → “Valencia Cathedral”
+  - “Cádiz — Land's End” → “Cádiz Land's End”
+
+Acceptance criteria:
+- Featured poster cards are straight, not tilted.
+- Desktop/laptop shows exactly 6 cards in one clean row.
+- Tablet shows 3×2.
+- Mobile shows 4 cards in a 2×2 layout.
+- No partial cards appear.
+- Featured cards have equal heights and aligned bottoms.
+- Posters have a separate short card title field.
+- Admin can create/edit the short card title.
+- Short card title has a strict max length, suggested 28 characters.
+- Product/homepage cards use short card title when available.
+- Cards fall back to full title if short card title is empty.
+- Poster detail pages still show full titles.
+- Existing posters continue to work.
+- Normal checkout/cart/order/admin fulfillment behavior is unchanged.
+- Typecheck passes.
+
+After completing, report:
+- Files changed.
+- Exact field name used.
+- Max character limit used.
+- Where the short card title is shown.
+- Where the full title is still shown.
+- How the responsive Featured posters layout works.
+- Confirmation that card tilt was removed.
+- Confirmation that featured card heights are equal.
+- Any migrations/schema/client generation performed.
+- Whether existing posters were backfilled.

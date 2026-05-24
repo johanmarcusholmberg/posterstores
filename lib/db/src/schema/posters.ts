@@ -18,6 +18,7 @@ export const postersTable = pgTable("posters", {
   price: numeric("price", { precision: 10, scale: 2 }).notNull(),
   currency: text("currency").notNull().default("EUR"),
   sizes: text("sizes").array(),
+  displayTitle: text("display_title"),
   isFeatured: boolean("is_featured").default(false),
   isNew: boolean("is_new").default(false),
   status: text("status").notNull().default("published"),

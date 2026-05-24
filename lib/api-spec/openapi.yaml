@@ -740,6 +740,11 @@ components:
           type: string
         title:
           type: string
+        displayTitle:
+          type: string
+          nullable: true
+          maxLength: 28
+          description: "Optional short card title (max 28 chars). Used on compact cards; falls back to full title when empty."
         description:
           type: string
         imageUrl:
@@ -814,6 +819,11 @@ components:
           type: string
         title:
           type: string
+        displayTitle:
+          type: string
+          nullable: true
+          maxLength: 28
+          description: "Optional short card title (max 28 chars). Used on compact cards; falls back to full title when empty."
         description:
           type: string
         imageUrl:
@@ -861,6 +871,11 @@ components:
       properties:
         title:
           type: string
+        displayTitle:
+          type: string
+          nullable: true
+          maxLength: 28
+          description: "Optional short card title (max 28 chars). Used on compact cards; falls back to full title when empty."
         description:
           type: string
         imageUrl:

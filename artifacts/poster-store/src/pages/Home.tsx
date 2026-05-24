@@ -111,7 +111,7 @@ function HomePosterCard({ poster }: { poster: Poster }) {
       {/* Info */}
       <div className="mt-1.5">
         <h3 className="font-serif font-semibold text-sm text-foreground line-clamp-2 leading-snug">
-          {poster.title}
+          {(poster as any).displayTitle || poster.title}
         </h3>
         <p className="text-xs font-medium text-foreground/70 mt-0.5">{priceLabel}</p>
       </div>
@@ -121,11 +121,10 @@ function HomePosterCard({ poster }: { poster: Poster }) {
 
 /**
  * Polaroid-inspired card used exclusively in the Featured posters section.
- * Subtle paper background, padded frame, larger bottom caption area, soft shadow.
+ * Warm paper background, padded frame, larger bottom caption area, soft shadow.
+ * Cards are straight (no tilt) and stretch to equal grid-row height.
  */
-const FEATURED_ROTATIONS = ["-0.6deg", "0.5deg", "-0.4deg", "0.7deg", "-0.5deg", "0.3deg"];
-
-function FeaturedPosterCard({ poster, index }: { poster: Poster; index: number }) {
+function FeaturedPosterCard({ poster }: { poster: Poster }) {
   const slug = (poster as any).slug as string | undefined;
   const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
 
@@ -139,20 +138,20 @@ function FeaturedPosterCard({ poster, index }: { poster: Poster; index: number }
       : formatPrice(displayPrice, displayCurrency);
 
   const displayImage = poster.primaryDisplayImageUrl ?? poster.imageUrl;
-  const rotation = FEATURED_ROTATIONS[index % FEATURED_ROTATIONS.length];
+  const cardTitle = (poster as any).displayTitle || poster.title;
 
   return (
     <Link
       href={href}
-      className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-      style={{ transform: `rotate(${rotation})` }}
+      className="group flex flex-col h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
       <div
         className={[
+          "flex flex-col flex-1",
           "bg-[#faf8f3] rounded-[2px]",
           "shadow-[0_2px_8px_rgba(0,0,0,0.09),0_1px_3px_rgba(0,0,0,0.06)]",
           "group-hover:shadow-[0_6px_20px_rgba(0,0,0,0.14),0_2px_6px_rgba(0,0,0,0.09)]",
-          "group-hover:-translate-y-1",
+          "group-hover:-translate-y-0.5",
           "transition-all duration-300 ease-out",
           "p-2 pb-0",
         ].join(" ")}
@@ -174,10 +173,10 @@ function FeaturedPosterCard({ poster, index }: { poster: Poster; index: number }
           )}
         </div>
 
-        {/* Polaroid caption tab */}
-        <div className="px-0.5 py-2.5 pb-3">
+        {/* Polaroid caption tab — fixed min-height keeps bottom edges aligned */}
+        <div className="px-0.5 pt-2.5 pb-3 min-h-[52px] flex flex-col justify-start">
           <h3 className="font-serif font-semibold text-[11px] sm:text-xs text-foreground/85 line-clamp-2 leading-snug">
-            {poster.title}
+            {cardTitle}
           </h3>
           <p className="text-[10px] text-foreground/50 mt-1">{priceLabel}</p>
         </div>
@@ -400,18 +399,18 @@ export default function Home() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-5 lg:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-5 lg:gap-4 items-stretch">
             {featured && featured.length > 0
               ? featured.slice(0, FEATURED_LIMIT).map((poster, i) => (
                   <div
                     key={poster.id}
-                    className={i >= 4 ? "hidden sm:block" : undefined}
+                    className={["h-full", i >= 4 ? "hidden sm:block" : ""].filter(Boolean).join(" ")}
                   >
-                    <FeaturedPosterCard poster={poster} index={i} />
+                    <FeaturedPosterCard poster={poster} />
                   </div>
                 ))
               : Array.from({ length: FEATURED_LIMIT }).map((_, i) => (
-                  <div key={i} className={i >= 4 ? "hidden sm:block" : undefined}>
+                  <div key={i} className={["h-full", i >= 4 ? "hidden sm:block" : ""].filter(Boolean).join(" ")}>
                     <FeaturedPosterCardSkeleton />
                   </div>
                 ))}
