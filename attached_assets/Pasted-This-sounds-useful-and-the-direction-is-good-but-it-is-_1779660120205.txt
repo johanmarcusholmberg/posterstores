@@ -1,0 +1,63 @@
+This sounds useful and the direction is good, but it is a larger change than the last visual refinement. Before I approve commit/push, please provide a final review report.
+
+Please confirm:
+
+1. Files changed
+List every changed and new file.
+
+2. Database
+- Confirm the new column name and type: homepage_visual_config JSONB.
+- Confirm the migration is idempotent and safe to run multiple times.
+- Confirm existing stores with null homepage_visual_config still work.
+- Confirm no existing store config fields were broken or renamed.
+
+3. Backend/API
+- Confirm the new routes:
+  - GET /api/admin/stores/:storeKey/homepage-visual
+  - PUT /api/admin/stores/:storeKey/homepage-visual
+- Confirm both routes require admin authentication.
+- Confirm validation schema fields.
+- Confirm old-image cleanup works safely and does not fail the save if cleanup fails.
+- Confirm public GET /api/stores/:storeKey/config includes homepageVisualConfig.
+
+4. Object storage
+- What object storage path is used for homepage hero/collection images?
+- Are file type and file size validated?
+- Are old images deleted only when safe?
+- What happens if upload succeeds but DB save fails?
+
+5. Admin UI
+- Confirm /admin/homepage is store-scoped using the active admin store key.
+- Confirm hero image upload, replace, remove work.
+- Confirm collection image upload, replace, remove work.
+- Confirm overlay sliders save and reload correctly.
+- Confirm text/button fields save and reload correctly.
+- Confirm admin nav/sidebar and dashboard links work.
+
+6. Public homepage
+- Confirm static fallback still works when homepageVisualConfig is null.
+- Confirm hero remains compact and does not become a full-screen hero again.
+- Confirm background image mode is readable with overlay.
+- Confirm text/buttons switch to white only when needed.
+- Confirm collection banner falls back to store.shop.collectionBanner when no admin override exists.
+- Confirm routePrefix-safe links still work.
+
+7. Multi-store safety
+- Confirm changing homepage visuals for one store does not affect another store.
+- Confirm data is saved by storeKey.
+- Confirm public homepage loads the correct store’s visual config.
+
+8. Required checks
+Please report exact results for:
+- pnpm run typecheck
+- pnpm test -- --run
+- pnpm --filter @workspace/api-server run build
+
+9. Screenshots
+Please send:
+- public homepage with no homepage background image set, showing fallback/default state
+- public homepage with hero/collection background image set
+- /admin/homepage editor screenshot
+- mobile homepage notes or screenshot
+
+Do not commit or push until I review this final report.
