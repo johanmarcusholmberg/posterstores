@@ -1,0 +1,108 @@
+Add back modular homepage discovery sections below the featured posters row.
+
+Current issue:
+The new product-first homepage is better, but it now feels too minimal. It mainly has the intro and featured posters row, and earlier discovery/content sections such as collection banners, region/category links, and new arrivals appear to have been removed. The homepage should not only push users to the shop; it should also offer more things to explore directly on the homepage.
+
+Important:
+- Do not revert the new product-first homepage.
+- Keep the compact intro and featured posters row.
+- Do not touch logo upload/storage.
+- Do not touch checkout/cart/orders/fulfillment.
+- Do not change admin featured poster selection.
+- Do not commit or push until I approve.
+- Keep everything multi-store safe and store-config aware where possible.
+
+Goal:
+Below the Featured posters row, add back useful discovery sections so the homepage feels richer and more like a real store homepage.
+
+Required homepage structure:
+1. Compact intro
+2. Featured posters horizontal row
+3. Collection/discovery banner section
+4. Shop by region/category section
+5. Optional New arrivals row or section
+6. Quote/story section
+7. Value proposition section
+
+Part 1 — Collection/discovery banner
+Add a homepage collection banner similar to the previous “Mediterranean Walls” card.
+
+Example content:
+- Eyebrow: COLLECTION
+- Title: Mediterranean Walls
+- Text: Warm-toned prints inspired by Spanish streets, terraces and coastlines.
+- CTA: Explore coastal posters →
+
+Requirements:
+- Place it below Featured posters.
+- It should be visually calm and premium.
+- Use the existing store theme colors where possible.
+- Link CTA to a filtered shop URL, for example /shop?category=Coastal%20Posters or another existing category/tag.
+- If the store config already has collectionBanner/homepageConfig fields, reuse them instead of hardcoding.
+- If no config exists, add a safe default for PostersOfSpain only through existing static store config.
+
+Part 2 — Shop by region/category
+Add a compact discovery section below the collection banner.
+
+Requirements:
+- Title: “Shop by region” or “Explore Spain”
+- Show region/category chips or cards from the active store config.
+- Link each item to the filtered shop page.
+- Keep it compact, not a huge section.
+- On mobile, allow wrapping or horizontal scroll.
+
+Examples:
+- Andalusia
+- Catalonia
+- Valencia
+- Coastal Posters
+- Architecture
+- Food & Markets
+
+Use actual available store.regions/store.categories if possible.
+
+Part 3 — New arrivals
+Add back a “New arrivals” section only if it does not make the homepage too long.
+
+Requirements:
+- Show recent/new posters from the active store.
+- Use a compact horizontal row like Featured posters.
+- If the same posters are already in Featured, either allow some overlap or filter duplicates if simple.
+- Keep this below region/category discovery.
+- Add “View all” link to /shop?sort=newest.
+
+Part 4 — Preserve current good work
+- Keep the new compact intro.
+- Keep the featured row with admin-controlled isFeatured + fallback logic.
+- Keep the homepage product-first.
+- Keep flat product-card visual style.
+- Do not reintroduce the old large 4-image hero collage.
+
+Part 5 — Acceptance criteria
+- Homepage has more discovery content than just intro + featured posters.
+- Collection banner appears below featured posters.
+- Region/category discovery links appear.
+- New arrivals appears if there are enough posters.
+- All links are store-aware and routePrefix-safe if applicable.
+- Featured poster admin selection still works.
+- Existing shop page remains unchanged.
+- Existing poster detail page remains unchanged.
+- Logo upload/storage remains unchanged.
+- Mobile remains clean and not too tall.
+
+Run:
+- pnpm run typecheck
+- pnpm test -- --run
+- pnpm --filter @workspace/api-server run build
+
+Report back with:
+- files changed
+- which homepage sections were added
+- whether collection content is config-driven or default/static
+- how region/category links are generated
+- how New arrivals is fetched
+- desktop screenshot
+- mobile screenshot/notes
+- test/build results
+
+Do not commit or push until I review.
