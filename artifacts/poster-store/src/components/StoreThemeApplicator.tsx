@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useStorefront } from "@/context/StorefrontContext";
 import type { StoreTypographyConfig } from "@/config/storefronts";
 
@@ -100,11 +100,6 @@ function buildCssVars(typo: StoreTypographyConfig | null | undefined): Record<st
 export function StoreThemeApplicator() {
   const store = useStorefront();
   const typo = store.typographyConfig;
-  const rootRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    rootRef.current = document.getElementById("store-theme-root");
-  }, []);
 
   useEffect(() => {
     const fontsToLoad: string[] = [];

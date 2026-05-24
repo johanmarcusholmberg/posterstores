@@ -1,0 +1,59 @@
+Review and harden the completed Brand & Typography implementation.
+
+Context:
+The implementation added typography_config jsonb to stores, added Brand & Typography controls in AdminStoreForm.tsx, added StoreThemeApplicator, Google Font loading, CSS variables scoped to #store-theme-root, hero text modes, overlay modes, and live preview.
+
+I want a focused follow-up review and hardening pass, not a rewrite.
+
+Tasks:
+
+1. Verify that the database/schema change is represented in the repository.
+   - The typography_config jsonb column was added directly via SQL.
+   - If there is no committed migration/schema update, add the minimal appropriate migration or schema change so new environments get the column.
+   - Do not make unrelated DB changes.
+
+2. Configure or seed safe defaults for the existing PostsofSpain store.
+   - The current issue was that uploading a light beige hero background made hero text white and hard to read.
+   - Make sure PostsofSpain does not rely on “unset preserves existing white-text behavior.”
+   - Set or document a default typography_config for PostsofSpain with:
+     - Hero text mode: dark or custom
+     - Hero heading color: existing brand blue
+     - Hero subtitle/bullet colors: muted readable neutral/olive
+     - Hero overlay: none, unless a subtle overlay is needed
+   - Preserve backward compatibility for other stores.
+
+3. Confirm public storefront styling works across key pages:
+   - Homepage hero
+   - Homepage sections
+   - Shop/listing page
+   - Product detail page
+   - Cart/checkout public pages if present
+   - Static public pages if present
+   - Mobile layout
+
+4. Confirm admin UI is not affected by store typography settings.
+   - StoreThemeApplicator should only affect the public storefront within #store-theme-root.
+   - Admin pages should keep their existing admin styling.
+
+5. Validate fallback behavior.
+   - Missing typography_config should not crash.
+   - Partial typography_config should fall back cleanly.
+   - Invalid/missing font values should fall back to system default.
+   - Invalid/missing color values should fall back to existing theme/default colors.
+
+6. Check Google Font loading.
+   - Ensure duplicate font links are not repeatedly injected unnecessarily.
+   - Ensure “System default” does not load an external font.
+   - Ensure selected preset fonts are encoded safely in the Google Fonts URL.
+
+7. Run the smallest relevant validation:
+   - Typecheck
+   - Any focused tests if available
+   - Build only if cheap/necessary
+
+Report back with:
+1. Whether the DB migration/schema is now committed
+2. What PostsofSpain default typography_config is
+3. Which pages were visually/behaviorally checked
+4. Any files changed
+5. Confirmation that the hero text no longer turns white automatically on the light beige uploaded hero background

@@ -90,6 +90,13 @@ const POSTSOFSPAIN_SEED = {
   primaryDomain: null,
   domainAliases: null,
   routePrefix: null,
+  typographyConfig: {
+    heroTextMode: "dark" as const,
+    heroHeadingColor: "#2F80A8",
+    heroSubtitleColor: "rgba(31,42,51,0.70)",
+    heroBulletColor: "rgba(31,42,51,0.45)",
+    heroOverlayMode: "none" as const,
+  },
 } as const;
 
 /**
