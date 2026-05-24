@@ -1,0 +1,107 @@
+Refine only the homepage Collection / discovery section based on the approved visual mockup.
+
+Context:
+The homepage has already been changed to the correct product-first structure:
+- compact intro
+- admin-controlled Featured posters row with fallback posters
+- Collection / Mediterranean Walls section
+- Explore Spain chips
+- quote/story
+- value props
+
+Keep this structure. Do not redo the homepage again.
+
+Current issue:
+The current “Mediterranean Walls” collection section works functionally, but visually it feels too empty and text-only. It does not create enough of a visual break after the Featured posters row. The page needs a warmer, more editorial discovery moment, similar to the approved mockup.
+
+Important:
+- Do not touch logo upload/storage.
+- Do not touch checkout/cart/orders/fulfillment.
+- Do not change backend/API unless absolutely unavoidable.
+- Do not change admin featured poster selection.
+- Do not change the featured fallback logic.
+- Do not change the Featured posters row behavior.
+- Do not reintroduce the old large 4-image hero collage.
+- Focus mainly on Home.tsx visual layout.
+- Do not commit or push until I approve.
+- Keep everything store-aware and routePrefix-safe.
+
+Goal:
+Keep the current product-first homepage, but make the Collection / Mediterranean Walls section a stronger visual editorial break.
+
+Current homepage structure must remain:
+1. Compact intro
+2. Featured posters row
+3. Collection / Mediterranean Walls banner
+4. Explore Spain chips
+5. Optional New arrivals if enough unique posters exist
+6. Quote/story
+7. Value props
+
+Main task:
+Redesign only the Collection / Mediterranean Walls section and nearby spacing.
+
+Collection section requirements:
+- Keep it config-driven from store.shop?.collectionBanner.
+- Keep existing content:
+  - eyebrow: COLLECTION
+  - title: Mediterranean Walls
+  - text: Warm-toned prints inspired by Spanish streets, terraces and coastlines.
+  - CTA: Explore coastal posters →
+- Make it feel like an editorial banner, not a blank text block.
+- On desktop, use a two-column layout:
+  - left: text + CTA
+  - right: visual preview area
+- The visual preview area should use 2–3 existing poster images already available in Home.tsx, preferably from featuredPosters or newArrivals.
+- Do not make extra per-card API calls.
+- Do not add new backend logic.
+- Use flat/rectangular image treatment consistent with the shop.
+- Avoid heavily rounded mood-board styling.
+- Add a warm subtle background/tint, for example sand/cream/terracotta, using existing theme colors where possible.
+- Keep the section moderate in height. It should be visually richer, not huge.
+
+Mobile:
+- Stack text and visual preview cleanly.
+- Use 2 images side-by-side or a compact image strip.
+- Keep it compact.
+- Do not make the mobile page overly tall.
+
+Explore Spain section:
+- Keep the existing generated chips and routePrefix-safe links.
+- Only adjust spacing if needed so the chips feel connected to the collection section.
+- Do not change the chip data logic.
+
+Spacing:
+- Reduce large blank bands around the Collection and Explore sections.
+- Keep the page rhythm:
+  product row → visual editorial banner → exploration chips → quote/value props.
+
+Acceptance criteria:
+- Existing compact intro remains unchanged.
+- Existing Featured posters row remains unchanged.
+- Existing admin-controlled featured selection remains unchanged.
+- Existing fallback logic remains unchanged.
+- Collection section now has text + visual imagery.
+- Collection section feels like a designed visual banner, not an empty text block.
+- No extra API calls.
+- No backend/API changes unless clearly justified.
+- Explore chips remain routePrefix-safe.
+- Logo upload/storage remains unchanged.
+- Shop and poster detail pages remain unchanged.
+- Mobile remains compact.
+
+Run:
+- pnpm run typecheck
+- pnpm test -- --run
+- pnpm --filter @workspace/api-server run build
+
+Report back with:
+- files changed
+- what changed in Home.tsx
+- how collection visual images are selected
+- whether any API/data logic changed
+- desktop screenshot
+- mobile screenshot/notes
+- test/build results
+
+Do not commit or push until I review the screenshot.
