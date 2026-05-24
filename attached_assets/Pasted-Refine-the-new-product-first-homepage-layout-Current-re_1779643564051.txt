@@ -1,0 +1,74 @@
+Refine the new product-first homepage layout.
+
+Current result:
+The direction is correct, but the homepage still does not match the approved mockup closely enough. The intro section is too tall/airy, featured posters start too far down, and the poster cards in the featured row feel too large/heavy for the homepage. The first viewport still feels like a landing hero instead of a product-first shop homepage.
+
+Important:
+- Do not touch logo upload/storage.
+- Do not touch checkout/cart/orders/fulfillment.
+- Do not change backend/API unless absolutely necessary.
+- Do not change admin featured poster selection.
+- Focus mainly on Home.tsx and homepage presentation.
+- Do not commit or push until I approve.
+
+Goal:
+Make the homepage closer to the approved mockup:
+Header → compact intro → featured posters row visible earlier → quote → value props.
+
+Required changes:
+
+1. Reduce intro vertical height
+- Remove excessive empty space above and below the intro.
+- The intro should start closer to the navbar.
+- Featured posters should begin much sooner.
+- Use tighter padding, for example py-6 md:py-8 instead of large spacing.
+- Avoid making the intro feel like a full hero section.
+
+2. Make intro more compact
+- Keep centered layout if it looks best, but reduce vertical gaps.
+- Slightly reduce headline size if needed.
+- Subtitle, buttons, and trust line should sit closer together.
+- The entire intro should feel like a compact shop introduction, not a landing page hero.
+
+3. Move featured posters higher
+- The “Featured posters” heading and row should be clearly visible in the first laptop viewport.
+- Ideally, the first row of product images should start around mid-page, not near the bottom.
+- Reduce the margin between intro and featured section.
+
+4. Make homepage poster cards smaller/more row-like
+- Featured row should show more products across the laptop viewport.
+- Cards currently feel too large for the homepage.
+- Use a compact homepage card width if needed.
+- Suggested desktop card width: around 180–220px instead of large shop-grid cards.
+- Keep horizontal scroll.
+- On mobile, keep swipeable cards but avoid oversized cards.
+
+5. Consider a compact card variant
+- Reuse PosterCard only if it can be sized cleanly.
+- If PosterCard is too heavy for homepage, create a small HomeFeaturedPosterCard variant.
+- The homepage card should show:
+  - image
+  - title
+  - price/from price
+- Keep favorite icon/badges only if they look clean at smaller size.
+- If badges and heart icon make the row cluttered, hide or simplify them in the homepage featured row.
+- Do not change the normal shop grid PosterCard unless necessary.
+
+6. Keep product-first mockup feel
+- The layout should feel like a premium e-commerce homepage.
+- Compact intro, then products.
+- No large hero collage.
+- No huge blank areas.
+- More products visible immediately.
+
+Acceptance criteria:
+- Less empty vertical space in the top half of the page.
+- Featured posters start significantly higher than in the current screenshot.
+- Product row shows more cards across laptop width.
+- First viewport clearly communicates “this is a poster shop”.
+- Quote and value props remain below.
+- Mobile remains compact and swipeable.
+- Admin featured poster selection remains unchanged.
+- Logo upload/storage remains unchanged.
+
+Please send a new laptop screenshot and mobile screenshot/notes before commit/push.
