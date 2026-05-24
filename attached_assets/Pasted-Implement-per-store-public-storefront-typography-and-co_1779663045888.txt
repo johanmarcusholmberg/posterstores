@@ -1,0 +1,119 @@
+Implement per-store public storefront typography and color controls in Admin → Stores.
+
+Context:
+This is the Poster Stores project. The existing logo/logo text is already handled in the admin section “Stores”. I want to extend that same admin area so each store can control its public storefront fonts and text/colors. This should be per store/storeKey and should apply to the public storefront only, not the admin UI.
+
+Important:
+Do not change poster images, product data, checkout logic, Stripe logic, admin authentication, or unrelated layout.
+Keep the implementation focused and incremental.
+Preserve existing behavior unless a store has theme settings configured.
+Avoid broad rewrites.
+
+Goal:
+Add a “Brand & Typography” or similar section inside Admin → Stores where an admin can configure the store’s visual text theme.
+
+Recommended UX:
+Inside the existing store admin/edit screen, add controls for:
+
+Fonts:
+- Logo font
+- Heading font
+- Body font
+
+Use safe preset dropdowns only for now, not custom font upload and not free text input.
+
+Suggested font options:
+- Playfair Display
+- Cormorant Garamond
+- Lora
+- Libre Baskerville
+- Merriweather
+- Inter
+- DM Sans
+- Source Sans 3
+- Manrope
+- System default
+
+Colors:
+- Primary brand color
+- Heading color
+- Body text color
+- Muted text color
+- Link color
+- Button background color
+- Button text color
+- Border/accent color
+- Page background color
+
+Hero-specific controls:
+- Hero text mode: dark / light / custom
+- If custom:
+  - Hero eyebrow color
+  - Hero heading color
+  - Hero subtitle color
+  - Hero bullet/supporting text color
+- Hero overlay mode: none / light / dark / custom
+- Hero overlay opacity if custom, or a simple opacity slider if easier
+
+Reason:
+The current issue is that uploading a light beige hero background image made the hero text turn white, making it unreadable. The store admin should be able to explicitly choose a readable hero text style instead of the code automatically switching to white just because a background image exists.
+
+Implementation guidance:
+1. First inspect the current store model/API/admin implementation to see how store settings are stored.
+2. Prefer storing the theme settings as a JSON object on the existing store config/settings if that pattern already exists.
+3. If a DB/schema migration is needed, keep it minimal and backwards-compatible.
+4. Existing stores with no theme settings should keep their current visual defaults.
+5. Add safe defaults for PostsofSpain that match the current brand:
+   - Primary/heading/link: existing blue brand color if available
+   - Body text: dark neutral
+   - Muted text: muted grey/olive
+   - Button background: existing blue brand color
+   - Button text: white
+   - Hero text mode: dark or custom, not forced white
+6. Load fonts safely on the public storefront. If the project already uses Google Fonts or CSS variables, follow the existing pattern. Otherwise add a simple controlled mechanism for the preset fonts.
+7. Apply the theme through CSS variables/classes where possible, not by scattering inline styles everywhere.
+8. The public storefront should consume the active store theme based on storeKey/domain/route resolution.
+9. Do not let store theme settings affect the admin interface itself.
+
+Expected public storefront behavior:
+- Logo uses configured logo font/color behavior where applicable, without breaking the existing logo/logo text settings.
+- Hero heading/subtitle/bullets use configured theme colors.
+- Section headings use heading font and heading color.
+- Body text uses body font and body color.
+- Links use link color.
+- Primary buttons use button background/text colors.
+- Secondary buttons remain readable with configured border/accent/link colors.
+- Product card titles/prices remain readable and consistent.
+- Static pages should inherit the same public typography where practical.
+
+Live preview:
+Add a small live preview in Admin → Stores near the theme controls. It should preview:
+- Logo sample
+- Hero eyebrow
+- Hero heading
+- Hero subtitle
+- Primary button
+- Secondary button
+- Section heading
+- Product title and price sample
+
+Validation:
+- Validate color inputs as hex colors.
+- Validate fonts against the allowed preset list.
+- Make sure invalid/missing theme values fall back gracefully.
+- Make sure contrast/readability is not made worse by default.
+- Keep type safety clean.
+
+Testing/checks:
+Run the smallest relevant checks available, preferably:
+- Typecheck
+- Lint if cheap/available
+- Any existing focused tests if affected
+- Build only if needed or already cheap in this project
+
+Report back with:
+1. Files changed
+2. Data/schema changes, if any
+3. How to use the new admin controls
+4. What defaults were applied
+5. Confirmation that the hero text no longer turns white automatically just because a background image exists
