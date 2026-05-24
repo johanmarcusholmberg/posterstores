@@ -119,7 +119,87 @@ function HomePosterCard({ poster }: { poster: Poster }) {
   );
 }
 
-/** Skeleton card for loading states */
+/**
+ * Polaroid-inspired card used exclusively in the Featured posters section.
+ * Subtle paper background, padded frame, larger bottom caption area, soft shadow.
+ */
+const FEATURED_ROTATIONS = ["-0.6deg", "0.5deg", "-0.4deg", "0.7deg", "-0.5deg", "0.3deg"];
+
+function FeaturedPosterCard({ poster, index }: { poster: Poster; index: number }) {
+  const slug = (poster as any).slug as string | undefined;
+  const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
+
+  const activeSizes = poster.posterSizes?.filter((s) => s.active) ?? [];
+  const lowestPrice = poster.lowestActivePrice;
+  const displayPrice = lowestPrice != null ? lowestPrice : poster.price;
+  const displayCurrency = activeSizes[0]?.currency ?? poster.currency;
+  const priceLabel =
+    activeSizes.length > 1
+      ? `From ${formatPrice(displayPrice, displayCurrency)}`
+      : formatPrice(displayPrice, displayCurrency);
+
+  const displayImage = poster.primaryDisplayImageUrl ?? poster.imageUrl;
+  const rotation = FEATURED_ROTATIONS[index % FEATURED_ROTATIONS.length];
+
+  return (
+    <Link
+      href={href}
+      className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      style={{ transform: `rotate(${rotation})` }}
+    >
+      <div
+        className={[
+          "bg-[#faf8f3] rounded-[2px]",
+          "shadow-[0_2px_8px_rgba(0,0,0,0.09),0_1px_3px_rgba(0,0,0,0.06)]",
+          "group-hover:shadow-[0_6px_20px_rgba(0,0,0,0.14),0_2px_6px_rgba(0,0,0,0.09)]",
+          "group-hover:-translate-y-1",
+          "transition-all duration-300 ease-out",
+          "p-2 pb-0",
+        ].join(" ")}
+      >
+        {/* Image inset — paper-border feel from outer padding */}
+        <div className="relative aspect-[3/4] overflow-hidden bg-[#ede8e0]">
+          <img
+            src={displayImage}
+            alt={poster.title}
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.04] motion-reduce:transition-none"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = poster.imageUrl;
+            }}
+          />
+          {poster.isNew && (
+            <div className="absolute top-1.5 left-1.5 bg-secondary text-secondary-foreground text-[9px] font-bold px-1.5 py-0.5">
+              NEW
+            </div>
+          )}
+        </div>
+
+        {/* Polaroid caption tab */}
+        <div className="px-0.5 py-2.5 pb-3">
+          <h3 className="font-serif font-semibold text-[11px] sm:text-xs text-foreground/85 line-clamp-2 leading-snug">
+            {poster.title}
+          </h3>
+          <p className="text-[10px] text-foreground/50 mt-1">{priceLabel}</p>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+/** Skeleton card matching the Polaroid style for the featured loading state */
+function FeaturedPosterCardSkeleton() {
+  return (
+    <div className="bg-[#faf8f3] rounded-[2px] shadow-[0_2px_8px_rgba(0,0,0,0.07)] p-2 pb-0">
+      <div className="aspect-[3/4] bg-muted animate-pulse" />
+      <div className="px-0.5 py-2.5 pb-3">
+        <div className="h-3 bg-muted animate-pulse w-3/4" />
+        <div className="mt-1.5 h-2.5 bg-muted animate-pulse w-1/2" />
+      </div>
+    </div>
+  );
+}
+
+/** Skeleton card for loading states (used in New arrivals horizontal scroll) */
 function PosterCardSkeleton() {
   return (
     <div className="flex-none w-[155px] sm:w-[170px] lg:w-[185px] snap-start">
@@ -134,11 +214,13 @@ export default function Home() {
   const store = useStorefront();
   const { resolvedRoutePrefix } = store;
 
+  const FEATURED_LIMIT = 6;
+
   const { data: featured } = useGetFeaturedPosters(
-    { storeKey: store.storeKey, limit: 12 },
+    { storeKey: store.storeKey, limit: FEATURED_LIMIT },
     {
       query: {
-        queryKey: getGetFeaturedPostersQueryKey({ storeKey: store.storeKey, limit: 12 }),
+        queryKey: getGetFeaturedPostersQueryKey({ storeKey: store.storeKey, limit: FEATURED_LIMIT }),
       },
     }
   );
@@ -298,10 +380,17 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Featured posters row ── */}
-      <section className="pt-5 pb-6 lg:pt-6 lg:pb-8 border-b border-border">
+      {/* ── Featured posters grid ── */}
+      {/*
+        Layout:
+          Desktop (≥1024px lg): 6 columns × 1 row — all 6 posters visible
+          Tablet  (640–1023px sm): 3 columns × 2 rows — all 6 posters visible
+          Mobile  (<640px): 2 columns × 2 rows — only first 4 shown (items 4+5 hidden on mobile)
+        Polaroid-style cards apply only here; the normal shop grid is unchanged.
+      */}
+      <section className="pt-6 pb-8 lg:pt-7 lg:pb-10 border-b border-border">
         <div className="container mx-auto px-6 lg:px-10">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-5 lg:mb-6">
             <h2 className="font-serif text-xl font-bold text-foreground">Featured posters</h2>
             <Link
               href={makeShopUrl(resolvedRoutePrefix)}
@@ -311,22 +400,20 @@ export default function Home() {
             </Link>
           </div>
 
-          {/* Horizontally scrollable row — swipeable on mobile */}
-          <div
-            className="flex gap-3 overflow-x-auto pb-3 scroll-smooth snap-x snap-mandatory -mx-6 px-6 lg:-mx-10 lg:px-10"
-            style={{ scrollbarWidth: "none" }}
-          >
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-5 lg:gap-4">
             {featured && featured.length > 0
-              ? featured.map((poster) => (
+              ? featured.slice(0, FEATURED_LIMIT).map((poster, i) => (
                   <div
                     key={poster.id}
-                    className="flex-none w-[155px] sm:w-[170px] lg:w-[185px] snap-start"
+                    className={i >= 4 ? "hidden sm:block" : undefined}
                   >
-                    <HomePosterCard poster={poster} />
+                    <FeaturedPosterCard poster={poster} index={i} />
                   </div>
                 ))
-              : Array.from({ length: 7 }).map((_, i) => (
-                  <PosterCardSkeleton key={i} />
+              : Array.from({ length: FEATURED_LIMIT }).map((_, i) => (
+                  <div key={i} className={i >= 4 ? "hidden sm:block" : undefined}>
+                    <FeaturedPosterCardSkeleton />
+                  </div>
                 ))}
           </div>
         </div>
