@@ -42,6 +42,8 @@ export interface StorefrontConfig {
       title: string;
       text: string;
       ctaText?: string;
+      /** Full relative path + query for the CTA, e.g. /shop?category=Coastal+Posters */
+      ctaLink?: string;
     };
   };
   regions: string[];
@@ -95,6 +97,7 @@ export const storefronts: Record<string, StorefrontConfig> = {
         title: "Mediterranean Walls",
         text: "Warm-toned prints inspired by Spanish streets, terraces and coastlines.",
         ctaText: "Explore coastal posters",
+        ctaLink: "/shop?category=Coastal+Posters",
       },
     },
     regions: ["Valencia","Andalusia","Catalonia","Madrid","Balearic Islands","Basque Country","Galicia","Canary Islands"],

@@ -4,6 +4,9 @@ import { useStorefront } from "@/context/StorefrontContext";
 import {
   useGetFeaturedPosters,
   getGetFeaturedPostersQueryKey,
+  useListPosters,
+  getListPostersQueryKey,
+  ListPostersSort,
   Poster,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -34,7 +37,13 @@ function formatPrice(price: number, currency: string): string {
   return `${symbol}${price.toFixed(2)}`;
 }
 
-/** Compact card used only on the homepage featured row */
+/** Build a /shop URL, prepending a routePrefix when present. */
+function makeShopUrl(routePrefix: string | null, query?: string): string {
+  const base = routePrefix ? `/${routePrefix}/shop` : "/shop";
+  return query ? `${base}?${query}` : base;
+}
+
+/** Compact card used only on the homepage featured/new-arrivals rows */
 function HomePosterCard({ poster }: { poster: Poster }) {
   const slug = (poster as any).slug as string | undefined;
   const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
@@ -109,8 +118,20 @@ function HomePosterCard({ poster }: { poster: Poster }) {
   );
 }
 
+/** Skeleton card for loading states */
+function PosterCardSkeleton() {
+  return (
+    <div className="flex-none w-[155px] sm:w-[170px] lg:w-[185px] snap-start">
+      <div className="aspect-[3/4] bg-muted animate-pulse" />
+      <div className="mt-1.5 h-3.5 bg-muted animate-pulse w-3/4" />
+      <div className="mt-1 h-3 bg-muted animate-pulse w-1/2" />
+    </div>
+  );
+}
+
 export default function Home() {
   const store = useStorefront();
+  const { resolvedRoutePrefix } = store;
 
   const { data: featured } = useGetFeaturedPosters(
     { storeKey: store.storeKey, limit: 12 },
@@ -121,9 +142,41 @@ export default function Home() {
     }
   );
 
+  const { data: newArrivalsData } = useListPosters(
+    {
+      storeKey: store.storeKey,
+      sort: ListPostersSort.newest,
+      limit: 10,
+      status: "published",
+    },
+    {
+      query: {
+        queryKey: getListPostersQueryKey({
+          storeKey: store.storeKey,
+          sort: ListPostersSort.newest,
+          limit: 10,
+          status: "published",
+        }),
+      },
+    }
+  );
+
   const brandStory =
     (store as any).homepage?.brandStory ??
     "A curated poster collection inspired by cities, landscapes, food, architecture and everyday moments.";
+
+  const collectionBanner = store.shop?.collectionBanner;
+
+  // Build discovery chips: up to 5 regions + up to 4 categories
+  const regionChips = (store.regions ?? []).slice(0, 5);
+  const categoryChips = (store.categories ?? []).slice(0, 4);
+
+  // New arrivals: dedupe against featured (by id), show up to 8
+  const featuredIds = new Set((featured ?? []).map((p) => p.id));
+  const newArrivals = (newArrivalsData?.posters ?? [])
+    .filter((p) => !featuredIds.has(p.id))
+    .slice(0, 8);
+  const showNewArrivals = newArrivals.length >= 3;
 
   return (
     <div className="min-h-screen pb-16">
@@ -141,12 +194,12 @@ export default function Home() {
             Mediterranean places, colors and moments — printed for your home.
           </p>
           <div className="flex flex-col sm:flex-row gap-2.5 justify-center">
-            <Link href="/shop">
+            <Link href={makeShopUrl(resolvedRoutePrefix)}>
               <Button size="default" className="w-full sm:w-auto h-9 px-6 text-sm" data-testid="btn-hero-primary">
                 Browse posters
               </Button>
             </Link>
-            <Link href="/shop">
+            <Link href={makeShopUrl(resolvedRoutePrefix)}>
               <Button
                 size="default"
                 variant="outline"
@@ -170,7 +223,7 @@ export default function Home() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-serif text-xl font-bold text-foreground">Featured posters</h2>
             <Link
-              href="/shop"
+              href={makeShopUrl(resolvedRoutePrefix)}
               className="text-sm text-primary font-medium hover:underline shrink-0 ml-4"
             >
               View all &rarr;
@@ -192,18 +245,109 @@ export default function Home() {
                   </div>
                 ))
               : Array.from({ length: 7 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="flex-none w-[155px] sm:w-[170px] lg:w-[185px] snap-start"
-                  >
-                    <div className="aspect-[3/4] bg-muted animate-pulse" />
-                    <div className="mt-1.5 h-3.5 bg-muted animate-pulse w-3/4" />
-                    <div className="mt-1 h-3 bg-muted animate-pulse w-1/2" />
-                  </div>
+                  <PosterCardSkeleton key={i} />
                 ))}
           </div>
         </div>
       </section>
+
+      {/* ── Collection / discovery banner ── */}
+      {collectionBanner && (
+        <section className="py-10 lg:py-12 border-b border-border bg-sand/40">
+          <div className="container mx-auto px-6 lg:px-10">
+            <div className="max-w-2xl">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-foreground/40 mb-2">
+                COLLECTION
+              </p>
+              <h2 className="font-serif text-2xl sm:text-3xl font-bold text-primary leading-tight mb-3">
+                {collectionBanner.title}
+              </h2>
+              <p className="text-sm text-foreground/65 leading-relaxed mb-5 max-w-md">
+                {collectionBanner.text}
+              </p>
+              <Link
+                href={
+                  collectionBanner.ctaLink
+                    ? resolvedRoutePrefix
+                      ? `/${resolvedRoutePrefix}${collectionBanner.ctaLink}`
+                      : collectionBanner.ctaLink
+                    : makeShopUrl(resolvedRoutePrefix)
+                }
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+              >
+                {collectionBanner.ctaText ?? "Explore collection"} →
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── Shop by region / category ── */}
+      {(regionChips.length > 0 || categoryChips.length > 0) && (
+        <section className="py-8 lg:py-10 border-b border-border" data-testid="shop-by-region-section">
+          <div className="container mx-auto px-6 lg:px-10">
+            <h2 className="font-serif text-lg font-bold text-foreground mb-4">
+              {store.shop?.regionFilterLabel ?? "Explore Spain"}
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              {regionChips.map((region) => (
+                <Link
+                  key={region}
+                  href={makeShopUrl(resolvedRoutePrefix, `region=${encodeURIComponent(region)}`)}
+                  className="inline-flex items-center px-3.5 py-1.5 rounded-full border border-border text-sm text-foreground/75 bg-surface hover:bg-sand/60 hover:border-primary/30 hover:text-primary transition-colors duration-150"
+                >
+                  {region}
+                </Link>
+              ))}
+              {categoryChips.map((cat) => (
+                <Link
+                  key={cat}
+                  href={makeShopUrl(resolvedRoutePrefix, `category=${encodeURIComponent(cat)}`)}
+                  className="inline-flex items-center px-3.5 py-1.5 rounded-full border border-border text-sm text-foreground/75 bg-surface hover:bg-sand/60 hover:border-primary/30 hover:text-primary transition-colors duration-150"
+                >
+                  {cat}
+                </Link>
+              ))}
+              <Link
+                href={makeShopUrl(resolvedRoutePrefix)}
+                className="inline-flex items-center px-3.5 py-1.5 rounded-full border border-primary/25 text-sm text-primary bg-primary/5 hover:bg-primary/10 transition-colors duration-150"
+              >
+                View all →
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── New arrivals ── */}
+      {showNewArrivals && (
+        <section className="pt-6 pb-7 lg:pt-7 lg:pb-9 border-b border-border" data-testid="new-arrivals-section">
+          <div className="container mx-auto px-6 lg:px-10">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-serif text-xl font-bold text-foreground">New arrivals</h2>
+              <Link
+                href={makeShopUrl(resolvedRoutePrefix, "sort=newest")}
+                className="text-sm text-primary font-medium hover:underline shrink-0 ml-4"
+              >
+                View all &rarr;
+              </Link>
+            </div>
+            <div
+              className="flex gap-3 overflow-x-auto pb-3 scroll-smooth snap-x snap-mandatory -mx-6 px-6 lg:-mx-10 lg:px-10"
+              style={{ scrollbarWidth: "none" }}
+            >
+              {newArrivals.map((poster) => (
+                <div
+                  key={poster.id}
+                  className="flex-none w-[155px] sm:w-[170px] lg:w-[185px] snap-start"
+                >
+                  <HomePosterCard poster={poster} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── Brand quote ── */}
       <section className="py-12 lg:py-14" data-testid="brand-story-section">
