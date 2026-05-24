@@ -73,7 +73,7 @@ export const AdminPublishControls = ({
               onCheckedChange={v => onFeaturedChange(Boolean(v))}
               data-testid="field-isFeatured"
             />
-            <span className="text-sm">Featured poster</span>
+            <span className="text-sm">Show on homepage featured row</span>
           </label>
           <label className="flex items-center gap-2 cursor-pointer select-none">
             <Checkbox

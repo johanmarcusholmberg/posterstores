@@ -1,22 +1,15 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { postersTable, ordersTable } from "@workspace/db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, notInArray } from "drizzle-orm";
 import {
   GetStoreStatsQueryParams,
   GetFeaturedPostersQueryParams,
   GetNewArrivalsQueryParams,
 } from "@workspace/api-zod";
+import { enrichPosters } from "../lib/posterEnrichment";
 
 const router = Router();
-
-function serializePoster(p: typeof postersTable.$inferSelect) {
-  return {
-    ...p,
-    price: Number(p.price),
-    createdAt: p.createdAt.toISOString(),
-  };
-}
 
 router.get("/stats/store", async (req, res) => {
   const query = GetStoreStatsQueryParams.safeParse(req.query);
@@ -64,16 +57,47 @@ router.get("/stats/featured", async (req, res) => {
   if (!query.success) return res.status(400).json({ error: query.error.flatten() });
 
   const storeKey = query.data.storeKey ?? "postsofspain";
-  const limit = query.data.limit ?? 8;
+  const limit = query.data.limit ?? 12;
 
-  const posters = await db
+  const featuredPosters = await db
     .select()
     .from(postersTable)
-    .where(and(eq(postersTable.isFeatured, true), eq(postersTable.storeKey, storeKey)))
+    .where(
+      and(
+        eq(postersTable.isFeatured, true),
+        eq(postersTable.storeKey, storeKey),
+        eq(postersTable.status, "published")
+      )
+    )
     .orderBy(desc(postersTable.createdAt))
     .limit(limit);
 
-  return res.json(posters.map(serializePoster));
+  let combined = featuredPosters;
+
+  if (combined.length < limit) {
+    const featuredIds = combined.map(p => p.id);
+    const remaining = limit - combined.length;
+
+    const fallbackConditions = [
+      eq(postersTable.storeKey, storeKey),
+      eq(postersTable.status, "published"),
+    ];
+    if (featuredIds.length > 0) {
+      fallbackConditions.push(notInArray(postersTable.id, featuredIds));
+    }
+
+    const fallback = await db
+      .select()
+      .from(postersTable)
+      .where(and(...fallbackConditions))
+      .orderBy(desc(postersTable.createdAt))
+      .limit(remaining);
+
+    combined = [...featuredPosters, ...fallback];
+  }
+
+  const enriched = await enrichPosters(combined, false);
+  return res.json(enriched);
 });
 
 router.get("/stats/new-arrivals", async (req, res) => {
@@ -90,7 +114,8 @@ router.get("/stats/new-arrivals", async (req, res) => {
     .orderBy(desc(postersTable.createdAt))
     .limit(limit);
 
-  return res.json(posters.map(serializePoster));
+  const enriched = await enrichPosters(posters, false);
+  return res.json(enriched);
 });
 
 export default router;
