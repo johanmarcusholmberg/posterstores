@@ -21,6 +21,7 @@ import {
   Rocket,
   Settings2,
   FileText,
+  LayoutPanelTop,
 } from "lucide-react";
 
 export default function AdminDashboard() {
@@ -196,6 +197,13 @@ export default function AdminDashboard() {
               <div className="flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium bg-background hover:bg-muted transition-colors cursor-pointer">
                 <Rocket className="w-4 h-4 text-primary" />
                 Launch checklist
+                <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
+              </div>
+            </Link>
+            <Link href="/admin/homepage">
+              <div className="flex items-center gap-2 rounded-lg border px-4 py-3 text-sm font-medium bg-background hover:bg-muted transition-colors cursor-pointer">
+                <LayoutPanelTop className="w-4 h-4 text-primary" />
+                Edit homepage
                 <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
               </div>
             </Link>

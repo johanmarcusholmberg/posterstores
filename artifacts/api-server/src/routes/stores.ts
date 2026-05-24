@@ -548,6 +548,87 @@ router.get("/stores/resolve", async (req, res) => {
   return res.json(serializeStore(resolved));
 });
 
+// ── Homepage visual config (admin) ────────────────────────────────────────────
+
+const heroVisualSchema = z.object({
+  backgroundImageUrl: z.string().nullable().optional(),
+  backgroundStoragePath: z.string().nullable().optional(),
+  backgroundOverlayOpacity: z.number().min(0).max(1).optional(),
+  primaryButtonText: z.string().nullable().optional(),
+  primaryButtonVariant: z.enum(["filled", "outline"]).optional(),
+  secondaryButtonText: z.string().nullable().optional(),
+  secondaryButtonVariant: z.enum(["filled", "outline"]).optional(),
+}).optional();
+
+const collectionBannerVisualSchema = z.object({
+  backgroundImageUrl: z.string().nullable().optional(),
+  backgroundStoragePath: z.string().nullable().optional(),
+  backgroundOverlayOpacity: z.number().min(0).max(1).optional(),
+  eyebrow: z.string().nullable().optional(),
+  title: z.string().nullable().optional(),
+  text: z.string().nullable().optional(),
+  ctaText: z.string().nullable().optional(),
+  ctaLink: z.string().nullable().optional(),
+}).optional();
+
+const homepageVisualConfigSchema = z.object({
+  hero: heroVisualSchema,
+  collectionBanner: collectionBannerVisualSchema,
+});
+
+// GET /api/admin/stores/:storeKey/homepage-visual
+router.get("/admin/stores/:storeKey/homepage-visual", requireAdmin, async (req, res) => {
+  const storeKey = String(req.params.storeKey);
+  const [store] = await db.select().from(storesTable).where(eq(storesTable.storeKey, storeKey)).limit(1);
+  if (!store) return res.status(404).json({ error: "Store not found" });
+  return res.json((store.homepageVisualConfig as object) ?? {});
+});
+
+// PUT /api/admin/stores/:storeKey/homepage-visual
+router.put("/admin/stores/:storeKey/homepage-visual", requireAdmin, async (req, res) => {
+  const storeKey = String(req.params.storeKey);
+
+  const [store] = await db.select().from(storesTable).where(eq(storesTable.storeKey, storeKey)).limit(1);
+  if (!store) return res.status(404).json({ error: "Store not found" });
+
+  const parsed = homepageVisualConfigSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const existing = (store.homepageVisualConfig ?? {}) as Record<string, unknown>;
+  const incoming = parsed.data as Record<string, unknown>;
+
+  // Clean up old storage objects when their paths have changed
+  const oldHeroPath = (existing["hero"] as Record<string, unknown> | undefined)?.["backgroundStoragePath"] as string | null | undefined;
+  const newHeroPath = (incoming["hero"] as Record<string, unknown> | undefined)?.["backgroundStoragePath"] as string | null | undefined;
+  const oldCollPath = (existing["collectionBanner"] as Record<string, unknown> | undefined)?.["backgroundStoragePath"] as string | null | undefined;
+  const newCollPath = (incoming["collectionBanner"] as Record<string, unknown> | undefined)?.["backgroundStoragePath"] as string | null | undefined;
+
+  if (oldHeroPath && oldHeroPath !== newHeroPath) {
+    try {
+      const file = await objectStorageService.getObjectEntityFile(oldHeroPath);
+      await file.delete();
+    } catch (err) {
+      req.log.warn({ err }, "Failed to delete old hero background image from storage");
+    }
+  }
+  if (oldCollPath && oldCollPath !== newCollPath) {
+    try {
+      const file = await objectStorageService.getObjectEntityFile(oldCollPath);
+      await file.delete();
+    } catch (err) {
+      req.log.warn({ err }, "Failed to delete old collection banner background image from storage");
+    }
+  }
+
+  const [updated] = await db
+    .update(storesTable)
+    .set({ homepageVisualConfig: parsed.data, updatedAt: new Date() })
+    .where(eq(storesTable.storeKey, storeKey))
+    .returning();
+
+  return res.json((updated.homepageVisualConfig as object) ?? {});
+});
+
 // GET /api/stores/:storeKey/config — public endpoint: merged config for a single store
 router.get("/stores/:storeKey/config", async (req, res) => {
   const storeKey = String(req.params.storeKey);
@@ -594,6 +675,7 @@ router.get("/stores/:storeKey/config", async (req, res) => {
       : undefined,
     logoUrl: store.logoUrl ?? null,
     logoAltText: store.logoAltText ?? null,
+    homepageVisualConfig: (store.homepageVisualConfig as object) ?? null,
   });
 });
 

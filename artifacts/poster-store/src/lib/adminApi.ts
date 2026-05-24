@@ -661,3 +661,81 @@ export async function fetchPublicStores(): Promise<AdminStore[]> {
   if (!res.ok) return [];
   return res.json();
 }
+
+// ─── Homepage visual config ────────────────────────────────────────────────
+
+export interface HeroVisualConfig {
+  backgroundImageUrl?: string | null;
+  backgroundStoragePath?: string | null;
+  backgroundOverlayOpacity?: number;
+  primaryButtonText?: string | null;
+  primaryButtonVariant?: "filled" | "outline";
+  secondaryButtonText?: string | null;
+  secondaryButtonVariant?: "filled" | "outline";
+}
+
+export interface CollectionBannerVisualConfig {
+  backgroundImageUrl?: string | null;
+  backgroundStoragePath?: string | null;
+  backgroundOverlayOpacity?: number;
+  eyebrow?: string | null;
+  title?: string | null;
+  text?: string | null;
+  ctaText?: string | null;
+  ctaLink?: string | null;
+}
+
+export interface HomepageVisualConfig {
+  hero?: HeroVisualConfig;
+  collectionBanner?: CollectionBannerVisualConfig;
+}
+
+export async function adminGetHomepageVisual(storeKey: string): Promise<HomepageVisualConfig> {
+  const res = await fetch(
+    `${BASE}/admin/stores/${encodeURIComponent(storeKey)}/homepage-visual`,
+    { credentials: "include" }
+  );
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(extractErrorMessage(body));
+  }
+  return res.json();
+}
+
+export async function adminUpdateHomepageVisual(
+  storeKey: string,
+  config: HomepageVisualConfig
+): Promise<HomepageVisualConfig> {
+  const res = await fetch(
+    `${BASE}/admin/stores/${encodeURIComponent(storeKey)}/homepage-visual`,
+    {
+      method: "PUT",
+      headers: jsonHeaders(),
+      credentials: "include",
+      body: JSON.stringify(config),
+    }
+  );
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(extractErrorMessage(body));
+  }
+  return res.json();
+}
+
+export async function requestStorageUploadUrl(
+  name: string,
+  size: number,
+  contentType: string
+): Promise<{ uploadURL: string; objectPath: string }> {
+  const res = await fetch(`${BASE}/storage/uploads/request-url`, {
+    method: "POST",
+    headers: jsonHeaders(),
+    credentials: "include",
+    body: JSON.stringify({ name, size, contentType }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(extractErrorMessage(body));
+  }
+  return res.json();
+}

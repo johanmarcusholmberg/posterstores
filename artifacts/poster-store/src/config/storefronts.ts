@@ -1,3 +1,29 @@
+export interface HeroVisualConfig {
+  backgroundImageUrl?: string | null;
+  backgroundStoragePath?: string | null;
+  backgroundOverlayOpacity?: number;
+  primaryButtonText?: string | null;
+  primaryButtonVariant?: "filled" | "outline";
+  secondaryButtonText?: string | null;
+  secondaryButtonVariant?: "filled" | "outline";
+}
+
+export interface CollectionBannerVisualConfig {
+  backgroundImageUrl?: string | null;
+  backgroundStoragePath?: string | null;
+  backgroundOverlayOpacity?: number;
+  eyebrow?: string | null;
+  title?: string | null;
+  text?: string | null;
+  ctaText?: string | null;
+  ctaLink?: string | null;
+}
+
+export interface HomepageVisualConfig {
+  hero?: HeroVisualConfig;
+  collectionBanner?: CollectionBannerVisualConfig;
+}
+
 export interface StorefrontConfig {
   storeKey: string;
   storeName: string;
@@ -56,6 +82,7 @@ export interface StorefrontConfig {
   };
   logoUrl?: string | null;
   logoAltText?: string | null;
+  homepageVisualConfig?: HomepageVisualConfig | null;
 }
 
 export const storefronts: Record<string, StorefrontConfig> = {

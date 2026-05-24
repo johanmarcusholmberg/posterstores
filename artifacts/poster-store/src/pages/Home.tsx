@@ -10,6 +10,7 @@ import {
   Poster,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const VALUE_PROPS = [
   {
@@ -166,6 +167,10 @@ export default function Home() {
     "A curated poster collection inspired by cities, landscapes, food, architecture and everyday moments.";
 
   const collectionBanner = store.shop?.collectionBanner;
+  const heroVisual = store.homepageVisualConfig?.hero;
+  const collectionVisual = store.homepageVisualConfig?.collectionBanner;
+  const hasHeroBg = !!heroVisual?.backgroundImageUrl;
+  const hasCollBg = !!collectionVisual?.backgroundImageUrl;
 
   // Pick up to 3 poster images for the collection preview strip.
   // Use featured first (already fetched), fallback to newArrivals — no extra API calls.
@@ -198,34 +203,84 @@ export default function Home() {
     <div className="min-h-screen pb-16">
 
       {/* ── Compact intro ── */}
-      <section className="bg-sand">
-        <div className="container mx-auto px-6 lg:px-10 py-5 lg:py-7 text-center">
-          <p className="text-xs font-medium uppercase tracking-widest text-foreground/45 mb-2">
-            INSPIRED BY SPAIN
-          </p>
-          <h1 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold text-primary mb-3 leading-tight">
+      <section
+        className={cn("relative overflow-hidden", !hasHeroBg && "bg-sand")}
+        style={
+          hasHeroBg
+            ? {
+                backgroundImage: `url(${heroVisual!.backgroundImageUrl})`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+              }
+            : undefined
+        }
+      >
+        {hasHeroBg && (
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundColor: `rgba(0,0,0,${heroVisual?.backgroundOverlayOpacity ?? 0.3})`,
+            }}
+          />
+        )}
+        <div className="relative z-10 container mx-auto px-6 lg:px-10 py-5 lg:py-7 text-center">
+          <h1
+            className={cn(
+              "font-serif text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 leading-tight",
+              hasHeroBg ? "text-white" : "text-primary"
+            )}
+          >
             Posters inspired by Spain
           </h1>
-          <p className="text-sm text-foreground/65 mb-5 max-w-sm mx-auto leading-relaxed">
+          <p
+            className={cn(
+              "text-sm mb-5 max-w-sm mx-auto leading-relaxed",
+              hasHeroBg ? "text-white/80" : "text-foreground/65"
+            )}
+          >
             Mediterranean places, colors and moments — printed for your home.
           </p>
           <div className="flex flex-col sm:flex-row gap-2.5 justify-center">
             <Link href={makeShopUrl(resolvedRoutePrefix)}>
-              <Button size="default" className="w-full sm:w-auto h-9 px-6 text-sm" data-testid="btn-hero-primary">
-                Browse posters
+              <Button
+                size="default"
+                data-testid="btn-hero-primary"
+                variant={
+                  hasHeroBg
+                    ? "default"
+                    : heroVisual?.primaryButtonVariant === "outline"
+                    ? "outline"
+                    : "default"
+                }
+                className={cn(
+                  "w-full sm:w-auto h-9 px-6 text-sm",
+                  hasHeroBg && "bg-white text-primary hover:bg-white/90 border-0"
+                )}
+              >
+                {heroVisual?.primaryButtonText || "Browse posters"}
               </Button>
             </Link>
             <Link href={makeShopUrl(resolvedRoutePrefix)}>
               <Button
                 size="default"
                 variant="outline"
-                className="w-full sm:w-auto h-9 px-6 text-sm border-primary/30 text-primary hover:bg-primary/5"
+                className={cn(
+                  "w-full sm:w-auto h-9 px-6 text-sm",
+                  hasHeroBg
+                    ? "border-white/60 text-white hover:bg-white/10 bg-transparent"
+                    : "border-primary/30 text-primary hover:bg-primary/5"
+                )}
               >
-                View all regions
+                {heroVisual?.secondaryButtonText || "View all regions"}
               </Button>
             </Link>
           </div>
-          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 justify-center text-xs text-foreground/40">
+          <div
+            className={cn(
+              "mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 justify-center text-xs",
+              hasHeroBg ? "text-white/50" : "text-foreground/40"
+            )}
+          >
             <span>✦ Fine art prints</span>
             <span>✦ Ships worldwide</span>
             <span>✦ Sustainably made</span>
@@ -268,80 +323,126 @@ export default function Home() {
       </section>
 
       {/* ── Collection / discovery banner ── */}
-      {collectionBanner && (
-        <section className="border-b border-border" style={{ backgroundColor: "#EBD9C4" }}>
-          <div className="container mx-auto px-6 lg:px-10 py-8 lg:py-10">
-            <div className="flex flex-col lg:flex-row lg:items-center gap-7 lg:gap-12">
+      {(collectionBanner || collectionVisual) && (() => {
+        const cbTitle = collectionVisual?.title ?? collectionBanner?.title ?? "Mediterranean Walls";
+        const cbText = collectionVisual?.text ?? collectionBanner?.text;
+        const cbCtaText = collectionVisual?.ctaText ?? collectionBanner?.ctaText ?? "Explore collection";
+        const cbCtaLink = collectionVisual?.ctaLink ?? collectionBanner?.ctaLink;
+        const cbEyebrow = collectionVisual?.eyebrow;
+        const resolvedCtaHref = cbCtaLink
+          ? resolvedRoutePrefix
+            ? `/${resolvedRoutePrefix}${cbCtaLink}`
+            : cbCtaLink
+          : makeShopUrl(resolvedRoutePrefix);
 
-              {/* Left column — text + CTA */}
-              <div className="lg:w-[52%] flex-none">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-foreground/45 mb-2.5">
-                  COLLECTION
-                </p>
-                <h2 className="font-serif text-2xl sm:text-3xl font-bold text-primary leading-tight mb-3">
-                  {collectionBanner.title}
-                </h2>
-                <p className="text-sm text-foreground/65 leading-relaxed mb-5 max-w-sm">
-                  {collectionBanner.text}
-                </p>
-                <Link
-                  href={
-                    collectionBanner.ctaLink
-                      ? resolvedRoutePrefix
-                        ? `/${resolvedRoutePrefix}${collectionBanner.ctaLink}`
-                        : collectionBanner.ctaLink
-                      : makeShopUrl(resolvedRoutePrefix)
+        return (
+          <section
+            className={cn("border-b border-border relative overflow-hidden")}
+            style={
+              hasCollBg
+                ? {
+                    backgroundImage: `url(${collectionVisual!.backgroundImageUrl})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
                   }
-                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
-                >
-                  {collectionBanner.ctaText ?? "Explore collection"} &rarr;
-                </Link>
-              </div>
+                : { backgroundColor: "#EBD9C4" }
+            }
+          >
+            {hasCollBg && (
+              <div
+                className="absolute inset-0"
+                style={{
+                  backgroundColor: `rgba(0,0,0,${collectionVisual?.backgroundOverlayOpacity ?? 0.35})`,
+                }}
+              />
+            )}
+            <div className="relative z-10 container mx-auto px-6 lg:px-10 py-8 lg:py-10">
+              <div className="flex flex-col lg:flex-row lg:items-center gap-7 lg:gap-12">
 
-              {/* Right column — poster image strip */}
-              {collectionPreviewPosters.length > 0 && (
-                <div className="lg:flex-1 min-w-0">
-                  <div className="flex gap-2 sm:gap-3">
-                    {collectionPreviewPosters.map((poster, idx) => {
-                      const slug = (poster as any).slug as string | undefined;
-                      const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
-                      const displayImg = poster.primaryDisplayImageUrl ?? poster.imageUrl;
-                      return (
-                        <Link
-                          key={poster.id}
-                          href={href}
-                          className={[
-                            "block flex-1 min-w-0 overflow-hidden group",
-                            // hide 3rd image on very small screens so 2 fill nicely
-                            idx === 2 ? "hidden sm:block" : "",
-                          ].join(" ")}
-                        >
-                          <div className="relative aspect-[3/4] overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.09)] group-hover:shadow-[0_3px_12px_rgba(0,0,0,0.14)] transition-shadow duration-300">
-                            <img
-                              src={displayImg}
-                              alt={poster.title}
-                              className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.04]"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = poster.imageUrl;
-                              }}
-                            />
-                            {/* subtle inner border */}
-                            <div
-                              className="absolute inset-0 ring-1 ring-inset ring-black/[0.06] pointer-events-none"
-                              aria-hidden="true"
-                            />
-                          </div>
-                        </Link>
-                      );
-                    })}
-                  </div>
+                {/* Left column — text + CTA */}
+                <div className="lg:w-[52%] flex-none">
+                  {cbEyebrow && (
+                    <p
+                      className={cn(
+                        "text-[10px] font-semibold uppercase tracking-[0.18em] mb-2.5",
+                        hasCollBg ? "text-white/60" : "text-foreground/45"
+                      )}
+                    >
+                      {cbEyebrow}
+                    </p>
+                  )}
+                  <h2
+                    className={cn(
+                      "font-serif text-2xl sm:text-3xl font-bold leading-tight mb-3",
+                      hasCollBg ? "text-white" : "text-primary"
+                    )}
+                  >
+                    {cbTitle}
+                  </h2>
+                  {cbText && (
+                    <p
+                      className={cn(
+                        "text-sm leading-relaxed mb-5 max-w-sm",
+                        hasCollBg ? "text-white/75" : "text-foreground/65"
+                      )}
+                    >
+                      {cbText}
+                    </p>
+                  )}
+                  <Link
+                    href={resolvedCtaHref}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 text-sm font-semibold hover:underline",
+                      hasCollBg ? "text-white" : "text-primary"
+                    )}
+                  >
+                    {cbCtaText} &rarr;
+                  </Link>
                 </div>
-              )}
 
+                {/* Right column — poster image strip */}
+                {collectionPreviewPosters.length > 0 && (
+                  <div className="lg:flex-1 min-w-0">
+                    <div className="flex gap-2 sm:gap-3">
+                      {collectionPreviewPosters.map((poster, idx) => {
+                        const slug = (poster as any).slug as string | undefined;
+                        const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
+                        const displayImg = poster.primaryDisplayImageUrl ?? poster.imageUrl;
+                        return (
+                          <Link
+                            key={poster.id}
+                            href={href}
+                            className={[
+                              "block flex-1 min-w-0 overflow-hidden group",
+                              idx === 2 ? "hidden sm:block" : "",
+                            ].join(" ")}
+                          >
+                            <div className="relative aspect-[3/4] overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.09)] group-hover:shadow-[0_3px_12px_rgba(0,0,0,0.14)] transition-shadow duration-300">
+                              <img
+                                src={displayImg}
+                                alt={poster.title}
+                                className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.04]"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = poster.imageUrl;
+                                }}
+                              />
+                              <div
+                                className="absolute inset-0 ring-1 ring-inset ring-black/[0.06] pointer-events-none"
+                                aria-hidden="true"
+                              />
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+              </div>
             </div>
-          </div>
-        </section>
-      )}
+          </section>
+        );
+      })()}
 
       {/* ── Shop by region / category ── */}
       {(regionChips.length > 0 || categoryChips.length > 0) && (

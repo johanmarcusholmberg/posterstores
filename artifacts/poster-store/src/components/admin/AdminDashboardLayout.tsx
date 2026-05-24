@@ -20,6 +20,7 @@ import {
   Rocket,
   Settings2,
   FileText,
+  LayoutPanelTop,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
   { href: "/admin/orders", label: "Orders", icon: ShoppingBag },
   { href: "/admin/fulfillment", label: "Fulfillment", icon: Package },
   { href: "/admin/mockups", label: "Mockups", icon: LayoutTemplate },
+  { href: "/admin/homepage", label: "Homepage Editor", icon: LayoutPanelTop },
   { href: "/admin/content", label: "Content Pages", icon: FileText },
   { href: "/admin/stores", label: "Stores", icon: Globe },
   { href: "/admin/launch-checklist", label: "Launch Checklist", icon: Rocket },
