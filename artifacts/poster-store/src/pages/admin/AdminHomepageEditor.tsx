@@ -61,6 +61,19 @@ interface ImageUploaderProps {
   onRemove: () => void;
 }
 
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+const MAX_FILE_BYTES = 8 * 1024 * 1024; // 8 MB
+
+function validateImageFile(file: File): string | null {
+  if (!(ALLOWED_IMAGE_TYPES as readonly string[]).includes(file.type)) {
+    return `File type not supported ("${file.type}"). Please upload a JPG, PNG, or WebP image.`;
+  }
+  if (file.size > MAX_FILE_BYTES) {
+    return `File is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum allowed size is 8 MB.`;
+  }
+  return null;
+}
+
 function ImageUploader({ label, hint, currentUrl, onUpload, onRemove }: ImageUploaderProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -69,6 +82,12 @@ function ImageUploader({ label, hint, currentUrl, onUpload, onRemove }: ImageUpl
   const [uploadError, setUploadError] = useState("");
 
   const handleFile = async (file: File) => {
+    const validationError = validateImageFile(file);
+    if (validationError) {
+      setUploadError(validationError);
+      return;
+    }
+
     const preview = URL.createObjectURL(file);
     setLocalPreview(preview);
     setUploading(true);

@@ -4,10 +4,13 @@ import { z } from "zod";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
 
+const ALLOWED_UPLOAD_CONTENT_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024; // 20 MB server-side guard
+
 const RequestUploadUrlBody = z.object({
   name: z.string(),
-  size: z.number().int(),
-  contentType: z.string(),
+  size: z.number().int().min(1).max(MAX_UPLOAD_BYTES),
+  contentType: z.enum(ALLOWED_UPLOAD_CONTENT_TYPES),
 });
 
 const RequestUploadUrlResponse = z.object({
