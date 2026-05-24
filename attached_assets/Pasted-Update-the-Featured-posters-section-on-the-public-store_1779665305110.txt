@@ -1,0 +1,83 @@
+Update the “Featured posters” section on the public storefront.
+
+Current direction:
+I want the Featured posters section to keep the curated 6-poster feeling on desktop/laptop, similar to the reference/example layout. The problem to avoid is showing partial cards, cramped spacing, or a horizontal carousel effect.
+
+Goal:
+Make the Featured posters section feel like a polished, curated row of Polaroid-inspired poster cards with good spacing and responsive behavior.
+
+Important constraints:
+- Do not change poster images.
+- Do not change poster data, checkout, cart, favorites, admin, or backend logic unless absolutely required.
+- Keep “View all →” visible and working.
+- Keep the implementation store-aware and compatible with the existing multi-store setup.
+- Keep changes small and targeted.
+- Do not create branches, PRs, GitHub automation, commits, or pushes unless I explicitly approve.
+
+Layout requirements:
+
+1. Featured poster count
+- On desktop/laptop, show exactly 6 featured posters.
+- Do not show 6.5 cards or any partially cut-off poster.
+- If more than 6 featured posters exist, only render the first 6 in this homepage section.
+- On mobile, consider limiting the visible featured posters to 4 if showing all 6 makes the page too long.
+- “View all →” should remain the path to the full shop.
+
+2. Avoid partial cards
+- The section must not use a desktop horizontal scroll layout.
+- On desktop/laptop, use a clean grid that fits 6 cards inside the content width.
+- No card should be clipped at the right edge.
+- Keep the row aligned with the page container and the “View all →” link.
+
+3. Responsive layout
+Use a responsive layout similar to:
+- Desktop/laptop: 6 columns × 1 row.
+- Tablet: 3 columns × 2 rows, or 2 columns × 3 rows if that looks better.
+- Mobile: 2 columns if readable, otherwise 1 column.
+- On mobile, avoid an overly long section. If needed, show only 4 posters on mobile while desktop still shows 6.
+- Avoid edge-to-edge cramped cards on mobile.
+
+4. Polaroid-inspired card styling
+Make only the Featured poster cards feel more like premium printed photo / Polaroid cards:
+- Warm off-white or paper-like card background.
+- Image inset with a subtle white/paper border feel.
+- Slightly larger bottom area beneath the image.
+- Soft natural shadow.
+- Subtle hover lift on desktop.
+- Optional very subtle rotation variation, but only if it stays elegant and not messy.
+- Slightly rounded corners, but not too modern-app-like.
+- Poster title and price should sit in the bottom Polaroid area.
+
+5. Card proportions
+- Keep the poster images visually consistent.
+- Avoid awkward cropping.
+- Keep title text readable even when long.
+- Price should be smaller and muted.
+- If the “NEW” badge remains, make it tasteful and not too visually dominant.
+
+6. Section spacing
+- Keep heading “Featured posters”.
+- Keep “View all →” on the right.
+- Add comfortable spacing between heading and cards.
+- The section should visually fit with the current cream/beige background and the Mediterranean collection banner below.
+
+7. Do not affect the normal shop grid
+- The Polaroid treatment should apply only to the Featured posters section unless there is already a safe component variant system.
+- Do not change the regular shop grid, poster detail page, cart, checkout, admin, or API behavior.
+
+Acceptance criteria:
+- Desktop/laptop shows 6 featured posters cleanly in one row.
+- No partial 6.5 card appears.
+- Mobile does not feel overly long or cramped.
+- Cards have a subtle Polaroid-inspired look.
+- Spacing feels premium and intentional.
+- “View all →” still works.
+- Normal shop grid and other product views are unchanged.
+- Typecheck passes.
+
+After completing, report:
+- Files changed.
+- Where the featured poster limit is set.
+- The responsive layout used for desktop, tablet, and mobile.
+- Whether mobile shows 4 or 6 posters and why.
+- Confirmation that normal shop grid/product pages were not changed.
