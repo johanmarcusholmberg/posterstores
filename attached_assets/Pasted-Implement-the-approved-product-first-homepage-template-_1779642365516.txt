@@ -1,0 +1,105 @@
+Implement the approved product-first homepage template and make featured posters fully admin-controlled.
+
+Goal:
+Replace the current homepage hero/collage with the approved shop-first layout:
+Header → compact intro → horizontal Featured posters row → quote/story → value props.
+
+Important:
+- Do not create branches, PRs, or GitHub automation.
+- Make changes first; do not commit or push until I approve.
+- Use pnpm, not npm.
+- Do not touch checkout/cart/orders/fulfillment.
+- Do not break logo upload/storage.
+- Everything must stay multi-store safe and store-scoped.
+- Admin, API, frontend types, DB/schema, and generated clients must be kept in sync.
+
+Homepage requirements:
+1. Remove the large top hero collage from Home.tsx.
+2. Add compact intro directly below navbar:
+   - eyebrow: “INSPIRED BY SPAIN”
+   - title: “Posters inspired by Spain”
+   - subtitle: “Mediterranean places, colors and moments — printed for your home.”
+   - buttons: “Browse posters” and “View all regions”
+   - trust line: “Fine art prints”, “Ships worldwide”, “Sustainably made”
+3. Directly below intro, show “Featured posters” row.
+4. Row must be horizontally scrollable on desktop and swipeable on mobile.
+5. Show real poster cards/products in the first laptop viewport.
+6. Use flat store/product card style. No rounded mood-board collage styling.
+7. Add “View all” link on the right of the Featured posters heading.
+8. Below featured row, add centered quote:
+   “A curated poster collection inspired by cities, landscapes, food, architecture and everyday moments.”
+9. Below quote, add 4 value props:
+   - Museum quality — Archival inks on premium fine art paper
+   - Made to order — Printed especially for you when you order
+   - Worldwide shipping — Carefully packed and shipped to your door
+   - Better choice — Sustainably made with responsible materials
+
+Admin-controlled featured posters:
+1. Admin must be able to choose which posters appear in the homepage Featured posters row.
+2. Use existing poster fields if suitable, for example isFeatured.
+3. If isFeatured already exists:
+   - make sure AdminPosterForm/AdminPosterEdit exposes it clearly as “Show on homepage featured row”
+   - make sure AdminPosterList makes featured status visible
+   - make sure saving updates DB/API/frontend correctly
+4. If current isFeatured already controls other behavior, keep it but clarify the UI label.
+5. Featured row should use selected featured posters first.
+6. If no featured posters are selected, fall back to newest published posters.
+7. If fewer than 8 featured posters exist, fill remaining slots with newest published posters.
+8. Avoid duplicates.
+9. Limit around 8–12 posters.
+10. No per-card extra API calls. No N+1 fetching.
+
+Sync requirements:
+- DB schema, backend routes, OpenAPI/Orval/generated client, adminApi.ts, frontend types, and UI must all stay synced.
+- If API contract changes, regenerate the client properly.
+- Ensure featured selection is store-scoped.
+- Ensure changing featured posters in admin is reflected on the homepage after refresh.
+- Existing shop page and poster detail page must keep working.
+
+Data behavior:
+- Homepage should fetch current active store posters.
+- Prefer selected featured posters.
+- Fallback to newest published posters.
+- Only show published, purchasable posters.
+- Use existing PosterCard if possible, or a compact variant that visually matches the shop grid.
+- Price should show as “From …” when multiple sizes/prices exist, consistent with the rest of the store.
+
+Responsive requirements:
+Desktop/laptop:
+- No full-screen hero.
+- Featured posters visible in first viewport.
+- Product row should feel like the main homepage feature.
+
+Mobile:
+- Compact intro.
+- Featured poster row swipeable horizontally.
+- No large stacked collage.
+- Quote and value props below.
+
+Acceptance criteria:
+- Homepage matches the approved product-first mockup direction.
+- Admin can select homepage featured posters.
+- Featured selection is persisted and store-scoped.
+- Homepage shows selected featured posters first.
+- Fallback works when no or too few featured posters are selected.
+- No rounded hero collage remains at the top.
+- Logo upload/storage remains intact.
+- No checkout/cart/order/admin regressions.
+- Everything is synced across DB/API/types/frontend.
+
+Run:
+- pnpm run typecheck
+- pnpm test -- --run
+- pnpm run build
+
+Report back with:
+- files changed
+- how admin selects featured posters
+- whether isFeatured was reused or changed
+- how homepage featured posters are fetched
+- fallback behavior
+- whether generated clients/types were updated
+- desktop and mobile screenshot notes
+- typecheck/test/build results
+
+Do not commit or push until I review and approve.
