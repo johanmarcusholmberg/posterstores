@@ -167,6 +167,22 @@ export default function Home() {
 
   const collectionBanner = store.shop?.collectionBanner;
 
+  // Pick up to 3 poster images for the collection preview strip.
+  // Use featured first (already fetched), fallback to newArrivals — no extra API calls.
+  const collectionPreviewPosters: Poster[] = React.useMemo(() => {
+    const pool = [...(featured ?? []), ...(newArrivalsData?.posters ?? [])];
+    const seen = new Set<number>();
+    const result: Poster[] = [];
+    for (const p of pool) {
+      if (!seen.has(p.id) && p.imageUrl) {
+        seen.add(p.id);
+        result.push(p);
+      }
+      if (result.length === 3) break;
+    }
+    return result;
+  }, [featured, newArrivalsData]);
+
   // Build discovery chips: up to 5 regions + up to 4 categories
   const regionChips = (store.regions ?? []).slice(0, 5);
   const categoryChips = (store.categories ?? []).slice(0, 4);
@@ -253,30 +269,75 @@ export default function Home() {
 
       {/* ── Collection / discovery banner ── */}
       {collectionBanner && (
-        <section className="py-10 lg:py-12 border-b border-border bg-sand/40">
-          <div className="container mx-auto px-6 lg:px-10">
-            <div className="max-w-2xl">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-foreground/40 mb-2">
-                COLLECTION
-              </p>
-              <h2 className="font-serif text-2xl sm:text-3xl font-bold text-primary leading-tight mb-3">
-                {collectionBanner.title}
-              </h2>
-              <p className="text-sm text-foreground/65 leading-relaxed mb-5 max-w-md">
-                {collectionBanner.text}
-              </p>
-              <Link
-                href={
-                  collectionBanner.ctaLink
-                    ? resolvedRoutePrefix
-                      ? `/${resolvedRoutePrefix}${collectionBanner.ctaLink}`
-                      : collectionBanner.ctaLink
-                    : makeShopUrl(resolvedRoutePrefix)
-                }
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
-              >
-                {collectionBanner.ctaText ?? "Explore collection"} →
-              </Link>
+        <section className="border-b border-border" style={{ backgroundColor: "#EBD9C4" }}>
+          <div className="container mx-auto px-6 lg:px-10 py-8 lg:py-10">
+            <div className="flex flex-col lg:flex-row lg:items-center gap-7 lg:gap-12">
+
+              {/* Left column — text + CTA */}
+              <div className="lg:w-[52%] flex-none">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-foreground/45 mb-2.5">
+                  COLLECTION
+                </p>
+                <h2 className="font-serif text-2xl sm:text-3xl font-bold text-primary leading-tight mb-3">
+                  {collectionBanner.title}
+                </h2>
+                <p className="text-sm text-foreground/65 leading-relaxed mb-5 max-w-sm">
+                  {collectionBanner.text}
+                </p>
+                <Link
+                  href={
+                    collectionBanner.ctaLink
+                      ? resolvedRoutePrefix
+                        ? `/${resolvedRoutePrefix}${collectionBanner.ctaLink}`
+                        : collectionBanner.ctaLink
+                      : makeShopUrl(resolvedRoutePrefix)
+                  }
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
+                >
+                  {collectionBanner.ctaText ?? "Explore collection"} &rarr;
+                </Link>
+              </div>
+
+              {/* Right column — poster image strip */}
+              {collectionPreviewPosters.length > 0 && (
+                <div className="lg:flex-1 min-w-0">
+                  <div className="flex gap-2 sm:gap-3">
+                    {collectionPreviewPosters.map((poster, idx) => {
+                      const slug = (poster as any).slug as string | undefined;
+                      const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
+                      const displayImg = poster.primaryDisplayImageUrl ?? poster.imageUrl;
+                      return (
+                        <Link
+                          key={poster.id}
+                          href={href}
+                          className={[
+                            "block flex-1 min-w-0 overflow-hidden group",
+                            // hide 3rd image on very small screens so 2 fill nicely
+                            idx === 2 ? "hidden sm:block" : "",
+                          ].join(" ")}
+                        >
+                          <div className="relative aspect-[3/4] overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.09)] group-hover:shadow-[0_3px_12px_rgba(0,0,0,0.14)] transition-shadow duration-300">
+                            <img
+                              src={displayImg}
+                              alt={poster.title}
+                              className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.04]"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = poster.imageUrl;
+                              }}
+                            />
+                            {/* subtle inner border */}
+                            <div
+                              className="absolute inset-0 ring-1 ring-inset ring-black/[0.06] pointer-events-none"
+                              aria-hidden="true"
+                            />
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
             </div>
           </div>
         </section>
@@ -284,7 +345,7 @@ export default function Home() {
 
       {/* ── Shop by region / category ── */}
       {(regionChips.length > 0 || categoryChips.length > 0) && (
-        <section className="py-8 lg:py-10 border-b border-border" data-testid="shop-by-region-section">
+        <section className="py-6 lg:py-8 border-b border-border" data-testid="shop-by-region-section">
           <div className="container mx-auto px-6 lg:px-10">
             <h2 className="font-serif text-lg font-bold text-foreground mb-4">
               {store.shop?.regionFilterLabel ?? "Explore Spain"}
