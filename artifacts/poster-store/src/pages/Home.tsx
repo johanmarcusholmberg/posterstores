@@ -172,6 +172,11 @@ export default function Home() {
   const hasHeroBg = !!heroVisual?.backgroundImageUrl;
   const hasCollBg = !!collectionVisual?.backgroundImageUrl;
 
+  const heroTextMode = store.typographyConfig?.heroTextMode;
+  const heroOverlayMode = store.typographyConfig?.heroOverlayMode;
+  const useStoreHeroVars = !!heroTextMode;
+  const useStoreOverlay = !!heroOverlayMode;
+
   // Pick up to 3 poster images for the collection preview strip.
   // Use featured first (already fetched), fallback to newArrivals — no extra API calls.
   const collectionPreviewPosters: Poster[] = React.useMemo(() => {
@@ -219,7 +224,9 @@ export default function Home() {
           <div
             className="absolute inset-0"
             style={{
-              backgroundColor: `rgba(0,0,0,${heroVisual?.backgroundOverlayOpacity ?? 0.3})`,
+              backgroundColor: useStoreOverlay
+                ? "var(--store-hero-overlay-color)"
+                : `rgba(0,0,0,${heroVisual?.backgroundOverlayOpacity ?? 0.3})`,
             }}
           />
         )}
@@ -227,18 +234,20 @@ export default function Home() {
           <h1
             className={cn(
               "font-serif text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 leading-tight",
-              hasHeroBg ? "text-white" : "text-primary"
+              !useStoreHeroVars && (hasHeroBg ? "text-white" : "text-primary")
             )}
+            style={useStoreHeroVars ? { color: "var(--store-hero-heading-color)" } : undefined}
           >
-            Posters inspired by Spain
+            {store.homepage?.heroTitle || "Posters inspired by Spain"}
           </h1>
           <p
             className={cn(
               "text-sm mb-5 max-w-sm mx-auto leading-relaxed",
-              hasHeroBg ? "text-white/80" : "text-foreground/65"
+              !useStoreHeroVars && (hasHeroBg ? "text-white/80" : "text-foreground/65")
             )}
+            style={useStoreHeroVars ? { color: "var(--store-hero-subtitle-color)" } : undefined}
           >
-            Mediterranean places, colors and moments — printed for your home.
+            {store.homepage?.heroSubtitle || "Mediterranean places, colors and moments — printed for your home."}
           </p>
           <div className="flex flex-col sm:flex-row gap-2.5 justify-center">
             <Link href={makeShopUrl(resolvedRoutePrefix)}>
@@ -246,7 +255,7 @@ export default function Home() {
                 size="default"
                 data-testid="btn-hero-primary"
                 variant={
-                  hasHeroBg
+                  hasHeroBg && !useStoreHeroVars
                     ? "default"
                     : heroVisual?.primaryButtonVariant === "outline"
                     ? "outline"
@@ -254,10 +263,10 @@ export default function Home() {
                 }
                 className={cn(
                   "w-full sm:w-auto h-9 px-6 text-sm",
-                  hasHeroBg && "bg-white text-primary hover:bg-white/90 border-0"
+                  hasHeroBg && !useStoreHeroVars && "bg-white text-primary hover:bg-white/90 border-0"
                 )}
               >
-                {heroVisual?.primaryButtonText || "Browse posters"}
+                {heroVisual?.primaryButtonText || store.homepage?.primaryCta || "Browse posters"}
               </Button>
             </Link>
             <Link href={makeShopUrl(resolvedRoutePrefix)}>
@@ -266,20 +275,21 @@ export default function Home() {
                 variant="outline"
                 className={cn(
                   "w-full sm:w-auto h-9 px-6 text-sm",
-                  hasHeroBg
+                  !useStoreHeroVars && (hasHeroBg
                     ? "border-white/60 text-white hover:bg-white/10 bg-transparent"
-                    : "border-primary/30 text-primary hover:bg-primary/5"
+                    : "border-primary/30 text-primary hover:bg-primary/5")
                 )}
               >
-                {heroVisual?.secondaryButtonText || "View all regions"}
+                {heroVisual?.secondaryButtonText || store.homepage?.secondaryCta || "View all regions"}
               </Button>
             </Link>
           </div>
           <div
             className={cn(
               "mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 justify-center text-xs",
-              hasHeroBg ? "text-white/50" : "text-foreground/40"
+              !useStoreHeroVars && (hasHeroBg ? "text-white/50" : "text-foreground/40")
             )}
+            style={useStoreHeroVars ? { color: "var(--store-hero-bullet-color)" } : undefined}
           >
             <span>✦ Fine art prints</span>
             <span>✦ Ships worldwide</span>

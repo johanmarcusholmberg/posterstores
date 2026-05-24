@@ -18,6 +18,7 @@ export const storesTable = pgTable("stores", {
   primaryDomain: text("primary_domain"),
   domainAliases: jsonb("domain_aliases").$type<string[]>(),
   routePrefix: text("route_prefix"),
+  typographyConfig: jsonb("typography_config"),
   logoUrl: text("logo_url"),
   logoStoragePath: text("logo_storage_path"),
   logoAltText: text("logo_alt_text"),

@@ -127,6 +127,20 @@
   --app-font-sans: 'Plus Jakarta Sans', sans-serif;
   --app-font-serif: 'Playfair Display', serif;
   --app-font-mono: Menlo, monospace;
+
+  /* Store-theme CSS variables — overridden per-store by StoreThemeApplicator */
+  --store-font-logo: var(--app-font-serif);
+  --store-font-heading: var(--app-font-serif);
+  --store-font-body: var(--app-font-sans);
+  --store-heading-color: hsl(var(--foreground));
+  --store-link-color: hsl(var(--primary));
+  --store-btn-text-color: hsl(var(--primary-foreground));
+  /* Hero vars — set by StoreThemeApplicator when typographyConfig.heroTextMode is configured */
+  --store-hero-heading-color: hsl(var(--primary));
+  --store-hero-subtitle-color: hsl(var(--foreground) / 0.65);
+  --store-hero-eyebrow-color: hsl(var(--foreground) / 0.45);
+  --store-hero-bullet-color: hsl(var(--foreground) / 0.4);
+  --store-hero-overlay-color: rgba(0,0,0,0.3);
   --radius: .5rem; /* 8px */
   --shadow-2xs: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00); /*replace with H S L */
   --shadow-xs: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00); /*replace with H S L */

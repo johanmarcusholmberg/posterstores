@@ -367,6 +367,25 @@ export interface AdminStoreThemeConfig {
   border: string;
 }
 
+export type HeroTextMode = "dark" | "light" | "custom";
+export type HeroOverlayMode = "none" | "light" | "dark" | "custom";
+
+export interface AdminStoreTypographyConfig {
+  logoFont?: string;
+  headingFont?: string;
+  bodyFont?: string;
+  headingColor?: string;
+  linkColor?: string;
+  buttonTextColor?: string;
+  heroTextMode?: HeroTextMode;
+  heroEyebrowColor?: string;
+  heroHeadingColor?: string;
+  heroSubtitleColor?: string;
+  heroBulletColor?: string;
+  heroOverlayMode?: HeroOverlayMode;
+  heroOverlayOpacity?: number;
+}
+
 export interface AdminStoreHomepageConfig {
   heroTitle?: string;
   heroSubtitle?: string;
@@ -394,6 +413,7 @@ export interface AdminStore {
   defaultLanguage: string;
   active: boolean;
   themeConfig: AdminStoreThemeConfig | null;
+  typographyConfig: AdminStoreTypographyConfig | null;
   homepageConfig: AdminStoreHomepageConfig | null;
   seoConfig: AdminStoreSeoConfig | null;
   navigationConfig: null;
@@ -417,6 +437,7 @@ export type CreateStorePayload = {
   defaultLanguage: string;
   active: boolean;
   themeConfig?: AdminStoreThemeConfig | null;
+  typographyConfig?: AdminStoreTypographyConfig | null;
   homepageConfig?: AdminStoreHomepageConfig | null;
   seoConfig?: AdminStoreSeoConfig | null;
   primaryDomain?: string | null;

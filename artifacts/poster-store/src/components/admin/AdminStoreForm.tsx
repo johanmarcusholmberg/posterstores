@@ -10,14 +10,18 @@ import {
   type CreateStorePayload,
   type UpdateStorePayload,
   type AdminStoreThemeConfig,
+  type AdminStoreTypographyConfig,
   type AdminStoreHomepageConfig,
   type AdminStoreSeoConfig,
+  type HeroTextMode,
+  type HeroOverlayMode,
 } from "@/lib/adminApi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Save, ArrowLeft, Loader2, Upload, X, ImageIcon } from "lucide-react";
@@ -40,6 +44,44 @@ const DEFAULT_THEME: AdminStoreThemeConfig = {
   muted: "#8A9A5B",
   border: "#E4DDD3",
 };
+
+const FONT_OPTIONS = [
+  "System default",
+  "Playfair Display",
+  "Cormorant Garamond",
+  "Lora",
+  "Libre Baskerville",
+  "Merriweather",
+  "Inter",
+  "DM Sans",
+  "Source Sans 3",
+  "Manrope",
+] as const;
+
+const TYPOGRAPHY_COLOR_FIELDS: { key: keyof AdminStoreTypographyConfig; label: string }[] = [
+  { key: "headingColor", label: "Heading color" },
+  { key: "linkColor", label: "Link color" },
+  { key: "buttonTextColor", label: "Button text color" },
+  { key: "heroEyebrowColor", label: "Hero eyebrow" },
+  { key: "heroHeadingColor", label: "Hero heading" },
+  { key: "heroSubtitleColor", label: "Hero subtitle" },
+  { key: "heroBulletColor", label: "Hero bullets" },
+];
+
+const DEFAULT_TYPOGRAPHY: AdminStoreTypographyConfig = {};
+
+const HERO_TEXT_MODES: { value: HeroTextMode; label: string }[] = [
+  { value: "dark", label: "Dark (dark text on light background)" },
+  { value: "light", label: "Light (white text on dark background)" },
+  { value: "custom", label: "Custom (set individual colors)" },
+];
+
+const HERO_OVERLAY_MODES: { value: HeroOverlayMode; label: string }[] = [
+  { value: "none", label: "None (no overlay)" },
+  { value: "light", label: "Light (white tint)" },
+  { value: "dark", label: "Dark (black tint)" },
+  { value: "custom", label: "Custom opacity" },
+];
 
 interface AdminStoreFormProps {
   existing?: AdminStore;
@@ -94,6 +136,10 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
   const th = existing?.themeConfig ?? DEFAULT_THEME;
   const [theme, setTheme] = useState<AdminStoreThemeConfig>({ ...DEFAULT_THEME, ...th });
 
+  // Typography & hero settings
+  const typo = existing?.typographyConfig ?? DEFAULT_TYPOGRAPHY;
+  const [typography, setTypography] = useState<AdminStoreTypographyConfig>({ ...DEFAULT_TYPOGRAPHY, ...typo });
+
   // SEO
   const seo = existing?.seoConfig ?? {};
   const [seoTitle, setSeoTitle] = useState(seo.defaultTitle ?? "");
@@ -120,6 +166,22 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
     if (!defaultLanguage) errs.push("Language is required");
     for (const [key, val] of Object.entries(theme)) {
       if (!HEX_COLOR_RE.test(val)) errs.push(`Theme color "${key}" must be a valid 6-digit hex (e.g. #2F80A8)`);
+    }
+    const typoColorKeys: (keyof AdminStoreTypographyConfig)[] = [
+      "headingColor", "linkColor", "buttonTextColor",
+      "heroEyebrowColor", "heroHeadingColor", "heroSubtitleColor", "heroBulletColor",
+    ];
+    for (const key of typoColorKeys) {
+      const val = typography[key] as string | undefined;
+      if (val && !HEX_COLOR_RE.test(val)) {
+        errs.push(`Typography color "${key}" must be a valid 6-digit hex (e.g. #2F80A8)`);
+      }
+    }
+    if (typography.heroOverlayOpacity !== undefined) {
+      const op = typography.heroOverlayOpacity;
+      if (typeof op !== "number" || op < 0 || op > 1) {
+        errs.push("Hero overlay opacity must be a number between 0 and 1");
+      }
     }
 
     // Domain routing validation
@@ -170,6 +232,11 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
     const aliases = splitList(domainAliasesRaw);
 
     try {
+      const cleanedTypography: AdminStoreTypographyConfig = Object.fromEntries(
+        Object.entries(typography).filter(([, v]) => v !== undefined && v !== "")
+      ) as AdminStoreTypographyConfig;
+      const typographyConfig = Object.keys(cleanedTypography).length > 0 ? cleanedTypography : null;
+
       if (isEdit && existing) {
         const payload: UpdateStorePayload = {
           name,
@@ -178,6 +245,7 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
           defaultLanguage,
           active,
           themeConfig: theme,
+          typographyConfig,
           homepageConfig,
           seoConfig,
           primaryDomain: primaryDomain || null,
@@ -197,6 +265,7 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
           defaultLanguage,
           active,
           themeConfig: theme,
+          typographyConfig,
           homepageConfig,
           seoConfig,
           primaryDomain: primaryDomain || null,
@@ -218,6 +287,18 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
 
   function updateThemeColor(key: keyof AdminStoreThemeConfig, val: string) {
     setTheme((prev) => ({ ...prev, [key]: val }));
+  }
+
+  function updateTypography<K extends keyof AdminStoreTypographyConfig>(key: K, val: AdminStoreTypographyConfig[K] | undefined) {
+    setTypography((prev) => {
+      const next = { ...prev };
+      if (val === undefined || val === "") {
+        delete next[key];
+      } else {
+        next[key] = val;
+      }
+      return next;
+    });
   }
 
   async function handleLogoFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -674,6 +755,221 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
               )}
             </div>
           ))}
+        </CardContent>
+      </Card>
+
+      {/* Brand & Typography */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Brand &amp; Typography</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Font presets */}
+          <div>
+            <p className="text-sm font-medium mb-3">Fonts</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {(["logoFont", "headingFont", "bodyFont"] as const).map((key) => (
+                <div key={key} className="space-y-1.5">
+                  <Label htmlFor={`typo-${key}`}>
+                    {key === "logoFont" ? "Logo font" : key === "headingFont" ? "Heading font" : "Body font"}
+                  </Label>
+                  <Select
+                    value={typography[key] ?? ""}
+                    onValueChange={(val) => updateTypography(key, val as typeof FONT_OPTIONS[number] || undefined)}
+                  >
+                    <SelectTrigger id={`typo-${key}`}>
+                      <SelectValue placeholder="System default" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FONT_OPTIONS.map((f) => (
+                        <SelectItem key={f} value={f}>{f}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Extra colors */}
+          <div>
+            <p className="text-sm font-medium mb-1">Extra color overrides</p>
+            <p className="text-xs text-muted-foreground mb-3">Leave blank to use the theme defaults above.</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {TYPOGRAPHY_COLOR_FIELDS.map(({ key, label }) => {
+                const colorKeys = ["headingColor", "linkColor", "buttonTextColor"] as const;
+                const isHeroColor = !colorKeys.includes(key as typeof colorKeys[number]);
+                return (
+                  <div key={key} className="space-y-1.5">
+                    <Label htmlFor={`typo-color-${key}`}>{label}</Label>
+                    <div className="flex gap-2 items-center">
+                      <input
+                        type="color"
+                        value={typography[key] as string || "#000000"}
+                        onChange={(e) => updateTypography(key, e.target.value)}
+                        className="w-8 h-8 rounded border cursor-pointer"
+                        aria-label={`${label} color picker`}
+                        title={isHeroColor ? "Only applied when Hero text mode is Custom" : undefined}
+                      />
+                      <Input
+                        id={`typo-color-${key}`}
+                        value={typography[key] as string || ""}
+                        onChange={(e) => updateTypography(key, e.target.value || undefined)}
+                        placeholder="leave blank"
+                        className="font-mono text-sm"
+                        maxLength={7}
+                      />
+                    </div>
+                    {(typography[key] as string | undefined) && !HEX_COLOR_RE.test(typography[key] as string) && (
+                      <p className="text-xs text-destructive">Invalid hex color</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Hero text mode */}
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-medium">Hero text mode</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Controls how hero text looks when a background image is set. Leaving unset preserves existing behavior (white text on background image).
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="hero-text-mode">Text mode</Label>
+              <Select
+                value={typography.heroTextMode ?? ""}
+                onValueChange={(val) => updateTypography("heroTextMode", (val || undefined) as HeroTextMode | undefined)}
+              >
+                <SelectTrigger id="hero-text-mode">
+                  <SelectValue placeholder="Unset (default behavior)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Unset (default behavior)</SelectItem>
+                  {HERO_TEXT_MODES.map(({ value, label }) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Hero overlay mode */}
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-medium">Hero overlay</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Controls the overlay tint on top of the hero background image.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="hero-overlay-mode">Overlay mode</Label>
+                <Select
+                  value={typography.heroOverlayMode ?? ""}
+                  onValueChange={(val) => updateTypography("heroOverlayMode", (val || undefined) as HeroOverlayMode | undefined)}
+                >
+                  <SelectTrigger id="hero-overlay-mode">
+                    <SelectValue placeholder="Unset (dark overlay by default)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Unset (dark overlay by default)</SelectItem>
+                    {HERO_OVERLAY_MODES.map(({ value, label }) => (
+                      <SelectItem key={value} value={value}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {(typography.heroOverlayMode === "light" || typography.heroOverlayMode === "dark" || typography.heroOverlayMode === "custom") && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="hero-overlay-opacity">
+                    Opacity <span className="text-muted-foreground font-normal">(0–1)</span>
+                  </Label>
+                  <Input
+                    id="hero-overlay-opacity"
+                    type="number"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={typography.heroOverlayOpacity ?? ""}
+                    onChange={(e) => {
+                      const v = parseFloat(e.target.value);
+                      updateTypography("heroOverlayOpacity", isNaN(v) ? undefined : Math.min(1, Math.max(0, v)));
+                    }}
+                    placeholder="0.3"
+                    className="font-mono text-sm"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Live preview */}
+          <div>
+            <p className="text-sm font-medium mb-2">Live preview</p>
+            <div
+              className="rounded-lg border border-border p-5 space-y-3"
+              style={{
+                backgroundColor: theme.background,
+                fontFamily: typography.bodyFont && typography.bodyFont !== "System default"
+                  ? `'${typography.bodyFont}', sans-serif`
+                  : undefined,
+              }}
+            >
+              <div
+                className="text-[10px] font-semibold uppercase tracking-widest"
+                style={{ color: theme.muted }}
+              >
+                Eyebrow / Collection label
+              </div>
+              <div
+                className="text-2xl font-bold"
+                style={{
+                  fontFamily: typography.headingFont && typography.headingFont !== "System default"
+                    ? `'${typography.headingFont}', serif`
+                    : "'Playfair Display', serif",
+                  color: typography.headingColor || theme.text,
+                }}
+              >
+                {name || "Store heading"}
+              </div>
+              <div
+                className="text-sm"
+                style={{ color: theme.text + "bb" }}
+              >
+                Body text — your poster collection description goes here.
+              </div>
+              <div className="flex gap-2 flex-wrap mt-1">
+                <span
+                  className="inline-block text-xs px-3 py-1.5 rounded font-semibold"
+                  style={{
+                    backgroundColor: theme.primary,
+                    color: typography.buttonTextColor || "#ffffff",
+                  }}
+                >
+                  Primary button
+                </span>
+                <span
+                  className="inline-block text-xs px-3 py-1.5 rounded font-semibold border"
+                  style={{
+                    borderColor: theme.primary + "55",
+                    color: typography.linkColor || theme.primary,
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  Secondary button
+                </span>
+              </div>
+              <div className="text-xs pt-1">
+                Product title —{" "}
+                <span className="font-semibold" style={{ color: theme.text }}>Poster Name</span>
+                {"  "}
+                <span style={{ color: typography.linkColor || theme.primary }}>€29.99</span>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

@@ -46,6 +46,40 @@ const themeConfigSchema = z
   .nullable()
   .optional();
 
+const ALLOWED_FONTS = [
+  "System default",
+  "Playfair Display",
+  "Cormorant Garamond",
+  "Lora",
+  "Libre Baskerville",
+  "Merriweather",
+  "Inter",
+  "DM Sans",
+  "Source Sans 3",
+  "Manrope",
+] as const;
+
+const optionalHex = z.string().regex(HEX_COLOR_RE, "Must be a valid hex color").optional();
+
+const typographyConfigSchema = z
+  .object({
+    logoFont: z.enum(ALLOWED_FONTS).optional(),
+    headingFont: z.enum(ALLOWED_FONTS).optional(),
+    bodyFont: z.enum(ALLOWED_FONTS).optional(),
+    headingColor: optionalHex,
+    linkColor: optionalHex,
+    buttonTextColor: optionalHex,
+    heroTextMode: z.enum(["dark", "light", "custom"]).optional(),
+    heroEyebrowColor: optionalHex,
+    heroHeadingColor: optionalHex,
+    heroSubtitleColor: optionalHex,
+    heroBulletColor: optionalHex,
+    heroOverlayMode: z.enum(["none", "light", "dark", "custom"]).optional(),
+    heroOverlayOpacity: z.number().min(0).max(1).optional(),
+  })
+  .nullable()
+  .optional();
+
 const homepageConfigSchema = z
   .object({
     heroTitle: z.string().optional(),
@@ -98,6 +132,7 @@ const createStoreSchema = z.object({
   defaultLanguage: z.string().min(1, "Language is required").default("en"),
   active: z.boolean().default(true),
   themeConfig: themeConfigSchema,
+  typographyConfig: typographyConfigSchema,
   homepageConfig: homepageConfigSchema,
   seoConfig: seoConfigSchema,
   navigationConfig: z.any().nullable().optional(),
@@ -243,6 +278,7 @@ router.post("/admin/stores", requireAdmin, async (req, res) => {
       defaultLanguage: parsed.data.defaultLanguage ?? "en",
       active: parsed.data.active ?? true,
       themeConfig: parsed.data.themeConfig ?? null,
+      typographyConfig: parsed.data.typographyConfig ?? null,
       homepageConfig: parsed.data.homepageConfig ?? null,
       seoConfig: parsed.data.seoConfig ?? null,
       navigationConfig: parsed.data.navigationConfig ?? null,
@@ -326,6 +362,7 @@ router.put("/admin/stores/:storeKey", requireAdmin, async (req, res) => {
   if (parsed.data.defaultLanguage !== undefined) updates.defaultLanguage = parsed.data.defaultLanguage;
   if (parsed.data.active !== undefined) updates.active = parsed.data.active;
   if ("themeConfig" in parsed.data) updates.themeConfig = parsed.data.themeConfig ?? null;
+  if ("typographyConfig" in parsed.data) updates.typographyConfig = parsed.data.typographyConfig ?? null;
   if ("homepageConfig" in parsed.data) updates.homepageConfig = parsed.data.homepageConfig ?? null;
   if ("seoConfig" in parsed.data) updates.seoConfig = parsed.data.seoConfig ?? null;
   if ("navigationConfig" in parsed.data) updates.navigationConfig = parsed.data.navigationConfig ?? null;
@@ -676,6 +713,7 @@ router.get("/stores/:storeKey/config", async (req, res) => {
     logoUrl: store.logoUrl ?? null,
     logoAltText: store.logoAltText ?? null,
     homepageVisualConfig: (store.homepageVisualConfig as object) ?? null,
+    typographyConfig: (store.typographyConfig as object) ?? null,
   });
 });
 

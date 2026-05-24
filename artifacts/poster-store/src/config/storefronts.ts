@@ -24,6 +24,25 @@ export interface HomepageVisualConfig {
   collectionBanner?: CollectionBannerVisualConfig;
 }
 
+export type HeroTextMode = "dark" | "light" | "custom";
+export type HeroOverlayMode = "none" | "light" | "dark" | "custom";
+
+export interface StoreTypographyConfig {
+  logoFont?: string;
+  headingFont?: string;
+  bodyFont?: string;
+  headingColor?: string;
+  linkColor?: string;
+  buttonTextColor?: string;
+  heroTextMode?: HeroTextMode;
+  heroEyebrowColor?: string;
+  heroHeadingColor?: string;
+  heroSubtitleColor?: string;
+  heroBulletColor?: string;
+  heroOverlayMode?: HeroOverlayMode;
+  heroOverlayOpacity?: number;
+}
+
 export interface StorefrontConfig {
   storeKey: string;
   storeName: string;
@@ -33,6 +52,7 @@ export interface StorefrontConfig {
   primaryDomain?: string | null;
   domainAliases?: string[] | null;
   routePrefix?: string | null;
+  typographyConfig?: StoreTypographyConfig | null;
   theme?: {
     background: string;
     surface: string;

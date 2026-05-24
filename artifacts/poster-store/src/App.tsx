@@ -8,6 +8,7 @@ import { AdminTokenProvider } from "@/context/AdminTokenContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+import { StoreThemeApplicator } from "@/components/StoreThemeApplicator";
 import Home from "@/pages/Home";
 import Shop from "@/pages/Shop";
 import PosterDetail from "@/pages/PosterDetail";
@@ -109,6 +110,16 @@ function PublicStorefrontSection() {
   return shell(<PublicRoutes />);
 }
 
+/** Applies per-store CSS variables to a wrapper div so they never bleed into admin. */
+function StoreThemeRoot({ children }: { children: React.ReactNode }) {
+  return (
+    <div id="store-theme-root">
+      <StoreThemeApplicator />
+      {children}
+    </div>
+  );
+}
+
 function Router() {
   return (
     <Switch>
@@ -133,7 +144,9 @@ function Router() {
 
       {/* Public storefront — catch-all (handles both prefixed and unprefixed) */}
       <Route>
-        <PublicStorefrontSection />
+        <StoreThemeRoot>
+          <PublicStorefrontSection />
+        </StoreThemeRoot>
       </Route>
     </Switch>
   );
