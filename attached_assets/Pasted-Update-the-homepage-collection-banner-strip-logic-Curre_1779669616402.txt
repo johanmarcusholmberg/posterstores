@@ -1,0 +1,68 @@
+Update the homepage collection banner strip logic.
+
+Current issue:
+The new “Show in collection banner strip” checkbox currently falls back to showing featured posters if no posters are selected. I do not want that behavior.
+
+Intended behavior:
+Sometimes I will have a finished collection/banner background image that already includes the visual composition I want. In that case, no poster thumbnails should be shown on top of it.
+Other times, I want to use the background image together with selected poster images from the gallery. In that case, only posters explicitly selected with “Show in collection banner strip” should appear.
+
+Important constraints:
+- Keep changes small and targeted.
+- Do not change the Featured posters section.
+- Do not change poster cards, displayTitle, shop grid, checkout, cart, favorites, orders, or unrelated admin features.
+- Keep the implementation store-aware and compatible with the existing multi-store setup.
+- Do not create branches, PRs, GitHub automation, commits, or pushes unless I explicitly approve.
+
+Tasks:
+
+1. Remove auto-selection fallback
+- Remove the fallback that uses the first 3 featured posters when no posters are selected for the collection banner strip.
+- The collection banner strip should only show posters that are explicitly marked with “Show in collection banner strip”.
+- If zero posters are marked, show zero poster thumbnails in the banner strip.
+
+2. Preserve the background/banner image
+- The collection banner/background image should still render normally even when no posters are selected.
+- The banner should not look broken or empty.
+- It should simply show the background image without the overlaid poster strip.
+
+3. Selection logic
+Use this logic:
+- If 1, 2, or 3 published posters are marked “Show in collection banner strip”, show those selected posters.
+- If more than 3 published posters are marked, show only the first 3.
+- If no published posters are marked, show no poster thumbnails.
+- Never show unpublished posters.
+- Never auto-fill with featured posters.
+
+4. Admin helper text
+Update the helper text for the checkbox so it no longer mentions fallback to featured posters.
+
+Suggested helper text:
+“Use this poster in the homepage collection banner strip. Select up to 3 posters. If none are selected, the banner shows only the background image.”
+
+5. Visual behavior
+- Ensure the banner layout still looks good with:
+  - zero selected posters,
+  - one selected poster,
+  - two selected posters,
+  - three selected posters.
+- With zero posters, avoid leaving an empty placeholder area where the thumbnails used to be.
+- The background image should remain the visual focus.
+
+6. Testing / verification
+Verify:
+- No selected posters → background image only, no poster thumbnails.
+- One selected poster → one thumbnail appears.
+- Two selected posters → two thumbnails appear.
+- Three selected posters → three thumbnails appear.
+- More than three selected posters → only first three published selected posters appear.
+- Featured posters are not used as fallback.
+- Featured posters section remains unchanged.
+- Typecheck passes.
+
+After completing, report:
+- Files changed.
+- Where the fallback logic was removed.
+- Updated admin helper text.
+- How the banner behaves with zero selected posters.
+- Confirmation that Featured posters and normal shop cards were not changed.

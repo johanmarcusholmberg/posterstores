@@ -97,7 +97,7 @@ export const AdminPublishControls = ({
           </label>
         </div>
         <p className="text-xs text-muted-foreground">
-          Up to 3 posters marked for the collection banner will appear as the image strip beside the collection banner text. Falls back to featured posters if none are selected.
+          Use this poster in the homepage collection banner strip. Select up to 3 posters. If none are selected, the banner shows only the background image.
         </p>
       </div>
     </div>

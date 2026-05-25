@@ -258,32 +258,19 @@ export default function Home() {
   const useStoreHeroVars = !!heroTextMode;
   const useStoreOverlay = !!heroOverlayMode;
 
-  // Pick up to 3 poster images for the collection preview strip.
-  // Priority: posters explicitly marked isCollectionBanner=true.
-  // Fallback: first 3 from the featured + newArrivals pool (no extra API calls).
+  // Up to 3 posters explicitly marked "Show in collection banner strip".
+  // No fallback — if zero are selected the banner shows background image only.
   const collectionPreviewPosters: Poster[] = React.useMemo(() => {
     const pool = [...(featured ?? []), ...(newArrivalsData?.posters ?? [])];
-
-    const bannerPicks = pool.filter(p => (p as any).isCollectionBanner && p.imageUrl);
-    if (bannerPicks.length > 0) {
-      const seen = new Set<number>();
-      return bannerPicks.filter(p => {
+    const seen = new Set<number>();
+    return pool
+      .filter(p => (p as any).isCollectionBanner && p.imageUrl)
+      .filter(p => {
         if (seen.has(p.id)) return false;
         seen.add(p.id);
         return true;
-      }).slice(0, 3);
-    }
-
-    const seen = new Set<number>();
-    const result: Poster[] = [];
-    for (const p of pool) {
-      if (!seen.has(p.id) && p.imageUrl) {
-        seen.add(p.id);
-        result.push(p);
-      }
-      if (result.length === 3) break;
-    }
-    return result;
+      })
+      .slice(0, 3);
   }, [featured, newArrivalsData]);
 
   // Build discovery chips: up to 5 regions + up to 4 categories
