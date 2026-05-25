@@ -29,6 +29,10 @@ export const ListPostersQueryParams = zod.object({
   sort: zod.enum(["newest", "price_asc", "price_desc", "popular"]).optional(),
   limit: zod.coerce.number().optional(),
   offset: zod.coerce.number().optional(),
+  isNew: zod.coerce
+    .boolean()
+    .optional()
+    .describe("Filter to only posters flagged as new arrivals (isNew=true)."),
   status: zod.coerce
     .string()
     .optional()

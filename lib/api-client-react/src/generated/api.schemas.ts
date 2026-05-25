@@ -361,6 +361,10 @@ export type ListPostersParams = {
   limit?: number;
   offset?: number;
   /**
+   * Filter to only posters flagged as new arrivals (isNew=true).
+   */
+  isNew?: boolean;
+  /**
    * Filter by status (published, draft, archived, all). Non-published values require admin token.
    */
   status?: string;

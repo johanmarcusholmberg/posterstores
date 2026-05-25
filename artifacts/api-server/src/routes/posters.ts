@@ -98,7 +98,7 @@ router.get("/posters", async (req, res) => {
   if (!query.success) {
     return res.status(400).json({ error: query.error.flatten() });
   }
-  const { storeKey, region, city, category, tag, search, minPrice, maxPrice, sort, limit = 24, offset = 0 } = query.data;
+  const { storeKey, region, city, category, tag, search, minPrice, maxPrice, sort, limit = 24, offset = 0, isNew } = query.data;
 
   if (!storeKey) {
     return res.status(400).json({ error: "storeKey query parameter is required" });
@@ -120,6 +120,8 @@ router.get("/posters", async (req, res) => {
   } else {
     conditions.push(eq(postersTable.status, "published"));
   }
+
+  if (isNew === true) conditions.push(eq(postersTable.isNew, true));
 
   if (region) {
     const regionValues = region.split(",").map(v => v.trim()).filter(Boolean);

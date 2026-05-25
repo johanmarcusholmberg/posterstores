@@ -1,0 +1,75 @@
+Diagnose and fix the “New arrival” admin flag not controlling the homepage “New arrivals” section.
+
+Problem:
+When I select/enable “New arrival” for a poster in the administration, that poster does not reliably show up in the “New arrivals” section on the public homepage.
+
+Goal:
+The homepage New arrivals section should use the actual admin-controlled “New arrival” flag, not just newest-created posters or unrelated sorting logic.
+
+Scope:
+- Investigate the complete flow from admin UI to backend/database to homepage rendering.
+- Likely files/areas to inspect:
+  - Admin poster edit/create components
+  - Poster API routes/controllers
+  - Poster database schema/model/types
+  - shared poster types/OpenAPI client if used
+  - artifacts/poster-store/src/pages/Home.tsx
+  - any poster query hooks used by Home.tsx
+- Do not change unrelated homepage design, hero, navbar, cart, checkout, product detail pages, footer, or poster images.
+- Keep the recently added New arrivals carousel/card UX intact.
+
+Tasks:
+
+1. Trace the admin field
+- Find the exact field used by the admin UI for “New arrival”.
+- Confirm whether the field is saved to the backend/database.
+- Confirm the database column/property name.
+- Confirm the field is included when fetching posters for public/homepage use.
+- Look for naming mismatches such as:
+  - newArrival
+  - isNewArrival
+  - is_new_arrival
+  - isNew
+  - badge/new
+  - featured/new/status fields
+
+2. Fix the homepage selection logic
+- Update the homepage New arrivals section so it selects posters where the admin-controlled New arrival flag is true.
+- Do not rely only on created date.
+- Keep existing store scoping, published/active filtering, and image-validity handling.
+- If needed, sort flagged New arrival posters by newest/updated/created date after filtering.
+- Limit the displayed number to the existing intended amount, unless the current carousel intentionally supports more.
+- If no posters are flagged as New arrival, use a safe fallback only if one already exists; otherwise render the section gracefully.
+
+3. Fix API/type propagation if needed
+- If the backend/API response does not include the New arrival field, add it.
+- If OpenAPI/generated client/types need updating, update/regenerate them according to the existing project workflow.
+- Keep naming consistent across frontend/backend.
+- Avoid adding duplicate fields if one already exists.
+
+4. Validate admin behavior
+- Confirm that enabling New arrival in admin makes the poster appear in the homepage New arrivals section.
+- Confirm disabling New arrival removes it from the homepage New arrivals section.
+- Confirm this respects the active store/storeKey, so New arrivals from another store do not leak into this homepage.
+- Confirm unpublished/inactive posters do not appear publicly, even if marked New arrival.
+
+5. Preserve recent UX changes
+- Keep New arrivals as the horizontal carousel.
+- Keep default card state as image + title only.
+- Keep price hidden by default in New arrivals.
+- Keep price/sizes only in the hover overlay where already implemented.
+- Do not alter price display elsewhere.
+
+6. Run checks
+- Run typecheck.
+- Run any relevant existing tests if they are quick and targeted.
+- Do not perform broad unrelated refactors.
+
+Report back:
+- Files changed.
+- Exact field name used for New arrival.
+- Root cause of why admin-selected New arrivals were not showing on the homepage.
+- How the homepage now selects New arrival posters.
+- Confirmation that enabling/disabling the admin flag works.
+- Confirmation that store scoping and published/active filtering are preserved.
+- Confirmation that typecheck passes.

@@ -300,16 +300,18 @@ export default function Home() {
   const { data: newArrivalsData } = useListPosters(
     {
       storeKey: store.storeKey,
+      isNew: true,
       sort: ListPostersSort.newest,
-      limit: 10,
+      limit: 12,
       status: "published",
     },
     {
       query: {
         queryKey: getListPostersQueryKey({
           storeKey: store.storeKey,
+          isNew: true,
           sort: ListPostersSort.newest,
-          limit: 10,
+          limit: 12,
           status: "published",
         }),
       },
