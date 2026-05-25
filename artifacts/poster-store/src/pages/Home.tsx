@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "wouter";
 import { useStorefront } from "@/context/StorefrontContext";
 import {
@@ -11,6 +11,7 @@ import {
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 const VALUE_PROPS = [
   {
@@ -288,6 +289,25 @@ export default function Home() {
 
   const FEATURED_LIMIT = 6;
 
+  // ── New arrivals carousel scroll state ──
+  const newArrivalsTrackRef = useRef<HTMLDivElement>(null);
+  const [naCanScrollLeft, setNaCanScrollLeft] = useState(false);
+  const [naCanScrollRight, setNaCanScrollRight] = useState(false);
+
+  const updateNaScrollState = useCallback(() => {
+    const el = newArrivalsTrackRef.current;
+    if (!el) return;
+    setNaCanScrollLeft(el.scrollLeft > 4);
+    setNaCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  }, []);
+
+  const scrollNa = useCallback((dir: "left" | "right") => {
+    const el = newArrivalsTrackRef.current;
+    if (!el) return;
+    const amount = el.clientWidth * 0.55;
+    el.scrollBy({ left: dir === "right" ? amount : -amount, behavior: "smooth" });
+  }, []);
+
   const { data: featured } = useGetFeaturedPosters(
     { storeKey: store.storeKey, limit: FEATURED_LIMIT },
     {
@@ -358,6 +378,16 @@ export default function Home() {
     .filter((p) => !featuredIds.has(p.id))
     .slice(0, 12);
   const showNewArrivals = newArrivals.length > 0;
+
+  // Update scroll arrow state when data loads or window resizes
+  useEffect(() => {
+    updateNaScrollState();
+  }, [newArrivals, updateNaScrollState]);
+
+  useEffect(() => {
+    window.addEventListener("resize", updateNaScrollState);
+    return () => window.removeEventListener("resize", updateNaScrollState);
+  }, [updateNaScrollState]);
 
   return (
     <div className="min-h-screen pb-16">
@@ -679,7 +709,9 @@ export default function Home() {
           <div className="container mx-auto max-w-screen-2xl pl-6 lg:pl-10 pr-0">
             <div className="relative">
               <div
+                ref={newArrivalsTrackRef}
                 className="flex gap-4 overflow-x-auto pb-3 scroll-smooth snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                onScroll={updateNaScrollState}
               >
                 {newArrivals.map((poster) => (
                   <div
@@ -692,11 +724,34 @@ export default function Home() {
                 {/* Trailing spacer so the last card clears the right-edge fade */}
                 <div className="flex-none w-4 lg:w-6" aria-hidden="true" />
               </div>
+
               {/* Right-edge fade — signals more content is scrollable */}
               <div
                 className="absolute inset-y-0 right-0 w-14 lg:w-20 bg-gradient-to-l from-background to-transparent pointer-events-none"
                 aria-hidden="true"
               />
+
+              {/* Left arrow — hidden on mobile, shown on sm+ when scrolled right */}
+              {naCanScrollLeft && (
+                <button
+                  onClick={() => scrollNa("left")}
+                  aria-label="Scroll New arrivals left"
+                  className="hidden sm:flex absolute left-0 top-1/2 -translate-y-1/2 z-10 items-center justify-center w-8 h-8 rounded-full bg-background/95 border border-border shadow-md text-foreground/80 hover:text-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+              )}
+
+              {/* Right arrow — hidden on mobile, shown on sm+ when more content exists */}
+              {naCanScrollRight && (
+                <button
+                  onClick={() => scrollNa("right")}
+                  aria-label="Scroll New arrivals right"
+                  className="hidden sm:flex absolute right-0 top-1/2 -translate-y-1/2 z-10 items-center justify-center w-8 h-8 rounded-full bg-background/95 border border-border shadow-md text-foreground/80 hover:text-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              )}
             </div>
           </div>
         </section>

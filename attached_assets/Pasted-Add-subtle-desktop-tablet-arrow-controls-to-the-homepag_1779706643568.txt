@@ -1,0 +1,100 @@
+Add subtle desktop/tablet arrow controls to the homepage New arrivals carousel.
+
+Current state:
+- New arrivals alignment and responsive sizing are now correct.
+- First card aligns with the homepage container.
+- The carousel overflows to the right with partial next card and right-edge fade.
+- Native horizontal scrolling works.
+- Problem: on desktop, users without a trackpad may still not understand how to scroll or may not have an obvious control.
+
+Goal:
+Add minimal premium left/right arrow buttons to the existing New arrivals carousel, without changing the layout, filtering, card design, or backend logic.
+
+Scope:
+- Edit only artifacts/poster-store/src/pages/Home.tsx.
+- Do not change backend/API/admin/filtering logic.
+- Do not change poster data or images.
+- Do not change hero, navbar, collection banner, Explore Spain filters, shop page, product page, cart, checkout, footer, newsletter, or other homepage sections.
+- Keep the current NewArrivalCard behavior:
+  - image + title by default
+  - price/sizes/View poster only in hover/focus overlay
+  - price hidden by default in New arrivals
+- Keep the current carousel alignment and card widths:
+  - mobile: 74vw
+  - tablet: 240px
+  - desktop: 260px
+  - first card aligned with section heading
+  - right-edge fade and trailing spacer preserved
+
+Tasks:
+
+1. Add arrow controls
+- Add left and right arrow buttons for the New arrivals carousel.
+- Buttons should be subtle and premium:
+  - circular
+  - warm surface/white background
+  - subtle border
+  - soft shadow
+  - small arrow icon
+- Place them vertically centered over the image row, near the left and right edges of the carousel area.
+- The right arrow should be available when there is more content to scroll.
+- The left arrow should be hidden or disabled at the initial far-left position.
+- After scrolling right, the left arrow should become available.
+- At the far-right end, the right arrow should become hidden or disabled.
+
+2. Scroll behavior
+- Use the existing scroll container with a ref.
+- Clicking right should smoothly scroll horizontally by roughly one carousel viewport segment or 1–2 card widths.
+- Clicking left should smoothly scroll back by the same amount.
+- Use native scrollBy or scrollTo.
+- Do not add a carousel library.
+- Do not duplicate posters.
+- Do not auto-scroll.
+
+3. State tracking
+- Add lightweight state for canScrollLeft and canScrollRight.
+- Update state:
+  - on initial render
+  - when newArrivals data changes
+  - on carousel scroll
+  - on window resize
+- Make sure this is safe when there are 0, 1, or 2 New arrivals.
+- Only show arrows when carousel content actually overflows.
+
+4. Responsive behavior
+- Desktop/tablet:
+  - show arrow controls when content overflows.
+- Mobile:
+  - hide arrows on small screens, because swipe is natural.
+- Do not block native touch/trackpad scrolling.
+
+5. Accessibility
+- Use real button elements.
+- Add aria-labels:
+  - “Scroll New arrivals left”
+  - “Scroll New arrivals right”
+- Keep visible focus styles.
+- Do not interfere with poster card click/tap behavior.
+
+6. Preserve existing layout
+- Do not change the current container alignment.
+- Do not change the current card widths.
+- Do not remove the right-edge fade.
+- Do not move “View all →”.
+- Do not change vertical spacing unless absolutely necessary.
+
+7. Run checks
+- Run typecheck for poster-store.
+
+Report back:
+- Files changed.
+- How the arrows were implemented.
+- How scroll amount is calculated.
+- How canScrollLeft/canScrollRight are tracked.
+- Confirm arrows only appear when carousel content overflows.
+- Confirm arrows are hidden on mobile or unobtrusive.
+- Confirm mobile touch scrolling still works.
+- Confirm carousel alignment remains container-synced.
+- Confirm New arrivals filtering/API/admin logic was not changed.
+- Confirm price remains hidden by default in New arrivals.
+- Confirm typecheck passes.
