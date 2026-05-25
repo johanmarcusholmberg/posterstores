@@ -310,7 +310,7 @@ export default function Home() {
             }}
           />
         )}
-        <div className="relative z-10 container mx-auto px-6 lg:px-10 py-5 lg:py-7 text-center">
+        <div className="relative z-10 container mx-auto px-6 lg:px-10 pt-3 pb-5 lg:pt-4 lg:pb-6 text-center">
           <h1
             className={cn(
               "font-serif text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 leading-tight",
@@ -322,7 +322,7 @@ export default function Home() {
           </h1>
           <p
             className={cn(
-              "text-sm mb-5 max-w-sm mx-auto leading-relaxed",
+              "text-sm mb-5 max-w-xl mx-auto leading-relaxed",
               !useStoreHeroVars && (hasHeroBg ? "text-white/80" : "text-foreground/65")
             )}
             style={useStoreHeroVars ? { color: "var(--store-hero-subtitle-color)" } : undefined}
