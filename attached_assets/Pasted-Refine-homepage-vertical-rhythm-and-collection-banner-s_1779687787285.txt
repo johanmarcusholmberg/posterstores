@@ -1,0 +1,91 @@
+Refine homepage vertical rhythm and collection banner size.
+
+Current issues:
+1. The collection banner still feels too tall. I want it about 30% shorter than the current version.
+2. The horizontal border lines between homepage sections make the page feel segmented and less premium.
+3. There is too much vertical padding between sections in general.
+
+Goal:
+Make the homepage feel smoother, more premium, and less blocky by reducing the collection banner height, removing section divider lines, and tightening vertical spacing.
+
+Important constraints:
+- Keep changes targeted to the homepage layout/spacing.
+- Do not change Featured poster card design, poster data, displayTitle logic, shop grid, poster detail page, cart, checkout, orders, or unrelated admin areas.
+- Keep selected collection poster logic unchanged:
+  - only explicitly selected isCollectionBanner posters appear,
+  - max 3,
+  - no fallback to featured/new arrivals.
+- Keep collection banner aligned to the same content width as Featured posters.
+- Keep collection banner rounded corners and soft shadow.
+- Do not create branches, PRs, GitHub automation, commits, or pushes unless I explicitly approve.
+
+Tasks:
+
+1. Make collection banner 30% shorter
+- Reduce the collection banner height/aspect by approximately 30% compared with the current implementation.
+- Keep it as a slim premium collection teaser, not a hero-style section.
+- Preserve a visually intentional crop of the background image.
+- Keep key image elements visible enough:
+  - framed pictures,
+  - shelf,
+  - right-side vases/plant,
+  - warm wall texture.
+- Do not revert to full original image ratio.
+
+2. Remove lines between homepage sections
+- Remove horizontal border/divider lines between homepage sections.
+- Specifically check for classes like border-b, border-t, border-border, divide-y, or similar on homepage sections.
+- The homepage should feel like one continuous page with breathing room, not separated by hard lines.
+- Keep borders only if they are part of an actual card component, not section dividers.
+
+3. Reduce vertical padding in general
+- Reduce vertical padding between main homepage sections.
+- Featured posters → collection banner → Explore Spain should feel tighter and smoother.
+- Avoid making the page cramped; keep enough whitespace for a premium feel.
+- Suggested direction:
+  - replace large py-6 / lg:py-8 section padding with smaller values where appropriate,
+  - reduce extra top/bottom margins around the collection banner,
+  - keep responsive spacing balanced on mobile and desktop.
+
+4. Preserve layout alignment
+- Keep the same homepage content container width.
+- Featured posters, collection banner, Explore Spain, and other normal homepage sections should still align visually.
+- Do not make any section accidentally full-bleed unless it is intentionally designed that way.
+
+5. Responsive behavior
+Verify on:
+- desktop/laptop,
+- tablet,
+- mobile.
+
+Make sure:
+- no horizontal overflow,
+- banner does not become too short for text readability,
+- mobile does not get huge vertical gaps,
+- selected collection posters still fit if shown.
+
+6. Keep behavior unchanged
+- No selected collection banner posters = background image only.
+- 1–3 selected posters = selected posters only.
+- More than 3 selected posters = first 3 only.
+- No fallback to featured/new arrivals.
+- Featured posters section content and card design unchanged.
+
+Acceptance criteria:
+- Collection banner is about 30% shorter than current.
+- Section divider lines are removed from the homepage.
+- Vertical spacing between sections is reduced and feels smoother.
+- Collection banner still feels premium with rounded corners and soft shadow.
+- Background crop remains intentional and visually pleasing.
+- Text remains readable.
+- Selected poster logic is unchanged.
+- Featured poster cards, shop grid, poster detail page, cart, checkout, orders, and admin behavior are unchanged.
+- Typecheck passes.
+
+After completing, report:
+- Files changed.
+- What banner height/aspect classes were changed.
+- Which divider/border classes were removed.
+- What vertical padding values were reduced.
+- Confirmation that selected collection banner logic was not changed.
+- Confirmation that Featured posters/shop cards were not changed.

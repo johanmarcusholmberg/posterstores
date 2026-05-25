@@ -386,7 +386,7 @@ export default function Home() {
           Mobile  (<640px): 2 columns × 2 rows — only first 4 shown (items 4+5 hidden on mobile)
         Polaroid-style cards apply only here; the normal shop grid is unchanged.
       */}
-      <section className="pt-6 pb-8 lg:pt-7 lg:pb-10 border-b border-border">
+      <section className="pt-4 pb-6 lg:pt-5 lg:pb-7">
         <div className="container mx-auto px-6 lg:px-10">
           <div className="flex items-center justify-between mb-5 lg:mb-6">
             <h2 className="font-serif text-xl font-bold text-foreground">Featured posters</h2>
@@ -431,7 +431,7 @@ export default function Home() {
           : makeShopUrl(resolvedRoutePrefix);
 
         return (
-          <section className="py-6 lg:py-8 border-b border-border">
+          <section className="py-3 lg:py-4">
             <div className="container mx-auto px-6 lg:px-10">
               {/* Card — rounded corners, background image scoped inside */}
               <div
@@ -445,7 +445,7 @@ export default function Home() {
                       src={collectionVisual!.backgroundImageUrl ?? undefined}
                       alt=""
                       aria-hidden="true"
-                      className="w-full aspect-[5/2] sm:aspect-[32/7] object-cover object-[center_70%] block"
+                      className="w-full aspect-[18/5] sm:aspect-[13/2] object-cover object-[center_72%] block"
                     />
                     <div
                       className="absolute inset-0"
@@ -552,7 +552,7 @@ export default function Home() {
 
       {/* ── Shop by region / category ── */}
       {(regionChips.length > 0 || categoryChips.length > 0) && (
-        <section className="py-6 lg:py-8 border-b border-border" data-testid="shop-by-region-section">
+        <section className="py-4 lg:py-5" data-testid="shop-by-region-section">
           <div className="container mx-auto px-6 lg:px-10">
             <h2 className="font-serif text-lg font-bold text-foreground mb-4">
               {store.shop?.regionFilterLabel ?? "Explore Spain"}
@@ -589,7 +589,7 @@ export default function Home() {
 
       {/* ── New arrivals ── */}
       {showNewArrivals && (
-        <section className="pt-6 pb-7 lg:pt-7 lg:pb-9 border-b border-border" data-testid="new-arrivals-section">
+        <section className="pt-4 pb-5 lg:pt-5 lg:pb-6" data-testid="new-arrivals-section">
           <div className="container mx-auto px-6 lg:px-10">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-serif text-xl font-bold text-foreground">New arrivals</h2>
