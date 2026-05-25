@@ -352,11 +352,11 @@ export default function Home() {
   const regionChips = (store.regions ?? []).slice(0, 5);
   const categoryChips = (store.categories ?? []).slice(0, 4);
 
-  // New arrivals: dedupe against featured (by id), show up to 8
+  // New arrivals: dedupe against featured (by id), show up to 12
   const featuredIds = new Set((featured ?? []).map((p) => p.id));
   const newArrivals = (newArrivalsData?.posters ?? [])
     .filter((p) => !featuredIds.has(p.id))
-    .slice(0, 8);
+    .slice(0, 12);
   const showNewArrivals = newArrivals.length > 0;
 
   return (
@@ -659,8 +659,9 @@ export default function Home() {
       {/* ── New arrivals ── */}
       {showNewArrivals && (
         <section className="pt-3 pb-4 lg:pt-4 lg:pb-5" data-testid="new-arrivals-section">
-          <div className="container mx-auto max-w-screen-2xl px-6 lg:px-10">
-            <div className="flex items-center justify-between mb-4">
+          {/* Header stays inside the padded container to align with other sections */}
+          <div className="container mx-auto max-w-screen-2xl px-6 lg:px-10 mb-4">
+            <div className="flex items-center justify-between">
               <h2 className="font-serif text-xl font-bold text-foreground">New arrivals</h2>
               <Link
                 href={makeShopUrl(resolvedRoutePrefix, "sort=newest")}
@@ -669,19 +670,28 @@ export default function Home() {
                 View all &rarr;
               </Link>
             </div>
+          </div>
+          {/* Scroll track — full viewport width so cards can always overflow to the right */}
+          <div className="relative">
             <div
-              className="flex gap-3 overflow-x-auto pb-3 scroll-smooth snap-x snap-mandatory -mx-6 px-6 lg:-mx-10 lg:px-10"
-              style={{ scrollbarWidth: "none" }}
+              className="flex gap-4 overflow-x-auto pb-3 scroll-smooth snap-x snap-mandatory pl-6 lg:pl-10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
               {newArrivals.map((poster) => (
                 <div
                   key={poster.id}
-                  className="flex-none w-[165px] sm:w-[195px] lg:w-[225px] snap-start"
+                  className="flex-none snap-start w-[200px] sm:w-[240px] lg:w-[280px]"
                 >
                   <NewArrivalCard poster={poster} />
                 </div>
               ))}
+              {/* Trailing spacer so the last card clears the right-edge fade */}
+              <div className="flex-none w-6 lg:w-10" aria-hidden="true" />
             </div>
+            {/* Right-edge fade — signals more content is scrollable */}
+            <div
+              className="absolute inset-y-0 right-0 w-16 lg:w-24 bg-gradient-to-l from-background to-transparent pointer-events-none"
+              aria-hidden="true"
+            />
           </div>
         </section>
       )}

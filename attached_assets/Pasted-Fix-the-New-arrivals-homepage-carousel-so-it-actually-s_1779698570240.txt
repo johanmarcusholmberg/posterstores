@@ -1,0 +1,74 @@
+Fix the New arrivals homepage carousel so it actually scrolls horizontally and visually behaves like a carousel.
+
+Current state:
+- The isNew filtering now works correctly.
+- The homepage New arrivals section shows the correct posters.
+- But the layout appears static: all visible cards fit in one row and there is no carousel/scroll effect.
+- I want New arrivals to be horizontally scrollable/seamless, with a partial next card visible when there are enough posters.
+
+Scope:
+- Prefer editing only artifacts/poster-store/src/pages/Home.tsx.
+- Do not change backend/API/filtering logic.
+- Do not change admin logic.
+- Do not change poster data or images.
+- Do not change hero, navbar, collection banner, shop page, product page, cart, checkout, footer, or newsletter behavior.
+- Keep the existing NewArrivalCard behavior: default image + title, price/sizes/View poster only in hover overlay.
+
+Tasks:
+
+1. Diagnose why the row is not scrollable
+- Inspect the New arrivals carousel markup/classes.
+- Check whether the scroll container actually has overflow-x-auto.
+- Check whether the inner row is wider than the container.
+- Check whether cards have shrink-0 or flex-none.
+- Check whether width classes are too small, causing all cards to fit.
+- Check whether the carousel is slicing/limiting the list too aggressively.
+- Check whether any parent container prevents overflow.
+
+2. Make the carousel actually overflow
+- Ensure each NewArrivalCard wrapper has a fixed width and does not shrink.
+- Use something like flex-none / shrink-0 on each card.
+- Increase desktop card width if needed so the row naturally overflows.
+- Keep mobile/tablet widths reasonable.
+- The intended behavior:
+  - mobile: horizontal touch scrolling
+  - tablet: horizontal scrolling
+  - desktop: horizontal scrolling if there are more cards than fit
+  - when there are enough posters, a partial next card should be visible at the right edge
+
+3. Improve scroll discoverability
+- Add a subtle right-edge fade or mask so it feels like content continues.
+- Do not add loud carousel arrows unless absolutely necessary.
+- Keep “View all →” in the section header.
+- Avoid visible ugly scrollbars if possible, but do not break accessibility.
+
+4. Preserve card UX
+- Default card state: image + title only.
+- Hover overlay: price, sizes if available, and “View poster →”.
+- Overlay must not shift layout.
+- Whole card must remain clickable/tappable.
+- Keyboard focus should still be visible.
+
+5. Avoid fake carousel behavior
+- Do not duplicate posters just to create infinite scrolling.
+- Do not auto-scroll.
+- Do not use a heavy carousel library.
+- Native horizontal scrolling is enough.
+
+6. Edge cases
+- 1–2 New arrivals: show cards normally, no awkward forced overflow needed.
+- 3–6 New arrivals: if they fit, consider whether card width should still make the row feel carousel-like on desktop.
+- 7+ New arrivals: must clearly overflow and be horizontally scrollable.
+- Make sure layout does not break on mobile.
+
+7. Run typecheck.
+
+Report back:
+- Files changed.
+- Root cause of why scrolling was not possible.
+- What layout/classes were changed to force real horizontal overflow.
+- Confirm whether card wrappers now use shrink-0/flex-none.
+- Confirm partial next card/fade behavior on desktop when enough posters exist.
+- Confirm mobile touch scrolling works.
+- Confirm New arrivals data/filtering was not changed.
+- Confirm typecheck passes.
