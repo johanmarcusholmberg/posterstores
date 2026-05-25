@@ -110,8 +110,8 @@ function HomePosterCard({ poster }: { poster: Poster }) {
       </div>
 
       {/* Info */}
-      <div className="mt-1.5">
-        <h3 className="font-serif font-semibold text-sm text-foreground line-clamp-2 leading-snug">
+      <div className="mt-1.5 min-w-0">
+        <h3 className="font-serif font-semibold text-sm text-foreground truncate leading-snug">
           {(poster as any).displayTitle || poster.title}
         </h3>
         <p className="text-xs font-medium text-foreground/70 mt-0.5">{priceLabel}</p>
@@ -184,8 +184,8 @@ function NewArrivalCard({ poster }: { poster: Poster }) {
       </div>
 
       {/* Info — title only, no price */}
-      <div className="mt-1.5">
-        <h3 className="font-serif font-semibold text-sm text-foreground line-clamp-2 leading-snug">
+      <div className="mt-1.5 min-w-0">
+        <h3 className="font-serif font-semibold text-sm text-foreground truncate leading-snug">
           {(poster as any).displayTitle || poster.title}
         </h3>
       </div>
@@ -248,8 +248,8 @@ function FeaturedPosterCard({ poster }: { poster: Poster }) {
         </div>
 
         {/* Polaroid caption tab — fixed min-height keeps bottom edges aligned */}
-        <div className="px-0.5 pt-2.5 pb-3 min-h-[52px] flex flex-col justify-start">
-          <h3 className="font-serif font-semibold text-[11px] sm:text-xs text-foreground/85 line-clamp-2 leading-snug">
+        <div className="px-0.5 pt-2.5 pb-3 min-h-[52px] flex flex-col justify-start min-w-0">
+          <h3 className="font-serif font-semibold text-[11px] sm:text-xs text-foreground/85 truncate leading-snug">
             {cardTitle}
           </h3>
           <p className="text-[10px] text-foreground/50 mt-1">{priceLabel}</p>

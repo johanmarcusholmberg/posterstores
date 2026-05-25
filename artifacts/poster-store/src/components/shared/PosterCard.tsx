@@ -188,8 +188,24 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
             aria-hidden="true"
           />
 
+          {/* Favorite heart — top-left */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-2 left-2 bg-white/50 backdrop-blur hover:bg-white/80 rounded-full transition-colors z-10"
+            onClick={toggleFavorite}
+            disabled={isPending}
+            aria-label={isFavorite ? "Remove from wishlist" : "Add to wishlist"}
+            data-testid={`btn-favorite-${poster.id}`}
+          >
+            <Heart
+              className={`h-4 w-4 ${isFavorite ? "fill-secondary text-secondary" : "text-foreground"}`}
+            />
+          </Button>
+
+          {/* NEW badge — top-right */}
           {poster.isNew && (
-            <div className="absolute top-2 left-2 bg-secondary text-secondary-foreground text-xs font-bold px-2 py-1 rounded">
+            <div className="absolute top-2 right-2 bg-secondary text-secondary-foreground text-xs font-bold px-2 py-1 rounded z-10 pointer-events-none">
               NEW
             </div>
           )}
@@ -203,20 +219,6 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
               {hoverImage ? "View in room" : "View poster"}
             </span>
           </div>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-2 right-2 bg-white/50 backdrop-blur hover:bg-white/80 rounded-full transition-colors"
-            onClick={toggleFavorite}
-            disabled={isPending}
-            aria-label={isFavorite ? "Remove from wishlist" : "Add to wishlist"}
-            data-testid={`btn-favorite-${poster.id}`}
-          >
-            <Heart
-              className={`h-4 w-4 ${isFavorite ? "fill-secondary text-secondary" : "text-foreground"}`}
-            />
-          </Button>
         </div>
 
         {/* Info area */}
@@ -226,7 +228,7 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
               {poster.category}
             </p>
           )}
-          <h3 className="font-serif font-semibold text-base sm:text-lg text-foreground line-clamp-2 leading-snug">
+          <h3 className="font-serif font-semibold text-base sm:text-lg text-foreground truncate leading-snug">
             {(poster as any).displayTitle || poster.title}
           </h3>
           <p className="font-medium text-foreground text-sm mt-1">{priceLabel}</p>
