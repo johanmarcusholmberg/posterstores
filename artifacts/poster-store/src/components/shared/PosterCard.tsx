@@ -187,17 +187,17 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
             aria-hidden="true"
           />
 
-          {/* Favorite heart — top-left, Concept B: warm scalloped-feel badge */}
+          {/* Favorite heart — top-left, matched to NEW badge overlay system */}
           <button
             type="button"
             onClick={toggleFavorite}
             disabled={isPending}
             aria-label={isFavorite ? "Remove from wishlist" : "Add to wishlist"}
             data-testid={`btn-favorite-${poster.id}`}
-            className="absolute top-2 left-2 z-10 h-8 w-8 flex items-center justify-center rounded-full bg-[#faf8f4]/90 border border-black/[0.08] shadow-[0_1px_5px_rgba(0,0,0,0.10)] backdrop-blur-[2px] hover:bg-[#faf8f4] active:scale-95 transition-all duration-200 disabled:opacity-50"
+            className="absolute top-2 left-2 z-10 h-8 w-8 flex items-center justify-center rounded-full bg-[#fefcfa]/70 border border-[#c9a08a]/60 backdrop-blur-[2px] hover:bg-[#fefcfa]/95 hover:border-[#c9a08a]/90 active:scale-95 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a08a] disabled:opacity-50"
           >
             <Heart
-              className={`h-4 w-4 ${isFavorite ? "fill-secondary text-secondary" : "text-foreground/70"}`}
+              className={`h-4 w-4 transition-colors duration-150 ${isFavorite ? "fill-[#9e6b4e] text-[#9e6b4e]" : "text-[#9e6b4e]/80"}`}
             />
           </button>
 

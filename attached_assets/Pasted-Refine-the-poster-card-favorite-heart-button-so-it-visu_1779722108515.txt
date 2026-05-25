@@ -1,0 +1,98 @@
+Refine the poster card favorite heart button so it visually matches the new outline NEW badge better.
+
+Current state:
+- The NEW badge now looks better: subtle, warm terracotta, outline pill, premium.
+- The favorite heart still looks mostly like the old generic white circular button.
+- The heart and NEW badge no longer overlap, but they still feel visually unsynced.
+
+Goal:
+Make the favorite heart button feel like part of the same overlay system as the new NEW badge.
+The heart should remain clearly clickable, but visually lighter, more refined, and less like a generic white floating button.
+
+Scope:
+- Focus only on poster/product card overlay styling.
+- Likely file:
+  artifacts/poster-store/src/components/shared/PosterCard.tsx
+- Also check homepage card variants in:
+  artifacts/poster-store/src/pages/Home.tsx
+  if they have their own favorite/heart styling.
+- Do not change backend/API/admin/filtering logic.
+- Do not change poster data or images.
+- Do not change favorite functionality.
+- Do not change NEW badge logic.
+- Do not change carousel scroll/arrows.
+- Do not change title truncation.
+- Do not change prices, cart, checkout, product detail, navbar, footer, or newsletter.
+
+Tasks:
+
+1. Make the heart button visually match the NEW badge
+- Keep the favorite button in the top-left.
+- Keep NEW badge in the top-right.
+- Change the heart button from a heavy filled white circle to a lighter premium outline-style control.
+- It should visually harmonize with the NEW badge’s:
+  - warm terracotta/neutral tone
+  - subtle outline
+  - light background
+  - refined minimal style
+
+Suggested styling direction:
+- size around h-9 w-9, or slightly smaller if tap target remains good
+- rounded-full
+- background: bg-[#fefcfa]/70 or bg-[#fefcfa]/60
+- border: border border-[#c9a08a]/60 or similar
+- text/icon color: text-[#9e6b4e] or a slightly darker neutral/terracotta
+- shadow: very subtle or remove if it feels too button-like
+- backdrop-blur-[2px] if useful over busy images
+- hover: slightly warmer/fuller background
+- active: scale-95
+- focus-visible ring preserved
+
+2. Heart icon
+- Keep the heart icon centered.
+- Keep size around h-4 w-4.
+- Avoid a generic black heart if possible; use the same terracotta/neutral tone family as the NEW badge.
+- Preserve filled/unfilled favorited state.
+- For favorited state, use a tasteful filled terracotta heart rather than a loud red heart.
+
+3. Reduce visual mismatch
+- The heart should no longer look like a large white bubble while NEW looks like a thin label.
+- The two overlays should feel like a coordinated pair:
+  - same top offset
+  - similar border tone
+  - similar warmth
+  - similar subtlety
+- Keep the heart more obviously interactive than NEW, but not visually heavier.
+
+4. Preserve behavior
+- Favorite click/tap behavior must remain unchanged.
+- The button must remain a real button.
+- The NEW badge must remain pointer-events-none.
+- z-index must still keep both overlays above images and hover layers.
+- No layout shift on hover.
+
+5. Apply consistently
+- Apply this heart styling anywhere poster cards use the favorite overlay:
+  - shared PosterCard
+  - homepage card variants if applicable
+- Keep NEW badge styling as-is unless a tiny color alignment tweak is needed.
+
+6. Responsive behavior
+- Desktop: heart and NEW feel balanced.
+- Mobile/tablet: heart remains tappable.
+- No overlap at small card widths.
+- Heart remains readable on both light and dark images.
+
+7. Run checks
+- Run typecheck for poster-store.
+- Backend/API typecheck is not needed if backend files are untouched.
+
+Report back:
+- Files changed.
+- Exact styling changed for the heart button.
+- Whether NEW badge styling was left unchanged or lightly adjusted.
+- Confirm favorite click/tap behavior is unchanged.
+- Confirm favorited/unfavorited states still work.
+- Confirm NEW remains pointer-events-none.
+- Confirm carousel/filtering/backend logic was not changed.
+- Confirm typecheck passes.
