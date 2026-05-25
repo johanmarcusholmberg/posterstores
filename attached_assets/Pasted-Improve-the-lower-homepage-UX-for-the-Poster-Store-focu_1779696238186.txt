@@ -1,0 +1,68 @@
+Improve the lower homepage UX for the Poster Store, focusing only on the “New arrivals” area and the sections below it.
+
+Goals:
+- Make the “New arrivals” section feel less empty and more premium/editorial.
+- Convert “New arrivals” from a static grid into a seamless horizontal scroll carousel.
+- Remove the always-visible “From €X.XX” price text from New arrivals cards.
+- Keep the homepage visually calm: New arrivals should primarily showcase poster image + short name/description.
+- On desktop hover, show commercial details such as “From €X”, available sizes, and a “View poster” affordance.
+- On mobile/touch, keep it simple: show image + title/short descriptor only, no hover-only content required.
+- Improve the empty-feeling area below New arrivals by tightening spacing and making the quote/benefit section feel more intentional.
+
+Specific implementation requirements:
+
+1. New arrivals carousel
+- Find the homepage New arrivals section, likely in:
+  artifacts/poster-store/src/pages/Home.tsx
+- Replace the current static New arrivals grid with a horizontally scrollable carousel.
+- The carousel should:
+  - align with the same max-width container used by the rest of the homepage
+  - use horizontal overflow scrolling
+  - have smooth scrolling behavior
+  - hide or minimize the default scrollbar visually where appropriate
+  - show a partially visible next card on desktop so users understand it is scrollable
+  - keep the “View all →” link in the section header
+  - not change poster selection logic or data fetching logic unless necessary
+
+2. New arrivals card content
+- Remove the always-visible “From €X.XX” text in this homepage section only.
+- Default card state should show:
+  - poster image
+  - short poster name/title
+  - optional short descriptor if already available, such as region/category/city; if not available, use no fallback clutter
+- Do not change price display on product pages, shop pages, cart, checkout, or other product grids.
+
+3. Hover behavior on desktop
+- Add a subtle hover state for New arrivals cards:
+  - slight image zoom or lift
+  - bottom gradient/overlay on the image
+  - show “From €X” if price data exists
+  - show available sizes if this data already exists in the poster object; do not invent sizes if not available
+  - show a small “View poster →” cue
+- Make sure hover content does not shift layout.
+- Ensure keyboard/focus behavior remains usable.
+
+4. Mobile behavior
+- The carousel should scroll horizontally with touch.
+- Do not rely on hover for critical navigation.
+- Poster cards should remain clickable/tappable.
+- Avoid making the section too tall on mobile.
+
+5. Quote and benefits section
+- Reduce excess vertical whitespace between New arrivals, the quote, the benefits row, and the footer.
+- Move the quote visually closer to the New arrivals carousel.
+- Improve the benefits row so it feels less like sparse floating text:
+  - turn the four benefit items into compact subtle cards or a denser row
+  - keep the existing text and meaning
+  - use subtle border/background, rounded corners, and consistent spacing
+  - keep it premium and quiet, not loud
+- Do not alter footer links or newsletter behavior.
+
+6. Constraints
+- Do not change poster images or poster data.
+- Do not change backend/API behavior.
+- Do not change collection banner, hero, navbar, cart, search, favorites, or checkout behavior.
+- Keep existing typography and brand colors unless a tiny spacing/contrast adjustment is needed.
+- Keep the page responsive.
+- Run typecheck after changes.
+- Provide a clear report of changed files and confirm exactly where price display was removed and where it remains unchanged.

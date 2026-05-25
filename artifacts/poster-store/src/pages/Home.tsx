@@ -120,6 +120,79 @@ function HomePosterCard({ poster }: { poster: Poster }) {
 }
 
 /**
+ * Card used in the New Arrivals horizontal carousel.
+ * Default state: image + title only (no price).
+ * Desktop hover: gradient overlay reveals price, available sizes, and "View poster →".
+ */
+function NewArrivalCard({ poster }: { poster: Poster }) {
+  const slug = (poster as any).slug as string | undefined;
+  const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
+
+  const activeSizes = poster.posterSizes?.filter((s) => s.active) ?? [];
+  const lowestPrice = poster.lowestActivePrice;
+  const displayPrice = lowestPrice != null ? lowestPrice : poster.price;
+  const displayCurrency = activeSizes[0]?.currency ?? poster.currency;
+  const hasPrice = displayPrice != null;
+  const priceLabel =
+    activeSizes.length > 1
+      ? `From ${formatPrice(displayPrice, displayCurrency)}`
+      : formatPrice(displayPrice, displayCurrency);
+  const sizeLabels = activeSizes
+    .slice(0, 4)
+    .map((s) => (s as any).size as string | undefined)
+    .filter(Boolean) as string[];
+
+  const baseImage = poster.imageUrl;
+
+  return (
+    <Link
+      href={href}
+      className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+    >
+      {/* Image */}
+      <div className="relative aspect-[3/4] overflow-hidden bg-[#f4f0eb] shadow-[0_1px_4px_rgba(0,0,0,0.06)] group-hover:shadow-[0_4px_18px_rgba(0,0,0,0.13)] transition-shadow duration-300">
+        <img
+          src={baseImage}
+          alt={poster.title}
+          className="absolute inset-0 object-cover w-full h-full transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.05] motion-reduce:transition-none"
+        />
+        {/* Hover overlay — desktop only */}
+        <div
+          className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-250 flex flex-col justify-end p-3 pointer-events-none"
+          aria-hidden="true"
+        >
+          {hasPrice && (
+            <p className="text-white text-[11px] font-semibold mb-0.5">{priceLabel}</p>
+          )}
+          {sizeLabels.length > 0 && (
+            <p className="text-white/65 text-[10px] mb-1.5 leading-tight">
+              {sizeLabels.join(" · ")}
+            </p>
+          )}
+          <span className="text-white/90 text-[11px] font-medium">View poster →</span>
+        </div>
+        <div
+          className="absolute inset-0 ring-1 ring-inset ring-black/[0.06] pointer-events-none"
+          aria-hidden="true"
+        />
+        {poster.isNew && (
+          <div className="absolute top-1.5 left-1.5 bg-secondary text-secondary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded">
+            NEW
+          </div>
+        )}
+      </div>
+
+      {/* Info — title only, no price */}
+      <div className="mt-1.5">
+        <h3 className="font-serif font-semibold text-sm text-foreground line-clamp-2 leading-snug">
+          {(poster as any).displayTitle || poster.title}
+        </h3>
+      </div>
+    </Link>
+  );
+}
+
+/**
  * Polaroid-inspired card used exclusively in the Featured posters section.
  * Warm paper background, padded frame, larger bottom caption area, soft shadow.
  * Cards are straight (no tilt) and stretch to equal grid-row height.
@@ -601,9 +674,9 @@ export default function Home() {
               {newArrivals.map((poster) => (
                 <div
                   key={poster.id}
-                  className="flex-none w-[155px] sm:w-[170px] lg:w-[185px] snap-start"
+                  className="flex-none w-[165px] sm:w-[195px] lg:w-[225px] snap-start"
                 >
-                  <HomePosterCard poster={poster} />
+                  <NewArrivalCard poster={poster} />
                 </div>
               ))}
             </div>
@@ -612,7 +685,7 @@ export default function Home() {
       )}
 
       {/* ── Brand quote ── */}
-      <section className="py-12 lg:py-14" data-testid="brand-story-section">
+      <section className="py-8 lg:py-10" data-testid="brand-story-section">
         <div className="max-w-2xl mx-auto px-6 text-center">
           <p className="font-serif text-xl md:text-2xl text-foreground/75 leading-relaxed italic">
             &ldquo;{brandStory}&rdquo;
@@ -621,13 +694,17 @@ export default function Home() {
       </section>
 
       {/* ── Value props ── */}
-      <section className="border-t border-border py-10 lg:py-14">
+      <section className="border-t border-border py-8 lg:py-10">
         <div className="container mx-auto max-w-screen-2xl px-6 lg:px-10">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             {VALUE_PROPS.map((prop, i) => (
-              <div key={i} className="text-center px-2" data-testid={`value-card-${i}`}>
-                <h3 className="font-serif font-bold text-base mb-1.5">{prop.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{prop.description}</p>
+              <div
+                key={i}
+                className="text-center px-4 py-5 bg-surface border border-border/50 rounded-xl"
+                data-testid={`value-card-${i}`}
+              >
+                <h3 className="font-serif font-bold text-sm mb-1.5">{prop.title}</h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">{prop.description}</p>
               </div>
             ))}
           </div>
