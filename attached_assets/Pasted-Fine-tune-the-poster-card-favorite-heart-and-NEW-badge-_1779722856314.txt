@@ -1,0 +1,96 @@
+Fine-tune the poster card favorite heart and NEW badge alignment.
+
+Current state:
+- The NEW badge is visually better than before: subtle outline pill.
+- The heart is closer in color/style but still does not feel fully synced with the NEW badge.
+- The two overlays sit at the same top offset, but because the heart is circular and taller while the NEW badge is a shorter horizontal pill, their optical centers do not align.
+- This makes the overlays feel slightly mismatched on the poster image.
+
+Goal:
+Make the heart and NEW badge feel like a coordinated overlay system by aligning their visual centers and slightly improving the heart contrast.
+
+Scope:
+- Focus only on poster/product card overlay styling.
+- Likely files:
+  artifacts/poster-store/src/components/shared/PosterCard.tsx
+  artifacts/poster-store/src/pages/Home.tsx
+- Do not change backend/API/admin/filtering logic.
+- Do not change poster data or images.
+- Do not change favorite functionality.
+- Do not change NEW/isNew logic.
+- Do not change carousel scroll/arrows.
+- Do not change title truncation, prices, cart, checkout, product detail, navbar, footer, or newsletter.
+
+Tasks:
+
+1. Align heart and NEW by visual center
+- Keep heart in the top-left and NEW in the top-right.
+- Do not simply rely on both having the same top offset if their heights differ.
+- Adjust the NEW badge vertical position so its visual center aligns with the center of the heart button.
+- Preferred implementation:
+  - heart remains around top-2 left-2 with h-9 w-9
+  - NEW badge should be positioned so its center aligns with the heart button center
+  - this may mean using top-[13px] or a similar value for the NEW badge
+- Alternative implementation:
+  - use an overlay row/wrapper with top-2 left/right positioning and items-center alignment if that is cleaner
+- The result should feel like both overlays belong to the same horizontal control line.
+
+2. Slightly strengthen the heart button
+- Keep the refined outline direction.
+- Do not return to the old heavy white bubble.
+- Make the heart a little more visible and clickable on both light and busy images.
+
+Suggested styling:
+- size: h-9 w-9
+- background: bg-[#fefcfa]/80 or bg-[#fefcfa]/85
+- border: border-[#c9a08a]/70 or similar
+- icon color: text-[#8f5f45] or similar warm terracotta-neutral
+- subtle shadow: shadow-sm or equivalent
+- backdrop-blur-[2px] if useful
+- hover: slightly stronger background/border
+- active: scale-95
+- focus-visible ring preserved
+
+3. Keep NEW badge refined
+- Keep the current NEW Badge A outline-pill style.
+- Only adjust vertical position/alignment unless a tiny color alignment tweak is needed.
+- NEW should remain:
+  - rounded-full
+  - outline/pill
+  - uppercase
+  - pointer-events-none
+  - subtle and premium
+
+4. Preserve behavior
+- Favorite button remains a real button and fully clickable/tappable.
+- Favorited/unfavorited states still work.
+- NEW badge remains pointer-events-none.
+- z-index keeps both overlays above images and hover layers.
+- No layout shift on hover.
+
+5. Apply consistently
+- Apply the same alignment/styling logic anywhere poster cards render these overlays:
+  - shared PosterCard
+  - HomePosterCard
+  - NewArrivalCard
+  - FeaturedPosterCard
+- Avoid having different top offsets/styles between shop cards and homepage cards unless there is a clear reason.
+
+6. Responsive behavior
+- Desktop: heart and NEW centers feel visually aligned.
+- Tablet/mobile: no overlap, heart remains tappable, NEW remains readable.
+- Check on both light and dark/busy poster images.
+
+7. Run checks
+- Run typecheck for poster-store.
+- Backend/API typecheck is not needed if backend files are untouched.
+
+Report back:
+- Files changed.
+- How the heart and NEW visual centers were aligned.
+- Exact heart styling changes.
+- Whether NEW style was changed or only repositioned.
+- Confirm favorite behavior is unchanged.
+- Confirm NEW remains pointer-events-none.
+- Confirm carousel/filtering/backend logic was not changed.
+- Confirm typecheck passes.

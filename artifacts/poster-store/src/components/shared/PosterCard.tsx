@@ -187,26 +187,32 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
             aria-hidden="true"
           />
 
-          {/* Favorite heart — top-left, matched to NEW badge overlay system */}
-          <button
-            type="button"
-            onClick={toggleFavorite}
-            disabled={isPending}
-            aria-label={isFavorite ? "Remove from wishlist" : "Add to wishlist"}
-            data-testid={`btn-favorite-${poster.id}`}
-            className="absolute top-2 left-2 z-10 h-8 w-8 flex items-center justify-center rounded-full bg-[#fefcfa]/70 border border-[#c9a08a]/60 backdrop-blur-[2px] hover:bg-[#fefcfa]/95 hover:border-[#c9a08a]/90 active:scale-95 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a08a] disabled:opacity-50"
-          >
-            <Heart
-              className={`h-4 w-4 transition-colors duration-150 ${isFavorite ? "fill-[#9e6b4e] text-[#9e6b4e]" : "text-[#9e6b4e]/80"}`}
-            />
-          </button>
+          {/*
+            Overlay row — heart (left) + NEW badge (right).
+            items-center aligns both overlays by their visual centers
+            regardless of their respective heights, with no pixel hacks.
+            Wrapper is pointer-events-none; button re-enables events.
+          */}
+          <div className="absolute top-2 left-2 right-2 z-10 flex items-center justify-between pointer-events-none">
+            <button
+              type="button"
+              onClick={toggleFavorite}
+              disabled={isPending}
+              aria-label={isFavorite ? "Remove from wishlist" : "Add to wishlist"}
+              data-testid={`btn-favorite-${poster.id}`}
+              className="pointer-events-auto h-9 w-9 flex items-center justify-center rounded-full bg-[#fefcfa]/85 border border-[#c9a08a]/70 shadow-sm backdrop-blur-[2px] hover:bg-[#fefcfa] hover:border-[#c9a08a] active:scale-95 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a08a] disabled:opacity-50"
+            >
+              <Heart
+                className={`h-4 w-4 transition-colors duration-150 ${isFavorite ? "fill-[#8f5f45] text-[#8f5f45]" : "text-[#8f5f45]/75"}`}
+              />
+            </button>
 
-          {/* NEW badge — top-right, Badge A: pill outline */}
-          {poster.isNew && (
-            <div className="absolute top-2 right-2 z-10 pointer-events-none rounded-full border border-[#c9a08a]/70 text-[#9e6b4e] bg-[#fefcfa]/80 backdrop-blur-[2px] text-[10px] font-medium tracking-[0.12em] uppercase px-2.5 py-[3px]">
-              NEW
-            </div>
-          )}
+            {poster.isNew && (
+              <div className="rounded-full border border-[#c9a08a]/70 text-[#9e6b4e] bg-[#fefcfa]/80 backdrop-blur-[2px] text-[10px] font-medium tracking-[0.12em] uppercase px-2.5 py-[3px]">
+                NEW
+              </div>
+            )}
+          </div>
 
           {/* Hover label — desktop only */}
           <div
