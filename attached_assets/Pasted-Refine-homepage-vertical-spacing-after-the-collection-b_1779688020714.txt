@@ -1,0 +1,69 @@
+Refine homepage vertical spacing after the collection banner height update.
+
+Current issue:
+The collection banner is now shorter, which is good, but the homepage still feels like there is too much vertical space between sections. The page should feel smoother and more compact, especially between Featured posters, the collection banner, Explore Spain, and New arrivals.
+
+Important constraints:
+- Keep changes targeted to homepage spacing/layout in Home.tsx.
+- Do not change poster data, APIs, admin, cart, checkout, orders, or unrelated functionality.
+- Do not change Featured poster card design.
+- Do not change selected collection banner logic:
+  - only explicitly selected isCollectionBanner posters,
+  - max 3,
+  - no fallback.
+- Keep section divider lines removed.
+- Keep collection banner rounded corners and soft shadow.
+- Do not create branches, PRs, GitHub automation, commits, or pushes unless I explicitly approve.
+
+Tasks:
+
+1. Tighten vertical spacing between main homepage sections
+- Reduce the vertical gap between:
+  - Featured posters and the collection banner,
+  - collection banner and Explore Spain,
+  - Explore Spain chips and New arrivals.
+- The page should feel like one continuous storefront, not separated blocks.
+- Keep enough breathing room so it does not feel cramped.
+
+2. Reduce section padding another small step
+- Review the current homepage section padding values.
+- Reduce top/bottom padding where it still feels excessive.
+- Suggested direction:
+  - Collection banner section can be very compact, for example py-2 lg:py-3 if it still has enough breathing room.
+  - Explore Spain can have less top padding after the banner.
+  - New arrivals can start closer after the category chips.
+- Avoid changing hero spacing unless clearly needed.
+
+3. Keep banner height mostly stable
+- The current banner height is closer to the desired size.
+- Do not make it significantly taller again.
+- If the image crop feels too aggressive, only make a very minor adjustment to focal position, not a major height increase.
+- Keep the banner as a slim premium teaser, not a second hero.
+
+4. Check collection banner crop
+- Confirm the framed pictures, shelf, and vases remain visible enough.
+- If needed, slightly adjust object-position/background-position to make the crop feel more intentional.
+- Do not revert to full image ratio.
+
+5. Responsive behavior
+Verify desktop/laptop, tablet, and mobile:
+- no horizontal overflow,
+- no overly large gaps,
+- mobile does not feel vertically stretched,
+- text remains readable.
+
+Acceptance criteria:
+- Homepage feels more compact and smoother vertically.
+- Section divider lines remain removed.
+- Featured posters → collection banner → Explore Spain → New arrivals has a better flow.
+- Collection banner remains slim and premium.
+- Banner crop still looks intentional.
+- Featured poster cards, shop grid, poster detail, cart, checkout, orders, admin, and API behavior are unchanged.
+- Typecheck passes.
+
+After completing, report:
+- Files changed.
+- Which padding/margin values changed.
+- Whether banner aspect ratio changed or stayed the same.
+- Whether banner object-position/focal crop changed.
+- Confirmation that selected banner logic was not changed.
