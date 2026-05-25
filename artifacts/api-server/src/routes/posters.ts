@@ -121,7 +121,9 @@ router.get("/posters", async (req, res) => {
     conditions.push(eq(postersTable.status, "published"));
   }
 
-  if (isNew === true) conditions.push(eq(postersTable.isNew, true));
+  if (typeof req.query.isNew === "string" && req.query.isNew === "true") {
+    conditions.push(eq(postersTable.isNew, true));
+  }
 
   if (region) {
     const regionValues = region.split(",").map(v => v.trim()).filter(Boolean);
