@@ -562,7 +562,7 @@ export default function Home() {
                 <Link
                   key={region}
                   href={makeShopUrl(resolvedRoutePrefix, `region=${encodeURIComponent(region)}`)}
-                  className="inline-flex items-center px-3.5 py-1.5 rounded-full border border-border text-sm text-foreground/75 bg-surface hover:bg-sand/60 hover:border-primary/30 hover:text-primary transition-colors duration-150"
+                  className="flex-1 min-w-fit inline-flex items-center justify-center px-3.5 py-1.5 rounded-full border border-border text-sm text-foreground/75 bg-surface hover:bg-sand/60 hover:border-primary/30 hover:text-primary transition-colors duration-150"
                 >
                   {region}
                 </Link>
@@ -571,7 +571,7 @@ export default function Home() {
                 <Link
                   key={cat}
                   href={makeShopUrl(resolvedRoutePrefix, `category=${encodeURIComponent(cat)}`)}
-                  className="inline-flex items-center px-3.5 py-1.5 rounded-full border border-border text-sm text-foreground/75 bg-surface hover:bg-sand/60 hover:border-primary/30 hover:text-primary transition-colors duration-150"
+                  className="flex-1 min-w-fit inline-flex items-center justify-center px-3.5 py-1.5 rounded-full border border-border text-sm text-foreground/75 bg-surface hover:bg-sand/60 hover:border-primary/30 hover:text-primary transition-colors duration-150"
                 >
                   {cat}
                 </Link>
