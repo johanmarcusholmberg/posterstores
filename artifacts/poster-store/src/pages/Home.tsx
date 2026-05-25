@@ -440,12 +440,12 @@ export default function Home() {
               >
                 {hasCollBg ? (
                   <>
-                    {/* img drives the container height so the full 16:5 image is always visible */}
+                    {/* img drives the container height; aspect-[32/7] gives a slim feature-card feel */}
                     <img
                       src={collectionVisual!.backgroundImageUrl ?? undefined}
                       alt=""
                       aria-hidden="true"
-                      className="w-full aspect-[16/5] object-cover block"
+                      className="w-full aspect-[5/2] sm:aspect-[32/7] object-cover object-[center_70%] block"
                     />
                     <div
                       className="absolute inset-0"
@@ -524,7 +524,7 @@ export default function Home() {
                               ].join(" ")}
                             >
                               {/* Paper-frame poster card */}
-                              <div className="w-[80px] sm:w-[96px] lg:w-[108px] bg-[#faf8f4] p-1.5 pb-3 rounded-[2px] shadow-[0_4px_14px_rgba(0,0,0,0.22)] group-hover:-translate-y-1 transition-transform duration-200">
+                              <div className="w-[60px] sm:w-[72px] lg:w-[84px] bg-[#faf8f4] p-1 pb-2.5 rounded-[2px] shadow-[0_4px_14px_rgba(0,0,0,0.22)] group-hover:-translate-y-1 transition-transform duration-200">
                                 <div className="relative aspect-[3/4] bg-[#ece7de] overflow-hidden">
                                   <img
                                     src={displayImg}

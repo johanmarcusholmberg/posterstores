@@ -1,0 +1,84 @@
+Refine the homepage collection banner height and image treatment.
+
+Current issue:
+The collection banner now preserves the full uploaded image ratio, but the card becomes too tall/heavy on the homepage. I do not want the banner to dominate the page this much.
+
+Decision:
+Use a slimmer homepage banner/card ratio instead of showing the full source image height. The banner should feel like a premium horizontal feature card, not a large hero section.
+
+Important constraints:
+- Keep changes targeted to the homepage collection banner.
+- Do not change Featured posters.
+- Do not change poster cards, shop grid, poster detail page, cart, checkout, orders, or unrelated admin areas.
+- Keep selected collection poster logic unchanged:
+  - only explicitly selected isCollectionBanner posters appear,
+  - max 3,
+  - no fallback to featured/new arrivals.
+- Keep same content-container alignment as the Featured posters section.
+- Keep rounded corners and soft shadow.
+- Do not create branches, PRs, GitHub automation, commits, or pushes unless I explicitly approve.
+
+Tasks:
+
+1. Make the banner slimmer
+- Replace the current true-image-ratio layout with a slimmer responsive banner height/aspect.
+- Suggested target ratio: around 1920×420, approximately 4.5:1.
+- Suggested Tailwind aspect ratio: aspect-[32/7] or similar.
+- The banner should be noticeably shorter than the current full 16:5 version.
+- Avoid making it feel like a second hero section.
+
+2. Use intentional cropping instead of accidental cropping
+- It is acceptable that the current background image crops slightly in this slimmer banner.
+- Use object-cover or background-cover only if the crop is intentional and visually controlled.
+- Set a sensible object-position/background-position so the important parts remain visible:
+  - the framed pictures,
+  - the shelf,
+  - the right-side vases/plant,
+  - enough warm wall texture.
+- Avoid cropping the shelf completely out.
+- Avoid showing too much empty top wall if it makes the banner feel unbalanced.
+
+3. Keep rounded card styling
+- Keep the collection banner inside the normal homepage content container.
+- Keep rounded corners, overflow-hidden, and soft shadow.
+- The banner should still align visually with Featured posters and other homepage sections.
+- If the current radius feels too large on a slimmer banner, reduce slightly, but keep the warm rounded look.
+
+4. Text overlay balance
+- Keep the title, description, and CTA readable.
+- Adjust text padding/positioning for the slimmer banner.
+- The text block should not feel too vertically centered in a huge empty area.
+- Ensure the text still works over the image background.
+
+5. Selected poster strip
+- Keep selected poster thumbnails working.
+- Ensure selected poster cards do not force the banner height larger.
+- Ensure they fit visually inside the slimmer banner.
+- Verify zero, one, two, and three selected posters.
+
+6. Responsive behavior
+- Desktop/laptop: slim premium banner card.
+- Tablet: still balanced and not too tall.
+- Mobile: avoid horizontal overflow and avoid a huge vertical banner.
+- If needed, use a slightly taller mobile treatment for readability, but keep it controlled.
+
+Acceptance criteria:
+- Collection banner is slimmer and no longer dominates the homepage.
+- Banner still aligns with the Featured posters content width.
+- Rounded corners and soft shadow remain.
+- Image crop is intentional and visually pleasing.
+- Shelf/framed pictures/vases remain visible enough.
+- Text remains readable.
+- Zero selected posters still shows the background image only.
+- Selected posters still work when chosen.
+- No fallback to featured/new arrivals.
+- Featured posters, shop grid, poster detail page, cart, checkout, orders, and unrelated admin are unchanged.
+- Typecheck passes.
+
+After completing, report:
+- Files changed.
+- What aspect ratio or height classes were used.
+- How the image crop/focal position is controlled.
+- Whether object-cover/background-cover is used and why.
+- Confirmation that selected poster logic was not changed.
+- Confirmation that the banner no longer uses the full true image ratio.
