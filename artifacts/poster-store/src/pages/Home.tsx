@@ -310,7 +310,7 @@ export default function Home() {
             }}
           />
         )}
-        <div className="relative z-10 container mx-auto px-6 lg:px-10 pt-3 pb-5 lg:pt-4 lg:pb-6 text-center">
+        <div className="relative z-10 container mx-auto max-w-7xl px-6 lg:px-10 pt-3 pb-5 lg:pt-4 lg:pb-6 text-center">
           <h1
             className={cn(
               "font-serif text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 leading-tight",
@@ -387,7 +387,7 @@ export default function Home() {
         Polaroid-style cards apply only here; the normal shop grid is unchanged.
       */}
       <section className="pt-4 pb-5 lg:pt-4 lg:pb-6">
-        <div className="container mx-auto px-6 lg:px-10">
+        <div className="container mx-auto max-w-7xl px-6 lg:px-10">
           <div className="flex items-center justify-between mb-5 lg:mb-6">
             <h2 className="font-serif text-xl font-bold text-foreground">Featured posters</h2>
             <Link
@@ -432,7 +432,7 @@ export default function Home() {
 
         return (
           <section className="py-2 lg:py-3">
-            <div className="container mx-auto px-6 lg:px-10">
+            <div className="container mx-auto max-w-7xl px-6 lg:px-10">
               {/* Card — rounded corners, background image scoped inside */}
               <div
                 className="relative overflow-hidden rounded-2xl shadow-[0_2px_20px_rgba(0,0,0,0.10)]"
@@ -553,7 +553,7 @@ export default function Home() {
       {/* ── Shop by region / category ── */}
       {(regionChips.length > 0 || categoryChips.length > 0) && (
         <section className="py-3 lg:py-4" data-testid="shop-by-region-section">
-          <div className="container mx-auto px-6 lg:px-10">
+          <div className="container mx-auto max-w-7xl px-6 lg:px-10">
             <h2 className="font-serif text-lg font-bold text-foreground mb-4">
               {store.shop?.regionFilterLabel ?? "Explore Spain"}
             </h2>
@@ -584,7 +584,7 @@ export default function Home() {
       {/* ── New arrivals ── */}
       {showNewArrivals && (
         <section className="pt-3 pb-4 lg:pt-4 lg:pb-5" data-testid="new-arrivals-section">
-          <div className="container mx-auto px-6 lg:px-10">
+          <div className="container mx-auto max-w-7xl px-6 lg:px-10">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-serif text-xl font-bold text-foreground">New arrivals</h2>
               <Link
@@ -622,7 +622,7 @@ export default function Home() {
 
       {/* ── Value props ── */}
       <section className="border-t border-border py-10 lg:py-14">
-        <div className="container mx-auto px-6 lg:px-10">
+        <div className="container mx-auto max-w-7xl px-6 lg:px-10">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {VALUE_PROPS.map((prop, i) => (
               <div key={i} className="text-center px-2" data-testid={`value-card-${i}`}>
