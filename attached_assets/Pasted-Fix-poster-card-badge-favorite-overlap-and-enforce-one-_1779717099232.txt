@@ -1,0 +1,105 @@
+Fix poster card badge/favorite overlap and enforce one-line product titles.
+
+Current problem:
+On poster/product cards, the heart/favorite button overlaps with the “NEW” badge in the top-left area of the image. Also, poster titles can wrap to different numbers of rows, which makes the product grid uneven. I want product titles to use a short title if available and always display as max one row with truncation if too long.
+
+Scope:
+- Focus on the reusable poster/product card component(s) used in grids such as shop/product lists and possibly homepage sections.
+- Likely files to inspect:
+  - artifacts/poster-store/src/components/public/*
+  - artifacts/poster-store/src/components/posters/*
+  - artifacts/poster-store/src/pages/Shop.tsx
+  - artifacts/poster-store/src/pages/Home.tsx
+  - any component rendering poster cards with favorite heart and NEW badge
+- Do not change backend/API/admin/filtering logic.
+- Do not change poster data or images.
+- Do not change cart, checkout, product detail functionality, navbar, footer, newsletter, or carousel scroll logic.
+- Keep existing favorite behavior unchanged.
+- Keep existing NEW/isNew logic unchanged.
+
+Tasks:
+
+1. Fix heart and NEW badge overlap
+- Find the poster card image overlay where the favorite heart button and NEW badge are rendered.
+- Ensure the heart button and NEW badge never overlap.
+- Use a clean, consistent placement.
+- Preferred layout:
+  - favorite heart button in the top-left corner
+  - NEW badge in the top-right corner
+- If there is already a design convention elsewhere, use the most consistent pattern, but avoid overlap completely.
+- Preserve click/tap behavior for the heart button.
+- Make sure the NEW badge does not block image/card clicks unnecessarily.
+- Ensure this works on desktop, tablet, and mobile.
+
+2. Keep overlays visually smooth
+- Maintain premium/minimal styling:
+  - heart button should remain circular/subtle
+  - NEW badge should remain small and readable
+  - spacing from image edges should be consistent
+- Avoid stacking both elements tightly in the same corner.
+- Avoid layout shifts on hover.
+- Make sure z-index is correct:
+  - heart button remains clickable
+  - NEW badge remains visible
+  - hover overlays do not hide or collide with these elements
+
+3. Enforce max one-line poster titles
+- Poster titles in cards should render as max 1 row.
+- Use the short title/short name field if available.
+- If no short title exists, fall back to the existing poster title/name.
+- If the displayed title is still too long, truncate with ellipsis.
+- Use appropriate Tailwind classes, for example:
+  - truncate
+  - whitespace-nowrap
+  - overflow-hidden
+  - text-ellipsis
+- Ensure the card title container has enough width rules for truncation to work.
+
+4. Preserve price alignment
+- Because titles are now one line, prices should align more consistently across cards.
+- Do not change price values or price formatting.
+- Do not hide prices on shop/product grids unless already intended.
+- Keep New arrivals homepage carousel behavior unchanged if it intentionally hides price by default.
+
+5. Use short title safely
+- Inspect the poster type/model to find the correct short title field, if one exists.
+- Possible field names may include:
+  - shortTitle
+  - shortName
+  - displayTitle
+  - subtitle
+- Do not invent a new field unless absolutely necessary.
+- If no short title field exists in the API response, simply truncate the existing title for now and report that no short-title field was available.
+- Do not change the database schema for this task.
+
+6. Check all affected card variants
+- Confirm the fix applies to the card variant shown in the screenshot.
+- Also check whether similar overlap/title wrapping can happen in:
+  - shop grid
+  - homepage Featured posters
+  - homepage New arrivals
+  - related posters
+  - favorites/cart-related poster cards if applicable
+- Apply the fix to the reusable component if possible instead of duplicating fixes.
+
+7. Responsive behavior
+- Desktop: title max one line, heart and NEW badge separated.
+- Tablet: same behavior.
+- Mobile: same behavior, no overlap, title truncates cleanly.
+- Ensure the heart tap target remains usable on touch devices.
+
+8. Run checks
+- Run typecheck for poster-store.
+- Backend/API typecheck is not needed if backend files are untouched.
+
+Report back:
+- Files changed.
+- Which poster card component(s) were updated.
+- How the heart/NEW overlap was fixed.
+- Whether NEW is now top-right or another chosen placement.
+- Which title field is used for display.
+- Confirm titles are max one line with ellipsis.
+- Confirm price alignment is improved.
+- Confirm favorite click/tap behavior is unchanged.
+- Confirm New arrivals carousel scroll/filtering logic was not changed.
+- Confirm typecheck passes.
