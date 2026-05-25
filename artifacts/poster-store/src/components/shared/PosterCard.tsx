@@ -4,7 +4,6 @@ import { Poster } from "@workspace/api-client-react";
 import { useStorefront } from "@/context/StorefrontContext";
 import { useAuth } from "@/context/AuthContext";
 import { addFavorite, removeFavorite } from "@/lib/favoritesApi";
-import { Button } from "@/components/ui/button";
 import { Heart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { LoginPromptModal } from "./LoginPromptModal";
@@ -188,24 +187,23 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
             aria-hidden="true"
           />
 
-          {/* Favorite heart — top-left */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-2 left-2 bg-white/50 backdrop-blur hover:bg-white/80 rounded-full transition-colors z-10"
+          {/* Favorite heart — top-left, Concept B: warm scalloped-feel badge */}
+          <button
+            type="button"
             onClick={toggleFavorite}
             disabled={isPending}
             aria-label={isFavorite ? "Remove from wishlist" : "Add to wishlist"}
             data-testid={`btn-favorite-${poster.id}`}
+            className="absolute top-2 left-2 z-10 h-8 w-8 flex items-center justify-center rounded-full bg-[#faf8f4]/90 border border-black/[0.08] shadow-[0_1px_5px_rgba(0,0,0,0.10)] backdrop-blur-[2px] hover:bg-[#faf8f4] active:scale-95 transition-all duration-200 disabled:opacity-50"
           >
             <Heart
-              className={`h-4 w-4 ${isFavorite ? "fill-secondary text-secondary" : "text-foreground"}`}
+              className={`h-4 w-4 ${isFavorite ? "fill-secondary text-secondary" : "text-foreground/70"}`}
             />
-          </Button>
+          </button>
 
-          {/* NEW badge — top-right */}
+          {/* NEW badge — top-right, Badge A: pill outline */}
           {poster.isNew && (
-            <div className="absolute top-2 right-2 bg-secondary text-secondary-foreground text-xs font-bold px-2 py-1 rounded z-10 pointer-events-none">
+            <div className="absolute top-2 right-2 z-10 pointer-events-none rounded-full border border-[#c9a08a]/70 text-[#9e6b4e] bg-[#fefcfa]/80 backdrop-blur-[2px] text-[10px] font-medium tracking-[0.12em] uppercase px-2.5 py-[3px]">
               NEW
             </div>
           )}

@@ -45,6 +45,10 @@ function makeShopUrl(routePrefix: string | null, query?: string): string {
   return query ? `${base}?${query}` : base;
 }
 
+/** Shared badge class constants for card overlays */
+const NEW_BADGE_CLS =
+  "absolute top-2 right-2 z-10 pointer-events-none rounded-full border border-[#c9a08a]/70 text-[#9e6b4e] bg-[#fefcfa]/80 backdrop-blur-[2px] text-[10px] font-medium tracking-[0.12em] uppercase px-2.5 py-[3px]";
+
 /** Compact card used only on the homepage featured/new-arrivals rows */
 function HomePosterCard({ poster }: { poster: Poster }) {
   const slug = (poster as any).slug as string | undefined;
@@ -102,11 +106,7 @@ function HomePosterCard({ poster }: { poster: Poster }) {
           className="absolute inset-0 ring-1 ring-inset ring-black/[0.06] pointer-events-none"
           aria-hidden="true"
         />
-        {poster.isNew && (
-          <div className="absolute top-1.5 left-1.5 bg-secondary text-secondary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded">
-            NEW
-          </div>
-        )}
+        {poster.isNew && <div className={NEW_BADGE_CLS}>NEW</div>}
       </div>
 
       {/* Info */}
@@ -176,11 +176,7 @@ function NewArrivalCard({ poster }: { poster: Poster }) {
           className="absolute inset-0 ring-1 ring-inset ring-black/[0.06] pointer-events-none"
           aria-hidden="true"
         />
-        {poster.isNew && (
-          <div className="absolute top-1.5 left-1.5 bg-secondary text-secondary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded">
-            NEW
-          </div>
-        )}
+        {poster.isNew && <div className={NEW_BADGE_CLS}>NEW</div>}
       </div>
 
       {/* Info — title only, no price */}
@@ -240,11 +236,7 @@ function FeaturedPosterCard({ poster }: { poster: Poster }) {
               (e.target as HTMLImageElement).src = poster.imageUrl;
             }}
           />
-          {poster.isNew && (
-            <div className="absolute top-1.5 left-1.5 bg-secondary text-secondary-foreground text-[9px] font-bold px-1.5 py-0.5">
-              NEW
-            </div>
-          )}
+          {poster.isNew && <div className={NEW_BADGE_CLS}>NEW</div>}
         </div>
 
         {/* Polaroid caption tab — fixed min-height keeps bottom edges aligned */}

@@ -1,0 +1,114 @@
+Update the poster card favorite icon and NEW badge styling.
+
+Design decision:
+- Use the favorite icon direction from Concept B: a softer, more unique circular/scalloped badge style for the heart.
+- Use NEW Badge A: a minimal pill-shaped outline badge with “NEW” text.
+- Do not use the current large filled orange NEW rectangle.
+
+Goal:
+Make the favorite heart and NEW badge feel more unique, premium, and cohesive with the poster store design.
+
+Scope:
+- Focus on poster/product card overlay styling.
+- Likely files:
+  - artifacts/poster-store/src/components/shared/PosterCard.tsx
+  - artifacts/poster-store/src/pages/Home.tsx if homepage card variants have separate NEW badge styling
+- Do not change backend/API/admin/filtering logic.
+- Do not change poster data or images.
+- Do not change favorite behavior.
+- Do not change carousel scroll behavior.
+- Do not change title truncation logic.
+- Do not change cart, checkout, shop filtering, product detail, navbar, footer, or newsletter behavior.
+
+Tasks:
+
+1. Favorite icon styling
+- Keep the favorite button in the top-left corner.
+- Make it feel like Concept B:
+  - softer, more unique badge shape than a plain generic circle
+  - still clean and minimal
+  - heart icon centered
+  - premium paper/poster-store feel
+- Keep it clearly clickable with a usable tap target.
+- Keep hover/active/favorited states working.
+- Do not break existing favorite toggle behavior.
+
+Suggested implementation direction:
+- Use a small custom badge wrapper with a subtle organic/scalloped feel if possible using CSS.
+- If a true scalloped shape is too complex, approximate it with:
+  - rounded-full
+  - soft off-white background
+  - subtle border
+  - very soft shadow
+  - optional slightly irregular/brand-like outline only if simple and robust
+- Keep size around h-9 w-9 or similar.
+- Heart icon should be around h-4 w-4.
+- Use warm neutral colors consistent with the site.
+
+2. NEW badge styling
+- Replace the current filled orange NEW rectangle with NEW Badge A:
+  - pill-shaped
+  - outline style
+  - minimal and refined
+  - uppercase NEW text
+  - smaller than current badge
+- Keep NEW badge in the top-right corner.
+- Keep pointer-events-none so it never blocks poster/card clicks.
+- Keep z-index so it remains visible over images and hover layers.
+
+Suggested implementation direction:
+- rounded-full
+- border
+- transparent or very subtle warm background
+- text in muted terracotta/brand accent
+- px-2.5 or px-3
+- py-0.5 or py-1
+- text-[10px] or text-xs
+- uppercase
+- tracking-[0.14em] or tracking-wide
+- font-medium or font-semibold, whichever looks best
+
+3. Cohesion between heart and NEW
+- Heart and NEW should sit at the same top offset.
+- Keep consistent inset spacing, for example top-2 left-2 and top-2 right-2.
+- They should feel like one overlay system, not two unrelated UI elements.
+- The NEW badge should be readable but not visually louder than the poster image.
+- The favorite button should remain more clearly interactive than the NEW badge.
+
+4. Apply consistently
+- Apply this styling to all card variants that render heart/NEW or NEW:
+  - shared PosterCard
+  - HomePosterCard
+  - NewArrivalCard
+  - FeaturedPosterCard
+  - any other card variant in Home.tsx that has a NEW badge
+- Avoid duplicated inconsistent badge styles.
+- If possible, extract small reusable class constants or helper components inside the relevant file to keep consistency.
+
+5. Preserve existing behavior
+- Favorite click/tap behavior unchanged.
+- isNew/NEW display logic unchanged.
+- Titles still max one line with ellipsis.
+- Prices unchanged.
+- New arrivals carousel scroll and arrows unchanged.
+- API/admin/filtering unchanged.
+
+6. Responsive behavior
+- Desktop: badges should look refined and balanced.
+- Tablet/mobile: heart remains tappable and NEW remains readable.
+- No overlap at small card widths.
+- No layout shift on hover.
+
+7. Run checks
+- Run typecheck for poster-store.
+- Backend/API typecheck is not needed if backend files are untouched.
+
+Report back:
+- Files changed.
+- Exact styling chosen for the favorite icon.
+- Exact styling chosen for NEW Badge A.
+- Confirm favorite click/tap behavior is unchanged.
+- Confirm NEW remains pointer-events-none.
+- Confirm all relevant card variants are consistent.
+- Confirm carousel/filtering/backend logic was not changed.
+- Confirm typecheck passes.
