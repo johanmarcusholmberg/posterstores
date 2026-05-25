@@ -1,0 +1,68 @@
+The homepage is still too narrow on large/wide screens after adding max-w-7xl.
+
+Current issue:
+On a big monitor, Featured posters, collection banner, Explore Spain, and New arrivals still look too compressed in the center with too much empty space on both sides. The page feels like a small island instead of a premium storefront.
+
+Goal:
+Increase the homepage content width further on large screens while keeping the layout contained, aligned, and not full-bleed.
+
+Important constraints:
+- Keep changes targeted to Home.tsx.
+- Do not change poster data, APIs, admin, cart, checkout, orders, or unrelated functionality.
+- Do not change Featured poster card design except layout sizing if required.
+- Do not change collection banner image, aspect ratio, rounded corners, shadow, crop, or selection logic.
+- Keep selected collection banner behavior unchanged:
+  - only explicitly selected isCollectionBanner posters appear,
+  - max 3,
+  - no fallback.
+- Do not create branches, PRs, GitHub automation, commits, or pushes unless I explicitly approve.
+
+Tasks:
+
+1. Increase homepage max-width beyond max-w-7xl
+- Replace or augment the current max-w-7xl homepage section containers with a wider large-screen max-width.
+- Suggested target:
+  - max-w-[1440px] as a first choice
+  - or max-w-screen-2xl / max-w-[1536px] if that matches the project’s Tailwind setup better.
+- Apply consistently to:
+  - Featured posters
+  - Collection banner
+  - Explore Spain
+  - New arrivals
+  - Hero content container if applicable
+  - Brand story if it uses the same homepage rhythm
+
+2. Keep product layout balanced
+- Featured posters should still show exactly 6 cards in one row on desktop.
+- Cards should become a bit larger/more comfortable on wide screens, not tiny.
+- Keep equal card heights and displayTitle usage.
+- Avoid making cards oversized.
+
+3. Keep collection banner aligned
+- Collection banner should use the same wider content container as Featured posters.
+- Keep the current slim height/aspect ratio and crop.
+- Keep rounded corners and soft shadow.
+- Do not make it full-bleed.
+
+4. Preserve responsive behavior
+- Mobile and tablet should remain unchanged.
+- Normal laptop should still look good.
+- Very wide desktop should use more space.
+- No horizontal overflow.
+
+Acceptance criteria:
+- On very wide screens, homepage content no longer feels like a small centered island.
+- Featured posters, collection banner, Explore Spain, and New arrivals align to the same wider container.
+- Layout remains premium and contained, not full-bleed.
+- Featured posters still show 6 clean cards in one row.
+- Collection banner design and selected-poster logic are unchanged.
+- Mobile/tablet/laptop still look good.
+- Typecheck passes.
+
+After completing, report:
+- Files changed.
+- Old max-width class and new max-width class.
+- Confirmation that large-screen layout is wider.
+- Confirmation that mobile/tablet were not affected.
+- Confirmation that collection banner behavior/design was not changed.
+- Typecheck result.
