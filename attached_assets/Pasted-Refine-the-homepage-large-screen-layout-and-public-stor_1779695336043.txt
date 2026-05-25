@@ -1,0 +1,124 @@
+Refine the homepage large-screen layout and public storefront header alignment.
+
+Current issue:
+On large/wide screens, the homepage still feels too narrow and compressed even after changing containers to max-w-[1440px]. The Featured posters, collection banner, Explore Spain, and New arrivals still feel like a small centered island.
+
+Also, the public header feels disconnected from the page layout: the logo sits far left and the icons sit far right, while the main storefront content is centered in a narrower column.
+
+Goal:
+Make the homepage and header use the same large-screen layout system. The storefront should feel wider, more confident, and premium on large monitors, while still contained and not full-bleed.
+
+Important constraints:
+- Keep changes targeted to Home.tsx and the public storefront header/navbar component.
+- Do not change APIs, database, admin, cart, checkout, orders, or unrelated functionality.
+- Do not change collection banner selection logic.
+- Do not change poster data or displayTitle logic.
+- Do not redesign the logo or icons.
+- Do not change search, favorites, cart, account, or mobile navigation behavior.
+- Do not create branches, PRs, GitHub automation, commits, or pushes unless I explicitly approve.
+
+Part A — Homepage large-screen layout
+
+1. Increase homepage max-width again
+- Change homepage section containers from max-w-[1440px] to a wider large-screen value.
+- Suggested target:
+  - max-w-[1536px]
+  - or max-w-screen-2xl if that matches the Tailwind setup better.
+- Apply consistently to:
+  - hero content,
+  - Featured posters,
+  - collection banner,
+  - Explore Spain,
+  - New arrivals,
+  - brand story if currently aligned with the homepage rhythm.
+
+2. Make Featured posters use the available width better
+- Featured posters should still show exactly 6 cards in one row on desktop.
+- On wide screens, cards should be larger and better distributed, not tiny.
+- Inspect whether the grid is constrained by nested max-width, fixed card width, small columns, or overly restrictive wrappers.
+- Adjust only the layout constraints needed so the six cards fill the wider container more naturally.
+- Keep equal card heights.
+- Keep Polaroid styling.
+- Keep displayTitle usage.
+- Do not change the functional card behavior.
+
+3. Scale the collection banner with the wider layout
+- The collection banner should use the same wider content container as Featured posters.
+- It should feel visually related to the Featured posters row.
+- Keep the current slim banner height/aspect ratio, rounded corners, soft shadow, and crop unless a very small adjustment is needed.
+- Do not make it full-bleed.
+- Do not change selected poster logic:
+  - only explicitly selected isCollectionBanner posters appear,
+  - max 3,
+  - no fallback.
+
+4. Align Explore Spain and New arrivals
+- Explore Spain chips and New arrivals should use the same wider content container.
+- New arrivals should not feel like a small narrow row on wide screens.
+
+5. Check for hidden/nested width constraints
+- Inspect Home.tsx for nested max-width, fixed width, mx-auto, grid wrapper, or card sizing that prevents sections from actually using the wider container.
+- Remove or adjust only the constraints that cause the content to stay too narrow.
+- Do not redesign unrelated components.
+
+Part B — Header alignment
+
+6. Align header content to the same max-width system
+- Keep the header background full-width.
+- Place the header inner content inside the same max-width container used by the homepage sections.
+- Use the final homepage large-screen width from Part A, for example max-w-[1536px] or max-w-screen-2xl.
+- Keep horizontal padding consistent with homepage sections, for example px-6 lg:px-10.
+- The logo should align visually with the left edge of homepage content.
+- The icons should align visually with the right edge of homepage content.
+- The header should no longer place logo/icons at the extreme browser edges on large screens.
+
+7. Preserve header behavior
+- Search icon/search behavior must continue working.
+- Favorites icon/link must continue working.
+- Cart icon/link must continue working.
+- Account/user icon behavior must continue working.
+- Mobile menu/header behavior must remain correct.
+- Do not redesign the logo or icons.
+
+Responsive verification:
+Check:
+- mobile,
+- tablet,
+- normal laptop,
+- large desktop/wide screen.
+
+Make sure:
+- mobile/tablet are unchanged,
+- normal laptop still looks good,
+- wide desktop uses space better,
+- no horizontal overflow,
+- header aligns with the storefront content,
+- header does not feel disconnected from the homepage layout.
+
+Acceptance criteria:
+- On a wide screen, homepage content no longer feels like a small centered island.
+- Featured posters are visibly larger or better distributed across the row.
+- Collection banner is wider and aligned with Featured posters.
+- Explore Spain and New arrivals align with the same width.
+- Layout remains contained and premium, not full-bleed.
+- Header logo and icons align to the same content width as the homepage sections.
+- Header background can remain full-width, but inner header content is contained.
+- Featured posters still show 6 clean cards in one row.
+- Collection banner design and selected-poster logic are unchanged.
+- Search, favorites, cart, account, and mobile header behavior are unchanged.
+- Mobile/tablet/laptop still look good.
+- Typecheck passes.
+
+Run:
+pnpm --filter @workspace/poster-store run typecheck
+
+After completing, report:
+- Files changed.
+- Old and new homepage max-width values.
+- Header/container classes changed.
+- Any nested width/card/grid constraints found.
+- What changed to make Featured posters use more width.
+- Confirmation that collection banner behavior/design was unchanged.
+- Confirmation that header behavior was unchanged.
+- Confirmation that mobile/tablet were checked.
+- Typecheck result.
