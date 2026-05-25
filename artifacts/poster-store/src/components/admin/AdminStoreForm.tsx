@@ -840,14 +840,14 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
             <div className="space-y-1.5">
               <Label htmlFor="hero-text-mode">Text mode</Label>
               <Select
-                value={typography.heroTextMode ?? ""}
-                onValueChange={(val) => updateTypography("heroTextMode", (val || undefined) as HeroTextMode | undefined)}
+                value={typography.heroTextMode ?? "__unset__"}
+                onValueChange={(val) => updateTypography("heroTextMode", (val === "__unset__" ? undefined : val) as HeroTextMode | undefined)}
               >
                 <SelectTrigger id="hero-text-mode">
                   <SelectValue placeholder="Unset (default behavior)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Unset (default behavior)</SelectItem>
+                  <SelectItem value="__unset__">Unset (default behavior)</SelectItem>
                   {HERO_TEXT_MODES.map(({ value, label }) => (
                     <SelectItem key={value} value={value}>{label}</SelectItem>
                   ))}
@@ -868,14 +868,14 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
               <div className="space-y-1.5">
                 <Label htmlFor="hero-overlay-mode">Overlay mode</Label>
                 <Select
-                  value={typography.heroOverlayMode ?? ""}
-                  onValueChange={(val) => updateTypography("heroOverlayMode", (val || undefined) as HeroOverlayMode | undefined)}
+                  value={typography.heroOverlayMode ?? "__unset__"}
+                  onValueChange={(val) => updateTypography("heroOverlayMode", (val === "__unset__" ? undefined : val) as HeroOverlayMode | undefined)}
                 >
                   <SelectTrigger id="hero-overlay-mode">
                     <SelectValue placeholder="Unset (dark overlay by default)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Unset (dark overlay by default)</SelectItem>
+                    <SelectItem value="__unset__">Unset (dark overlay by default)</SelectItem>
                     {HERO_OVERLAY_MODES.map(({ value, label }) => (
                       <SelectItem key={value} value={value}>{label}</SelectItem>
                     ))}
