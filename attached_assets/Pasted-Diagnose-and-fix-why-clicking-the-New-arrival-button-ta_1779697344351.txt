@@ -1,0 +1,87 @@
+Diagnose and fix why clicking the “New arrival” button/tag on a poster updates the visible “New” tag in admin/poster page but does not update the homepage “New arrivals/New posters” section.
+
+Problem:
+When I test the function, the “New arrival” button on the poster page adds the “New” tag visually on the poster, but the poster list in the homepage New arrivals section does not update. This means I cannot test the carousel behavior.
+
+Important context:
+- The intended backend field is isNew.
+- DB column is is_new.
+- GET /posters now supports ?isNew=true.
+- Home.tsx now queries isNew: true, status: "published", sort: newest, limit: 12.
+- Home.tsx render condition was changed to show the section when newArrivals.length > 0.
+- Typechecks currently pass.
+
+Goal:
+Clicking/toggling “New arrival” in admin/poster management must persistently update the same isNew field that the homepage query uses. After the change, the homepage New arrivals section should reflect the updated poster list after refresh, and preferably after normal query refetch/invalidation.
+
+Scope:
+- Investigate the complete toggle flow from the admin/poster page button to API/database to homepage query.
+- Keep changes minimal and targeted.
+- Do not change carousel visual design unless necessary for testing.
+- Do not change poster images, product page layout, shop page, cart, checkout, navbar, hero, footer, or unrelated admin behavior.
+
+Tasks:
+
+1. Find the “New arrival” button implementation
+- Locate the admin/poster page component where clicking “New arrival” adds the visible “New” tag.
+- Confirm exactly what field it updates.
+- Check whether it updates:
+  - isNew
+  - is_new
+  - tags/badges
+  - local component state only
+  - another field entirely
+- If it updates a different field or only local UI state, fix it so it updates the real isNew field.
+
+2. Verify persistence
+- Confirm that toggling “New arrival” sends an API request to update the poster.
+- Confirm the request payload includes isNew: true or isNew: false.
+- Confirm the backend update route accepts and saves isNew to the is_new DB column.
+- Confirm the poster response after save returns the updated isNew value.
+- If the backend update schema/type omits isNew, add it consistently and regenerate API client/types if needed.
+
+3. Verify homepage API result
+- After toggling a published poster to isNew=true, verify GET /api/posters?storeKey=...&isNew=true&status=published&sort=newest&limit=12 includes that poster.
+- If it does not, identify why:
+  - isNew not saved
+  - poster status not published
+  - wrong storeKey
+  - wrong API param handling
+  - stale cache
+  - image/filter exclusion
+- Fix the actual cause, not only the symptom.
+
+4. Handle client cache/refetch
+- Check whether the poster-store homepage uses TanStack Query or another query cache.
+- Ensure the New arrivals query has a distinct query key that includes isNew/status/storeKey/sort/limit.
+- If the admin page and homepage share a cache context, invalidate/refetch the relevant poster queries after successful toggle/save.
+- If they are separate pages/apps where invalidation is not practical, ensure a browser refresh shows the correct homepage data.
+- Do not over-engineer real-time updates unless already supported.
+
+5. Admin testing clarity
+- If the poster is not published, make the report clear that it will not show publicly even if New arrival is enabled.
+- If possible, keep the admin UI clear that “New arrival” only appears on the public homepage for published posters in the active store.
+- Do not add major UI unless necessary.
+
+6. Preserve intended public filtering
+- Homepage New arrivals must still only show:
+  - current storeKey
+  - status published
+  - isNew true
+- Draft/archived posters must not show publicly.
+- Other store posters must not leak.
+
+7. Run checks
+- Run typecheck for poster-store and api-server.
+- Run any quick targeted test or manual API check available in the Replit environment.
+
+Report back:
+- Files changed.
+- Exact root cause.
+- Whether the button was updating isNew, another field, or only local UI state.
+- Whether backend update schemas/routes needed changes.
+- Whether the database is_new value is now persisted.
+- Whether the homepage API query now returns the toggled poster.
+- Whether homepage refresh shows the updated New arrivals section.
+- Whether cache invalidation/refetch was changed.
+- Confirm typechecks pass.

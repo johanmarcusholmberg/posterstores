@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAdminToken } from "@/context/AdminTokenContext";
 import {
   adminCreatePoster,
@@ -99,6 +100,7 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
   const { adminStoreKey } = useAdminToken();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const activeStore = storefronts[adminStoreKey] ?? storefronts["postsofspain"];
   const defaultCurrency = activeStore.defaultCurrency ?? "EUR";
@@ -231,6 +233,7 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
           slug: slugValue,
         };
         await adminUpdatePoster(existing.id, storeKey, payload);
+        await queryClient.invalidateQueries({ queryKey: ["/api/posters"] });
         toast({ title: "Poster updated", description: title });
       } else {
         const payload: CreatePosterPayload = {
@@ -254,6 +257,7 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
           slug: slugValue,
         };
         const created = await adminCreatePoster(payload);
+        await queryClient.invalidateQueries({ queryKey: ["/api/posters"] });
         toast({ title: "Poster created", description: title });
         setLocation(`/admin/posters/${created.id}`);
         return;
