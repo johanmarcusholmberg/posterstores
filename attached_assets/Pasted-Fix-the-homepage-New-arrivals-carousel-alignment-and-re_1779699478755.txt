@@ -1,0 +1,120 @@
+Fix the homepage New arrivals carousel alignment and responsive sizing.
+
+Current problem:
+The New arrivals filtering now works correctly, but the carousel layout is visually wrong. The poster cards start at the far left edge of the viewport, while the “New arrivals” heading, “View all →”, Explore Spain filters, banner, quote, value props, and footer are aligned inside the centered max-width page container.
+
+This makes the New arrivals section look unsynced from the rest of the homepage. I want a real carousel, but it must feel integrated with the same layout system as the rest of the page.
+
+Goal:
+Make the New arrivals carousel horizontally scrollable while keeping the first card aligned with the same left edge as the New arrivals heading and the rest of the homepage content.
+
+The desired behavior is:
+- The heading and first carousel card share the same left edge.
+- The carousel can continue/bleed to the right to create horizontal scroll.
+- A partial next card should be visible when there are enough posters.
+- The carousel should feel harmonious with the page on desktop, tablet, and mobile.
+- Do not turn it back into a static grid.
+
+Scope:
+- Prefer editing only:
+  artifacts/poster-store/src/pages/Home.tsx
+- Do not change backend/API/filtering/admin logic.
+- Do not change poster data or images.
+- Do not change hero, navbar, collection banner, Explore Spain filters, shop page, product page, cart, checkout, footer, or newsletter behavior.
+- Keep the current NewArrivalCard UX:
+  - default state: image + title only
+  - hover overlay: price/sizes/View poster only on hover/focus
+  - price hidden by default in New arrivals
+- Keep existing New arrivals API/filtering logic:
+  - isNew=true
+  - status=published
+  - current storeKey
+  - sort=newest
+  - limit=12
+
+Tasks:
+
+1. Fix left alignment
+- The first New arrivals poster card must align with the same left edge as the “New arrivals” heading.
+- The heading, View all link, and first carousel card should all visually belong to the same max-width container system.
+- Do not let the first card start at the viewport edge.
+- Avoid a full-bleed-left carousel layout.
+
+2. Preserve right-side carousel overflow
+- The carousel may extend/bleed toward the right edge of the viewport so users can scroll horizontally.
+- Only the right side should feel like it continues beyond the visible area.
+- Keep or add a subtle right-edge fade/mask to signal more content.
+- The fade should not cover important card text too aggressively.
+- Keep a trailing spacer so the final card is not hidden behind the fade.
+
+3. Ensure real horizontal scrolling
+- Inspect the New arrivals carousel markup/classes.
+- Ensure the scroll container has overflow-x-auto.
+- Ensure the inner row is wider than the visible container when enough posters exist.
+- Ensure every carousel card wrapper uses flex-none or shrink-0 so cards never shrink or wrap.
+- Do not rely on negative margin/padding tricks that cancel each other out.
+- Do not duplicate posters.
+- Do not auto-scroll.
+- Do not add a heavy carousel library.
+- Native horizontal scrolling is enough.
+
+4. Responsive card sizing
+Make the carousel card sizes feel harmonious with the rest of the homepage.
+
+Desktop:
+- Cards should feel slightly larger and more editorial than compact product grid cards, but not oversized.
+- Aim for around 4.5–5.5 visible cards on large desktop screens, with the next card partially visible when enough posters exist.
+- Avoid showing all cards fully in one static-looking row when there are enough posters.
+- Avoid huge cards that dominate the page or feel disconnected from Featured posters / Explore Spain.
+
+Tablet:
+- Use an intermediate size where roughly 2.5–3.5 cards are visible.
+- Keep the first card aligned with the tablet page padding/container.
+- Keep horizontal touch/trackpad scrolling natural.
+
+Mobile:
+- The first card must align with the same mobile page padding as the section heading.
+- Use a mobile card width around 70–78vw so users see one full card and part of the next card.
+- Keep horizontal touch scrolling natural.
+- Do not make mobile cards so narrow that the carousel looks like a tiny grid.
+- Do not make mobile cards so wide that the user cannot see a hint of the next card.
+
+5. Preserve card behavior
+- Default card state must remain image + title only.
+- Price must not be shown by default in New arrivals.
+- Price, sizes if available, and “View poster →” should remain in the hover/focus overlay only.
+- The overlay must not shift layout.
+- The whole card should remain clickable/tappable.
+- Keyboard focus should remain visible.
+
+6. Edge cases
+- 0 New arrivals: section hidden gracefully.
+- 1–2 New arrivals: show cards normally, aligned with the container, with no awkward forced full-width layout.
+- 3–6 New arrivals: cards should still feel like a carousel if they overflow on the current screen size, but do not force broken spacing.
+- 7+ New arrivals: carousel must clearly overflow and be horizontally scrollable.
+- The layout must not break on mobile.
+
+7. Do not change functionality
+- Do not change isNew filtering.
+- Do not change published/storeKey filtering.
+- Do not change admin save/cache logic.
+- Do not change price display elsewhere.
+- Do not change product page, shop page, cart, checkout, or other product grids.
+
+8. Run checks
+- Run typecheck for poster-store.
+- If api-server is untouched, no API typecheck is required, but report that backend/API was not changed.
+- If any shared types or API files are unexpectedly touched, stop and explain why before broadening scope.
+
+Report back:
+- Files changed.
+- What caused the misalignment.
+- How the carousel left edge is now aligned with the homepage container.
+- How the carousel still overflows/scrolls to the right.
+- What responsive card widths/classes were used for desktop, tablet, and mobile.
+- Confirm card wrappers use flex-none/shrink-0.
+- Confirm partial next card/right fade behavior works when enough posters exist.
+- Confirm mobile touch scrolling works.
+- Confirm New arrivals filtering/API/admin logic was not changed.
+- Confirm price remains hidden by default in New arrivals.
+- Confirm typecheck passes.
