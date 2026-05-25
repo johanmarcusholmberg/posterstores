@@ -1,0 +1,90 @@
+Refine the homepage collection banner layout and selected poster image rendering.
+
+Current issues:
+1. The “Mediterranean Walls” collection banner is currently too wide/edge-to-edge compared with the Featured posters section. I want the widths across homepage sections to feel harmonized.
+2. The collection banner should have warm rounded corners and feel like a premium section/card, not a full-width strip.
+3. Now that selected posters can be shown in the banner, their image sizing looks off. It looks like the poster images may be cropped or forced into an awkward size.
+
+Important constraints:
+- Keep changes targeted to the homepage collection banner.
+- Do not change the Featured posters section except if needed to reuse its container width token/class.
+- Do not change poster data, displayTitle, shop grid, poster detail page, cart, checkout, orders, or unrelated admin features.
+- Keep the “Show in collection banner strip” selection logic as-is:
+  - show only explicitly selected collection banner posters,
+  - max 3,
+  - no fallback to featured/new arrivals.
+- Keep the implementation store-aware.
+- Do not create branches, PRs, GitHub automation, commits, or pushes unless I explicitly approve.
+
+Tasks:
+
+1. Harmonize section width
+- Make the collection banner use the same max-width/content width as the Featured posters section.
+- The banner should align visually with the Featured posters row above it.
+- Avoid full-bleed/edge-to-edge layout for this collection banner.
+- Use the existing homepage container/max-width pattern if one exists.
+
+2. Add warm rounded card styling
+- Give the collection banner warm rounded corners.
+- Use overflow-hidden so the background image respects the rounded corners.
+- Add a subtle shadow or soft border if it improves the premium feel.
+- Keep the current Mediterranean/warm paper feel.
+- The banner should look like a designed feature card placed on the page.
+
+3. Preserve background image behavior
+- The background/banner image should still cover the banner area nicely.
+- It should not stretch unnaturally.
+- It should still work when zero selected posters are shown.
+- With zero selected posters, the section should look like a finished standalone banner image.
+
+4. Fix selected poster image sizing
+- Inspect how selected collection banner poster images are currently rendered.
+- If they are using object-cover and cropping the poster artwork, change the poster image rendering so the full poster/image is visible.
+- Prefer a consistent poster frame/card wrapper with object-contain for the poster image if that gives the best result.
+- Do not let selected posters become distorted, stretched, or awkwardly cropped.
+- Keep a consistent size across 1, 2, or 3 selected posters.
+- The selected posters should feel intentionally placed on top of/in the banner, not accidentally cut.
+
+5. Responsive behavior
+Verify the collection banner looks good with:
+- zero selected posters,
+- one selected poster,
+- two selected posters,
+- three selected posters.
+
+Check:
+- desktop/laptop,
+- tablet,
+- mobile.
+
+On mobile:
+- The banner should not become too tall or cramped.
+- If selected poster thumbnails do not fit well on mobile, stack or hide them in a clean intentional way.
+- Do not allow horizontal overflow.
+
+6. Keep selection behavior unchanged
+- No selected posters = background image only.
+- 1–3 selected posters = only those selected posters appear.
+- More than 3 selected posters = only first 3 shown.
+- No fallback to Featured posters or New arrivals.
+
+Acceptance criteria:
+- Collection banner width aligns with the Featured posters section width.
+- Banner has warm rounded corners and feels like a premium card/feature section.
+- Background image respects rounded corners.
+- Selected poster images are not awkwardly cropped or stretched.
+- Selected poster images keep consistent sizing.
+- Banner works visually with zero, one, two, or three selected posters.
+- No horizontal overflow on mobile.
+- Featured posters section remains unchanged.
+- Shop grid, poster detail page, cart, checkout, orders, admin behavior, and API behavior are unchanged.
+- Typecheck passes.
+
+After completing, report:
+- Files changed.
+- What container/max-width was used.
+- What border radius/shadow/border styling was added.
+- Whether selected poster images were using object-cover or fixed sizing.
+- How selected poster image sizing was fixed.
+- Confirmation that zero selected posters still shows background image only.
+- Confirmation that the banner selection logic was not changed.

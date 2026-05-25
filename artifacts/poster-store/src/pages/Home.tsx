@@ -431,108 +431,110 @@ export default function Home() {
           : makeShopUrl(resolvedRoutePrefix);
 
         return (
-          <section
-            className={cn("border-b border-border relative overflow-hidden")}
-            style={
-              hasCollBg
-                ? {
-                    backgroundImage: `url(${collectionVisual!.backgroundImageUrl})`,
-                    backgroundSize: "cover",
-                    backgroundPosition: "center",
-                  }
-                : { backgroundColor: "#EBD9C4" }
-            }
-          >
-            {hasCollBg && (
+          <section className="py-6 lg:py-8 border-b border-border">
+            <div className="container mx-auto px-6 lg:px-10">
+              {/* Card — rounded corners, background image scoped inside */}
               <div
-                className="absolute inset-0"
-                style={{
-                  backgroundColor: `rgba(0,0,0,${collectionVisual?.backgroundOverlayOpacity ?? 0.35})`,
-                }}
-              />
-            )}
-            <div className="relative z-10 container mx-auto px-6 lg:px-10 py-8 lg:py-10">
-              <div className="flex flex-col lg:flex-row lg:items-center gap-7 lg:gap-12">
-
-                {/* Left column — text + CTA */}
-                <div className="lg:w-[52%] flex-none">
-                  {cbEyebrow && (
-                    <p
-                      className={cn(
-                        "text-[10px] font-semibold uppercase tracking-[0.18em] mb-2.5",
-                        hasCollBg ? "text-white/60" : "text-foreground/45"
-                      )}
-                    >
-                      {cbEyebrow}
-                    </p>
-                  )}
-                  <h2
-                    className={cn(
-                      "font-serif text-2xl sm:text-3xl font-bold leading-tight mb-3",
-                      hasCollBg ? "text-white" : "text-primary"
-                    )}
-                  >
-                    {cbTitle}
-                  </h2>
-                  {cbText && (
-                    <p
-                      className={cn(
-                        "text-sm leading-relaxed mb-5 max-w-sm",
-                        hasCollBg ? "text-white/75" : "text-foreground/65"
-                      )}
-                    >
-                      {cbText}
-                    </p>
-                  )}
-                  <Link
-                    href={resolvedCtaHref}
-                    className={cn(
-                      "inline-flex items-center gap-1.5 text-sm font-semibold hover:underline",
-                      hasCollBg ? "text-white" : "text-primary"
-                    )}
-                  >
-                    {cbCtaText} &rarr;
-                  </Link>
-                </div>
-
-                {/* Right column — poster image strip */}
-                {collectionPreviewPosters.length > 0 && (
-                  <div className="lg:flex-1 min-w-0">
-                    <div className="flex gap-2 sm:gap-3">
-                      {collectionPreviewPosters.map((poster, idx) => {
-                        const slug = (poster as any).slug as string | undefined;
-                        const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
-                        const displayImg = poster.primaryDisplayImageUrl ?? poster.imageUrl;
-                        return (
-                          <Link
-                            key={poster.id}
-                            href={href}
-                            className={[
-                              "block flex-1 min-w-0 overflow-hidden group",
-                              idx === 2 ? "hidden sm:block" : "",
-                            ].join(" ")}
-                          >
-                            <div className="relative aspect-[3/4] overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.09)] group-hover:shadow-[0_3px_12px_rgba(0,0,0,0.14)] transition-shadow duration-300">
-                              <img
-                                src={displayImg}
-                                alt={poster.title}
-                                className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.04]"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src = poster.imageUrl;
-                                }}
-                              />
-                              <div
-                                className="absolute inset-0 ring-1 ring-inset ring-black/[0.06] pointer-events-none"
-                                aria-hidden="true"
-                              />
-                            </div>
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  </div>
+                className="relative overflow-hidden rounded-2xl shadow-[0_2px_20px_rgba(0,0,0,0.10)]"
+                style={
+                  hasCollBg
+                    ? {
+                        backgroundImage: `url(${collectionVisual!.backgroundImageUrl})`,
+                        backgroundSize: "cover",
+                        backgroundPosition: "center",
+                      }
+                    : { backgroundColor: "#EBD9C4" }
+                }
+              >
+                {hasCollBg && (
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      backgroundColor: `rgba(0,0,0,${collectionVisual?.backgroundOverlayOpacity ?? 0.35})`,
+                    }}
+                  />
                 )}
+                <div className="relative z-10 px-6 lg:px-10 py-8 lg:py-10">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-7 sm:gap-10 lg:gap-14">
 
+                    {/* Left column — text + CTA */}
+                    <div className="flex-1 min-w-0">
+                      {cbEyebrow && (
+                        <p
+                          className={cn(
+                            "text-[10px] font-semibold uppercase tracking-[0.18em] mb-2.5",
+                            hasCollBg ? "text-white/60" : "text-foreground/45"
+                          )}
+                        >
+                          {cbEyebrow}
+                        </p>
+                      )}
+                      <h2
+                        className={cn(
+                          "font-serif text-2xl sm:text-3xl font-bold leading-tight mb-3",
+                          hasCollBg ? "text-white" : "text-primary"
+                        )}
+                      >
+                        {cbTitle}
+                      </h2>
+                      {cbText && (
+                        <p
+                          className={cn(
+                            "text-sm leading-relaxed mb-5 max-w-sm",
+                            hasCollBg ? "text-white/75" : "text-foreground/65"
+                          )}
+                        >
+                          {cbText}
+                        </p>
+                      )}
+                      <Link
+                        href={resolvedCtaHref}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 text-sm font-semibold hover:underline",
+                          hasCollBg ? "text-white" : "text-primary"
+                        )}
+                      >
+                        {cbCtaText} &rarr;
+                      </Link>
+                    </div>
+
+                    {/* Right column — poster cards (only when explicitly selected) */}
+                    {collectionPreviewPosters.length > 0 && (
+                      <div className="flex-none flex items-end gap-2.5 sm:gap-3">
+                        {collectionPreviewPosters.map((poster, idx) => {
+                          const slug = (poster as any).slug as string | undefined;
+                          const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
+                          const displayImg = poster.primaryDisplayImageUrl ?? poster.imageUrl;
+                          return (
+                            <Link
+                              key={poster.id}
+                              href={href}
+                              className={[
+                                "flex-none group",
+                                idx === 2 ? "hidden sm:block" : "",
+                              ].join(" ")}
+                            >
+                              {/* Paper-frame poster card */}
+                              <div className="w-[80px] sm:w-[96px] lg:w-[108px] bg-[#faf8f4] p-1.5 pb-3 rounded-[2px] shadow-[0_4px_14px_rgba(0,0,0,0.22)] group-hover:-translate-y-1 transition-transform duration-200">
+                                <div className="relative aspect-[3/4] bg-[#ece7de] overflow-hidden">
+                                  <img
+                                    src={displayImg}
+                                    alt={poster.title}
+                                    className="absolute inset-0 w-full h-full object-contain"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).src = poster.imageUrl;
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                  </div>
+                </div>
               </div>
             </div>
           </section>
