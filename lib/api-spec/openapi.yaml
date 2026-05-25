@@ -784,6 +784,9 @@ components:
           type: boolean
         isNew:
           type: boolean
+        isCollectionBanner:
+          type: boolean
+          description: "When true, this poster appears in the collection banner image strip on the homepage."
         status:
           type: string
           enum: [draft, published, archived]
@@ -858,6 +861,9 @@ components:
           type: boolean
         isNew:
           type: boolean
+        isCollectionBanner:
+          type: boolean
+          description: "When true, this poster appears in the collection banner image strip on the homepage."
         status:
           type: string
           enum: [draft, published, archived]
@@ -910,6 +916,9 @@ components:
           type: boolean
         isNew:
           type: boolean
+        isCollectionBanner:
+          type: boolean
+          description: "When true, this poster appears in the collection banner image strip on the homepage."
         status:
           type: string
           enum: [draft, published, archived]

@@ -119,6 +119,7 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
   const [status, setStatus] = useState<PosterStatus>((existing?.status as PosterStatus) ?? "draft");
   const [isFeatured, setIsFeatured] = useState(existing?.isFeatured ?? false);
   const [isNew, setIsNew] = useState(existing?.isNew ?? false);
+  const [isCollectionBanner, setIsCollectionBanner] = useState(existing?.isCollectionBanner ?? false);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [sizeErrors, setSizeErrors] = useState<string[]>([]);
@@ -226,6 +227,7 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
           status,
           isFeatured,
           isNew,
+          isCollectionBanner,
           slug: slugValue,
         };
         await adminUpdatePoster(existing.id, storeKey, payload);
@@ -248,6 +250,7 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
           status,
           isFeatured,
           isNew,
+          isCollectionBanner,
           slug: slugValue,
         };
         const created = await adminCreatePoster(payload);
@@ -557,9 +560,11 @@ export const AdminPosterForm = ({ existing }: AdminPosterFormProps) => {
                 status={status}
                 isFeatured={isFeatured}
                 isNew={isNew}
+                isCollectionBanner={isCollectionBanner}
                 onStatusChange={setStatus}
                 onFeaturedChange={setIsFeatured}
                 onNewChange={setIsNew}
+                onCollectionBannerChange={setIsCollectionBanner}
                 canPublish={canPublish}
                 publishBlockReasons={publishBlockReasons}
               />

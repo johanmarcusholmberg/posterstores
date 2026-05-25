@@ -259,9 +259,21 @@ export default function Home() {
   const useStoreOverlay = !!heroOverlayMode;
 
   // Pick up to 3 poster images for the collection preview strip.
-  // Use featured first (already fetched), fallback to newArrivals — no extra API calls.
+  // Priority: posters explicitly marked isCollectionBanner=true.
+  // Fallback: first 3 from the featured + newArrivals pool (no extra API calls).
   const collectionPreviewPosters: Poster[] = React.useMemo(() => {
     const pool = [...(featured ?? []), ...(newArrivalsData?.posters ?? [])];
+
+    const bannerPicks = pool.filter(p => (p as any).isCollectionBanner && p.imageUrl);
+    if (bannerPicks.length > 0) {
+      const seen = new Set<number>();
+      return bannerPicks.filter(p => {
+        if (seen.has(p.id)) return false;
+        seen.add(p.id);
+        return true;
+      }).slice(0, 3);
+    }
+
     const seen = new Set<number>();
     const result: Poster[] = [];
     for (const p of pool) {

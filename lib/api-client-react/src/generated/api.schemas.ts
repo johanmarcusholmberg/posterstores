@@ -77,6 +77,8 @@ export interface Poster {
   lowestActivePrice?: number | null;
   isFeatured?: boolean;
   isNew?: boolean;
+  /** When true, this poster appears in the collection banner image strip on the homepage. */
+  isCollectionBanner?: boolean;
   status?: PosterStatus;
   createdAt: string;
   primaryDisplayImageUrl?: string | null;
@@ -121,6 +123,8 @@ export interface CreatePosterBody {
   posterSizes?: PosterSizeInput[];
   isFeatured?: boolean;
   isNew?: boolean;
+  /** When true, this poster appears in the collection banner image strip on the homepage. */
+  isCollectionBanner?: boolean;
   status?: CreatePosterBodyStatus;
   /** SEO-friendly URL slug (lowercase letters, numbers, and hyphens only). Auto-generated from title if omitted. */
   slug?: string;
@@ -156,6 +160,8 @@ export interface UpdatePosterBody {
   posterSizes?: PosterSizeInput[];
   isFeatured?: boolean;
   isNew?: boolean;
+  /** When true, this poster appears in the collection banner image strip on the homepage. */
+  isCollectionBanner?: boolean;
   status?: UpdatePosterBodyStatus;
   /** Update the SEO-friendly URL slug (lowercase letters, numbers, and hyphens only). Must be unique within the store. */
   slug?: string;

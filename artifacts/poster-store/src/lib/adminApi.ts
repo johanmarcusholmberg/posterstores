@@ -55,6 +55,7 @@ export interface AdminPoster {
   lowestActivePrice?: number | null;
   isFeatured?: boolean | null;
   isNew?: boolean | null;
+  isCollectionBanner?: boolean | null;
   status: PosterStatus;
   createdAt: string;
 }

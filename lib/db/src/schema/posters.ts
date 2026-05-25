@@ -21,6 +21,7 @@ export const postersTable = pgTable("posters", {
   displayTitle: text("display_title"),
   isFeatured: boolean("is_featured").default(false),
   isNew: boolean("is_new").default(false),
+  isCollectionBanner: boolean("is_collection_banner").default(false),
   status: text("status").notNull().default("published"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

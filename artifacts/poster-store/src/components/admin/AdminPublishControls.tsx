@@ -9,9 +9,11 @@ interface AdminPublishControlsProps {
   status: PosterStatus;
   isFeatured: boolean;
   isNew: boolean;
+  isCollectionBanner: boolean;
   onStatusChange: (s: PosterStatus) => void;
   onFeaturedChange: (v: boolean) => void;
   onNewChange: (v: boolean) => void;
+  onCollectionBannerChange: (v: boolean) => void;
   canPublish: boolean;
   publishBlockReasons?: string[];
 }
@@ -20,9 +22,11 @@ export const AdminPublishControls = ({
   status,
   isFeatured,
   isNew,
+  isCollectionBanner,
   onStatusChange,
   onFeaturedChange,
   onNewChange,
+  onCollectionBannerChange,
   canPublish,
   publishBlockReasons = [],
 }: AdminPublishControlsProps) => {
@@ -83,7 +87,18 @@ export const AdminPublishControls = ({
             />
             <span className="text-sm">New arrival</span>
           </label>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <Checkbox
+              checked={isCollectionBanner}
+              onCheckedChange={v => onCollectionBannerChange(Boolean(v))}
+              data-testid="field-isCollectionBanner"
+            />
+            <span className="text-sm">Show in collection banner strip</span>
+          </label>
         </div>
+        <p className="text-xs text-muted-foreground">
+          Up to 3 posters marked for the collection banner will appear as the image strip beside the collection banner text. Falls back to featured posters if none are selected.
+        </p>
       </div>
     </div>
   );

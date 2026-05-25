@@ -81,6 +81,12 @@ export const ListPostersResponse = zod.object({
       lowestActivePrice: zod.number().nullish(),
       isFeatured: zod.boolean().optional(),
       isNew: zod.boolean().optional(),
+      isCollectionBanner: zod
+        .boolean()
+        .optional()
+        .describe(
+          "When true, this poster appears in the collection banner image strip on the homepage.",
+        ),
       status: zod.enum(["draft", "published", "archived"]).optional(),
       createdAt: zod.string(),
       primaryDisplayImageUrl: zod.string().nullish(),
@@ -131,6 +137,12 @@ export const CreatePosterBody = zod.object({
     .optional(),
   isFeatured: zod.boolean().optional(),
   isNew: zod.boolean().optional(),
+  isCollectionBanner: zod
+    .boolean()
+    .optional()
+    .describe(
+      "When true, this poster appears in the collection banner image strip on the homepage.",
+    ),
   status: zod.enum(["draft", "published", "archived"]).optional(),
   slug: zod
     .string()
@@ -193,6 +205,12 @@ export const GetPosterResponse = zod.object({
   lowestActivePrice: zod.number().nullish(),
   isFeatured: zod.boolean().optional(),
   isNew: zod.boolean().optional(),
+  isCollectionBanner: zod
+    .boolean()
+    .optional()
+    .describe(
+      "When true, this poster appears in the collection banner image strip on the homepage.",
+    ),
   status: zod.enum(["draft", "published", "archived"]).optional(),
   createdAt: zod.string(),
   primaryDisplayImageUrl: zod.string().nullish(),
@@ -245,6 +263,12 @@ export const UpdatePosterBody = zod.object({
     .optional(),
   isFeatured: zod.boolean().optional(),
   isNew: zod.boolean().optional(),
+  isCollectionBanner: zod
+    .boolean()
+    .optional()
+    .describe(
+      "When true, this poster appears in the collection banner image strip on the homepage.",
+    ),
   status: zod.enum(["draft", "published", "archived"]).optional(),
   slug: zod
     .string()
@@ -296,6 +320,12 @@ export const UpdatePosterResponse = zod.object({
   lowestActivePrice: zod.number().nullish(),
   isFeatured: zod.boolean().optional(),
   isNew: zod.boolean().optional(),
+  isCollectionBanner: zod
+    .boolean()
+    .optional()
+    .describe(
+      "When true, this poster appears in the collection banner image strip on the homepage.",
+    ),
   status: zod.enum(["draft", "published", "archived"]).optional(),
   createdAt: zod.string(),
   primaryDisplayImageUrl: zod.string().nullish(),
@@ -434,6 +464,12 @@ export const GetCartResponse = zod.object({
           lowestActivePrice: zod.number().nullish(),
           isFeatured: zod.boolean().optional(),
           isNew: zod.boolean().optional(),
+          isCollectionBanner: zod
+            .boolean()
+            .optional()
+            .describe(
+              "When true, this poster appears in the collection banner image strip on the homepage.",
+            ),
           status: zod.enum(["draft", "published", "archived"]).optional(),
           createdAt: zod.string(),
           primaryDisplayImageUrl: zod.string().nullish(),
@@ -527,6 +563,12 @@ export const AddCartItemResponse = zod.object({
           lowestActivePrice: zod.number().nullish(),
           isFeatured: zod.boolean().optional(),
           isNew: zod.boolean().optional(),
+          isCollectionBanner: zod
+            .boolean()
+            .optional()
+            .describe(
+              "When true, this poster appears in the collection banner image strip on the homepage.",
+            ),
           status: zod.enum(["draft", "published", "archived"]).optional(),
           createdAt: zod.string(),
           primaryDisplayImageUrl: zod.string().nullish(),
@@ -619,6 +661,12 @@ export const UpdateCartItemResponse = zod.object({
           lowestActivePrice: zod.number().nullish(),
           isFeatured: zod.boolean().optional(),
           isNew: zod.boolean().optional(),
+          isCollectionBanner: zod
+            .boolean()
+            .optional()
+            .describe(
+              "When true, this poster appears in the collection banner image strip on the homepage.",
+            ),
           status: zod.enum(["draft", "published", "archived"]).optional(),
           createdAt: zod.string(),
           primaryDisplayImageUrl: zod.string().nullish(),
@@ -707,6 +755,12 @@ export const RemoveCartItemResponse = zod.object({
           lowestActivePrice: zod.number().nullish(),
           isFeatured: zod.boolean().optional(),
           isNew: zod.boolean().optional(),
+          isCollectionBanner: zod
+            .boolean()
+            .optional()
+            .describe(
+              "When true, this poster appears in the collection banner image strip on the homepage.",
+            ),
           status: zod.enum(["draft", "published", "archived"]).optional(),
           createdAt: zod.string(),
           primaryDisplayImageUrl: zod.string().nullish(),
@@ -787,6 +841,12 @@ export const GetFavoritesResponseItem = zod.object({
   lowestActivePrice: zod.number().nullish(),
   isFeatured: zod.boolean().optional(),
   isNew: zod.boolean().optional(),
+  isCollectionBanner: zod
+    .boolean()
+    .optional()
+    .describe(
+      "When true, this poster appears in the collection banner image strip on the homepage.",
+    ),
   status: zod.enum(["draft", "published", "archived"]).optional(),
   createdAt: zod.string(),
   primaryDisplayImageUrl: zod.string().nullish(),
@@ -845,6 +905,12 @@ export const AddFavoriteResponseItem = zod.object({
   lowestActivePrice: zod.number().nullish(),
   isFeatured: zod.boolean().optional(),
   isNew: zod.boolean().optional(),
+  isCollectionBanner: zod
+    .boolean()
+    .optional()
+    .describe(
+      "When true, this poster appears in the collection banner image strip on the homepage.",
+    ),
   status: zod.enum(["draft", "published", "archived"]).optional(),
   createdAt: zod.string(),
   primaryDisplayImageUrl: zod.string().nullish(),
@@ -903,6 +969,12 @@ export const RemoveFavoriteResponseItem = zod.object({
   lowestActivePrice: zod.number().nullish(),
   isFeatured: zod.boolean().optional(),
   isNew: zod.boolean().optional(),
+  isCollectionBanner: zod
+    .boolean()
+    .optional()
+    .describe(
+      "When true, this poster appears in the collection banner image strip on the homepage.",
+    ),
   status: zod.enum(["draft", "published", "archived"]).optional(),
   createdAt: zod.string(),
   primaryDisplayImageUrl: zod.string().nullish(),
@@ -1249,6 +1321,12 @@ export const GetFeaturedPostersResponseItem = zod.object({
   lowestActivePrice: zod.number().nullish(),
   isFeatured: zod.boolean().optional(),
   isNew: zod.boolean().optional(),
+  isCollectionBanner: zod
+    .boolean()
+    .optional()
+    .describe(
+      "When true, this poster appears in the collection banner image strip on the homepage.",
+    ),
   status: zod.enum(["draft", "published", "archived"]).optional(),
   createdAt: zod.string(),
   primaryDisplayImageUrl: zod.string().nullish(),
@@ -1308,6 +1386,12 @@ export const GetNewArrivalsResponseItem = zod.object({
   lowestActivePrice: zod.number().nullish(),
   isFeatured: zod.boolean().optional(),
   isNew: zod.boolean().optional(),
+  isCollectionBanner: zod
+    .boolean()
+    .optional()
+    .describe(
+      "When true, this poster appears in the collection banner image strip on the homepage.",
+    ),
   status: zod.enum(["draft", "published", "archived"]).optional(),
   createdAt: zod.string(),
   primaryDisplayImageUrl: zod.string().nullish(),
