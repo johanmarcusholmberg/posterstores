@@ -436,26 +436,35 @@ export default function Home() {
               {/* Card — rounded corners, background image scoped inside */}
               <div
                 className="relative overflow-hidden rounded-2xl shadow-[0_2px_20px_rgba(0,0,0,0.10)]"
-                style={
-                  hasCollBg
-                    ? {
-                        backgroundImage: `url(${collectionVisual!.backgroundImageUrl})`,
-                        backgroundSize: "cover",
-                        backgroundPosition: "center",
-                      }
-                    : { backgroundColor: "#EBD9C4" }
-                }
+                style={!hasCollBg ? { backgroundColor: "#EBD9C4" } : undefined}
               >
-                {hasCollBg && (
-                  <div
-                    className="absolute inset-0"
-                    style={{
-                      backgroundColor: `rgba(0,0,0,${collectionVisual?.backgroundOverlayOpacity ?? 0.35})`,
-                    }}
-                  />
-                )}
-                <div className="relative z-10 px-6 lg:px-10 py-8 lg:py-10">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-7 sm:gap-10 lg:gap-14">
+                {hasCollBg ? (
+                  <>
+                    {/* img drives the container height so the full 16:5 image is always visible */}
+                    <img
+                      src={collectionVisual!.backgroundImageUrl ?? undefined}
+                      alt=""
+                      aria-hidden="true"
+                      className="w-full aspect-[16/5] object-cover block"
+                    />
+                    <div
+                      className="absolute inset-0"
+                      style={{
+                        backgroundColor: `rgba(0,0,0,${collectionVisual?.backgroundOverlayOpacity ?? 0.35})`,
+                      }}
+                    />
+                  </>
+                ) : null}
+                {/* Content — absolutely positioned over image, or normal-flow when no image */}
+                <div
+                  className={cn(
+                    "z-10 px-6 lg:px-10",
+                    hasCollBg
+                      ? "absolute inset-0 flex items-center"
+                      : "relative py-8 lg:py-10"
+                  )}
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-7 sm:gap-10 lg:gap-14 w-full">
 
                     {/* Left column — text + CTA */}
                     <div className="flex-1 min-w-0">
