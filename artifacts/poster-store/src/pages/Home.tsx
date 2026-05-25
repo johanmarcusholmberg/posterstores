@@ -576,12 +576,6 @@ export default function Home() {
                   {cat}
                 </Link>
               ))}
-              <Link
-                href={makeShopUrl(resolvedRoutePrefix)}
-                className="inline-flex items-center px-3.5 py-1.5 rounded-full border border-primary/25 text-sm text-primary bg-primary/5 hover:bg-primary/10 transition-colors duration-150"
-              >
-                View all →
-              </Link>
             </div>
           </div>
         </section>
