@@ -357,7 +357,7 @@ export default function Home() {
   const newArrivals = (newArrivalsData?.posters ?? [])
     .filter((p) => !featuredIds.has(p.id))
     .slice(0, 8);
-  const showNewArrivals = newArrivals.length >= 3;
+  const showNewArrivals = newArrivals.length > 0;
 
   return (
     <div className="min-h-screen pb-16">
