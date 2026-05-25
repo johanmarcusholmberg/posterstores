@@ -1,0 +1,85 @@
+Refine homepage wide-screen layout and section container widths.
+
+Current issue:
+On large desktop screens, the homepage content sections feel too narrow and compressed in the center. Featured posters, the collection banner, Explore Spain, and New arrivals look like a small island with too much empty space on both sides.
+
+Goal:
+Make the homepage scale better on large screens while keeping the premium contained layout. Do not make sections fully edge-to-edge, but allow the main content container to become wider on large displays.
+
+Important constraints:
+- Keep changes targeted to homepage layout in Home.tsx.
+- Do not change poster data, APIs, admin, cart, checkout, orders, or unrelated functionality.
+- Do not change Featured poster card design beyond layout/container sizing if needed.
+- Do not change selected collection banner logic:
+  - only explicitly selected isCollectionBanner posters,
+  - max 3,
+  - no fallback.
+- Keep section divider lines removed.
+- Keep collection banner rounded corners and soft shadow.
+- Do not create branches, PRs, GitHub automation, commits, or pushes unless I explicitly approve.
+
+Tasks:
+
+1. Improve large-screen container width
+- Review the homepage section container classes.
+- Increase the max-width used by normal homepage sections on large/wide screens.
+- Featured posters, collection banner, Explore Spain, and New arrivals should align to the same wider content container.
+- Suggested direction:
+  - use something like max-w-7xl or max-w-[1440px] for large screens,
+  - keep comfortable horizontal padding,
+  - avoid full-bleed product sections.
+- The layout should feel premium and intentional on a big monitor.
+
+2. Keep product cards appropriately sized
+- Featured posters should still show 6 cards in one row on desktop.
+- On large screens, the cards may become slightly larger or have more comfortable spacing, but should not become oversized.
+- Avoid the current compressed/small-card feeling.
+- Keep equal card heights and displayTitle usage.
+
+3. Scale collection banner with the wider container
+- The collection banner should use the same wider content container.
+- It should feel visually related to the Featured posters width.
+- Keep the current slimmer banner height/aspect unless a very small adjustment is needed.
+- Keep rounded corners, overflow-hidden, and soft shadow.
+- Do not make it feel like a full-width hero.
+
+4. Keep Explore Spain and New arrivals aligned
+- Explore Spain heading/chips and New arrivals should use the same container width as the other homepage sections.
+- On large screens, the chips should not feel cramped in a narrow row.
+- New arrivals should not look like a small centered block.
+
+5. Responsive behavior
+Verify:
+- mobile,
+- tablet,
+- normal laptop,
+- large desktop/wide screen.
+
+Make sure:
+- no horizontal overflow,
+- mobile/tablet layouts are not negatively affected,
+- large screens use space better without becoming edge-to-edge.
+
+6. Keep behavior unchanged
+- No selected collection banner posters = background image only.
+- 1–3 selected posters = selected posters only.
+- More than 3 selected posters = first 3 only.
+- No fallback to featured/new arrivals.
+- Featured cards, shop grid, poster detail, cart, checkout, orders, admin, and API behavior unchanged.
+
+Acceptance criteria:
+- On large screens, homepage content no longer feels too narrow or tiny.
+- Featured posters, collection banner, Explore Spain, and New arrivals align to a consistent wider container.
+- Layout remains contained and premium, not full-bleed.
+- Featured posters still show 6 clean cards in one row.
+- Collection banner remains slim and balanced.
+- Mobile/tablet/laptop still look good.
+- Typecheck passes.
+
+After completing, report:
+- Files changed.
+- What max-width/container classes changed.
+- How the large-screen layout now behaves.
+- Confirmation that mobile/tablet were checked.
+- Confirmation that selected banner logic was not changed.
+- Confirmation that Featured poster cards/shop cards were not functionally changed.

@@ -1,0 +1,71 @@
+Implement #11 — Widen Homepage Container on Large Screens.
+
+Goal:
+The homepage content currently feels too narrow and compressed on large/wide desktop screens. Widen the normal homepage content sections so they scale better on large monitors while staying contained and premium, not full-bleed.
+
+Important constraints:
+- Keep changes targeted to Home.tsx.
+- Do not change shop page, poster detail page, cart, checkout, orders, admin, APIs, or data.
+- Do not change Featured poster card design.
+- Do not change collection banner image, aspect ratio, rounded corners, shadow, or selection logic.
+- Do not change selected collection banner behavior:
+  - only explicitly selected isCollectionBanner posters appear,
+  - max 3,
+  - no fallback.
+- Do not create branches, PRs, GitHub automation, commits, or pushes unless I explicitly approve.
+
+Tasks:
+
+1. Add a wider large-screen container
+- Update the homepage section wrappers that currently use:
+  container mx-auto px-6 lg:px-10
+- Add a large-screen max-width so sections can scale better on wide monitors.
+- Suggested class:
+  max-w-7xl
+- Apply consistently to the main homepage sections:
+  - Featured posters
+  - Collection banner
+  - Explore Spain
+  - New arrivals
+  - Hero content div if applicable for visual consistency
+  - Brand story section if it uses the same homepage content rhythm
+
+2. Keep layout contained
+- Do not make product sections full-bleed.
+- The sections should widen on large screens but remain centered.
+- Keep comfortable horizontal padding.
+- Ensure all normal homepage sections align to the same content column.
+
+3. Preserve existing visual design
+- Featured posters should still show 6 clean cards in one row on desktop.
+- Collection banner should keep its current slim aspect ratio, rounded corners, soft shadow, and crop/focal behavior.
+- Explore Spain chips should align with the same container.
+- New arrivals should align with the same container.
+- Mobile and tablet layouts should remain unchanged.
+
+4. Typecheck
+- Run:
+  pnpm --filter @workspace/poster-store run typecheck
+- Confirm it passes.
+
+Relevant file:
+- artifacts/poster-store/src/pages/Home.tsx
+- Likely areas around lines 313, 390, 435, 556, 587, 625
+
+Acceptance criteria:
+- On large screens ≥1280px, homepage sections are noticeably wider and use more available space.
+- Featured posters, collection banner, Explore Spain, and New arrivals align to the same wider container.
+- Layout remains contained and premium, not full-bleed.
+- Mobile and tablet layouts are unchanged.
+- Collection banner rounded corners, soft shadow, and slim aspect ratio are unchanged.
+- Selected banner poster logic is unchanged.
+- Featured poster card design is unchanged.
+- Typecheck passes.
+
+After completing, report:
+- Files changed.
+- Which container classes were updated.
+- Confirmation that large-screen layout is wider.
+- Confirmation that mobile/tablet were not affected.
+- Confirmation that collection banner behavior and design were not changed.
+- Typecheck result.
