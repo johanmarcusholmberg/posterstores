@@ -113,7 +113,7 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
         {/* Image container */}
         <div
           className={[
-            "relative h-[190px] sm:h-auto sm:aspect-[3/4] overflow-hidden",
+            "relative aspect-[3/4] overflow-hidden",
             "bg-[#f4f0eb]",
             "mb-2 sm:mb-3",
             "shadow-[0_1px_4px_rgba(0,0,0,0.06)]",
