@@ -7,10 +7,13 @@ import { addFavorite, removeFavorite } from "@/lib/favoritesApi";
 import { Heart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { LoginPromptModal } from "./LoginPromptModal";
+import { getOptimizedImageUrl } from "@/lib/imageUrl";
 
 interface PosterCardProps {
   poster: Poster;
   favoritedIds?: number[];
+  /** When true, loads the image eagerly with fetchPriority="high" (use for LCP cards only). */
+  priority?: boolean;
 }
 
 function formatPrice(price: number, currency: string): string {
@@ -20,7 +23,7 @@ function formatPrice(price: number, currency: string): string {
   return `${symbol}${price.toFixed(2)}`;
 }
 
-export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
+export const PosterCard = ({ poster, favoritedIds, priority = false }: PosterCardProps) => {
   const store = useStorefront();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -136,8 +139,11 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
             card looks correct with no animation.
           */}
           <img
-            src={baseImage}
+            src={getOptimizedImageUrl(baseImage, { width: 400, quality: 75 })}
             alt={poster.title}
+            loading={priority ? "eager" : "lazy"}
+            fetchPriority={priority ? "high" : undefined}
+            decoding="async"
             className={[
               "absolute inset-0 object-cover w-full h-full",
               "motion-reduce:transition-none",
@@ -164,9 +170,11 @@ export const PosterCard = ({ poster, favoritedIds }: PosterCardProps) => {
           */}
           {hoverImage && (
             <img
-              src={hoverImage}
+              src={getOptimizedImageUrl(hoverImage, { width: 400, quality: 75 })}
               alt=""
               aria-hidden="true"
+              loading="lazy"
+              decoding="async"
               className={[
                 "absolute inset-0 object-cover w-full h-full",
                 "transition-[opacity,transform] duration-[280ms] ease-out",

@@ -1,0 +1,160 @@
+Implement the first mobile performance quick wins for the public poster-store storefront.
+
+Context:
+We completed the main mobile UX/layout fixes. A new performance audit found that the storefront currently has:
+
+* No `loading="lazy"`
+* No `decoding="async"`
+* No `fetchPriority`
+* Unsplash images often loaded at `w=800` even when displayed much smaller on mobile
+* Hover images rendered eagerly
+* No preconnect hint for `images.unsplash.com`
+* Google Fonts loaded as a render-blocking stylesheet
+
+Goal:
+Improve mobile performance without changing visual design or behavior.
+
+Important:
+Do NOT change:
+
+* Admin functionality
+* Database/schema/API logic
+* Checkout/cart logic
+* Poster card visual design
+* Hover mockup behavior
+* Product gallery behavior
+* Git branches, commits, pushes, PRs, or GitHub automation
+
+Tasks:
+
+1. Add Unsplash preconnect
+   In `index.html`, add:
+
+`<link rel="preconnect" href="https://images.unsplash.com">`
+
+Keep existing font preconnects.
+
+2. Make Google Fonts less render-blocking
+   Change the Google Fonts loading pattern in `index.html` to a non-blocking/preload pattern.
+
+Use a safe HTML approach compatible with Vite.
+
+Preserve:
+
+* Inter font
+* same weights
+* `display=swap`
+
+Do not introduce a new font package in this step.
+
+3. Create a shared image optimization helper
+   Create a small utility function, for example:
+
+`getOptimizedImageUrl(url, options)`
+
+Requirements:
+
+* Only modify Unsplash image URLs.
+* Leave non-Unsplash URLs unchanged.
+* Preserve existing query params where possible.
+* Replace or set `w` based on requested width.
+* Replace or set `q` based on requested quality.
+* Do not force WebP/AVIF yet.
+* Keep the function simple and well-tested through usage.
+
+Suggested behavior:
+
+* Shop grid/card thumbnails: width 400, quality 75
+* Small carousel thumbnails/cards: width 400, quality 75
+* Product main image/gallery: keep higher quality/width, do not aggressively reduce
+* Hero/background images: do not change unless clearly safe
+
+4. Add lazy loading and async decoding to below-fold images
+   Update public-facing image components so offscreen images use:
+
+`loading="lazy"`
+`decoding="async"`
+
+Focus likely files:
+
+* `PosterCard.tsx`
+* New Arrivals card component, if separate
+* Featured poster card component, if separate
+* `MockupGallery.tsx` thumbnails
+* Cart item images if applicable
+
+Important:
+Do NOT lazy-load true above-the-fold/LCP images.
+
+5. Add priority support for important images
+   For components like `PosterCard`, add an optional prop such as:
+
+`priority?: boolean`
+
+When `priority` is true:
+
+* use `loading="eager"`
+* use `fetchPriority="high"`
+* still use `decoding="async"`
+
+When `priority` is false or omitted:
+
+* use `loading="lazy"`
+* use normal/default fetch priority
+* use `decoding="async"`
+
+Apply priority only where clearly appropriate:
+
+* first visible shop grid image(s), for example first 2–4 cards
+* first featured poster image if it is above the fold
+* main active product gallery image
+
+Do not overuse `fetchPriority="high"`.
+
+6. Keep hover mockup behavior visually unchanged
+   For hover mockup images:
+
+* Do not remove them
+* Do not delay rendering until mouseenter yet
+* Add `loading="lazy"` and `decoding="async"`
+* Keep the existing hover crossfade behavior unchanged
+
+7. Verify public pages
+   Test:
+
+* Home
+* Shop
+* A filtered shop page
+* Product page
+* Cart
+* Login/content pages if relevant
+
+Viewports:
+
+* 375×667
+* 393×852
+* 412×915
+* 768×1024
+
+Verify:
+
+* Images still appear correctly
+* No broken Unsplash URLs
+* Non-Unsplash URLs still work
+* No visual design changes
+* Hover mockups still work on desktop
+* Main product image still loads promptly
+* No layout shift introduced
+* No horizontal overflow
+* Typecheck passes
+
+Deliver:
+
+* Files changed
+* Summary of image attribute changes
+* Summary of image URL optimization helper
+* Which images are priority/eager vs lazy
+* Any screenshots or performance observations available
+* Typecheck result
+
+Do not commit or push.

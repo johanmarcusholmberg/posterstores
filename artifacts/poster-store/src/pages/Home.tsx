@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { getOptimizedImageUrl } from "@/lib/imageUrl";
 
 const VALUE_PROPS = [
   {
@@ -78,8 +79,10 @@ function HomePosterCard({ poster }: { poster: Poster }) {
       {/* Image */}
       <div className="relative aspect-[3/4] overflow-hidden bg-[#f4f0eb] shadow-[0_1px_4px_rgba(0,0,0,0.06)] group-hover:shadow-[0_3px_14px_rgba(0,0,0,0.11)] transition-shadow duration-300">
         <img
-          src={baseImage}
+          src={getOptimizedImageUrl(baseImage, { width: 400, quality: 75 })}
           alt={poster.title}
+          loading="lazy"
+          decoding="async"
           className={[
             "absolute inset-0 object-cover w-full h-full",
             "motion-reduce:transition-none",
@@ -93,9 +96,11 @@ function HomePosterCard({ poster }: { poster: Poster }) {
         />
         {hoverImage && (
           <img
-            src={hoverImage}
+            src={getOptimizedImageUrl(hoverImage, { width: 400, quality: 75 })}
             alt=""
             aria-hidden="true"
+            loading="lazy"
+            decoding="async"
             className="absolute inset-0 object-cover w-full h-full transition-opacity duration-[280ms] ease-out opacity-0 group-hover:opacity-100 motion-reduce:transition-none motion-reduce:opacity-0"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = "none";
@@ -153,8 +158,10 @@ function NewArrivalCard({ poster }: { poster: Poster }) {
       {/* Image */}
       <div className="relative aspect-[3/4] overflow-hidden bg-[#f4f0eb] shadow-[0_1px_4px_rgba(0,0,0,0.06)] group-hover:shadow-[0_4px_18px_rgba(0,0,0,0.13)] transition-shadow duration-300">
         <img
-          src={baseImage}
+          src={getOptimizedImageUrl(baseImage, { width: 400, quality: 75 })}
           alt={poster.title}
+          loading="lazy"
+          decoding="async"
           className="absolute inset-0 object-cover w-full h-full transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.05] motion-reduce:transition-none"
         />
         {/* Hover overlay — desktop only */}
@@ -197,7 +204,7 @@ function NewArrivalCard({ poster }: { poster: Poster }) {
  * Warm paper background, padded frame, larger bottom caption area, soft shadow.
  * Cards are straight (no tilt) and stretch to equal grid-row height.
  */
-function FeaturedPosterCard({ poster }: { poster: Poster }) {
+function FeaturedPosterCard({ poster, priority = false }: { poster: Poster; priority?: boolean }) {
   const slug = (poster as any).slug as string | undefined;
   const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
 
@@ -232,8 +239,11 @@ function FeaturedPosterCard({ poster }: { poster: Poster }) {
         {/* Image inset — paper-border feel from outer padding */}
         <div className="relative aspect-[3/4] overflow-hidden bg-[#ede8e0]">
           <img
-            src={displayImage}
+            src={getOptimizedImageUrl(displayImage, { width: 400, quality: 75 })}
             alt={poster.title}
+            loading={priority ? "eager" : "lazy"}
+            fetchPriority={priority ? "high" : undefined}
+            decoding="async"
             className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.04] motion-reduce:transition-none"
             onError={(e) => {
               (e.target as HTMLImageElement).src = poster.imageUrl;
@@ -505,7 +515,7 @@ export default function Home() {
                     key={poster.id}
                     className={["h-full", i >= 4 ? "hidden sm:block" : ""].filter(Boolean).join(" ")}
                   >
-                    <FeaturedPosterCard poster={poster} />
+                    <FeaturedPosterCard poster={poster} priority={i < 2} />
                   </div>
                 ))
               : Array.from({ length: FEATURED_LIMIT }).map((_, i) => (
@@ -545,6 +555,8 @@ export default function Home() {
                       src={collectionVisual!.backgroundImageUrl ?? undefined}
                       alt=""
                       aria-hidden="true"
+                      loading="lazy"
+                      decoding="async"
                       className="w-full aspect-[18/5] sm:aspect-[13/2] object-cover object-[center_72%] block"
                     />
                     <div
@@ -629,6 +641,8 @@ export default function Home() {
                                   <img
                                     src={displayImg}
                                     alt={poster.title}
+                                    loading="lazy"
+                                    decoding="async"
                                     className="absolute inset-0 w-full h-full object-contain"
                                     onError={(e) => {
                                       (e.target as HTMLImageElement).src = poster.imageUrl;

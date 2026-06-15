@@ -103,6 +103,7 @@ function CompositedMockup({ backgroundUrl, posterImageUrl, template, alt, classN
       <img
         src={backgroundUrl}
         alt={alt}
+        decoding="async"
         className={cn("w-full h-full object-cover transition-opacity duration-300", bgLoaded ? "opacity-100" : "opacity-0")}
         onLoad={() => setBgLoaded(true)}
         onError={(e) => {
@@ -412,6 +413,8 @@ export const MockupGallery = ({
                   <img
                     src={img.mockup.template.backgroundImageUrl}
                     alt={img.label}
+                    loading="lazy"
+                    decoding="async"
                     className="w-full h-full object-cover"
                     onError={(e) => { (e.target as HTMLImageElement).src = fallbackImageUrl; }}
                   />
@@ -419,6 +422,8 @@ export const MockupGallery = ({
                   <img
                     src={img.url}
                     alt={img.label}
+                    loading="lazy"
+                    decoding="async"
                     className="w-full h-full object-cover"
                     onError={(e) => { (e.target as HTMLImageElement).src = fallbackImageUrl; }}
                   />
@@ -497,6 +502,8 @@ export const MockupGallery = ({
                     <img
                       src={img.isComposited && img.mockup?.template?.backgroundImageUrl ? img.mockup.template.backgroundImageUrl : img.url}
                       alt={img.label}
+                      loading="lazy"
+                      decoding="async"
                       className="w-full h-full object-cover"
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = fallbackImageUrl;
@@ -578,6 +585,8 @@ function MainImage({
         key={finalSrc}
         src={finalSrc}
         alt={alt}
+        fetchPriority="high"
+        decoding="async"
         className={cn(
           "w-full h-full object-cover transition-opacity duration-300",
           loaded ? "opacity-100" : "opacity-0"

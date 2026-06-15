@@ -527,8 +527,8 @@ export default function Shop() {
           ) : showBanner ? (
             <>
               <div className={gridClasses}>
-                {firstBatch.map(poster => (
-                  <PosterCard key={poster.id} poster={poster} />
+                {firstBatch.map((poster, i) => (
+                  <PosterCard key={poster.id} poster={poster} priority={i < 2} />
                 ))}
               </div>
               <div className="my-6">
@@ -541,7 +541,7 @@ export default function Shop() {
               </div>
               {restBatch.length > 0 && (
                 <div className={gridClasses}>
-                  {restBatch.map(poster => (
+                  {restBatch.map((poster) => (
                     <PosterCard key={poster.id} poster={poster} />
                   ))}
                 </div>
@@ -549,8 +549,8 @@ export default function Shop() {
             </>
           ) : (
             <div className={gridClasses}>
-              {accumulated.map(poster => (
-                <PosterCard key={poster.id} poster={poster} />
+              {accumulated.map((poster, i) => (
+                <PosterCard key={poster.id} poster={poster} priority={i < 2} />
               ))}
             </div>
           )}

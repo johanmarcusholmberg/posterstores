@@ -115,6 +115,8 @@ export default function Cart() {
                         <img
                           src={item.poster.imageUrl}
                           alt={item.poster?.title}
+                          loading="lazy"
+                          decoding="async"
                           className="w-full h-full object-cover"
                         />
                       ) : (
