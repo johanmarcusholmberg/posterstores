@@ -1,0 +1,116 @@
+Run a mobile performance audit for the public poster-store storefront.
+
+Context:
+We have completed the main mobile UX/layout fixes:
+- Hero CTA tap targets
+- Featured poster text size
+- New Arrivals mobile price visibility
+- Footer tap targets
+- Filter overflow chip touch behavior
+- Product page mobile skeleton/layout/spacing
+- Shop grid image aspect ratio now uses aspect-[3/4] on mobile
+
+Now audit performance only. Do not make code changes yet.
+
+Focus:
+Public customer-facing pages only:
+- Home
+- Shop
+- Product page
+- Cart
+- Login/account if relevant
+- Content pages if relevant
+
+Do NOT review or modify:
+- Admin pages
+- Database/schema
+- API behavior
+- Checkout/payment logic
+- Git branches, commits, pushes, PRs, or GitHub automation
+
+Audit areas:
+
+1. Image loading
+Check:
+- Are poster images lazy-loaded where appropriate?
+- Are above-the-fold images prioritized correctly?
+- Are shop/product/home images using reasonable file sizes?
+- Are thumbnails accidentally loading full-resolution poster files?
+- Are responsive image sizes used where possible?
+- Are srcset/sizes used anywhere?
+- Are images served as WebP/AVIF if available?
+- Are width/height/aspect-ratio constraints preventing layout shift?
+
+2. Mobile performance metrics
+Use Lighthouse or available browser devtools checks for mobile emulation.
+
+Measure or estimate:
+- LCP
+- CLS
+- INP / interaction responsiveness
+- Total Blocking Time if available
+- JavaScript bundle size concerns
+- Image weight concerns
+- Network waterfall issues
+
+Test viewports:
+- 375×667
+- 393×852
+- 412×915
+- 768×1024
+
+Use a simulated slower mobile connection if available.
+
+3. Page-specific checks
+
+Home:
+- Hero background image loading
+- Featured posters image loading
+- Collection banner background and poster strip
+- New Arrivals carousel images
+
+Shop:
+- Initial grid image loading
+- Load more behavior
+- Whether offscreen poster images lazy-load correctly
+- Any excessive re-rendering or layout shift
+
+Product page:
+- Main poster/gallery image loading priority
+- Thumbnail/mockup image loading
+- Lightbox image loading
+- Whether gallery images block the page unnecessarily
+
+Cart/login/content:
+- Any unnecessary images/scripts
+- Whether pages load quickly despite low content
+
+4. Identify issues
+
+For every issue found, provide:
+- Severity: Critical / High / Medium / Low
+- Page/component
+- Description
+- Evidence or observed behavior
+- User impact
+- Recommended fix
+- Estimated effort:
+  - Small <30 min
+  - Medium 30–120 min
+  - Large >2h
+- Regression risk:
+  - Low / Medium / High
+
+5. Prioritize
+
+Create:
+- Top 10 performance improvements
+- Top 5 quick wins
+- Any “do not fix yet” items that need more investigation
+- Recommended implementation order
+
+Important:
+Do not make code changes.
+Do not install new packages unless only for temporary local analysis.
+Do not commit or push.
+Return findings only.
