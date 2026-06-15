@@ -1,0 +1,113 @@
+Implement admin route code-splitting with React.lazy and Suspense.
+
+Context:
+The mobile performance audit found that admin pages are statically imported in `App.tsx`, meaning public storefront visitors may download admin-related code they never use.
+
+The previous mobile performance quick wins are verified and stable:
+
+* Unsplash preconnect
+* Non-blocking Google Fonts
+* Optimized Unsplash card URLs
+* Lazy loading / async decoding for below-fold images
+* Priority loading for key LCP images
+* Typecheck clean
+* No public visual regressions
+
+Goal:
+Reduce the public storefront JavaScript payload by lazy-loading admin-only routes.
+
+Important:
+Do NOT change:
+
+* Public storefront UI or behavior
+* Admin page functionality
+* Database/schema/API logic
+* Authentication logic
+* Checkout/cart logic
+* Git branches, commits, pushes, PRs, or GitHub automation
+
+Task:
+In `App.tsx`, replace static imports for admin-only pages with `React.lazy(() => import(...))`.
+
+Likely admin imports include:
+
+* AdminDashboard
+* AdminPosters
+* AdminPosterForm
+* AdminMockupEditor
+* AdminStores
+* AdminSettings
+* AdminOrders
+* AdminUsers
+* AdminAnalytics
+* Any other `/admin`-only pages currently imported statically
+
+Keep public/customer-facing pages statically imported for now unless there is a clear reason not to.
+
+Add a `<Suspense>` boundary around admin routes only, or around the route tree if that is the cleanest safe approach.
+
+Suspense fallback requirements:
+
+* Should be visually neutral
+* Should not cause layout shift
+* Should be appropriate for admin loading
+* Do not introduce new packages
+* Prefer a simple centered loading state or existing Skeleton/Loader component if already available
+
+Important implementation constraints:
+
+* Preserve all existing routes exactly
+* Preserve protected route/auth behavior exactly
+* Preserve admin layout nesting exactly
+* Do not rename routes
+* Do not move files
+* Do not refactor unrelated routing logic
+* Do not change public page imports unless necessary
+
+Verification:
+Run typecheck.
+
+Then manually smoke test:
+Public:
+
+* `/`
+* `/shop`
+* one product page
+* `/cart`
+* `/login`
+
+Admin:
+
+* `/admin`
+* `/admin/posters`
+* poster edit/create page if available
+* mockup editor if available
+* stores/settings page if available
+* any admin page affected by the lazy import change
+
+Check:
+
+* Public pages still load normally
+* Admin pages show fallback briefly if needed, then load correctly
+* Auth/protected route behavior is unchanged
+* No blank admin screen
+* No console errors
+* No circular import or default export issues
+* No visual regression in public storefront
+
+If possible:
+
+* Inspect build output and confirm admin pages are split into separate chunks
+* Report whether public bundle size appears reduced
+
+Deliver:
+
+* Files changed
+* List of admin imports converted to lazy imports
+* Description of Suspense fallback placement
+* Typecheck result
+* Public smoke test result
+* Admin smoke test result
+* Any bundle/chunk observations
+
+Do not commit or push.

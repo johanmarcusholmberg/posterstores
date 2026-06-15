@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, Suspense } from "react";
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -9,6 +9,8 @@ import { AuthProvider } from "@/context/AuthContext";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { StoreThemeApplicator } from "@/components/StoreThemeApplicator";
+
+// ── Public pages — statically imported so the storefront is never gated ──
 import Home from "@/pages/Home";
 import Shop from "@/pages/Shop";
 import PosterDetail from "@/pages/PosterDetail";
@@ -27,25 +29,49 @@ import Terms from "@/pages/Terms";
 import Contact from "@/pages/Contact";
 import About from "@/pages/About";
 import NotFound from "@/pages/not-found";
-import AdminDashboard from "@/pages/admin/AdminDashboard";
-import AdminPosters from "@/pages/admin/AdminPosters";
-import AdminPosterNew from "@/pages/admin/AdminPosterNew";
-import AdminPosterEdit from "@/pages/admin/AdminPosterEdit";
-import AdminMockups from "@/pages/admin/AdminMockups";
-import AdminPosterMockups from "@/pages/admin/AdminPosterMockups";
-import AdminOrders from "@/pages/admin/AdminOrders";
-import AdminOrderDetail from "@/pages/admin/AdminOrderDetail";
-import AdminFulfillment from "@/pages/admin/AdminFulfillment";
-import AdminStores from "@/pages/admin/AdminStores";
-import AdminStoreNew from "@/pages/admin/AdminStoreNew";
-import AdminStoreEdit from "@/pages/admin/AdminStoreEdit";
-import AdminLaunchChecklist from "@/pages/admin/AdminLaunchChecklist";
-import AdminProductionSetup from "@/pages/admin/AdminProductionSetup";
-import AdminContentPages from "@/pages/admin/AdminContentPages";
-import AdminContentPageEdit from "@/pages/admin/AdminContentPageEdit";
-import AdminHomepageEditor from "@/pages/admin/AdminHomepageEditor";
+
+// ── Admin pages — lazily imported so they are split into separate chunks ──
+// None of these modules are loaded until a visitor navigates to /admin/*.
+const AdminDashboard = React.lazy(() => import("@/pages/admin/AdminDashboard"));
+const AdminPosters = React.lazy(() => import("@/pages/admin/AdminPosters"));
+const AdminPosterNew = React.lazy(() => import("@/pages/admin/AdminPosterNew"));
+const AdminPosterEdit = React.lazy(() => import("@/pages/admin/AdminPosterEdit"));
+const AdminMockups = React.lazy(() => import("@/pages/admin/AdminMockups"));
+const AdminPosterMockups = React.lazy(() => import("@/pages/admin/AdminPosterMockups"));
+const AdminOrders = React.lazy(() => import("@/pages/admin/AdminOrders"));
+const AdminOrderDetail = React.lazy(() => import("@/pages/admin/AdminOrderDetail"));
+const AdminFulfillment = React.lazy(() => import("@/pages/admin/AdminFulfillment"));
+const AdminStores = React.lazy(() => import("@/pages/admin/AdminStores"));
+const AdminStoreNew = React.lazy(() => import("@/pages/admin/AdminStoreNew"));
+const AdminStoreEdit = React.lazy(() => import("@/pages/admin/AdminStoreEdit"));
+const AdminLaunchChecklist = React.lazy(() => import("@/pages/admin/AdminLaunchChecklist"));
+const AdminProductionSetup = React.lazy(() => import("@/pages/admin/AdminProductionSetup"));
+const AdminContentPages = React.lazy(() => import("@/pages/admin/AdminContentPages"));
+const AdminContentPageEdit = React.lazy(() => import("@/pages/admin/AdminContentPageEdit"));
+const AdminHomepageEditor = React.lazy(() => import("@/pages/admin/AdminHomepageEditor"));
 
 const queryClient = new QueryClient();
+
+/** Neutral loading state shown while an admin chunk is being fetched. */
+function AdminLoadingFallback() {
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-background">
+      <div className="flex flex-col items-center gap-3 text-muted-foreground">
+        <svg
+          className="animate-spin h-6 w-6"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+        </svg>
+        <span className="text-sm">Loading…</span>
+      </div>
+    </div>
+  );
+}
 
 function ScrollToTop() {
   const [location] = useLocation();
@@ -120,27 +146,48 @@ function StoreThemeRoot({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * All admin routes in a single Switch, wrapped in a single Suspense boundary.
+ * Rendered only when the URL starts with /admin — lazy chunks are fetched
+ * on first admin navigation and cached for subsequent visits.
+ */
+function AdminRoutes() {
+  return (
+    <Suspense fallback={<AdminLoadingFallback />}>
+      <Switch>
+        <Route path="/admin/posters/new" component={AdminPosterNew} />
+        <Route path="/admin/posters/:id/mockups" component={AdminPosterMockups} />
+        <Route path="/admin/posters/:id" component={AdminPosterEdit} />
+        <Route path="/admin/posters" component={AdminPosters} />
+        <Route path="/admin/mockups" component={AdminMockups} />
+        <Route path="/admin/orders/:id" component={AdminOrderDetail} />
+        <Route path="/admin/orders" component={AdminOrders} />
+        <Route path="/admin/fulfillment" component={AdminFulfillment} />
+        <Route path="/admin/launch-checklist" component={AdminLaunchChecklist} />
+        <Route path="/admin/production-setup" component={AdminProductionSetup} />
+        <Route path="/admin/homepage" component={AdminHomepageEditor} />
+        <Route path="/admin/content/:pageKey" component={AdminContentPageEdit} />
+        <Route path="/admin/content" component={AdminContentPages} />
+        <Route path="/admin/stores/new" component={AdminStoreNew} />
+        <Route path="/admin/stores/:storeKey" component={AdminStoreEdit} />
+        <Route path="/admin/stores" component={AdminStores} />
+        <Route path="/admin" component={AdminDashboard} />
+      </Switch>
+    </Suspense>
+  );
+}
+
 function Router() {
   return (
     <Switch>
-      {/* Admin routes — always unaffected by store prefix */}
-      <Route path="/admin/posters/new" component={AdminPosterNew} />
-      <Route path="/admin/posters/:id/mockups" component={AdminPosterMockups} />
-      <Route path="/admin/posters/:id" component={AdminPosterEdit} />
-      <Route path="/admin/posters" component={AdminPosters} />
-      <Route path="/admin/mockups" component={AdminMockups} />
-      <Route path="/admin/orders/:id" component={AdminOrderDetail} />
-      <Route path="/admin/orders" component={AdminOrders} />
-      <Route path="/admin/fulfillment" component={AdminFulfillment} />
-      <Route path="/admin/launch-checklist" component={AdminLaunchChecklist} />
-      <Route path="/admin/production-setup" component={AdminProductionSetup} />
-      <Route path="/admin/homepage" component={AdminHomepageEditor} />
-      <Route path="/admin/content/:pageKey" component={AdminContentPageEdit} />
-      <Route path="/admin/content" component={AdminContentPages} />
-      <Route path="/admin/stores/new" component={AdminStoreNew} />
-      <Route path="/admin/stores/:storeKey" component={AdminStoreEdit} />
-      <Route path="/admin/stores" component={AdminStores} />
-      <Route path="/admin" component={AdminDashboard} />
+      {/*
+       * Admin routes — two entries cover both the bare /admin path and all
+       * /admin/* sub-paths. Both render AdminRoutes which handles the inner
+       * Switch. wouter's exact matching means /admin only matches the first
+       * entry; /admin/anything matches the second.
+       */}
+      <Route path="/admin" component={AdminRoutes} />
+      <Route path="/admin/:rest+" component={AdminRoutes} />
 
       {/* Public storefront — catch-all (handles both prefixed and unprefixed) */}
       <Route>
