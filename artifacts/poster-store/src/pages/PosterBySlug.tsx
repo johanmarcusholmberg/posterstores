@@ -233,12 +233,15 @@ export default function PosterBySlug() {
 
   if (poster === undefined && !notFound) {
     return (
-      <div className="container mx-auto px-4 py-12 flex gap-12 animate-pulse">
-        <div className="w-1/2 aspect-[3/4] bg-muted rounded-md" />
-        <div className="w-1/2 space-y-6">
-          <div className="h-10 bg-muted w-3/4 rounded" />
-          <div className="h-6 bg-muted w-1/4 rounded" />
-          <div className="h-32 bg-muted w-full rounded" />
+      <div className="container mx-auto px-4 py-6 md:py-12 animate-pulse">
+        <div className="h-5 bg-muted w-24 rounded mb-4 md:mb-8" />
+        <div className="grid grid-cols-1 md:grid-cols-[360px_1fr] gap-10">
+          <div className="aspect-[3/4] w-full bg-muted rounded-md" />
+          <div className="space-y-6">
+            <div className="h-10 bg-muted w-3/4 rounded" />
+            <div className="h-6 bg-muted w-1/4 rounded" />
+            <div className="h-32 bg-muted w-full rounded" />
+          </div>
         </div>
       </div>
     );
@@ -256,12 +259,12 @@ export default function PosterBySlug() {
   const noActiveSizes = activeSizes.length === 0;
 
   return (
-    <div className="container mx-auto px-4 py-12">
-      <button onClick={goBack} className="inline-flex items-center text-muted-foreground hover:text-foreground mb-8">
+    <div className="container mx-auto px-4 py-6 md:py-12">
+      <button onClick={goBack} className="inline-flex items-center text-muted-foreground hover:text-foreground mb-4 md:mb-8">
         <ArrowLeft className="mr-2 h-4 w-4" /> Back to shop
       </button>
 
-      <div className="grid grid-cols-1 md:grid-cols-[360px_1fr] gap-10 mb-24 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-[360px_1fr] gap-10 mb-12 md:mb-24 items-start">
         <div>
           <MockupGallery
             mockups={mockups ?? []}
@@ -278,16 +281,16 @@ export default function PosterBySlug() {
           <h1 className="font-serif text-4xl md:text-5xl font-bold text-foreground mb-3">
             {poster.title}
           </h1>
-          <p className="text-2xl font-medium text-foreground mb-8" data-testid="detail-price">
+          <p className="text-2xl font-medium text-foreground mb-4 md:mb-8" data-testid="detail-price">
             {pricePrefix}{formatPrice(displayedPrice, displayedCurrency)}
           </p>
 
-          <div className="prose prose-stone mb-10 text-muted-foreground">
+          <div className="prose prose-stone mb-6 md:mb-10 text-muted-foreground">
             <p>{poster.description}</p>
           </div>
 
           {activeSizes.length > 0 && (
-            <div className="mb-10">
+            <div className="mb-6 md:mb-10">
               <h3 className="font-medium text-foreground mb-3">Select Size</h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3" data-testid="size-selector">
                 {activeSizes.map((size) => {

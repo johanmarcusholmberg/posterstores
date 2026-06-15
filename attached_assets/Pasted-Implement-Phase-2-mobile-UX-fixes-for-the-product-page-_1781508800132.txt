@@ -1,0 +1,117 @@
+Implement Phase 2 mobile UX fixes for the product page only.
+
+Context:
+Phase 1 mobile quick wins are already completed:
+- Hero CTAs are now 44px
+- Featured poster text is larger
+- New Arrivals price appears on mobile
+- Footer links have better tap targets
+- Filter overflow chip works on touch
+
+Now focus only on product page mobile UX.
+
+Do NOT change:
+- Admin pages
+- Shop grid card aspect ratio
+- New Arrivals carousel
+- Header/navbar
+- Footer
+- Checkout/cart logic
+- Any database/schema/API logic
+- Git branches, commits, PRs, or GitHub automation
+
+Files/components likely involved:
+- PosterBySlug.tsx
+- Poster detail/loading skeleton component, if separated
+- MockupGallery.tsx only if needed for the gallery max-height issue
+
+Tasks:
+
+1. Fix PP-1 — Product page loading skeleton layout shift
+Problem:
+The loading skeleton currently appears as two side-by-side columns on mobile, then the real product page loads as a single-column mobile layout. This causes a jarring layout shift.
+
+Fix:
+Make the skeleton match the real responsive product page layout:
+- Mobile: single column
+- Desktop/tablet: same layout as the loaded product page
+
+Suggested approach:
+- Replace mobile `flex` / `w-1/2` skeleton layout with:
+  - `grid grid-cols-1 md:grid-cols-[360px_1fr]`
+  - `gap-10` or the same gap used by the real product layout
+  - `w-full md:w-auto` where needed
+
+2. Fix PP-2 — Reduce dead space before product image on mobile
+Problem:
+On small mobile screens there is too much space before the product image appears.
+
+Fix:
+Reduce mobile-only spacing around:
+- Product page container top padding
+- Back button bottom margin
+- Any large mobile-only gap before the image/gallery
+
+Target:
+The poster image should become visible much earlier above the fold on iPhone SE / 375px viewport.
+
+Suggested direction:
+- Use smaller mobile padding like `py-6 md:py-12`
+- Use smaller mobile back-button margin like `mb-4 md:mb-8`
+
+3. Fix PP-3 — Reduce huge bottom gap before related section
+Problem:
+There is a large `mb-24`-style gap before the “More from [region]” section on mobile.
+
+Fix:
+Make this responsive:
+- Smaller on mobile, for example `mb-12`
+- Preserve larger desktop spacing if it currently looks good there, for example `md:mb-24`
+
+4. Fix PP-5 — Tighten internal product info spacing on mobile
+Problem:
+Spacing between price, description, size selector, and add-to-cart area is too large on mobile, pushing conversion controls below the fold.
+
+Fix:
+Reduce mobile-only margins such as:
+- `mb-8` → `mb-4 md:mb-8`
+- `mb-10` → `mb-6 md:mb-10`
+
+Do not make the page feel cramped. The goal is tighter mobile rhythm, not dense layout.
+
+5. Review and fix PP-4 only if confirmed — Gallery max-height issue
+Problem:
+The gallery may have `maxHeight: "420px"` applied on mobile, which can prevent the poster image from using the full available mobile width.
+
+Action:
+First verify the issue visually at 375px and 393px widths.
+
+If confirmed:
+- Remove or disable the `maxHeight: "420px"` constraint on mobile
+- Keep desktop/tablet behavior unchanged if it currently looks good
+- Prefer responsive behavior such as applying max-height only from `sm` or `md` upward
+
+Important:
+Do not implement a full-bleed gallery yet. That is a later premium/wow improvement. This task is only to avoid accidental mobile width restriction.
+
+Testing:
+After changes, test these viewports:
+- 375×667
+- 393×852
+- 412×915
+- 768×1024
+
+Verify:
+- No skeleton layout jump on mobile
+- Product image appears earlier above the fold
+- Add to Cart area is reachable sooner
+- Related section spacing feels natural
+- Desktop product page still looks unchanged or improved
+- No regressions in product gallery swipe/lightbox behavior
+
+Deliverables:
+- Summary of files changed
+- Before/after explanation for each PP item
+- Mobile screenshots for product page at 375px and 393px if possible
+- Confirm typecheck passes
+- Do not commit or push

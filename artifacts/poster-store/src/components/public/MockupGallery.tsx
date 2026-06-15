@@ -293,8 +293,8 @@ export const MockupGallery = ({
     return (
       <div className="space-y-2.5" aria-busy="true">
         <div
-          className="bg-muted animate-pulse"
-          style={{ aspectRatio: "3/4", maxHeight: "420px" }}
+          className="bg-muted animate-pulse sm:max-h-[420px]"
+          style={{ aspectRatio: "3/4" }}
         />
         <div className="flex gap-2">
           {[0, 1, 2].map((i) => (
@@ -340,8 +340,8 @@ export const MockupGallery = ({
         {/* Main image — flat poster style, no rounded corners, minimal shadow */}
         <div
           ref={mainImageRef}
-          className="relative bg-[#f4f0eb] overflow-hidden cursor-zoom-in group select-none shadow-[0_1px_4px_rgba(0,0,0,0.06)]"
-          style={{ aspectRatio: "3/4", maxHeight: "420px" }}
+          className="relative bg-[#f4f0eb] overflow-hidden cursor-zoom-in group select-none shadow-[0_1px_4px_rgba(0,0,0,0.06)] sm:max-h-[420px]"
+          style={{ aspectRatio: "3/4" }}
           onClick={openLightbox}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
