@@ -1,0 +1,88 @@
+Run a verification audit of the mobile performance changes just implemented.
+
+Context:
+The following performance fixes are already implemented:
+- Unsplash preconnect
+- Non-blocking Google Fonts preload pattern
+- getOptimizedImageUrl utility
+- Poster/card images optimized to w=400 q=75
+- Lazy loading and decoding="async" added to below-fold images
+- Priority/eager loading added to first shop cards, first featured cards, and product gallery main image
+- Hover mockup images remain visually unchanged but now lazy-load
+
+Goal:
+Verify that the changes work correctly in browser/network behavior, not just typecheck.
+
+Do NOT make code changes unless you find a clear bug.
+Do NOT commit or push.
+
+Test pages:
+- /
+- /shop
+- one filtered shop page
+- one product page
+- /cart
+- /login if available
+
+Viewports:
+- 375×667
+- 393×852
+- 412×915
+- 768×1024
+- desktop 1280px sanity check
+
+Checks:
+
+1. Network waterfall
+For /shop on mobile:
+- Confirm only the first visible poster images load eagerly.
+- Confirm below-fold poster images do not all load immediately.
+- Confirm hover/mockup images no longer compete with initial visible images.
+- Confirm Unsplash URLs use w=400&q=75 for card/thumbnail contexts.
+- Confirm product page main image is not accidentally reduced to w=400.
+
+2. LCP behavior
+Check likely LCP candidates:
+- Home hero / first visible poster area
+- First shop grid image
+- Product page main gallery image
+
+Confirm:
+- LCP image is not lazy-loaded.
+- LCP image has high priority where applicable.
+- No obvious delay from the new font-loading strategy.
+
+3. Visual regression
+Confirm:
+- No broken images
+- No blurry card images on 375–412px mobile
+- No blurry card images on tablet
+- Hover mockups still fade correctly on desktop
+- New Arrivals images still appear while swiping
+- Collection banner still looks correct
+- Product gallery and lightbox still work
+
+4. Console/build
+- Confirm no console errors or warnings related to invalid DOM attributes.
+- Confirm TypeScript/typecheck passes.
+- Confirm build passes if available.
+
+5. Performance observation
+If Lighthouse is available, run mobile Lighthouse for:
+- Home
+- Shop
+- Product page
+
+Report:
+- Performance score before/after if previous numbers are available
+- LCP
+- CLS
+- INP/TBT if available
+- Total image transfer size on /shop
+- Number of initial image requests on /shop
+
+Deliver:
+- Verification summary
+- Any bugs found
+- Any recommended follow-up fixes
+- Confirm whether we are safe to proceed to admin route code-splitting
