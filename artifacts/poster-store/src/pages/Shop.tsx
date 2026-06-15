@@ -154,6 +154,7 @@ function HiddenFiltersPopover({
 }) {
   const [open, setOpen] = useState(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const cancelClose = () => {
     if (closeTimer.current) {
@@ -167,16 +168,37 @@ function HiddenFiltersPopover({
     closeTimer.current = setTimeout(() => setOpen(false), 120);
   };
 
+  // Close when tapping outside (touch devices)
+  useEffect(() => {
+    if (!open) return;
+    const handleOutside = (e: MouseEvent | TouchEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutside);
+    document.addEventListener("touchstart", handleOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      document.removeEventListener("touchstart", handleOutside);
+    };
+  }, [open]);
+
   return (
     <div
+      ref={containerRef}
       className="relative"
       onMouseEnter={() => { cancelClose(); setOpen(true); }}
       onMouseLeave={scheduleClose}
       data-testid="filter-chips-overflow"
     >
-      <span className="text-xs text-muted-foreground bg-muted hover:bg-muted/80 rounded-full px-2.5 py-1 font-medium select-none cursor-pointer transition-colors">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="text-xs text-muted-foreground bg-muted hover:bg-muted/80 rounded-full px-2.5 py-1 font-medium select-none cursor-pointer transition-colors min-h-[32px]"
+      >
         +{hiddenFilters.length} more
-      </span>
+      </button>
 
       {open && (
         <div
@@ -187,8 +209,8 @@ function HiddenFiltersPopover({
           {hiddenFilters.map(f => (
             <button
               key={`${f.key}-${f.value}`}
-              onClick={() => onRemove(f)}
-              className="flex items-center justify-between gap-3 text-xs text-foreground hover:bg-muted/60 rounded px-2.5 py-1.5 text-left w-full transition-colors group"
+              onClick={() => { onRemove(f); setOpen(false); }}
+              className="flex items-center justify-between gap-3 text-xs text-foreground hover:bg-muted/60 rounded px-2.5 py-1.5 text-left w-full transition-colors group min-h-[36px]"
             >
               <span>{f.label}</span>
               <X className="h-3 w-3 text-muted-foreground group-hover:text-foreground shrink-0" />

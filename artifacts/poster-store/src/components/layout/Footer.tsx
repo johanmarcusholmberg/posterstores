@@ -58,11 +58,11 @@ export const Footer = () => {
 
         <div>
           <h4 className="font-medium text-foreground mb-3">Information</h4>
-          <ul className="space-y-2 text-sm text-muted-foreground">
-            <li><Link href="/about" className="hover:text-primary transition-colors" data-testid="footer-link-about">About</Link></li>
-            <li><Link href="/shipping" className="hover:text-primary transition-colors" data-testid="footer-link-shipping">Shipping</Link></li>
-            <li><Link href="/returns" className="hover:text-primary transition-colors" data-testid="footer-link-returns">Returns</Link></li>
-            <li><Link href="/contact" className="hover:text-primary transition-colors" data-testid="footer-link-contact">Contact</Link></li>
+          <ul className="space-y-0 text-sm text-muted-foreground">
+            <li><Link href="/about" className="block py-1.5 hover:text-primary transition-colors" data-testid="footer-link-about">About</Link></li>
+            <li><Link href="/shipping" className="block py-1.5 hover:text-primary transition-colors" data-testid="footer-link-shipping">Shipping</Link></li>
+            <li><Link href="/returns" className="block py-1.5 hover:text-primary transition-colors" data-testid="footer-link-returns">Returns</Link></li>
+            <li><Link href="/contact" className="block py-1.5 hover:text-primary transition-colors" data-testid="footer-link-contact">Contact</Link></li>
           </ul>
         </div>
 

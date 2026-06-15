@@ -179,11 +179,14 @@ function NewArrivalCard({ poster }: { poster: Poster }) {
         {poster.isNew && <div className={NEW_BADGE_CLS}>NEW</div>}
       </div>
 
-      {/* Info — title only, no price */}
+      {/* Info — title always; price shown on mobile where hover overlay is inaccessible */}
       <div className="mt-1.5 min-w-0">
         <h3 className="font-serif font-semibold text-sm text-foreground truncate leading-snug">
           {(poster as any).displayTitle || poster.title}
         </h3>
+        {hasPrice && (
+          <p className="text-xs font-medium text-foreground/70 mt-0.5 sm:hidden">{priceLabel}</p>
+        )}
       </div>
     </Link>
   );
@@ -241,10 +244,10 @@ function FeaturedPosterCard({ poster }: { poster: Poster }) {
 
         {/* Polaroid caption tab — fixed min-height keeps bottom edges aligned */}
         <div className="px-0.5 pt-2.5 pb-3 min-h-[52px] flex flex-col justify-start min-w-0">
-          <h3 className="font-serif font-semibold text-[11px] sm:text-xs text-foreground/85 truncate leading-snug">
+          <h3 className="font-serif font-semibold text-[13px] sm:text-xs text-foreground/85 truncate leading-snug">
             {cardTitle}
           </h3>
-          <p className="text-[10px] text-foreground/50 mt-1">{priceLabel}</p>
+          <p className="text-[11px] text-foreground/50 mt-1">{priceLabel}</p>
         </div>
       </div>
     </Link>
@@ -439,7 +442,7 @@ export default function Home() {
                     : "default"
                 }
                 className={cn(
-                  "w-full sm:w-auto h-9 px-6 text-sm",
+                  "w-full sm:w-auto h-11 px-6 text-sm",
                   hasHeroBg && !useStoreHeroVars && "bg-white text-primary hover:bg-white/90 border-0"
                 )}
               >
@@ -451,7 +454,7 @@ export default function Home() {
                 size="default"
                 variant="outline"
                 className={cn(
-                  "w-full sm:w-auto h-9 px-6 text-sm",
+                  "w-full sm:w-auto h-11 px-6 text-sm",
                   !useStoreHeroVars && (hasHeroBg
                     ? "border-white/60 text-white hover:bg-white/10 bg-transparent"
                     : "border-primary/30 text-primary hover:bg-primary/5")
