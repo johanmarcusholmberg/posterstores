@@ -1,0 +1,155 @@
+Implement a sticky mobile Add to Cart bar on the product page.
+
+Context:
+We have completed:
+
+* Mobile UX Phase 1 fixes
+* Product page mobile spacing/skeleton cleanup
+* Shop grid poster aspect ratio fix
+* Mobile performance quick wins
+* Admin route code-splitting
+
+Now add one premium mobile ecommerce improvement.
+
+Goal:
+On mobile product pages, show a sticky bottom Add to Cart bar after the main Add to Cart section scrolls out of view.
+
+This should improve conversion without changing desktop behavior.
+
+Important:
+Do NOT change:
+
+* Desktop product page layout
+* Product data/API/database logic
+* Cart logic beyond reusing the existing add-to-cart handler
+* Size selection behavior
+* Admin pages
+* Homepage/shop layout
+* Git branches, commits, pushes, PRs, or GitHub automation
+
+Scope:
+Customer-facing product page only.
+
+Likely files:
+
+* `PosterBySlug.tsx`
+* Product detail component if separated
+* Existing cart hook/context if already used by the current Add to Cart button
+
+Behavior:
+
+1. Mobile only
+   The sticky bar should appear only on mobile/small screens.
+   Use a responsive class such as:
+
+* visible below `md`
+* hidden on `md` and larger
+
+Desktop should be unchanged.
+
+2. Trigger behavior
+   The sticky bar should not show immediately at the top of the page.
+
+It should appear only after the normal Add to Cart button/section has scrolled out of view.
+
+Suggested implementation:
+
+* Use an `IntersectionObserver` watching the existing Add to Cart button or its container.
+* When the normal Add to Cart button is not visible, show the sticky bar.
+* When the normal Add to Cart button becomes visible again, hide the sticky bar.
+
+If IntersectionObserver is overkill in the current structure, use a simple scroll listener, but prefer IntersectionObserver.
+
+3. Sticky bar content
+   The bar should include:
+
+* Short poster title/display title, truncated to one line
+* Selected size
+* Current price
+* Add to Cart button
+
+Suggested mobile layout:
+
+* Fixed bottom bar
+* Warm/light background matching site design
+* Top border or subtle shadow
+* Safe-area support for iPhone:
+
+  * include `pb-[env(safe-area-inset-bottom)]` or equivalent
+* Button should be easy to tap, at least 44px high
+* Avoid blocking content too harshly
+
+Example structure:
+Left:
+
+* Poster title
+* Selected size · price
+
+Right:
+
+* Add to cart button
+
+4. Reuse existing logic
+   The sticky Add to Cart button must call the same handler as the normal Add to Cart button.
+
+It must respect:
+
+* selected size
+* quantity if applicable
+* sold-out/unavailable state if applicable
+* loading/disabled state if applicable
+* existing toast/feedback behavior
+
+Do not duplicate business logic.
+
+5. Avoid layout overlap
+   When the sticky bar can appear, add enough bottom padding to the mobile product page so the sticky bar does not cover the final content.
+
+Only apply this bottom padding on mobile.
+
+6. Animation
+   Add a subtle slide/fade transition if simple:
+
+* translate-y-full → translate-y-0
+* opacity transition
+
+Keep it tasteful and lightweight.
+Do not add new animation libraries.
+
+7. Accessibility
+
+* Button text should be clear: “Add to cart”
+* Sticky bar should not trap focus
+* Do not duplicate confusing landmarks
+* Ensure the sticky button remains keyboard/touch accessible
+
+Testing:
+Test on:
+
+* 375×667
+* 393×852
+* 412×915
+* 768×1024
+* Desktop 1280px
+
+Verify:
+
+* Sticky bar is hidden at the top while the normal Add to Cart button is visible
+* Sticky bar appears after scrolling past the normal Add to Cart button
+* Sticky bar hides again when scrolling back up
+* Add to Cart works from the sticky bar
+* Selected size and price update correctly when size changes
+* No overlap with footer/content
+* No desktop change
+* No console errors
+* Typecheck passes
+
+Deliver:
+
+* Files changed
+* Explanation of trigger logic
+* Confirmation that sticky button reuses existing add-to-cart handler
+* Mobile screenshots or behavior summary
+* Typecheck result
+
+Do not commit or push.
