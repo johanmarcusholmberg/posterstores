@@ -162,7 +162,13 @@ export default function PosterBySlug() {
     if (!el) return;
     const observer = new IntersectionObserver(
       ([entry]) => {
-        setShowStickyBar(!entry.isIntersecting);
+        if (entry.isIntersecting) {
+          setShowStickyBar(false);
+        } else {
+          // Only show when the button has scrolled above the viewport,
+          // not when it is still below (initial page load).
+          setShowStickyBar(entry.boundingClientRect.top < 0);
+        }
       },
       { threshold: 0 }
     );

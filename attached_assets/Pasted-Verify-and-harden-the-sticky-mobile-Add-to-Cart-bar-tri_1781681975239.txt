@@ -1,0 +1,69 @@
+Verify and harden the sticky mobile Add to Cart bar trigger logic.
+
+Context:
+A sticky mobile Add to Cart bar was implemented on the product page using an IntersectionObserver watching the existing Add to Cart button container.
+
+Current behavior:
+
+* Sticky bar appears when the observed Add to Cart container is not intersecting
+* Sticky bar hides when the container re-enters the viewport
+* Sticky bar is mobile-only via `md:hidden`
+* Sticky button reuses `handleAddToCart()`
+* Desktop is unchanged
+* Typecheck passes
+
+Important issue to verify:
+`isIntersecting = false` can mean two different things:
+
+1. The user has scrolled past the normal Add to Cart button and it is above the viewport — sticky bar should show.
+2. The normal Add to Cart button is still below the viewport on initial page load — sticky bar should NOT show yet.
+
+Task:
+Verify on 375×667, 393×852, and 412×915:
+
+* At the top of the product page, the sticky bar should not appear immediately.
+* The sticky bar should only appear after the user has actually scrolled past the normal Add to Cart button.
+* Scrolling back up to the normal Add to Cart button should hide the sticky bar again.
+
+If the sticky bar appears too early:
+Update the trigger logic so it only shows when the observed Add to Cart container has moved above the viewport.
+
+Suggested logic:
+Inside the IntersectionObserver callback, use the observed entry:
+
+* If `entry.isIntersecting` is true:
+
+  * hide sticky bar
+* If `entry.isIntersecting` is false:
+
+  * check `entry.boundingClientRect.top < 0`
+  * show sticky bar only when the element is above the viewport
+  * keep it hidden when `entry.boundingClientRect.top > 0`, meaning the button is still below the viewport
+
+Do not change:
+
+* Sticky bar visual design
+* Desktop behavior
+* Add to cart handler
+* Size/price logic
+* Cart logic
+* Product layout spacing
+* Admin pages
+* Git branches, commits, pushes, PRs, or GitHub automation
+
+Also verify:
+
+* selected size and price update live in the sticky bar
+* disabled/loading states match the main Add to Cart button
+* no footer/content overlap
+* no console errors
+* typecheck passes
+
+Deliver:
+
+* Whether the early-show issue existed
+* Exact trigger logic after verification/fix
+* Mobile behavior summary
+* Typecheck result
+
+Do not commit or push.
