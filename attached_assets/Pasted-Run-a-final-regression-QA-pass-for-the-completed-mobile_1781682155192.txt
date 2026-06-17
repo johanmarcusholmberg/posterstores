@@ -1,0 +1,108 @@
+Run a final regression QA pass for the completed mobile UX + performance improvements.
+
+Context:
+The following work has been completed:
+
+* Mobile Phase 1 UX fixes
+* Product page mobile spacing/skeleton/gallery fixes
+* Shop grid aspect ratio fix
+* Mobile image performance quick wins
+* Admin route code-splitting
+* Sticky mobile Add to Cart bar
+* Sticky bar trigger hardened so it only appears after the normal Add to Cart button has scrolled above the viewport
+
+Goal:
+Verify the full public storefront and admin entry points still work correctly after all recent changes.
+
+Do NOT make code changes unless you find a clear bug.
+Do NOT commit, push, create branches, or open PRs.
+
+Public pages to test:
+
+* `/`
+* `/shop`
+* one filtered shop page
+* one product page
+* `/cart`
+* `/login`
+* content pages such as About, Shipping, Returns, Contact if available
+
+Admin pages to smoke test:
+
+* `/admin`
+* `/admin/posters`
+* `/admin/mockups`
+* `/admin/stores`
+* `/admin/orders`
+* any admin route affected by the lazy route split
+
+Viewports:
+
+* 375×667
+* 393×852
+* 412×915
+* 768×1024
+* 1280×800
+
+Test areas:
+
+1. Mobile layout
+   Confirm:
+
+* No horizontal overflow
+* Header/search/menu still work
+* Hero CTAs look correct
+* Featured posters text is readable
+* New Arrivals price appears on mobile
+* Shop grid cards are true portrait ratio
+* Product page image appears early and full-width
+* Footer links have comfortable tap targets
+
+2. Product page sticky Add to Cart
+   Confirm:
+
+* Hidden at top of page
+* Appears only after scrolling past the normal Add to Cart button
+* Hides again when scrolling back up
+* Selected size and price update live
+* Button reuses the same add-to-cart behavior
+* Disabled/loading states match the main button
+* No footer/content overlap
+* Desktop is completely unchanged
+
+3. Image performance behavior
+   Confirm:
+
+* First shop cards are eager/high priority
+* Below-fold cards are lazy
+* Hover images remain visually unchanged
+* Card images use optimized Unsplash URLs where intended
+* Product main gallery image is not reduced to thumbnail size
+* No broken image URLs
+* No visible blurriness on mobile/tablet
+
+4. Admin route split
+   Confirm:
+
+* Admin routes still render correctly behind auth/token gate
+* No blank screens
+* No lazy-loading errors
+* Public routes do not show admin loading fallback
+
+5. Console/build
+   Confirm:
+
+* No new console errors
+* Typecheck passes
+* Build passes if available in the Replit environment
+
+Deliver:
+
+* Final QA summary
+* Any bugs found
+* Any fixes made, if needed
+* Typecheck result
+* Build result if available
+* Whether this set of changes is safe to sync/commit
+
+Do not commit or push.
