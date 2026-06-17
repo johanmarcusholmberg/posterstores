@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { useStorefront } from "@/context/StorefrontContext";
 import { useAuth } from "@/context/AuthContext";
@@ -104,6 +104,8 @@ export default function PosterBySlug() {
   const [isFavorite, setIsFavorite] = useState(false);
   const [favoritesPending, setFavoritesPending] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [showStickyBar, setShowStickyBar] = useState(false);
+  const addToCartRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!slug) return;
@@ -154,6 +156,19 @@ export default function PosterBySlug() {
       .then((ids) => setIsFavorite(ids.includes(poster.id)))
       .catch(() => {});
   }, [user, poster?.id, store.storeKey]);
+
+  useEffect(() => {
+    const el = addToCartRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setShowStickyBar(!entry.isIntersecting);
+      },
+      { threshold: 0 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [poster]);
 
   const { data: relatedPosters } = useListPosters(
     { storeKey: store.storeKey, region: poster?.region ?? undefined, limit: 4 },
@@ -259,7 +274,7 @@ export default function PosterBySlug() {
   const noActiveSizes = activeSizes.length === 0;
 
   return (
-    <div className="container mx-auto px-4 py-6 md:py-12">
+    <div className="container mx-auto px-4 pt-6 md:py-12 pb-28 md:pb-12">
       <button onClick={goBack} className="inline-flex items-center text-muted-foreground hover:text-foreground mb-4 md:mb-8">
         <ArrowLeft className="mr-2 h-4 w-4" /> Back to shop
       </button>
@@ -324,7 +339,7 @@ export default function PosterBySlug() {
             </p>
           )}
 
-          <div className="flex gap-3 mt-auto">
+          <div ref={addToCartRef} className="flex gap-3 mt-auto">
             <Button
               size="lg"
               className="flex-1 text-lg h-14"
@@ -377,6 +392,43 @@ export default function PosterBySlug() {
       )}
 
       <LoginPromptModal open={showLoginPrompt} onClose={() => setShowLoginPrompt(false)} />
+
+      {/* Sticky mobile Add to Cart bar — hidden on md+ */}
+      <div
+        aria-hidden={!showStickyBar}
+        className={`
+          md:hidden fixed bottom-0 left-0 right-0 z-50
+          bg-background border-t border-border shadow-lg
+          px-4 pt-3 pb-3
+          transition-transform transition-opacity duration-200 ease-out
+          ${showStickyBar ? "translate-y-0 opacity-100" : "translate-y-full opacity-0"}
+        `}
+        style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-foreground truncate leading-tight">
+              {poster.title}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {selectedSize
+                ? `${selectedSize.sizeLabel} · ${formatPrice(selectedSize.price, selectedSize.currency)}`
+                : `${pricePrefix}${formatPrice(displayedPrice, displayedCurrency)}`}
+            </p>
+          </div>
+          <Button
+            size="default"
+            className="shrink-0 h-11 px-5 text-sm"
+            onClick={handleAddToCart}
+            disabled={addCartItem.isPending || noActiveSizes || (activeSizes.length > 0 && !selectedSizeId)}
+            aria-label="Add to cart"
+          >
+            {addCartItem.isPending ? "Adding…" : (
+              <><ShoppingBag className="mr-1.5 h-4 w-4" /> Add to cart</>
+            )}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
