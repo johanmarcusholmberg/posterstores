@@ -1,0 +1,106 @@
+You are working in the Poster Stores project.
+
+The admin-owned mockup template + poster sync feature is implemented and hardened. Do a small production-polish pass focused only on the known remaining limitations.
+
+Important:
+- Do not refactor broadly.
+- Do not rebuild the whole mockup system.
+- Do not change the ownership model: store admin owns mockups and sync.
+- Do not create branches, PRs, commits, pushes, or GitHub automation.
+- Make targeted changes only, then report back.
+- Preserve existing admin login gate behavior.
+
+Known current limitations:
+1. Mockup sync is synchronous/blocking and may time out for large catalogs.
+2. Regenerated mockup uploads may leave old object-storage files orphaned.
+3. MockupGallery lightbox uses a fixed 3/4 aspect ratio for some composited images, which can crop landscape/square mockups.
+4. Generated mockup templates start inactive, which is correct. Do not auto-sync generated templates.
+
+Your task:
+Implement a small, safe production-polish pass.
+
+Part 1 — Large sync safety
+Add guardrails to POST /api/admin/mockup-sync so large syncs are safer.
+
+Preferred minimal implementation:
+- Before running sync, calculate estimated work count:
+  posters × active selected templates.
+- Return this count to the admin UI before execution, if the UI already supports preview/dry-run.
+- Add a clear warning in AdminMockupSyncPanel when the selected sync will generate many composites.
+- Add a server-side maximum per request, for example 100 poster/template combinations, unless overwrite/force mode explicitly allows a larger number.
+- If the request exceeds the safe maximum, return a clear admin-facing error explaining that the operator should sync fewer posters/templates at a time.
+- Do not implement a full background job queue yet unless the existing architecture already has a clean queue pattern.
+
+Part 2 — Better sync progress and result clarity
+Improve AdminMockupSyncPanel result display if needed:
+- Show total planned combinations
+- Generated count
+- Skipped count
+- Failed count
+- Clear reason for skipped rows, especially:
+  - existing mockup already exists
+  - inactive template
+  - unpublished poster
+  - exceeded safety limit
+- Keep the UI simple.
+
+Part 3 — Object storage cleanup on overwrite/regenerate
+Inspect how regenerated mockup images are uploaded.
+
+If overwrite/regenerate replaces an existing poster_mockups.image_url:
+- Attempt to delete the old object from storage only if it belongs to the app’s expected mockup-composites/ path.
+- Do not delete external URLs.
+- Do not delete manually uploaded assets unless the row is clearly a generated sync mockup.
+- If storage deletion is difficult or risky, do not fake it. Add a clearly named TODO and report the limitation.
+
+Part 4 — Lightbox aspect ratio
+Fix MockupGallery lightbox cropping for server-composited mockups.
+
+Goal:
+- Portrait mockups remain portrait.
+- Landscape mockups are not forced into a 3/4 frame.
+- Square mockups are not cropped.
+- Existing CSS/live composited preview should still work.
+
+Preferred approach:
+- Use actual image naturalWidth/naturalHeight where possible.
+- Or use metadata already available on the mockup/template/poster image.
+- Fall back safely to object-contain with max-width/max-height rather than hardcoded 3/4 cropping.
+
+Do not break:
+- Product gallery
+- Lightbox navigation
+- Existing manually uploaded mockups
+- CSS/live composite preview behavior
+- Mobile layout
+
+Part 5 — Tests / verification
+Run:
+- pnpm --filter @workspace/api-server run typecheck
+- pnpm --filter @workspace/poster-store run typecheck
+
+Add small tests only if practical and low-cost, especially around:
+- sync size-limit planning
+- old image cleanup path safety
+- lightbox aspect-ratio helper logic
+
+Manual QA checklist to report:
+- Small sync still works
+- Oversized sync shows clear warning/error
+- Sync result counts are understandable
+- Regenerate/overwrite does not duplicate rows
+- Old generated object cleanup is attempted safely, or limitation is clearly reported
+- Portrait mockup lightbox still looks correct
+- Landscape/square mockup lightbox no longer crops
+- Existing product page/gallery/hover behavior still works
+
+Deliverable:
+Report:
+1. Bugs or issues found
+2. Files changed
+3. Code fixes made
+4. Typecheck/test results
+5. Manual QA results
+6. Remaining limitations
+
+Do not commit or push. Stop after the report.
