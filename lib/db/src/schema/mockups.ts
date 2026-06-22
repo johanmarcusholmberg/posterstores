@@ -77,7 +77,7 @@ export const mockupTemplatesTable = pgTable("mockup_templates", {
   contrast: real("contrast").default(0.97),
   saturation: real("saturation").default(0.92),
   compositeBlur: real("composite_blur").default(0),
-  // AI detection metadata
+  // AI detection metadata (legacy per-session fields)
   detectionConfidence: real("detection_confidence"),
   detectionDescription: text("detection_description"),
   detectionSource: text("detection_source"),
@@ -86,6 +86,12 @@ export const mockupTemplatesTable = pgTable("mockup_templates", {
   placementWasManuallyAdjusted: boolean("placement_was_manually_adjusted").default(false),
   sourceImageWidth: integer("source_image_width"),
   sourceImageHeight: integer("source_image_height"),
+  // Smart placement fields
+  placementMode: text("placement_mode").default("manual").notNull(),
+  detectedPlacementConfig: jsonb("detected_placement_config"),
+  detectedPlacementStatus: text("detected_placement_status").default("not_analyzed").notNull(),
+  detectedPlacementError: text("detected_placement_error"),
+  analyzedAt: timestamp("analyzed_at", { withTimezone: true }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

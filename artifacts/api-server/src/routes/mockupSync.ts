@@ -10,6 +10,7 @@ import { requireAdmin } from "../middleware/requireAdmin";
 import { adminLimiter } from "../middleware/rateLimiter";
 import { compositePosterIntoTemplate } from "../lib/mockupCompositor";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { resolveEffectiveMockupPlacement } from "../lib/mockupPlacementAnalyzer";
 import { randomUUID } from "crypto";
 
 const router = Router();
@@ -47,6 +48,8 @@ interface SyncResult {
   reason?: string;
   mockupId?: number;
   imageUrl?: string;
+  placementSource?: "auto_detected" | "manual";
+  placementWarnings?: string[];
 }
 
 interface SyncBody {
@@ -108,9 +111,15 @@ router.post(
         )
       );
 
-    let targetTemplates = templateRows.filter(
-      (t) => t.posterX != null && t.posterY != null && t.posterWidth != null && t.posterHeight != null && t.backgroundImageUrl != null
-    );
+    // A template is compositable if it has a background image AND effective placement.
+    // Effective placement can come from auto_detected config OR manual posterX/Y/Width/Height.
+    let targetTemplates = templateRows.filter((t) => {
+      if (!t.backgroundImageUrl) return false;
+      const { placementSource, posterX, posterY, posterWidth, posterHeight } = resolveEffectiveMockupPlacement(t);
+      if (placementSource === "auto_detected") return true;
+      // manual: must have all four placement values
+      return posterX != null && posterY != null && posterWidth != null && posterHeight != null;
+    });
 
     if (templateIds && templateIds.length > 0) {
       targetTemplates = targetTemplates.filter((t) => templateIds.includes(t.id));
@@ -182,6 +191,10 @@ router.post(
           }
         }
 
+        // Resolve effective placement for this template
+        const effective = resolveEffectiveMockupPlacement(template);
+        const { posterX, posterY, posterWidth, posterHeight, rotation, placementSource, warnings: placementWarnings } = effective;
+
         if (dryRun) {
           generated++;
           results.push({
@@ -190,7 +203,9 @@ router.post(
             templateId: template.id,
             templateName: template.name,
             action: "generated",
-            reason: "dry-run — not actually generated",
+            reason: `dry-run — not actually generated (placement: ${placementSource})`,
+            placementSource,
+            placementWarnings,
           });
           continue;
         }
@@ -209,16 +224,30 @@ router.post(
           continue;
         }
 
+        // Skip if effective placement is null
+        if (posterX == null || posterY == null || posterWidth == null || posterHeight == null) {
+          failed++;
+          results.push({
+            posterId: poster.id,
+            posterTitle: poster.title,
+            templateId: template.id,
+            templateName: template.name,
+            action: "failed",
+            reason: `Template has no valid placement (mode: ${placementSource})`,
+          });
+          continue;
+        }
+
         try {
           const composited = await compositePosterIntoTemplate(
             template.backgroundImageUrl!,
             poster.imageUrl,
             {
-              posterX: template.posterX!,
-              posterY: template.posterY!,
-              posterWidth: template.posterWidth!,
-              posterHeight: template.posterHeight!,
-              rotation: template.rotation,
+              posterX,
+              posterY,
+              posterWidth,
+              posterHeight,
+              rotation,
               fitMode: template.fitMode,
               borderRadius: template.borderRadius,
               brightness: template.brightness,
@@ -262,6 +291,8 @@ router.post(
                 action: "generated",
                 mockupId: existing.id,
                 imageUrl,
+                placementSource,
+                placementWarnings,
               });
               continue;
             }
@@ -320,6 +351,8 @@ router.post(
             action: "generated",
             mockupId: inserted.id,
             imageUrl,
+            placementSource,
+            placementWarnings,
           });
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";

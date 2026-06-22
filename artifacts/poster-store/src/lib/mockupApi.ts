@@ -1,5 +1,31 @@
 const BASE = "/api";
 
+export interface DetectedPlacementConfig {
+  surfaceType: "poster" | "frame" | "paper" | "unknown";
+  confidence: number;
+  coordinateSystem: "normalized";
+  corners: {
+    topLeft: { x: number; y: number };
+    topRight: { x: number; y: number };
+    bottomRight: { x: number; y: number };
+    bottomLeft: { x: number; y: number };
+  };
+  boundingBox: { x: number; y: number; width: number; height: number };
+  rotation: number;
+  recommendedFitMode: "cover" | "contain" | "stretch";
+  recommendedRender: {
+    shadowOpacity: number;
+    shadowBlur: number;
+    highlightOpacity: number;
+    overlayOpacity: number;
+    borderRadius: number;
+  };
+  warnings: string[];
+}
+
+export type PlacementMode = "manual" | "auto_detected" | "auto_detected_needs_review";
+export type DetectedPlacementStatus = "not_analyzed" | "detected" | "needs_review" | "failed";
+
 export interface MockupTemplate {
   id: number;
   storeKey: string | null;
@@ -43,7 +69,7 @@ export interface MockupTemplate {
   contrast: number | null;
   saturation: number | null;
   compositeBlur: number | null;
-  // AI detection
+  // AI detection (legacy per-session)
   detectionConfidence: number | null;
   detectionDescription: string | null;
   detectionSource: string | null;
@@ -52,6 +78,12 @@ export interface MockupTemplate {
   placementWasManuallyAdjusted: boolean | null;
   sourceImageWidth: number | null;
   sourceImageHeight: number | null;
+  // Smart placement
+  placementMode: PlacementMode | null;
+  detectedPlacementConfig: DetectedPlacementConfig | null;
+  detectedPlacementStatus: DetectedPlacementStatus | null;
+  detectedPlacementError: string | null;
+  analyzedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -491,6 +523,12 @@ export async function adminRunMockupSync(params: {
 export interface GenerateTemplateResponse {
   template: MockupTemplate;
   note: string;
+  placementAnalysis?: {
+    status: string;
+    confidence: number;
+    warnings: string[];
+    error?: string;
+  };
 }
 
 export async function adminGenerateMockupTemplate(params: {
@@ -505,6 +543,34 @@ export async function adminGenerateMockupTemplate(params: {
     headers: jsonHeaders(),
     credentials: "include",
     body: JSON.stringify(params),
+  });
+  if (!res.ok) await handleError(res);
+  return res.json();
+}
+
+// ─── Smart Placement API ──────────────────────────────────────────────────────
+
+export interface SmartPlacementAnalysisResponse {
+  templateId: number;
+  detectedConfig: DetectedPlacementConfig | null;
+  confidence: number;
+  status: "detected" | "needs_review" | "failed";
+  warnings: string[];
+  error?: string;
+  template: MockupTemplate;
+}
+
+/**
+ * Run server-side smart placement analysis for an existing template.
+ * Saves the result to the DB and returns the updated template.
+ */
+export async function adminAnalyzeMockupTemplatePlacement(
+  templateId: number
+): Promise<SmartPlacementAnalysisResponse> {
+  const res = await fetch(`${BASE}/admin/mockup-templates/${templateId}/analyze-placement`, {
+    method: "POST",
+    headers: jsonHeaders(),
+    credentials: "include",
   });
   if (!res.ok) await handleError(res);
   return res.json();

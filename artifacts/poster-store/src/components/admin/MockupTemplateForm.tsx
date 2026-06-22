@@ -14,12 +14,16 @@ import {
 } from "@/components/ui/select";
 import {
   type MockupTemplate,
+  type DetectedPlacementConfig,
+  type PlacementMode,
+  type DetectedPlacementStatus,
   adminCreateMockupTemplate,
   adminUpdateMockupTemplate,
   requestMockupImageUploadUrl,
   uploadMockupImageFile,
   getStorageUrl,
   analyzeMockupPlacement,
+  adminAnalyzeMockupTemplatePlacement,
 } from "@/lib/mockupApi";
 import { Upload, Loader2, Sparkles, CheckCircle2, AlertCircle, Info, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -246,6 +250,18 @@ export function MockupTemplateForm({
   const [imgNaturalHeight, setImgNaturalHeight] = useState<number | null>(
     template?.sourceImageHeight ?? null
   );
+
+  // Smart placement state (DB-persisted)
+  const [placementMode, setPlacementMode] = useState<PlacementMode>(
+    (template?.placementMode as PlacementMode | null | undefined) ?? "manual"
+  );
+  const [detectedStatus, setDetectedStatus] = useState<DetectedPlacementStatus>(
+    (template?.detectedPlacementStatus as DetectedPlacementStatus | null | undefined) ?? "not_analyzed"
+  );
+  const [storedDetectedConfig, setStoredDetectedConfig] = useState<DetectedPlacementConfig | null>(
+    template?.detectedPlacementConfig ?? null
+  );
+  const [analyzingTemplate, setAnalyzingTemplate] = useState(false);
 
   const lastAnalyzedUrlRef = useRef<string>("");
   const [saving, setSaving] = useState(false);
@@ -577,6 +593,52 @@ export function MockupTemplateForm({
   const handleResetToFallback = () => {
     applyFallbackPlacement(orientation);
     toast({ title: "Placement reset to default fallback" });
+  };
+
+  const handleAnalyzeAndSave = async () => {
+    if (!template?.id || analyzingTemplate) return;
+    setAnalyzingTemplate(true);
+    try {
+      const result = await adminAnalyzeMockupTemplatePlacement(template.id);
+      setStoredDetectedConfig(result.detectedConfig);
+      setDetectedStatus(result.status === "failed" ? "failed" : result.template.detectedPlacementStatus ?? "not_analyzed");
+      setPlacementMode(result.template.placementMode ?? "manual");
+      if (result.status === "failed") {
+        toast({ variant: "destructive", title: "Analysis failed", description: result.error ?? "Could not detect placement" });
+      } else {
+        const pct = Math.round(result.confidence * 100);
+        toast({ title: `Placement analyzed — ${pct}% confidence`, description: result.warnings.length > 0 ? result.warnings[0] : "Review detected placement below." });
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Analysis failed";
+      toast({ variant: "destructive", title: "Analysis failed", description: msg });
+    } finally {
+      setAnalyzingTemplate(false);
+    }
+  };
+
+  const handleApproveDetected = async () => {
+    if (!template?.id) return;
+    try {
+      await adminUpdateMockupTemplate(template.id, { placementMode: "auto_detected" } as any);
+      setPlacementMode("auto_detected");
+      toast({ title: "Approved — sync will use detected placement" });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Update failed";
+      toast({ variant: "destructive", title: "Failed to approve", description: msg });
+    }
+  };
+
+  const handleUseManual = async () => {
+    if (!template?.id) return;
+    try {
+      await adminUpdateMockupTemplate(template.id, { placementMode: "manual" } as any);
+      setPlacementMode("manual");
+      toast({ title: "Switched to manual placement" });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Update failed";
+      toast({ variant: "destructive", title: "Failed to update", description: msg });
+    }
   };
 
   const handleSave = async () => {
@@ -917,6 +979,30 @@ export function MockupTemplateForm({
                       </div>
                     </div>
                   )}
+                  {/* Detected placement overlay (blue/indigo) — DB-persisted detection */}
+                  {storedDetectedConfig?.boundingBox && (
+                    <div
+                      className="absolute border-2 border-indigo-400/80 bg-indigo-400/10 pointer-events-none"
+                      style={{
+                        left: `${storedDetectedConfig.boundingBox.x * 100}%`,
+                        top: `${storedDetectedConfig.boundingBox.y * 100}%`,
+                        width: `${storedDetectedConfig.boundingBox.width * 100}%`,
+                        height: `${storedDetectedConfig.boundingBox.height * 100}%`,
+                        transform: storedDetectedConfig.rotation ? `rotate(${storedDetectedConfig.rotation}deg)` : undefined,
+                      }}
+                    >
+                      <div className="absolute top-1 left-1 flex items-center gap-1">
+                        <span className={cn(
+                          "text-[9px] font-semibold px-1 py-0.5 rounded leading-tight",
+                          placementMode === "auto_detected"
+                            ? "bg-indigo-600/90 text-white"
+                            : "bg-indigo-400/80 text-white"
+                        )}>
+                          {placementMode === "auto_detected" ? "✓ auto" : "detected"}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                   {analysisState === "fallback" && hasPosterArea && (
                     <div className="absolute top-2 left-2 bg-orange-500/90 text-white text-[10px] font-medium px-1.5 py-0.5 rounded shadow">
                       Fallback values
@@ -1057,6 +1143,125 @@ export function MockupTemplateForm({
                     <p className="text-xs text-muted-foreground mt-1">Fallback values applied — adjust as needed</p>
                   </div>
                 </>
+              )}
+            </div>
+          )}
+
+          {/* Auto placement mode — persisted in DB, only for existing templates */}
+          {isEdit && (
+            <div className={cn(
+              "space-y-2.5 rounded-md border p-3",
+              placementMode === "auto_detected" && "border-indigo-300 bg-indigo-50/50 dark:border-indigo-700 dark:bg-indigo-950/20",
+              placementMode === "auto_detected_needs_review" && "border-amber-300 bg-amber-50/50 dark:border-amber-700 dark:bg-amber-950/20",
+              placementMode === "manual" && "border-border bg-muted/20"
+            )}>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium">Auto placement mode</p>
+                  <span className={cn(
+                    "text-[10px] font-semibold px-1.5 py-0.5 rounded-full border",
+                    placementMode === "auto_detected" && "bg-indigo-100 text-indigo-800 border-indigo-300 dark:bg-indigo-950/40 dark:text-indigo-300",
+                    placementMode === "auto_detected_needs_review" && "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300",
+                    placementMode === "manual" && "bg-muted text-muted-foreground border-border"
+                  )}>
+                    {placementMode === "auto_detected" ? "✓ Active" : placementMode === "auto_detected_needs_review" ? "Needs review" : "Manual"}
+                  </span>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs"
+                  disabled={analyzingTemplate || !backgroundImageUrl}
+                  onClick={handleAnalyzeAndSave}
+                >
+                  {analyzingTemplate ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                  {analyzingTemplate ? "Analyzing…" : "Re-analyze & save"}
+                </Button>
+              </div>
+
+              {detectedStatus === "not_analyzed" && !storedDetectedConfig && (
+                <p className="text-xs text-muted-foreground">No analysis saved yet. Click "Re-analyze & save" to run AI placement detection.</p>
+              )}
+              {detectedStatus === "failed" && (
+                <p className="text-xs text-destructive">Last analysis failed. Try re-analyzing or set placement manually.</p>
+              )}
+
+              {storedDetectedConfig && detectedStatus !== "failed" && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs text-muted-foreground">
+                      Surface: <span className="font-medium text-foreground">{storedDetectedConfig.surfaceType}</span>
+                    </span>
+                    <span className={cn(
+                      "text-xs font-semibold px-1.5 py-0.5 rounded border",
+                      storedDetectedConfig.confidence >= 0.75 ? "bg-emerald-100 text-emerald-800 border-emerald-300" : storedDetectedConfig.confidence >= 0.5 ? "bg-yellow-100 text-yellow-800 border-yellow-300" : "bg-orange-100 text-orange-800 border-orange-300"
+                    )}>
+                      {Math.round(storedDetectedConfig.confidence * 100)}% confidence
+                    </span>
+                    <span className={cn(
+                      "text-xs px-1.5 py-0.5 rounded border",
+                      detectedStatus === "detected" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"
+                    )}>
+                      {detectedStatus === "detected" ? "Detected" : "Needs review"}
+                    </span>
+                  </div>
+
+                  {storedDetectedConfig.warnings.length > 0 && (
+                    <div className="space-y-0.5">
+                      {storedDetectedConfig.warnings.map((w, i) => (
+                        <p key={i} className="text-xs text-amber-700 dark:text-amber-400 flex items-start gap-1">
+                          <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
+                          {w}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2 flex-wrap pt-0.5">
+                    {placementMode !== "auto_detected" && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-7 gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
+                        onClick={handleApproveDetected}
+                      >
+                        <CheckCircle2 className="w-3 h-3" />
+                        Approve detected placement
+                      </Button>
+                    )}
+                    {placementMode === "auto_detected" && (
+                      <>
+                        <span className="text-xs text-indigo-700 dark:text-indigo-400 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" />
+                          Sync will use auto-detected placement
+                        </span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 gap-1.5 text-xs"
+                          onClick={handleUseManual}
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          Switch to manual
+                        </Button>
+                      </>
+                    )}
+                    {placementMode === "auto_detected_needs_review" && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 gap-1.5 text-xs"
+                        onClick={handleUseManual}
+                      >
+                        Use manual instead
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">Blue overlay on the image shows the detected area. White overlay shows manual placement.</p>
+                </div>
               )}
             </div>
           )}

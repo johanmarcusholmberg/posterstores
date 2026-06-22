@@ -20,6 +20,7 @@ import { migrateTypographyConfig } from "./lib/migrateTypographyConfig";
 import { migrateDisplayTitle } from "./lib/migrateDisplayTitle";
 import { migrateCollectionBanner } from "./lib/migrateCollectionBanner";
 import { migrateMockupSync } from "./lib/migrateMockupSync";
+import { migrateSmartPlacement } from "./lib/migrateSmartPlacement";
 import { seedPostsofSpain } from "./lib/seedPostsofSpain";
 
 const app: Express = express();
@@ -113,6 +114,7 @@ migrateSlugField()
   .then(() => migrateDisplayTitle())
   .then(() => migrateCollectionBanner())
   .then(() => migrateMockupSync())
+  .then(() => migrateSmartPlacement())
   .then(() => seedMockupTemplates())
   .catch((err) =>
     logger.error(err, "Failed to run startup migrations")

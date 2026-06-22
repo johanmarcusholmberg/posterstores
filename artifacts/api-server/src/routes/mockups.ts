@@ -8,6 +8,7 @@ import {
 import { eq, and, or, isNull, asc, inArray } from "drizzle-orm";
 import { requireAdmin } from "../middleware/requireAdmin";
 import { adminLimiter } from "../middleware/rateLimiter";
+import { analyzeMockupPlacement } from "../lib/mockupPlacementAnalyzer";
 
 const router = Router();
 
@@ -263,6 +264,12 @@ const ALLOWED_TEMPLATE_FIELDS = [
   "placementWasManuallyAdjusted",
   "sourceImageWidth",
   "sourceImageHeight",
+  // Smart placement fields
+  "placementMode",
+  "detectedPlacementConfig",
+  "detectedPlacementStatus",
+  "detectedPlacementError",
+  "analyzedAt",
 ] as const;
 
 /**
@@ -508,9 +515,31 @@ router.put("/mockup-templates/:id", requireAdmin, async (req, res) => {
     for (const key of ALLOWED_TEMPLATE_FIELDS) {
       if (req.body[key] === undefined) continue;
 
-      if (key === "detectedAt") {
+      if (key === "detectedAt" || key === "analyzedAt") {
         const coerced = coerceDate(req.body[key]);
         if (coerced !== undefined) (updates as any)[key] = coerced;
+        continue;
+      }
+
+      if (key === "placementMode") {
+        const v = req.body[key];
+        if (v !== undefined) {
+          if (v !== null && !["manual", "auto_detected", "auto_detected_needs_review"].includes(v)) {
+            return res.status(400).json({ error: `placementMode must be 'manual', 'auto_detected', or 'auto_detected_needs_review'` });
+          }
+          (updates as any)[key] = v;
+        }
+        continue;
+      }
+
+      if (key === "detectedPlacementStatus") {
+        const v = req.body[key];
+        if (v !== undefined) {
+          if (v !== null && !["not_analyzed", "detected", "needs_review", "failed"].includes(v)) {
+            return res.status(400).json({ error: `detectedPlacementStatus must be 'not_analyzed', 'detected', 'needs_review', or 'failed'` });
+          }
+          (updates as any)[key] = v;
+        }
         continue;
       }
 
@@ -589,6 +618,98 @@ router.delete("/mockup-templates/:id", requireAdmin, async (req, res) => {
   await db.delete(mockupTemplatesTable).where(eq(mockupTemplatesTable.id, id));
   return res.status(204).send();
 });
+
+// ─── Admin: analyze placement for a specific template ────────────────────────
+
+router.post(
+  "/admin/mockup-templates/:id/analyze-placement",
+  adminLimiter,
+  requireAdmin,
+  async (req, res) => {
+    const id = Number(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+
+    const [template] = await db
+      .select()
+      .from(mockupTemplatesTable)
+      .where(eq(mockupTemplatesTable.id, id));
+
+    if (!template) return res.status(404).json({ error: "Template not found" });
+
+    const imageUrl = template.backgroundImageUrl;
+    if (!imageUrl) {
+      return res.status(400).json({ error: "Template has no background image URL to analyze" });
+    }
+
+    req.log.info({ templateId: id, imageUrl, event: "smart_placement_analyze" }, "Running smart placement analysis");
+
+    const result = await analyzeMockupPlacement(imageUrl);
+
+    const now = new Date();
+    let placementMode = template.placementMode ?? "manual";
+
+    if (result.status === "detected" && result.config) {
+      const { confidence } = result.config;
+      // Admin must always review and approve — never auto-activate
+      placementMode = "auto_detected_needs_review";
+
+      await db
+        .update(mockupTemplatesTable)
+        .set({
+          detectedPlacementConfig: result.config as any,
+          detectedPlacementStatus: confidence >= 0.75 ? "detected" : "needs_review",
+          detectedPlacementError: null,
+          analyzedAt: now,
+          placementMode,
+          updatedAt: now,
+        })
+        .where(eq(mockupTemplatesTable.id, id));
+    } else if (result.status === "needs_review" && result.config) {
+      placementMode = "auto_detected_needs_review";
+      await db
+        .update(mockupTemplatesTable)
+        .set({
+          detectedPlacementConfig: result.config as any,
+          detectedPlacementStatus: "needs_review",
+          detectedPlacementError: null,
+          analyzedAt: now,
+          placementMode,
+          updatedAt: now,
+        })
+        .where(eq(mockupTemplatesTable.id, id));
+    } else {
+      await db
+        .update(mockupTemplatesTable)
+        .set({
+          detectedPlacementStatus: "failed",
+          detectedPlacementError: result.error ?? "Analysis failed",
+          analyzedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(mockupTemplatesTable.id, id));
+    }
+
+    const [updated] = await db
+      .select()
+      .from(mockupTemplatesTable)
+      .where(eq(mockupTemplatesTable.id, id));
+
+    req.log.info(
+      { templateId: id, status: result.status, confidence: result.confidence, event: "smart_placement_analyze" },
+      "Smart placement analysis complete"
+    );
+
+    return res.json({
+      templateId: id,
+      detectedConfig: result.config,
+      confidence: result.confidence,
+      status: result.status,
+      warnings: result.config?.warnings ?? [],
+      error: result.error,
+      template: updated,
+    });
+  }
+);
 
 // ─── Poster mockup routes ────────────────────────────────────────────────────
 
