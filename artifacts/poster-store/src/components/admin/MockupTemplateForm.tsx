@@ -182,6 +182,9 @@ export function MockupTemplateForm({
   const [active, setActive] = useState(template?.active ?? true);
   const [sortOrder, setSortOrder] = useState(template?.sortOrder ?? 0);
   const [isGlobal, setIsGlobal] = useState(template ? template.storeKey === null : true);
+  const [canBePrimary, setCanBePrimary] = useState(template?.canBePrimary ?? true);
+  const [canBeHover, setCanBeHover] = useState(template?.canBeHover ?? false);
+  const [canBeGallery, setCanBeGallery] = useState(template?.canBeGallery ?? true);
 
   const [backgroundImageUrl, setBackgroundImageUrl] = useState(
     template?.backgroundImageUrl ?? template?.previewThumbnailUrl ?? ""
@@ -603,6 +606,9 @@ export function MockupTemplateForm({
         isFeatured,
         active,
         sortOrder,
+        canBePrimary,
+        canBeHover,
+        canBeGallery,
         storeKey: isGlobal ? null : storeKey,
         backgroundImageUrl: backgroundImageUrl || undefined,
         storagePath: storagePath || undefined,
@@ -788,6 +794,35 @@ export function MockupTemplateForm({
               <p className="text-xs text-muted-foreground">Available to all stores</p>
             </div>
             <Switch checked={isGlobal} onCheckedChange={setIsGlobal} />
+          </div>
+
+          {/* Intended use flags */}
+          <div className="rounded-md border px-3 py-2.5 space-y-2">
+            <p className="text-sm font-medium">Intended use (for sync)</p>
+            <p className="text-xs text-muted-foreground -mt-1">
+              Controls how generated mockups are assigned during bulk sync.
+            </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm">Can be primary</p>
+                <p className="text-xs text-muted-foreground">Use as the main product image if none exists</p>
+              </div>
+              <Switch checked={canBePrimary} onCheckedChange={setCanBePrimary} />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm">Can be hover</p>
+                <p className="text-xs text-muted-foreground">Use as the hover image in shop listings</p>
+              </div>
+              <Switch checked={canBeHover} onCheckedChange={setCanBeHover} />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm">Can be gallery</p>
+                <p className="text-xs text-muted-foreground">Include in the product detail gallery</p>
+              </div>
+              <Switch checked={canBeGallery} onCheckedChange={setCanBeGallery} />
+            </div>
           </div>
 
           <div className="space-y-1.5">

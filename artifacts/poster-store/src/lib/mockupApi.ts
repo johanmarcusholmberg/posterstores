@@ -18,6 +18,11 @@ export interface MockupTemplate {
   isFeatured: boolean;
   active: boolean;
   sortOrder: number;
+  // Intended use flags
+  canBePrimary: boolean;
+  canBeHover: boolean;
+  canBeGallery: boolean;
+  // Placement
   posterX: number | null;
   posterY: number | null;
   posterWidth: number | null;
@@ -26,6 +31,7 @@ export interface MockupTemplate {
   borderRadius: number | null;
   shadowStrength: number | null;
   fitMode: string | null;
+  // Compositing
   shadowEnabled: boolean | null;
   shadowOpacity: number | null;
   shadowBlur: number | null;
@@ -37,6 +43,7 @@ export interface MockupTemplate {
   contrast: number | null;
   saturation: number | null;
   compositeBlur: number | null;
+  // AI detection
   detectionConfidence: number | null;
   detectionDescription: string | null;
   detectionSource: string | null;
@@ -62,6 +69,9 @@ export interface PosterMockupTemplate {
   storeKey: string | null;
   active: boolean | null;
   isFeatured: boolean | null;
+  canBePrimary: boolean | null;
+  canBeHover: boolean | null;
+  canBeGallery: boolean | null;
   posterX: number | null;
   posterY: number | null;
   posterWidth: number | null;
@@ -91,6 +101,10 @@ export interface PosterMockup {
   sortOrder: number;
   isPrimary: boolean;
   isHoverMockup: boolean;
+  isGallery: boolean;
+  status: string;
+  generatedAt: string | null;
+  errorMessage: string | null;
   createdAt: string;
   template: PosterMockupTemplate | null;
 }
@@ -101,6 +115,7 @@ export interface BatchMockupItem {
   sortOrder?: number;
   isPrimary?: boolean;
   isHoverMockup?: boolean;
+  isGallery?: boolean;
 }
 
 function jsonHeaders(): HeadersInit {
@@ -403,13 +418,9 @@ export function resolvePosterDisplayImage(
 ): string {
   if (!mockups || mockups.length === 0) return fallbackImageUrl;
 
-  // Filter to only active mockups that have a displayable image
   const activeMockups = mockups.filter((m) => {
-    // Custom image URLs with no template are always active
     if (!m.mockupTemplateId) return !!m.mockupImageUrl;
-    // If template is present, it must be active
     if (m.template && m.template.active === false) return false;
-    // Must have some displayable URL
     return !!(
       m.mockupImageUrl ||
       m.template?.previewThumbnailUrl ||
@@ -419,12 +430,9 @@ export function resolvePosterDisplayImage(
 
   if (activeMockups.length === 0) return fallbackImageUrl;
 
-  // Only use a mockup image when one is explicitly marked primary.
-  // If no mockup is primary, fall back to the poster's own image.
   const primaryMockup = activeMockups.find((m) => m.isPrimary);
   if (!primaryMockup) return fallbackImageUrl;
 
-  // Featured primary takes precedence over plain primary.
   const pick =
     activeMockups.find((m) => m.isPrimary && m.template?.isFeatured) ??
     primaryMockup;
@@ -433,4 +441,70 @@ export function resolvePosterDisplayImage(
   if (pick.template?.previewThumbnailUrl) return pick.template.previewThumbnailUrl;
   if (pick.template?.backgroundImageUrl) return pick.template.backgroundImageUrl;
   return fallbackImageUrl;
+}
+
+// ─── Sync API ─────────────────────────────────────────────────────────────────
+
+export type SyncScope = "all" | "missing" | "selected";
+
+export interface SyncResult {
+  posterId: number;
+  posterTitle: string;
+  templateId: number;
+  templateName: string;
+  action: "generated" | "skipped" | "failed";
+  reason?: string;
+  mockupId?: number;
+  imageUrl?: string;
+}
+
+export interface SyncResponse {
+  generated: number;
+  skipped: number;
+  failed: number;
+  dryRun: boolean;
+  results: SyncResult[];
+  note?: string;
+}
+
+export async function adminRunMockupSync(params: {
+  storeKey: string;
+  scope: SyncScope;
+  posterIds?: number[];
+  templateIds?: number[];
+  overwrite?: boolean;
+  dryRun?: boolean;
+}): Promise<SyncResponse> {
+  const res = await fetch(`${BASE}/admin/mockup-sync`, {
+    method: "POST",
+    headers: jsonHeaders(),
+    credentials: "include",
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) await handleError(res);
+  return res.json();
+}
+
+// ─── AI Template Generation API ───────────────────────────────────────────────
+
+export interface GenerateTemplateResponse {
+  template: MockupTemplate;
+  note: string;
+}
+
+export async function adminGenerateMockupTemplate(params: {
+  prompt: string;
+  name?: string;
+  category?: string;
+  storeKey?: string | null;
+  size?: "1024x1024" | "512x512" | "256x256";
+}): Promise<GenerateTemplateResponse> {
+  const res = await fetch(`${BASE}/mockup-templates/generate`, {
+    method: "POST",
+    headers: jsonHeaders(),
+    credentials: "include",
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) await handleError(res);
+  return res.json();
 }

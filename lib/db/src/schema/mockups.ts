@@ -52,6 +52,11 @@ export const mockupTemplatesTable = pgTable("mockup_templates", {
   isFeatured: boolean("is_featured").default(false).notNull(),
   active: boolean("active").default(true).notNull(),
   sortOrder: integer("sort_order").default(0).notNull(),
+  // Intended use flags
+  canBePrimary: boolean("can_be_primary").default(true).notNull(),
+  canBeHover: boolean("can_be_hover").default(false).notNull(),
+  canBeGallery: boolean("can_be_gallery").default(true).notNull(),
+  // Placement
   posterX: real("poster_x"),
   posterY: real("poster_y"),
   posterWidth: real("poster_width"),
@@ -60,6 +65,7 @@ export const mockupTemplatesTable = pgTable("mockup_templates", {
   borderRadius: real("border_radius"),
   shadowStrength: real("shadow_strength"),
   fitMode: text("fit_mode").default("cover"),
+  // Compositing settings
   shadowEnabled: boolean("shadow_enabled").default(true),
   shadowOpacity: real("shadow_opacity").default(0.4),
   shadowBlur: real("shadow_blur").default(20),
@@ -71,6 +77,7 @@ export const mockupTemplatesTable = pgTable("mockup_templates", {
   contrast: real("contrast").default(0.97),
   saturation: real("saturation").default(0.92),
   compositeBlur: real("composite_blur").default(0),
+  // AI detection metadata
   detectionConfidence: real("detection_confidence"),
   detectionDescription: text("detection_description"),
   detectionSource: text("detection_source"),
@@ -96,6 +103,11 @@ export const posterMockupsTable = pgTable("poster_mockups", {
   sortOrder: integer("sort_order").default(0).notNull(),
   isPrimary: boolean("is_primary").default(false).notNull(),
   isHoverMockup: boolean("is_hover_mockup").default(false).notNull(),
+  isGallery: boolean("is_gallery").default(true).notNull(),
+  // Sync status tracking
+  status: text("status").default("manual").notNull(),
+  generatedAt: timestamp("generated_at", { withTimezone: true }),
+  errorMessage: text("error_message"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
