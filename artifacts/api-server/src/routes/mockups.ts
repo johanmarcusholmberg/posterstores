@@ -617,6 +617,10 @@ router.get("/posters/:id/mockups", async (req, res) => {
       sortOrder: posterMockupsTable.sortOrder,
       isPrimary: posterMockupsTable.isPrimary,
       isHoverMockup: posterMockupsTable.isHoverMockup,
+      isGallery: posterMockupsTable.isGallery,
+      status: posterMockupsTable.status,
+      generatedAt: posterMockupsTable.generatedAt,
+      errorMessage: posterMockupsTable.errorMessage,
       createdAt: posterMockupsTable.createdAt,
       template: {
         id: mockupTemplatesTable.id,

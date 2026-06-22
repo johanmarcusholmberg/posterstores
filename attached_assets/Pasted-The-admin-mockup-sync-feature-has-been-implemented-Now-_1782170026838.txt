@@ -1,0 +1,134 @@
+The admin mockup sync feature has been implemented. Now do a focused hardening and end-to-end QA pass before GitHub sync.
+
+Important:
+- Do not build new large features.
+- Do not refactor broadly.
+- Do not create branches, PRs, commits, or pushes.
+- Only make targeted fixes if you find real issues.
+- The login gate is expected; do not treat it as a bug.
+
+Context of completed feature:
+- mockup_templates now has canBePrimary, canBeHover, canBeGallery.
+- poster_mockups now has status, generatedAt, errorMessage, isGallery and a unique partial index on poster_id + mockup_template_id.
+- Server has:
+  - migrateMockupSync.ts
+  - mockupCompositor.ts
+  - mockupSync.ts with POST /api/admin/mockup-sync
+  - generateMockupTemplate.ts
+- Frontend has:
+  - MockupTemplateForm.tsx intended-use switches
+  - AdminMockupSyncPanel.tsx
+  - AdminMockups.tsx tabs: Templates / Sync mockups
+- Typecheck was already clean for api-server and poster-store.
+
+Your task:
+Perform a hardening audit and fix only concrete bugs.
+
+Check these areas carefully:
+
+1. Public storefront consumption
+Verify that generated synced mockups are actually used correctly outside admin:
+- Product page gallery
+- Product lightbox
+- Poster card hover image
+- Primary product mockup logic
+- Fallback behavior when no generated mockups exist
+
+Make sure existing manually uploaded/mockup images still work.
+
+2. Duplicate prevention and upsert correctness
+Inspect the database/index/upsert logic carefully.
+
+Verify:
+- Running sync twice for the same poster/template does not create duplicates.
+- Failed rows and generated rows behave correctly.
+- The unique partial index works with the actual upsert/query logic.
+- If PostgreSQL ON CONFLICT cannot safely target the partial unique index, fix it with a safe explicit lookup/update/insert flow or a better constraint/index approach.
+
+3. Primary / hover / gallery assignment rules
+Verify:
+- canBePrimary only assigns primary when appropriate.
+- Existing manually chosen primary mockup is not overwritten accidentally.
+- canBeHover only assigns hover when appropriate.
+- Existing manually chosen hover mockup is not overwritten accidentally.
+- canBeGallery controls product gallery inclusion.
+- Templates with all flags off do not unexpectedly appear publicly.
+
+4. Sync modes and filters
+Verify:
+- Sync one poster
+- Sync all published posters
+- Sync missing mockups only
+- Sync selected templates only
+- Store filtering
+- Inactive templates are skipped
+- Draft/unpublished posters are skipped unless intentionally included
+
+5. Error handling and status
+Verify:
+- Failed render/upload records status = failed and stores useful errorMessage.
+- Successful render sets status = generated and generatedAt.
+- The admin panel shows generated / failed / skipped counts clearly.
+- Individual result rows are understandable.
+- One failed poster/template does not stop the entire sync.
+
+6. Compositor robustness
+Inspect mockupCompositor.ts.
+
+Verify:
+- Poster fitting works for cover / contain / stretch.
+- Placement x/y/width/height are validated/safely defaulted.
+- Rotation does not break compositing.
+- Missing or bad image URLs fail gracefully.
+- Very large images do not cause obvious memory/time problems.
+- Output format/quality is reasonable for storefront display.
+- Sharp dependency/import works in the server environment.
+
+7. Generated template flow
+Verify:
+- Generated mockup templates are not automatically active unless admin reviews/activates them.
+- GPT-proposed placement is treated as a starting point, not trusted as final.
+- Generated template records include safe defaults for intended-use flags.
+- If generation fails, admin gets a clear error.
+
+8. Security/safety
+Verify:
+- Admin sync endpoint is protected by the same admin auth as other admin routes.
+- Template generation endpoint is protected appropriately.
+- Remote image fetching does not allow obviously unsafe/untrusted input beyond existing object storage / known image URLs.
+- No secrets/API keys leak into frontend logs or error messages.
+
+9. Tests
+Run:
+- pnpm --filter @workspace/api-server run typecheck
+- pnpm --filter @workspace/poster-store run typecheck
+- Relevant existing tests if available
+
+Add focused tests only where practical and low-cost, especially for pure logic:
+- sync planning / duplicate prevention
+- intended-use assignment rules
+- placement defaulting/validation
+- skip/overwrite behavior
+
+Manual QA checklist to report:
+- Admin templates tab loads
+- Intended-use switches save and reload
+- Sync tab loads
+- Sync one poster with one template works
+- Running same sync twice does not duplicate
+- Product page shows generated gallery mockup
+- Poster card hover uses generated hover mockup if configured
+- Existing manual mockups remain intact
+- Inactive template is skipped
+- Failed render is visible in admin
+
+Deliverable:
+Report:
+1. Bugs found
+2. Files changed
+3. Any code fixes made
+4. Typecheck/test results
+5. Manual QA result
+6. Remaining limitations or recommended next step
+
+Do not commit or push. Stop after the report.

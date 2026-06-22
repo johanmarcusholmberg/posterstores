@@ -113,6 +113,16 @@ router.post(
       existingMockups.map((m) => `${m.posterId}:${m.mockupTemplateId}`)
     );
 
+    // Track which posters already have a primary / hover assigned (pre-existing
+    // or just generated this run) so we never assign two primaries/hovers to
+    // the same poster within a single sync pass.
+    const assignedPrimary = new Set(
+      existingMockups.filter((m) => m.isPrimary).map((m) => m.posterId)
+    );
+    const assignedHover = new Set(
+      existingMockups.filter((m) => m.isHoverMockup).map((m) => m.posterId)
+    );
+
     // ── 4. Build work plan ───────────────────────────────────────────────────
     const results: SyncResult[] = [];
     let generated = 0;
@@ -221,17 +231,16 @@ router.post(
             }
           }
 
-          // Check if any primary mockup exists
-          const hasPrimary = existingMockups.some(
-            (m) => m.posterId === poster.id && m.isPrimary
-          );
-
-          const isPrimary = template.canBePrimary && !hasPrimary;
-          const isHover = template.canBeHover && !existingMockups.some(
-            (m) => m.posterId === poster.id && m.isHoverMockup
-          );
+          // Use running sets (not stale snapshot) to decide primary/hover
+          // so we never assign two primaries or two hovers to the same poster
+          // within a single sync pass.
+          const isPrimary = template.canBePrimary && !assignedPrimary.has(poster.id);
+          const isHover = template.canBeHover && !assignedHover.has(poster.id);
           const isGallery = template.canBeGallery;
 
+          // Plain insert — we already know this pair is new (alreadyExists is
+          // false). onConflictDoNothing guards against the rare case of a
+          // parallel sync running simultaneously (avoids partial-index issues).
           const [inserted] = await db
             .insert(posterMockupsTable)
             .values({
@@ -245,19 +254,26 @@ router.post(
               status: "generated",
               generatedAt: now,
             })
-            .onConflictDoUpdate({
-              target: [posterMockupsTable.posterId, posterMockupsTable.mockupTemplateId],
-              set: {
-                mockupImageUrl: imageUrl,
-                status: "generated",
-                generatedAt: now,
-                errorMessage: null,
-                updatedAt: now,
-              },
-            })
+            .onConflictDoNothing()
             .returning();
 
+          if (!inserted) {
+            // Parallel sync race — treat as skipped
+            skipped++;
+            results.push({
+              posterId: poster.id,
+              posterTitle: poster.title,
+              templateId: template.id,
+              templateName: template.name,
+              action: "skipped",
+              reason: "Conflict — pair was already inserted by a concurrent sync",
+            });
+            continue;
+          }
+
           existingSet.add(pairKey);
+          if (isPrimary) assignedPrimary.add(poster.id);
+          if (isHover) assignedHover.add(poster.id);
 
           generated++;
           results.push({

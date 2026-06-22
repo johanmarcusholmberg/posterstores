@@ -82,9 +82,13 @@ export async function compositePosterIntoTemplate(
   });
 
   if (config.rotation) {
-    posterResized = posterResized.rotate(config.rotation, {
-      background: { r: 0, g: 0, b: 0, a: 0 },
-    });
+    // Rotate expands the canvas — resize back to exactly areaW×areaH so the
+    // composited image doesn't bleed outside the intended placement area.
+    posterResized = posterResized
+      .rotate(config.rotation, {
+        background: { r: 0, g: 0, b: 0, a: 0 },
+      })
+      .resize(areaW, areaH, { fit: "cover" });
   }
 
   const borderRadiusPx =

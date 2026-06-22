@@ -37,9 +37,15 @@ function hasPlacementData(t: PosterMockupTemplate | null): boolean {
 
 /**
  * Returns true when a mockup should be shown to customers.
- * Inactive-template rows and orphaned template references are hidden.
+ * Inactive-template rows, orphaned template references, non-gallery mockups,
+ * and failed-sync rows with no image are hidden.
  */
 function isVisible(m: PosterMockup): boolean {
+  // Respect gallery flag — false means "not for gallery display"
+  // (defaults to true for existing/manual mockups so this is non-breaking)
+  if (m.isGallery === false) return false;
+  // Failed sync rows with no image produce nothing useful
+  if (m.status === "failed" && !m.mockupImageUrl) return false;
   if (!m.mockupTemplateId) return !!m.mockupImageUrl;
   if (m.template) return m.template.active !== false;
   return false;
