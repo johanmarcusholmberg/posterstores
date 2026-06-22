@@ -190,6 +190,23 @@ export class ObjectStorageService {
   }
 
   /**
+   * Delete an object from the private object dir by its sub-path.
+   * subPath must NOT start with '/'. Example: "mockup-composites/postsofspain/1/2-abc.jpg"
+   * Returns true if deleted, false if not found. Throws on unexpected errors.
+   */
+  async deleteObject(subPath: string): Promise<boolean> {
+    const privateObjectDir = this.getPrivateObjectDir();
+    const fullPath = `${privateObjectDir}/${subPath}`;
+    const { bucketName, objectName } = parseObjectPath(fullPath);
+    const bucket = objectStorageClient.bucket(bucketName);
+    const file = bucket.file(objectName);
+    const [exists] = await file.exists();
+    if (!exists) return false;
+    await file.delete();
+    return true;
+  }
+
+  /**
    * Upload a Buffer directly to the private object dir at the given sub-path.
    * subPath must NOT start with '/'. Example: "store-assets/postsofspain/logo/1234-logo.png"
    * Returns the normalised objectPath: "/objects/store-assets/postsofspain/logo/1234-logo.png"

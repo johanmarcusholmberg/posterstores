@@ -529,6 +529,10 @@ export const MockupGallery = ({
 /**
  * Lightbox image renderer — uses object-contain so portraits/squares/mockups
  * all display at their natural aspect ratio without cropping or stretching.
+ *
+ * For composited mockups the container aspect ratio is derived from the
+ * background image's natural dimensions so landscape/square templates are not
+ * forced into the portrait 3/4 frame.
  */
 function LightboxImage({
   item,
@@ -539,14 +543,41 @@ function LightboxImage({
   fallbackImageUrl: string;
   alt: string;
 }) {
+  const [bgRatio, setBgRatio] = useState<string | null>(null);
+
+  const bgUrl =
+    item.isComposited && item.mockup?.template?.backgroundImageUrl
+      ? item.mockup.template.backgroundImageUrl
+      : null;
+
+  // Probe the background image to get its natural dimensions so we can set
+  // the container aspect ratio correctly without hardcoding 3/4.
+  useEffect(() => {
+    if (!bgUrl) return;
+    const probe = new window.Image();
+    probe.onload = () => {
+      if (probe.naturalWidth && probe.naturalHeight) {
+        setBgRatio(`${probe.naturalWidth}/${probe.naturalHeight}`);
+      }
+    };
+    probe.src = bgUrl;
+    return () => { probe.onload = null; };
+  }, [bgUrl]);
+
   if (
     item.isComposited &&
     item.mockup?.template &&
     hasPlacementData(item.mockup.template) &&
     item.mockup.template.backgroundImageUrl
   ) {
+    // Default to 3/4 only until the probe fires (usually instant if already cached).
+    // Using aspect-ratio + max-height + max-width lets the browser compute the
+    // correct size without cropping landscape or square templates.
+    const aspectRatio = bgRatio ?? "3/4";
     return (
-      <div className="max-h-[82vh] max-w-[88vw] w-auto h-auto" style={{ aspectRatio: "3/4" }}>
+      <div
+        style={{ aspectRatio, maxHeight: "82vh", maxWidth: "88vw" }}
+      >
         <CompositedMockup
           backgroundUrl={item.mockup.template.backgroundImageUrl!}
           posterImageUrl={fallbackImageUrl}

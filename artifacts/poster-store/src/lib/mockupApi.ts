@@ -462,6 +462,7 @@ export interface SyncResponse {
   generated: number;
   skipped: number;
   failed: number;
+  plannedCount?: number;
   dryRun: boolean;
   results: SyncResult[];
   note?: string;

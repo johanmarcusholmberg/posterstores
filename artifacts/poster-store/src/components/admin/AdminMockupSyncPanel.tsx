@@ -61,8 +61,9 @@ export function AdminMockupSyncPanel({ storeKey }: AdminMockupSyncPanelProps) {
 
   const [status, setStatus] = useState<SyncStatus>("idle");
   const [results, setResults] = useState<SyncResult[] | null>(null);
-  const [summary, setSummary] = useState<{ generated: number; skipped: number; failed: number } | null>(null);
+  const [summary, setSummary] = useState<{ generated: number; skipped: number; failed: number; plannedCount?: number } | null>(null);
   const [syncNote, setSyncNote] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
 
   const syncableTemplates = templates.filter(
@@ -97,6 +98,7 @@ export function AdminMockupSyncPanel({ storeKey }: AdminMockupSyncPanelProps) {
     setResults(null);
     setSummary(null);
     setSyncNote(null);
+    setSyncError(null);
 
     const templateIds =
       selectedTemplateIds.length > 0 ? selectedTemplateIds : undefined;
@@ -110,7 +112,7 @@ export function AdminMockupSyncPanel({ storeKey }: AdminMockupSyncPanelProps) {
         dryRun,
       });
 
-      setSummary({ generated: resp.generated, skipped: resp.skipped, failed: resp.failed });
+      setSummary({ generated: resp.generated, skipped: resp.skipped, failed: resp.failed, plannedCount: resp.plannedCount });
       setResults(resp.results);
       setSyncNote(resp.note ?? null);
       setStatus("done");
@@ -129,6 +131,7 @@ export function AdminMockupSyncPanel({ storeKey }: AdminMockupSyncPanelProps) {
       }
     } catch (e: any) {
       setStatus("error");
+      setSyncError(e?.message ?? "Sync failed");
       toast({ title: "Sync failed", description: e?.message, variant: "destructive" });
     }
   }, [storeKey, scope, selectedTemplateIds, overwrite, dryRun]);
@@ -296,7 +299,13 @@ export function AdminMockupSyncPanel({ storeKey }: AdminMockupSyncPanelProps) {
           )}
         </Button>
         {status === "done" && summary && (
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            {summary.plannedCount != null && (
+              <>
+                <span className="text-muted-foreground">{summary.plannedCount} planned</span>
+                <span className="text-muted-foreground">·</span>
+              </>
+            )}
             <span className="flex items-center gap-1 text-emerald-600 font-medium">
               <CheckCircle2 className="w-4 h-4" />
               {summary.generated} generated
@@ -322,6 +331,16 @@ export function AdminMockupSyncPanel({ storeKey }: AdminMockupSyncPanelProps) {
           </span>
         )}
       </div>
+
+      {syncError && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 flex gap-3 text-sm text-destructive">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium mb-0.5">Sync blocked</p>
+            <p>{syncError}</p>
+          </div>
+        </div>
+      )}
 
       {syncNote && (
         <div className="text-sm text-muted-foreground bg-muted/60 rounded px-3 py-2">

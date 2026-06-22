@@ -15,6 +15,29 @@ import { randomUUID } from "crypto";
 const router = Router();
 const storage = new ObjectStorageService();
 
+/** Maximum poster × template combinations allowed per non-dry-run request. */
+const SYNC_HARD_LIMIT = 100;
+
+/**
+ * If the old imageUrl is a generated mockup-composite stored in our object
+ * storage, extract the sub-path and delete it.  We only touch URLs that
+ * match the expected `/api/storage/objects/mockup-composites/` prefix so
+ * manually-uploaded assets and external URLs are never affected.
+ */
+async function tryDeleteOldComposite(
+  imageUrl: string | null | undefined,
+  log: { warn: (obj: object, msg: string) => void }
+): Promise<void> {
+  const GENERATED_PREFIX = "/api/storage/objects/mockup-composites/";
+  if (!imageUrl || !imageUrl.startsWith(GENERATED_PREFIX)) return;
+  const subPath = imageUrl.slice("/api/storage/objects/".length); // "mockup-composites/…"
+  try {
+    await storage.deleteObject(subPath);
+  } catch (err) {
+    log.warn({ err, subPath }, "Failed to delete old composite from storage (non-fatal)");
+  }
+}
+
 interface SyncResult {
   posterId: number;
   posterTitle: string;
@@ -94,10 +117,20 @@ router.post(
     }
 
     if (targetTemplates.length === 0) {
-      return res.json({ generated: 0, skipped: 0, failed: 0, results: [], note: "No active templates with placement data and background image found." });
+      return res.json({ generated: 0, skipped: 0, failed: 0, plannedCount: 0, results: [], note: "No active templates with placement data and background image found." });
     }
 
-    // ── 3. Load existing poster_mockups for these posters ────────────────────
+    // ── 3. Safety-limit check ────────────────────────────────────────────────
+    const plannedCount = targetPosters.length * targetTemplates.length;
+    if (!dryRun && plannedCount > SYNC_HARD_LIMIT) {
+      return res.status(400).json({
+        error: `Sync would generate ${plannedCount} combinations (${targetPosters.length} poster${targetPosters.length !== 1 ? "s" : ""} × ${targetTemplates.length} template${targetTemplates.length !== 1 ? "s" : ""}), which exceeds the safe limit of ${SYNC_HARD_LIMIT} per request. Reduce the number of posters or templates, or run multiple smaller syncs.`,
+        plannedCount,
+        limit: SYNC_HARD_LIMIT,
+      });
+    }
+
+    // ── 4. Load existing poster_mockups for these posters ────────────────────
     const posterIdsTarget = targetPosters.map((p) => p.id);
     const existingMockups = await db
       .select()
@@ -206,6 +239,9 @@ router.post(
               (m) => m.posterId === poster.id && m.mockupTemplateId === template.id
             );
             if (existing) {
+              // Delete the old generated composite from storage before overwriting
+              await tryDeleteOldComposite(existing.mockupImageUrl, req.log);
+
               await db
                 .update(posterMockupsTable)
                 .set({
@@ -331,6 +367,7 @@ router.post(
       generated,
       skipped,
       failed,
+      plannedCount,
       dryRun,
       results,
     });
