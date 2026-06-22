@@ -1,0 +1,270 @@
+You are working in the Poster Stores project.
+
+Goal:
+Upgrade the admin mockup system so mockup templates can automatically detect where the poster should go. The operator should not rely only on manual x/y/width/height placement.
+
+Current state:
+- Store admin owns mockup templates and poster mockup sync.
+- mockup_templates has intended-use flags: canBePrimary, canBeHover, canBeGallery.
+- poster_mockups stores generated synced mockups.
+- mockupSync.ts composites posters into templates using placement settings.
+- generateMockupTemplate.ts can generate a template record.
+- mockupCompositor.ts uses Sharp to place posters into templates.
+- Large sync safety, duplicate prevention, old-object cleanup, and dynamic lightbox ratio are already implemented.
+- Both api-server and poster-store typechecks are clean.
+
+New goal:
+Make template mockups intelligent.
+
+When a mockup template is uploaded or generated, the system should analyze the image and automatically identify the poster/frame/print surface where the poster artwork belongs.
+
+The sync should then use that detected poster surface instead of relying on manually typed placement.
+
+Important:
+- Do not remove manual placement. Keep it as fallback and override.
+- Do not break existing templates.
+- Do not refactor broadly.
+- Do not implement a full background queue.
+- Do not create branches, PRs, commits, pushes, or GitHub automation.
+- Make targeted changes and report back.
+- Generated templates must still start inactive until reviewed by admin.
+
+Feature to build: Smart mockup placement detection
+
+1. Data model
+
+Add safe, idempotent migration fields to mockup_templates.
+
+Add fields similar to:
+
+- placementMode:
+  - manual
+  - auto_detected
+  - auto_detected_needs_review
+- detectedPlacementConfig jsonb
+- detectedPlacementConfidence number / real
+- detectedPlacementStatus:
+  - not_analyzed
+  - detected
+  - needs_review
+  - failed
+- detectedPlacementError text
+- analyzedAt timestamp
+
+detectedPlacementConfig should support:
+
+{
+  "surfaceType": "poster" | "frame" | "paper" | "unknown",
+  "confidence": 0.0-1.0,
+  "coordinateSystem": "normalized",
+  "corners": {
+    "topLeft": { "x": 0.0-1.0, "y": 0.0-1.0 },
+    "topRight": { "x": 0.0-1.0, "y": 0.0-1.0 },
+    "bottomRight": { "x": 0.0-1.0, "y": 0.0-1.0 },
+    "bottomLeft": { "x": 0.0-1.0, "y": 0.0-1.0 }
+  },
+  "boundingBox": {
+    "x": 0.0-1.0,
+    "y": 0.0-1.0,
+    "width": 0.0-1.0,
+    "height": 0.0-1.0
+  },
+  "rotation": 0,
+  "recommendedFitMode": "cover" | "contain" | "stretch",
+  "recommendedRender": {
+    "shadowOpacity": number,
+    "shadowBlur": number,
+    "highlightOpacity": number,
+    "overlayOpacity": number,
+    "borderRadius": number
+  },
+  "warnings": []
+}
+
+Keep the existing placement_config and render_config fields. The effective placement should be resolved like this:
+- If placementMode is auto_detected and detectedPlacementStatus is detected, use detectedPlacementConfig.
+- If placementMode is auto_detected_needs_review, show it in admin preview but do not use for public sync unless admin approves.
+- If auto detection failed or no detection exists, fall back to existing manual placement_config.
+- Manual placement always wins if admin chooses manual.
+
+2. Placement analyzer service
+
+Create a server-side analyzer, for example:
+
+artifacts/api-server/src/lib/mockupPlacementAnalyzer.ts
+
+It should:
+- Accept a template image URL.
+- Download/load the image safely.
+- Send it to the existing AI/vision provider if available.
+- Ask the model to identify the visible poster/frame/print area where artwork should be inserted.
+- Return strict JSON matching detectedPlacementConfig.
+- Validate and clamp all coordinates to 0–1.
+- Reject impossible geometry.
+- Set confidence.
+- Add warnings for low confidence, occlusion, tilted/perspective surfaces, multiple possible frames, or no clear poster area.
+
+Prompt the model carefully:
+- It must identify the empty poster/frame/paper surface intended to receive artwork.
+- It must return four corner points in normalized coordinates.
+- It must not describe the image in prose.
+- It must return JSON only.
+- If multiple frames exist, choose the most central/largest intended poster surface.
+- If no clear surface exists, return confidence below 0.5 and surfaceType unknown.
+
+If no vision provider is cleanly reusable:
+- Implement the server structure and admin UI hooks.
+- Add a clear TODO/report saying which provider integration is missing.
+- Do not fake detection.
+
+3. Analyze template endpoint
+
+Add admin-protected endpoint:
+
+POST /api/admin/mockup-templates/:id/analyze-placement
+
+Behavior:
+- Load the template.
+- Run mockupPlacementAnalyzer.
+- Save detectedPlacementConfig, confidence, status, error, analyzedAt.
+- If confidence >= 0.75 and geometry is valid, set placementMode to auto_detected_needs_review, not fully auto_detected.
+- Admin must approve detected placement before it becomes active.
+- If confidence < 0.75, keep placementMode manual or auto_detected_needs_review and status needs_review.
+- If failed, status failed and store detectedPlacementError.
+
+Return:
+- template id
+- detected config
+- confidence
+- status
+- warnings
+
+4. Generated template flow
+
+Update generateMockupTemplate.ts:
+
+When a mockup template is generated:
+- Generate the background/mockup template as before.
+- Save it inactive.
+- Immediately run placement analysis if vision provider is available.
+- Save detected placement result.
+- Keep placementMode as auto_detected_needs_review.
+- Do not activate the template automatically.
+- Do not sync it automatically.
+- Admin must review and approve.
+
+Also improve the generation prompt so generated mockup templates are easier to analyze:
+- Ask for a realistic interior/wall/frame scene.
+- The poster/frame area should be empty, clean, unobstructed, and clearly visible.
+- The poster area should have natural lighting/shadow but no text/artwork.
+- Avoid multiple competing frames unless specifically requested.
+- Avoid extreme angles unless perspective rendering is supported.
+
+5. Admin UI
+
+Update MockupTemplateForm or AdminMockups template editor.
+
+Add an “Auto placement” section:
+
+Show:
+- Detection status
+- Confidence
+- Analyze / Re-analyze placement button
+- Detected warnings
+- Preview overlay of detected corners/bounding box on the template image
+- Button: “Approve detected placement”
+- Button: “Use manual placement instead”
+
+Behavior:
+- If detected placement exists, draw the detected polygon/box over the template preview.
+- Admin can approve it.
+- Approving sets placementMode = auto_detected.
+- Manual fallback sets placementMode = manual.
+- If confidence is low, clearly label it “Needs review”.
+- Existing numeric placement controls remain available.
+
+6. Sync behavior
+
+Update mockupSync.ts / mockupCompositor.ts so sync uses effective placement.
+
+Implement helper:
+
+resolveEffectiveMockupPlacement(template)
+
+Rules:
+- If placementMode = auto_detected and detectedPlacementStatus = detected, use detectedPlacementConfig.
+- Else use manual placement_config.
+- Return both placement source and warnings.
+
+Use effective placement when generating composites.
+
+Result logs should include:
+- placementSource: auto_detected or manual
+- warnings if auto placement was missing/invalid/fallback
+
+7. Compositor behavior
+
+The compositor should support the detected placement as well as possible.
+
+Minimum:
+- Convert detected normalized boundingBox/corners into pixel coordinates.
+- If the corners form a mostly rectangular/rotated rectangle, derive x/y/width/height/rotation and use current Sharp compositing path.
+- Preserve existing fit modes.
+- Preserve current shadow/highlight/render settings.
+
+Perspective:
+- If arbitrary four-corner perspective transform can be implemented safely with an existing/lightweight dependency, implement it.
+- If not, do not fake it.
+- Store the four corners and show the correct overlay in admin, but for server render use best-fit rotated rectangle.
+- Add a warning when detected perspective is too strong for the current renderer:
+  “Detected perspective requires future perspective renderer; using best-fit rectangle.”
+- Do not make public mockups look broken.
+
+8. Public behavior
+
+Do not change public product behavior except that newly generated mockups should appear more correctly positioned after admin approval and sync.
+
+Verify:
+- Product gallery still works.
+- Poster card hover still works.
+- Primary mockup still works.
+- Lightbox still works.
+- Existing manual templates still work.
+
+9. Tests / verification
+
+Run:
+- pnpm --filter @workspace/api-server run typecheck
+- pnpm --filter @workspace/poster-store run typecheck
+
+Add focused low-cost tests where practical:
+- detected coordinate validation/clamping
+- effective placement resolution
+- fallback from auto to manual
+- low-confidence detection handling
+- generated template starts inactive and needs review
+
+Manual QA checklist:
+- Existing manual template still works
+- Uploaded template can be analyzed
+- Generated template gets analyzed if provider is available
+- Detection result is visible in admin
+- Admin can approve detected placement
+- Admin can switch back to manual placement
+- Sync uses auto-detected placement after approval
+- Sync falls back to manual placement when detection is missing/failed
+- Public product/gallery/hover behavior still works
+- Low-confidence detections do not auto-activate
+
+Deliverable:
+Report:
+1. Files changed
+2. DB migration summary
+3. Analyzer endpoint summary
+4. Admin UI changes
+5. Sync/compositor changes
+6. Typecheck/test results
+7. Manual QA results
+8. Limitations, especially if full perspective transform is not implemented
+
+Do not commit or push. Stop after implementation and report.
