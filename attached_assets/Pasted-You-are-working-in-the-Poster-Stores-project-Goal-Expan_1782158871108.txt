@@ -1,0 +1,222 @@
+You are working in the Poster Stores project.
+
+Goal:
+Expand the current store admin mockup functionality so the STORE ADMIN owns and manages all poster mockups. The mockup section should support:
+
+1. Managing reusable mockup templates
+2. Generating/adding new mockup templates
+3. Synchronizing template mockups with posters
+4. Automatically compositing/uploading each poster into selected mockup templates with correct fitting, placement, shading, and hover/primary usage
+5. Keeping the process suitable for one operator managing many posters
+
+Important workflow context:
+- The store/admin should own mockups, not the art style generator.
+- The generator may create poster art, but the store should decide which mockups exist, which posters get which mockups, and how mockups are synchronized.
+- Do not create a separate “mockup mode” for users. This is an admin/operator workflow.
+- Keep changes targeted and avoid unnecessary rebuilds or broad refactors.
+- Do not create branches, PRs, or run git automation. Make changes only, then report files changed and ask for approval before any commit/push.
+
+First, inspect the existing codebase before changing anything:
+- Current mockup/admin implementation
+- Poster image model
+- Mockup gallery/product gallery logic
+- Existing fields such as isPrimary, isHoverMockup, placement metadata, sourceImageWidth/sourceImageHeight, etc.
+- Existing upload/storage APIs
+- Existing image generation/upscale/provider code, if any reusable endpoints exist
+
+Then implement the smallest robust version of this feature.
+
+Desired admin UX:
+
+Add or improve a “Mockup Templates” area inside store administration.
+
+Each mockup template should have:
+- Name
+- Template image
+- Optional preview thumbnail
+- Store association
+- Active/inactive status
+- Sort order
+- Template category/type, for example:
+  - framed wall
+  - room scene
+  - close-up frame
+  - lifestyle
+  - product card hover
+- Intended use flags:
+  - can be primary product mockup
+  - can be hover mockup
+  - can be gallery mockup
+- Poster placement settings:
+  - x
+  - y
+  - width
+  - height
+  - rotation
+  - optional corner/perspective values if the current code can support it safely
+- Styling/compositing settings:
+  - border radius
+  - shadow opacity
+  - shadow blur
+  - highlight opacity
+  - overlay/shading opacity
+  - blend mode if already practical
+  - fit mode: cover / contain / stretch
+- Safe defaults for all settings
+
+Admin should be able to:
+- Upload a new mockup template image
+- Edit placement visually or numerically
+- See a live preview using a selected poster
+- Save the template
+- Mark template active/inactive
+- Set intended use flags
+- Select which templates should apply to all posters or selected posters
+- Run synchronization
+
+Synchronization behavior:
+
+Add a “Sync mockups” action in admin.
+
+It should support:
+- Sync selected poster
+- Sync all published posters
+- Sync posters missing mockups
+- Sync selected templates only
+- Dry-run/preview count if easy to add
+
+When sync runs:
+- For each selected poster and active selected template:
+  - Create or update a generated/composited mockup image
+  - Use the poster image as the inserted artwork
+  - Apply placement/fitting/shading settings from the template
+  - Upload/store the resulting mockup image
+  - Connect it to the poster’s mockup/gallery images
+  - Respect intended use flags:
+    - if template is hover mockup, set resulting image as hover mockup when appropriate
+    - if template is primary mockup, allow it to be primary only if no existing primary mockup exists, unless admin explicitly overrides
+    - gallery mockups should appear in product gallery
+- Avoid duplicate mockups for the same poster/template pair.
+- If a poster image changes, the sync should be able to regenerate affected mockups.
+- Keep existing manually adjusted mockups safe unless admin explicitly chooses overwrite/regenerate.
+
+Data model:
+
+Add idempotent migrations as needed. Prefer explicit tables instead of overloading existing poster image rows too much.
+
+Suggested model, but adapt to existing schema:
+
+mockup_templates:
+- id
+- store_id
+- name
+- template_image_url
+- thumbnail_url
+- category
+- is_active
+- sort_order
+- can_be_primary
+- can_be_hover
+- can_be_gallery
+- placement_config jsonb
+- render_config jsonb
+- created_at
+- updated_at
+
+poster_mockups or equivalent relationship:
+- id
+- poster_id
+- template_id
+- image_url
+- status: pending / generated / failed
+- is_primary
+- is_hover_mockup
+- is_gallery
+- generated_at
+- error_message
+- created_at
+- updated_at
+
+If existing poster image/mockup tables already cover this, reuse them, but ensure template_id/poster_id uniqueness exists.
+
+Compositing/rendering:
+
+Implement a practical first version. Do not over-engineer.
+
+Preferred:
+- Use existing server-side image tools if already available.
+- Otherwise implement a simple server-side compositing route using available Node image tooling already in the project, or add one lightweight dependency only if necessary.
+- The renderer should:
+  - load the mockup template image
+  - load the poster image
+  - resize/crop the poster according to fit mode and placement_config
+  - composite the poster into the template
+  - apply optional shadow/highlight/overlay effects if feasible
+  - export a web-optimized image
+  - upload/store it using the existing storage pattern
+
+Important:
+- If full perspective transform is not safely available, implement x/y/width/height/rotation first and leave perspective as future-ready config.
+- Do not break existing mockup gallery behavior.
+- Existing product page/gallery/lightbox behavior must keep working.
+
+Generating new mockup templates:
+
+Add admin support to “Generate mockup template” only if the project already has image generation/provider functionality that can be reused cleanly.
+
+If available:
+- Add a simple admin action:
+  - prompt
+  - style/category
+  - generate template image
+  - save generated image as a mockup template
+- Generated templates should still require admin placement review before activation.
+- Do not automatically apply generated templates to posters until activated.
+
+If generation endpoints are not already available or would require a large refactor:
+- Add the UI/data model hooks as “manual upload first”
+- Leave a clearly marked TODO/report explaining what endpoint integration is needed later
+- Do not invent a broken generation flow
+
+Admin safety:
+
+- Add clear status messages during sync.
+- Show generated / failed / skipped counts.
+- Show failed poster/template combinations with error text.
+- Make sync idempotent.
+- Do not overwrite existing mockups unless admin explicitly selects overwrite/regenerate.
+- Keep a confirmation step for “sync all posters”.
+
+Testing/verification:
+
+Run:
+- Typecheck
+- Existing relevant tests
+- Add focused tests for pure logic where possible:
+  - template selection
+  - duplicate prevention
+  - sync planning
+  - primary/hover assignment rules
+  - placement config defaults
+
+Manual QA checklist:
+- Admin can create/upload a template
+- Admin can preview poster inside template
+- Admin can save placement/render settings
+- Admin can sync one poster with one template
+- Duplicate sync does not create duplicates
+- Sync missing mockups only skips posters that already have generated mockups
+- Product page still shows gallery images correctly
+- Hover mockup still works on poster cards
+- Existing mockups are not lost
+
+Deliverables:
+1. Files changed
+2. DB migration summary
+3. Admin UI changes
+4. API/server changes
+5. Sync behavior summary
+6. Any limitations, especially around perspective transform or AI template generation
+7. Typecheck/test results
+
+Do not commit or push. Stop after implementation and report back.
