@@ -181,13 +181,11 @@ function Router() {
   return (
     <Switch>
       {/*
-       * Admin routes — two entries cover both the bare /admin path and all
-       * /admin/* sub-paths. Both render AdminRoutes which handles the inner
-       * Switch. wouter's exact matching means /admin only matches the first
-       * entry; /admin/anything matches the second.
+       * Admin routes — a single regex catches /admin and any /admin/…
+       * sub-path including multi-segment paths like /admin/posters/5.
+       * Using a regex because wouter v3's :param+ does not span slashes.
        */}
-      <Route path="/admin" component={AdminRoutes} />
-      <Route path="/admin/:rest+" component={AdminRoutes} />
+      <Route path={/^\/admin(\/.*)?$/} component={AdminRoutes} />
 
       {/* Public storefront — catch-all (handles both prefixed and unprefixed) */}
       <Route>
