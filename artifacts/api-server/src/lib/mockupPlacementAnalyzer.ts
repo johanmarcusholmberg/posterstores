@@ -65,8 +65,29 @@ export interface DetectedPlacementConfig {
     borderRadius: number;
   };
   warnings: string[];
-  /** Set to "manual_surface" when corners were saved via the admin surface editor, not AI detection. */
+  /**
+   * @deprecated Use the `placement_config` column for manual surfaces.
+   * Legacy: "manual_surface" may appear in rows saved before the column was added.
+   */
   source?: "ai" | "manual_surface";
+}
+
+/**
+ * Admin-defined manual poster surface.
+ * Stored in the `placement_config` JSONB column — never mixed with AI detection data.
+ */
+export interface ManualSurfaceConfig {
+  mode: "corners" | "bounding_box";
+  coordinateSystem: "normalized";
+  source: "manual";
+  corners?: {
+    topLeft: NormalizedPoint;
+    topRight: NormalizedPoint;
+    bottomRight: NormalizedPoint;
+    bottomLeft: NormalizedPoint;
+  };
+  boundingBox?: { x: number; y: number; width: number; height: number };
+  fitMode?: string;
 }
 
 export interface PlacementAnalysisResult {
@@ -78,7 +99,14 @@ export interface PlacementAnalysisResult {
 
 // ─── Effective surface resolver ───────────────────────────────────────────────
 
-export type SurfaceRenderMode = "corners" | "bounding_box";
+/**
+ * How the poster is geometrically composited onto the background.
+ * Note: this is NOT the same as template.renderMode ("deterministic" | "ai_rendered").
+ */
+export type SurfaceGeometryMode = "corners" | "bounding_box";
+/** @deprecated Use SurfaceGeometryMode */
+export type SurfaceRenderMode = SurfaceGeometryMode;
+
 export type SurfaceSource =
   | "auto_detected_corners"
   | "auto_detected_bbox"
@@ -88,11 +116,14 @@ export type SurfaceSource =
 
 /**
  * Resolved poster surface, ready for the compositor.
- * When `renderMode === "corners"`, use `corners` + `compositePosterWithCorners`.
- * When `renderMode === "bounding_box"`, use `posterX/Y/Width/Height` + `compositePosterIntoTemplate`.
+ * When `geometryMode === "corners"`, use `corners` + `compositePosterWithCorners`.
+ * When `geometryMode === "bounding_box"`, use `posterX/Y/Width/Height` + `compositePosterIntoTemplate`.
+ *
+ * Note: `geometryMode` here is distinct from the template's `renderMode` field
+ * ("deterministic" | "ai_rendered"), which controls the renderer pipeline.
  */
 export interface EffectiveMockupSurface {
-  renderMode: SurfaceRenderMode;
+  geometryMode: SurfaceGeometryMode;
   corners: CornerPoints | null;
   posterX: number | null;
   posterY: number | null;
@@ -221,16 +252,24 @@ function isNonRectangular(corners: CornerPoints, tol = 0.005): boolean {
 }
 
 /**
- * Resolve the effective poster surface for a template, combining manual fields,
- * AI-detected config, and fallback rules.
+ * Resolve the effective poster surface for a template.
+ *
+ * Priority:
+ *   1. placementMode === "auto_detected" + valid detectedPlacementConfig (AI only)
+ *   2. placementConfig with valid corners (admin manual surface column)
+ *   3. placementConfig with valid bounding box
+ *   4. Legacy: detectedPlacementConfig with source="manual_surface" (backward compat)
+ *   5. Legacy: posterX/Y/Width/Height scalar fields
+ *   6. Fallback (no surface — sync will skip this template)
  *
  * User-facing name: "Poster surface".
- * Internal backward-compat name: placement.
  */
 export function resolveEffectiveMockupSurface(template: {
   placementMode: string | null;
   detectedPlacementStatus: string | null;
   detectedPlacementConfig: unknown;
+  /** Admin-defined manual surface (placement_config column). */
+  placementConfig?: unknown;
   posterX: number | null;
   posterY: number | null;
   posterWidth: number | null;
@@ -241,79 +280,157 @@ export function resolveEffectiveMockupSurface(template: {
   const mode = template.placementMode ?? "manual";
   const status = template.detectedPlacementStatus ?? "not_analyzed";
 
+  // ── Priority 1: AI-approved detected surface ──────────────────────────────
+  // Only active when admin has set placementMode = "auto_detected".
+  // detectedPlacementConfig must contain pure AI data (not legacy manual_surface rows).
   if (mode === "auto_detected" && status === "detected" && template.detectedPlacementConfig) {
     try {
       const cfg = template.detectedPlacementConfig as DetectedPlacementConfig;
-
-      // --- Prefer corners when they form a valid non-degenerate quad ---
-      const c = cfg.corners;
-      if (c?.topLeft && c.topRight && c.bottomRight && c.bottomLeft) {
-        const cornersObj: CornerPoints = {
-          topLeft: c.topLeft,
-          topRight: c.topRight,
-          bottomRight: c.bottomRight,
-          bottomLeft: c.bottomLeft,
-        };
-        const cornerError = validateSurfaceCorners(cornersObj);
-        if (!cornerError) {
-          const isManualSource = cfg.source === "manual_surface";
-          const bb = convertCornersToBoundingBox(cornersObj);
-          const warnings: string[] = [...(cfg.warnings ?? [])];
-          const renderMode: SurfaceRenderMode = isNonRectangular(cornersObj)
-            ? "corners"
-            : "bounding_box";
-
+      // Skip legacy rows that were wrongly written to this column
+      if (cfg.source !== "manual_surface") {
+        const c = cfg.corners;
+        if (c?.topLeft && c.topRight && c.bottomRight && c.bottomLeft) {
+          const cornersObj: CornerPoints = {
+            topLeft: c.topLeft,
+            topRight: c.topRight,
+            bottomRight: c.bottomRight,
+            bottomLeft: c.bottomLeft,
+          };
+          const cornerError = validateSurfaceCorners(cornersObj);
+          if (!cornerError) {
+            const bb = convertCornersToBoundingBox(cornersObj);
+            const geometryMode: SurfaceGeometryMode = isNonRectangular(cornersObj) ? "corners" : "bounding_box";
+            return {
+              geometryMode,
+              corners: cornersObj,
+              posterX: round3(bb.x * 100),
+              posterY: round3(bb.y * 100),
+              posterWidth: round3(bb.width * 100),
+              posterHeight: round3(bb.height * 100),
+              rotation: cfg.rotation ?? 0,
+              fitMode: cfg.recommendedFitMode ?? template.fitMode ?? null,
+              surfaceSource: geometryMode === "corners" ? "auto_detected_corners" : "auto_detected_bbox",
+              warnings: [...(cfg.warnings ?? [])],
+            };
+          }
+        }
+        // Fall back to detected bounding box
+        const bb = cfg.boundingBox;
+        if (bb && typeof bb.x === "number" && typeof bb.y === "number" &&
+            typeof bb.width === "number" && typeof bb.height === "number" &&
+            bb.width > 0.01 && bb.height > 0.01) {
           return {
-            renderMode,
-            corners: cornersObj,
+            geometryMode: "bounding_box",
+            corners: null,
             posterX: round3(bb.x * 100),
             posterY: round3(bb.y * 100),
             posterWidth: round3(bb.width * 100),
             posterHeight: round3(bb.height * 100),
             rotation: cfg.rotation ?? 0,
             fitMode: cfg.recommendedFitMode ?? template.fitMode ?? null,
-            surfaceSource: isManualSource
-              ? renderMode === "corners"
-                ? "manual_corners"
-                : "manual_bbox"
-              : renderMode === "corners"
-              ? "auto_detected_corners"
-              : "auto_detected_bbox",
-            warnings,
+            surfaceSource: "auto_detected_bbox",
+            warnings: [...(cfg.warnings ?? [])],
           };
         }
       }
-
-      // --- Fall back to bounding box from detected config ---
-      const bb = cfg.boundingBox;
-      if (
-        bb &&
-        typeof bb.x === "number" &&
-        typeof bb.y === "number" &&
-        typeof bb.width === "number" &&
-        typeof bb.height === "number" &&
-        bb.width > 0.01 &&
-        bb.height > 0.01
-      ) {
-        return {
-          renderMode: "bounding_box",
-          corners: null,
-          posterX: round3(bb.x * 100),
-          posterY: round3(bb.y * 100),
-          posterWidth: round3(bb.width * 100),
-          posterHeight: round3(bb.height * 100),
-          rotation: cfg.rotation ?? 0,
-          fitMode: cfg.recommendedFitMode ?? template.fitMode ?? null,
-          surfaceSource: "auto_detected_bbox",
-          warnings: [...(cfg.warnings ?? [])],
-        };
-      }
     } catch {
-      // fall through to manual
+      // fall through
     }
   }
 
-  // --- Manual bounding box (posterX/Y/Width/Height) ---
+  // ── Priority 2 & 3: Admin-defined manual surface (placement_config column) ─
+  if (template.placementConfig) {
+    try {
+      const mc = template.placementConfig as ManualSurfaceConfig;
+      if (mc.source === "manual" && mc.coordinateSystem === "normalized") {
+        if (mc.mode === "corners" && mc.corners) {
+          const c = mc.corners;
+          const cornersObj: CornerPoints = {
+            topLeft: c.topLeft,
+            topRight: c.topRight,
+            bottomRight: c.bottomRight,
+            bottomLeft: c.bottomLeft,
+          };
+          const cornerError = validateSurfaceCorners(cornersObj);
+          if (!cornerError) {
+            const bb = convertCornersToBoundingBox(cornersObj);
+            const geometryMode: SurfaceGeometryMode = isNonRectangular(cornersObj) ? "corners" : "bounding_box";
+            return {
+              geometryMode,
+              corners: cornersObj,
+              posterX: round3(bb.x * 100),
+              posterY: round3(bb.y * 100),
+              posterWidth: round3(bb.width * 100),
+              posterHeight: round3(bb.height * 100),
+              rotation: 0,
+              fitMode: mc.fitMode ?? template.fitMode ?? null,
+              surfaceSource: geometryMode === "corners" ? "manual_corners" : "manual_bbox",
+              warnings: [],
+            };
+          }
+        }
+        if (mc.mode === "bounding_box" && mc.boundingBox) {
+          const bb = mc.boundingBox;
+          if (bb.width > 0.01 && bb.height > 0.01) {
+            return {
+              geometryMode: "bounding_box",
+              corners: null,
+              posterX: round3(bb.x * 100),
+              posterY: round3(bb.y * 100),
+              posterWidth: round3(bb.width * 100),
+              posterHeight: round3(bb.height * 100),
+              rotation: 0,
+              fitMode: mc.fitMode ?? template.fitMode ?? null,
+              surfaceSource: "manual_bbox",
+              warnings: [],
+            };
+          }
+        }
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  // ── Priority 4: Legacy — manual_surface saved in detectedPlacementConfig ──
+  // Backward compat for rows written before the placement_config column existed.
+  if (template.detectedPlacementConfig) {
+    try {
+      const cfg = template.detectedPlacementConfig as DetectedPlacementConfig;
+      if (cfg.source === "manual_surface") {
+        const c = cfg.corners;
+        if (c?.topLeft && c.topRight && c.bottomRight && c.bottomLeft) {
+          const cornersObj: CornerPoints = {
+            topLeft: c.topLeft,
+            topRight: c.topRight,
+            bottomRight: c.bottomRight,
+            bottomLeft: c.bottomLeft,
+          };
+          const cornerError = validateSurfaceCorners(cornersObj);
+          if (!cornerError) {
+            const bb = convertCornersToBoundingBox(cornersObj);
+            const geometryMode: SurfaceGeometryMode = isNonRectangular(cornersObj) ? "corners" : "bounding_box";
+            return {
+              geometryMode,
+              corners: cornersObj,
+              posterX: round3(bb.x * 100),
+              posterY: round3(bb.y * 100),
+              posterWidth: round3(bb.width * 100),
+              posterHeight: round3(bb.height * 100),
+              rotation: cfg.rotation ?? 0,
+              fitMode: cfg.recommendedFitMode ?? template.fitMode ?? null,
+              surfaceSource: geometryMode === "corners" ? "manual_corners" : "manual_bbox",
+              warnings: ["Legacy: surface was saved in the AI detection column. Re-save via the corner editor to migrate."],
+            };
+          }
+        }
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  // ── Priority 5: Legacy manual bounding box (posterX/Y/Width/Height fields) ─
   if (
     template.posterX != null &&
     template.posterY != null &&
@@ -321,7 +438,7 @@ export function resolveEffectiveMockupSurface(template: {
     template.posterHeight != null
   ) {
     return {
-      renderMode: "bounding_box",
+      geometryMode: "bounding_box",
       corners: null,
       posterX: template.posterX,
       posterY: template.posterY,
@@ -332,13 +449,14 @@ export function resolveEffectiveMockupSurface(template: {
       surfaceSource: "manual_bbox",
       warnings:
         mode === "auto_detected"
-          ? ["Auto-detected surface unavailable — using manual surface fallback"]
+          ? ["Auto-detected surface unavailable — using manual bounding box fallback"]
           : [],
     };
   }
 
+  // ── Priority 6: No valid surface ─────────────────────────────────────────
   return {
-    renderMode: "bounding_box",
+    geometryMode: "bounding_box",
     corners: null,
     posterX: null,
     posterY: null,

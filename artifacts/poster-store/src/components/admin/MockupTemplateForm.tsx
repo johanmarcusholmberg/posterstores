@@ -15,6 +15,7 @@ import {
 import {
   type MockupTemplate,
   type DetectedPlacementConfig,
+  type ManualSurfaceConfig,
   type PlacementMode,
   type DetectedPlacementStatus,
   adminCreateMockupTemplate,
@@ -270,6 +271,10 @@ export function MockupTemplateForm({
   );
   const [storedDetectedConfig, setStoredDetectedConfig] = useState<DetectedPlacementConfig | null>(
     template?.detectedPlacementConfig ?? null
+  );
+  /** Admin-defined manual surface stored in placement_config column. Separate from AI detection. */
+  const [storedManualSurface, setStoredManualSurface] = useState<ManualSurfaceConfig | null>(
+    template?.placementConfig ?? null
   );
   const [analyzingTemplate, setAnalyzingTemplate] = useState(false);
   const [showSurfaceEditor, setShowSurfaceEditor] = useState(false);
@@ -680,37 +685,28 @@ export function MockupTemplateForm({
       const bbW = Math.max(...xs) - bbX;
       const bbH = Math.max(...ys) - bbY;
 
-      const newConfig: DetectedPlacementConfig = {
-        surfaceType: "unknown",
-        confidence: 1,
+      // Write to placement_config column (manual surface), NOT detectedPlacementConfig (AI only).
+      const manualConfig: ManualSurfaceConfig = {
+        mode: "corners",
         coordinateSystem: "normalized",
+        source: "manual",
         corners,
         boundingBox: { x: bbX, y: bbY, width: bbW, height: bbH },
-        rotation: 0,
-        recommendedFitMode: "cover",
-        recommendedRender: {
-          shadowOpacity: 0.3,
-          shadowBlur: 15,
-          highlightOpacity: 0,
-          overlayOpacity: 0,
-          borderRadius: 0,
-        },
-        warnings: [],
-        source: "manual_surface",
+        fitMode: fitMode || "cover",
       };
 
       await adminUpdateMockupTemplate(template.id, {
-        placementMode: "auto_detected",
-        detectedPlacementConfig: newConfig,
-        detectedPlacementStatus: "detected",
+        // Keep placementMode as "manual" — this is admin-defined, not AI-detected.
+        placementMode: "manual",
+        placementConfig: manualConfig,
       } as any);
 
-      setStoredDetectedConfig(newConfig);
-      setPlacementMode("auto_detected");
-      setDetectedStatus("detected");
+      setStoredManualSurface(manualConfig);
+      // Do NOT change placementMode to "auto_detected" — manual surface stays "manual".
+      setPlacementMode("manual");
       setShowSurfaceEditor(false);
       setSurfaceChanged(true);
-      toast({ title: "Surface corners saved", description: "Run Sync mockups to regenerate images with the new surface." });
+      toast({ title: "Manual surface saved", description: "Run Sync mockups to regenerate public images." });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Save failed";
       toast({ variant: "destructive", title: "Failed to save surface", description: msg });
@@ -1334,7 +1330,15 @@ export function MockupTemplateForm({
                     placementMode === "auto_detected_needs_review" && "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300",
                     placementMode === "manual" && "bg-muted text-muted-foreground border-border"
                   )}>
-                    {placementMode === "auto_detected" ? "✓ Active" : placementMode === "auto_detected_needs_review" ? "Needs review" : "Manual"}
+                    {placementMode === "auto_detected"
+                      ? "✓ Detected (active)"
+                      : placementMode === "auto_detected_needs_review"
+                      ? "Detected (needs review)"
+                      : storedManualSurface?.mode === "corners"
+                      ? "Manual corners (active)"
+                      : hasPosterArea
+                      ? "Manual bbox (active)"
+                      : "No surface"}
                   </span>
                 </div>
                 <Button
@@ -1520,7 +1524,7 @@ export function MockupTemplateForm({
               <div className="flex items-center gap-2 rounded-md border border-indigo-300 bg-indigo-50 dark:bg-indigo-950/30 px-3 py-2">
                 <RefreshCw className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
                 <p className="text-xs text-indigo-700 dark:text-indigo-400">
-                  Surface corners saved — run <strong>Sync mockups</strong> to regenerate composite images.
+                  Manual surface saved — run <strong>Sync mockups</strong> to regenerate public images.
                 </p>
               </div>
             )}
@@ -1726,12 +1730,12 @@ export function MockupTemplateForm({
                 imageWidth={imgNaturalWidth}
                 imageHeight={imgNaturalHeight}
                 initialCorners={
-                  storedDetectedConfig?.source === "manual_surface" && storedDetectedConfig.corners
-                    ? (storedDetectedConfig.corners as SurfaceCorners)
+                  storedManualSurface?.mode === "corners" && storedManualSurface.corners
+                    ? (storedManualSurface.corners as SurfaceCorners)
                     : null
                 }
                 detectedCorners={
-                  storedDetectedConfig?.source !== "manual_surface" && storedDetectedConfig?.corners
+                  storedDetectedConfig?.corners
                     ? (storedDetectedConfig.corners as SurfaceCorners)
                     : null
                 }

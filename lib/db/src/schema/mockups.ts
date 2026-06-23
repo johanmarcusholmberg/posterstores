@@ -89,6 +89,8 @@ export const mockupTemplatesTable = pgTable("mockup_templates", {
   // Smart placement fields
   placementMode: text("placement_mode").default("manual").notNull(),
   detectedPlacementConfig: jsonb("detected_placement_config"),
+  /** Admin-defined manual surface (corners or bbox). Separate from AI detection. */
+  placementConfig: jsonb("placement_config"),
   detectedPlacementStatus: text("detected_placement_status").default("not_analyzed").notNull(),
   detectedPlacementError: text("detected_placement_error"),
   analyzedAt: timestamp("analyzed_at", { withTimezone: true }),

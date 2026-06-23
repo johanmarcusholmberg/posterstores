@@ -21,8 +21,29 @@ export interface DetectedPlacementConfig {
     borderRadius: number;
   };
   warnings: string[];
-  /** Set to "manual_surface" when corners were saved via the admin surface editor, not AI detection. */
+  /**
+   * @deprecated Use `placementConfig` (separate column) for manual surfaces.
+   * Only "ai" is valid going forward; "manual_surface" is legacy from old saves.
+   */
   source?: "ai" | "manual_surface";
+}
+
+/**
+ * Admin-defined manual poster surface stored in the `placement_config` column.
+ * Separate from `detectedPlacementConfig` which holds AI candidate data only.
+ */
+export interface ManualSurfaceConfig {
+  mode: "corners" | "bounding_box";
+  coordinateSystem: "normalized";
+  source: "manual";
+  corners?: {
+    topLeft: { x: number; y: number };
+    topRight: { x: number; y: number };
+    bottomRight: { x: number; y: number };
+    bottomLeft: { x: number; y: number };
+  };
+  boundingBox?: { x: number; y: number; width: number; height: number };
+  fitMode?: string;
 }
 
 export type PlacementMode = "manual" | "auto_detected" | "auto_detected_needs_review";
@@ -83,6 +104,8 @@ export interface MockupTemplate {
   // Smart placement
   placementMode: PlacementMode | null;
   detectedPlacementConfig: DetectedPlacementConfig | null;
+  /** Admin-defined manual surface. Separate from AI detection. */
+  placementConfig: ManualSurfaceConfig | null;
   detectedPlacementStatus: DetectedPlacementStatus | null;
   detectedPlacementError: string | null;
   analyzedAt: string | null;

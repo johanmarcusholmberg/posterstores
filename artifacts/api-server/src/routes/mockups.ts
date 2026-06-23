@@ -267,6 +267,7 @@ const ALLOWED_TEMPLATE_FIELDS = [
   // Smart placement fields
   "placementMode",
   "detectedPlacementConfig",
+  "placementConfig",
   "detectedPlacementStatus",
   "detectedPlacementError",
   "analyzedAt",

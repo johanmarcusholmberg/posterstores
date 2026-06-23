@@ -242,7 +242,7 @@ router.post(
           posterHeight,
           rotation,
           corners,
-          renderMode: surfaceRenderMode,
+          geometryMode: surfaceGeometryMode,
           surfaceSource,
           warnings: surfaceWarnings,
         } = surface;
@@ -343,7 +343,7 @@ router.post(
             imageBuffer = aiResult.imageBuffer!;
             aiRenderWarning = aiResult.warning;
           } else if (
-            surfaceRenderMode === "corners" &&
+            surfaceGeometryMode === "corners" &&
             corners != null
           ) {
             // ── Perspective warp path ──────────────────────────────────────

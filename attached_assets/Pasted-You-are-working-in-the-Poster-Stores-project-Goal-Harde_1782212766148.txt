@@ -1,0 +1,150 @@
+You are working in the Poster Stores project.
+
+Goal:
+Harden the new Poster Surface / corner editor implementation so manual surfaces and AI-detected surfaces are clearly separated and not mixed.
+
+Context:
+- A pixel/corner editor was added.
+- mockupSync now uses perspective warp when corners exist.
+- MockupTemplateForm has been updated to use “Poster surface” language.
+- Typechecks are clean.
+- Public storefront still only shows finalized mockupImageUrl images.
+- The user specifically wants the mockup workflow to be self-explanatory and not mix old/new concepts.
+
+Important:
+- Do not refactor broadly.
+- Do not remove the corner editor.
+- Do not remove perspective rendering.
+- Do not change public gallery behavior.
+- Do not create branches, PRs, commits, pushes, or GitHub automation.
+- Keep changes targeted.
+- Stop after reporting results.
+
+Problem to fix:
+The current implementation saves manually edited corners into detectedPlacementConfig with source: "manual_surface" and placementMode: "auto_detected".
+
+This mixes manual admin-defined surfaces with AI-detected surfaces.
+
+Correct model:
+1. placement_config = active/manual/admin-approved poster surface
+2. detectedPlacementConfig = AI-detected candidate only
+3. detectedPlacementStatus = status of AI candidate only
+4. placementMode or active surface source should not call manual surfaces "auto_detected"
+
+Required behavior:
+
+Manual corner editor:
+- Saving corners from MockupSurfaceEditor must write to placement_config, not detectedPlacementConfig.
+- The saved config should clearly indicate:
+  - mode: "corners"
+  - coordinateSystem: "normalized"
+  - source: "manual"
+  - corners
+  - boundingBox derived from corners if useful
+  - fitMode
+- It should set the active surface to manual if such a field exists.
+- It should show “Manual surface active — run Sync mockups to regenerate public images.”
+
+AI detection:
+- AI detection must write only to detectedPlacementConfig.
+- detectedPlacementConfig should only contain AI-detected candidate data.
+- source should be "ai" or omitted if redundant.
+- AI detection should never overwrite placement_config directly.
+- Low-confidence/failed detection must leave placement_config unchanged.
+
+Approve detected surface:
+Choose the cleanest approach:
+A. Copy detectedPlacementConfig into placement_config as the active surface with source: "detected_approved"; or
+B. Keep detectedPlacementConfig separate but set placementMode = "auto_detected" only when admin approves it.
+
+Either is acceptable, but the UI and helper functions must make the active source clear:
+- Manual surface active
+- Detected surface needs review
+- Detected surface approved
+- No active surface
+
+Naming cleanup:
+- Do not use renderMode to mean "corners" or "bounding_box" if renderMode already means deterministic vs ai_rendered.
+- Use:
+  - template.renderMode = "deterministic" | "ai_rendered"
+  - surface.mode or surface.geometryMode = "bounding_box" | "corners"
+- Update mockupSync.ts and any helper types accordingly.
+
+Effective surface resolution:
+Update or verify resolveEffectiveMockupSurface():
+
+Priority:
+1. If placementMode indicates approved detected surface and detectedPlacementConfig is valid:
+   - use detected surface
+   - surfaceSource = "detected_corners" or "detected_bounding_box"
+2. Else if placement_config contains valid manual corners:
+   - use manual corners
+   - surfaceSource = "manual_corners"
+3. Else if placement_config contains valid bounding box:
+   - use manual bounding box
+   - surfaceSource = "manual_bounding_box"
+4. Else:
+   - no valid surface; skip deterministic sync for that template
+
+Do not silently create fallback surfaces for existing templates during sync.
+
+Sync result labels:
+- Report surfaceSource clearly:
+  - manual_corners
+  - manual_bounding_box
+  - detected_corners
+  - detected_bounding_box
+- Report surfaceWarning if perspective fallback occurs.
+
+Admin UI:
+Update labels/messages so they are clear:
+- “Save poster surface” writes to Manual surface.
+- “Apply detected surface” approves/copies AI candidate.
+- “Detected surface” remains separate from “Manual surface.”
+- After saving manual corners: “Manual surface saved. Run Sync mockups to regenerate public images.”
+- After approving detected surface: “Detected surface approved. Run Sync mockups to regenerate public images.”
+
+Data compatibility:
+- Existing templates using old x/y/width/height must still work.
+- Existing detectedPlacementConfig rows should still be read safely.
+- If any rows were already saved with source: "manual_surface" inside detectedPlacementConfig, support them as legacy but do not create new ones.
+- Add a small migration only if absolutely necessary.
+
+Tests / verification:
+Run:
+- pnpm run typecheck:libs
+- pnpm --filter @workspace/api-server run typecheck
+- pnpm --filter @workspace/poster-store run typecheck
+
+Add low-cost tests if practical:
+- manual corner save writes placement_config, not detectedPlacementConfig
+- AI detection writes detectedPlacementConfig only
+- approved detected surface is used by sync
+- manual corners are used by sync
+- bounding box fallback still works
+- renderMode remains deterministic/ai_rendered and is not confused with surface mode
+- public gallery still only shows mockupImageUrl
+
+Manual QA:
+- Existing manual bounding-box template still works.
+- Corner editor can save manual surface.
+- Saved manual surface is shown as Manual surface active.
+- AI-detected candidate is shown separately.
+- Failed AI detection does not alter manual surface.
+- Approving detected surface makes it active.
+- Sync result shows manual_corners or detected_corners correctly.
+- Public product gallery still only shows generated mockupImageUrl.
+
+Deliverable:
+Report:
+1. Bugs/ambiguities found
+2. Files changed
+3. Data model clarification
+4. Surface resolution behavior
+5. Admin UI wording changes
+6. Sync behavior changes
+7. Typecheck/test results
+8. Manual QA results
+9. Remaining limitations
+
+Do not commit or push. Stop after report.
