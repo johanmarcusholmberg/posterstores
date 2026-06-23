@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -62,45 +62,49 @@ const CORNER_LABELS_LONG: Record<CornerKey, string> = {
   bottomLeft: "Bottom-left",
 };
 
-const ZOOM_LEVELS = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4];
+// ─── Pure coordinate helpers ─────────────────────────────────────────────────
+// These functions have no side effects and can be unit-tested independently.
 
 function round3(n: number): number {
   return Math.round(n * 1000) / 1000;
 }
+
 function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
 
-/** Build a default surface from bbox for a given image size. */
+/** Build a default surface inset 15% from each edge. */
 function defaultCorners(iw: number, ih: number): SurfaceCorners {
   const r = 0.15;
   return {
-    topLeft: { x: r * iw, y: r * ih },
-    topRight: { x: (1 - r) * iw, y: r * ih },
+    topLeft:     { x: r * iw,       y: r * ih },
+    topRight:    { x: (1 - r) * iw, y: r * ih },
     bottomRight: { x: (1 - r) * iw, y: (1 - r) * ih },
-    bottomLeft: { x: r * iw, y: (1 - r) * ih },
+    bottomLeft:  { x: r * iw,       y: (1 - r) * ih },
   };
 }
 
-/** Convert normalized 0-1 corners to pixel corners for image (iw × ih). */
-function normToPixel(c: SurfaceCorners, iw: number, ih: number): SurfaceCorners {
+/**
+ * normalizedToImage — 0-1 normalized → image-space pixels.
+ * Round-trips with imageToNormalized.
+ */
+export function normalizedToImage(c: SurfaceCorners, iw: number, ih: number): SurfaceCorners {
   const conv = (p: CornerPoint) => ({ x: round3(p.x * iw), y: round3(p.y * ih) });
   return {
-    topLeft: conv(c.topLeft),
-    topRight: conv(c.topRight),
-    bottomRight: conv(c.bottomRight),
-    bottomLeft: conv(c.bottomLeft),
+    topLeft: conv(c.topLeft), topRight: conv(c.topRight),
+    bottomRight: conv(c.bottomRight), bottomLeft: conv(c.bottomLeft),
   };
 }
 
-/** Convert pixel corners to normalized 0-1. */
-function pixelToNorm(c: SurfaceCorners, iw: number, ih: number): SurfaceCorners {
+/**
+ * imageToNormalized — image-space pixels → 0-1 normalized.
+ * Round-trips with normalizedToImage.
+ */
+export function imageToNormalized(c: SurfaceCorners, iw: number, ih: number): SurfaceCorners {
   const conv = (p: CornerPoint) => ({ x: round3(p.x / iw), y: round3(p.y / ih) });
   return {
-    topLeft: conv(c.topLeft),
-    topRight: conv(c.topRight),
-    bottomRight: conv(c.bottomRight),
-    bottomLeft: conv(c.bottomLeft),
+    topLeft: conv(c.topLeft), topRight: conv(c.topRight),
+    bottomRight: conv(c.bottomRight), bottomLeft: conv(c.bottomLeft),
   };
 }
 
@@ -120,6 +124,8 @@ function validatePixelCorners(c: SurfaceCorners, iw: number, ih: number): string
   return null;
 }
 
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export default function MockupSurfaceEditor({
   backgroundImageUrl,
   imageWidth,
@@ -133,10 +139,10 @@ export default function MockupSurfaceEditor({
   const iw = imageWidth ?? 1000;
   const ih = imageHeight ?? 1000;
 
-  // Pixel-space corners (relative to the natural image size)
+  // Corners are stored in IMAGE-SPACE PIXELS (0 … iw, 0 … ih).
   const [corners, setCorners] = useState<SurfaceCorners>(() => {
-    if (initialCorners) return normToPixel(initialCorners, iw, ih);
-    if (detectedCorners) return normToPixel(detectedCorners, iw, ih);
+    if (initialCorners) return normalizedToImage(initialCorners, iw, ih);
+    if (detectedCorners) return normalizedToImage(detectedCorners, iw, ih);
     return defaultCorners(iw, ih);
   });
 
@@ -146,13 +152,22 @@ export default function MockupSurfaceEditor({
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // ── Live-state refs for non-React event handlers (wheel) ──────────────────
+  // useLayoutEffect keeps them updated synchronously before each paint.
+  const stateRef = useRef({ zoom, pan });
+  useLayoutEffect(() => {
+    stateRef.current = { zoom, pan };
+  });
+
+  // ── Drag ref ──────────────────────────────────────────────────────────────
   const dragRef = useRef<{
     corner: CornerKey;
-    startMx: number;
-    startMy: number;
-    startPx: number;
-    startPy: number;
+    /** Cursor offset from corner centre in image-space pixels at drag start. */
+    offsetX: number;
+    offsetY: number;
   } | null>(null);
+
   const isPanning = useRef(false);
   const panStart = useRef({ mx: 0, my: 0, px: 0, py: 0 });
 
@@ -161,27 +176,69 @@ export default function MockupSurfaceEditor({
     setValidationError(validatePixelCorners(corners, iw, ih));
   }, [corners, iw, ih]);
 
-  // ── Coordinate helpers ────────────────────────────────────────────────────
+  // ── Transform helpers ─────────────────────────────────────────────────────
+  //
+  // The editor uses ONE coordinate system: image-space pixels (0…iw, 0…ih).
+  // Screen rendering is done by a single CSS transform on a content layer
+  // that contains BOTH the <img> and the <svg>, so they are always locked.
+  //
+  // getEditorTransform() describes that CSS transform.
+  // screenToImage()      converts viewport pointer coords to image pixels.
+  // imageToScreen()      converts image pixels to container-relative pixels
+  //                      (useful for debug/display — not used for rendering).
 
-  /** Convert a pixel-space corner to the scaled display position (in CSS px within the container). */
-  const toDisplay = useCallback(
-    (pt: CornerPoint) => ({
+  /** The CSS transform applied to the content layer. */
+  const getEditorTransform = useCallback(() => {
+    return { scale: zoom, tx: pan.x, ty: pan.y };
+  }, [zoom, pan]);
+
+  /**
+   * screenToImage — converts viewport clientX/clientY to image-space pixels.
+   *
+   * Accounts for:
+   *  • Container position in the page (getBoundingClientRect)
+   *  • Current pan offset
+   *  • Current zoom scale
+   *
+   * Round-trip: imageToScreen(screenToImage(pt)) ≈ pt
+   */
+  const screenToImage = useCallback(
+    (clientX: number, clientY: number): CornerPoint => {
+      const rect = containerRef.current!.getBoundingClientRect();
+      return {
+        x: (clientX - rect.left - pan.x) / zoom,
+        y: (clientY - rect.top  - pan.y) / zoom,
+      };
+    },
+    [pan, zoom]
+  );
+
+  /**
+   * imageToScreen — converts image-space pixels to container-relative CSS pixels.
+   * (Used only for external callers / tests, not needed for rendering.)
+   */
+  const imageToScreen = useCallback(
+    (pt: CornerPoint): CornerPoint => ({
       x: pt.x * zoom + pan.x,
       y: pt.y * zoom + pan.y,
     }),
     [zoom, pan]
   );
 
-  /** Convert a CSS-px position within the container to image-pixel coords. */
-  const fromDisplay = useCallback(
-    (cx: number, cy: number) => ({
-      x: (cx - pan.x) / zoom,
-      y: (cy - pan.y) / zoom,
-    }),
-    [zoom, pan]
-  );
+  // Expose helpers on window in dev so the browser console can test them
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      (window as unknown as Record<string, unknown>).__surfaceEditor = {
+        getEditorTransform,
+        screenToImage,
+        imageToScreen,
+        normalizedToImage: (c: SurfaceCorners) => normalizedToImage(c, iw, ih),
+        imageToNormalized: (c: SurfaceCorners) => imageToNormalized(c, iw, ih),
+      };
+    }
+  }, [getEditorTransform, screenToImage, imageToScreen, iw, ih]);
 
-  // ── Fit-to-container zoom ─────────────────────────────────────────────────
+  // ── Fit-to-container ──────────────────────────────────────────────────────
 
   const fitView = useCallback(() => {
     const el = containerRef.current;
@@ -189,15 +246,17 @@ export default function MockupSurfaceEditor({
     const containerW = el.clientWidth;
     const containerH = el.clientHeight;
     const padding = 32;
-    const newZoom = Math.min(
-      (containerW - padding * 2) / iw,
-      (containerH - padding * 2) / ih
+    const newZoom = Math.max(
+      0.05,
+      Math.min(
+        (containerW - padding * 2) / iw,
+        (containerH - padding * 2) / ih
+      )
     );
-    const zoomClamped = Math.max(0.05, newZoom);
-    setZoom(zoomClamped);
+    setZoom(newZoom);
     setPan({
-      x: (containerW - iw * zoomClamped) / 2,
-      y: (containerH - ih * zoomClamped) / 2,
+      x: (containerW - iw * newZoom) / 2,
+      y: (containerH - ih * newZoom) / 2,
     });
   }, [iw, ih]);
 
@@ -205,7 +264,41 @@ export default function MockupSurfaceEditor({
     fitView();
   }, [fitView]);
 
+  // ── Wheel zoom (toward cursor, non-passive) ───────────────────────────────
+  //
+  // Attached via addEventListener with { passive: false } so preventDefault
+  // reliably suppresses page scroll. The handler reads zoom/pan from stateRef
+  // to avoid stale closures without needing to re-register on every render.
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.1 : 0.9;
+      const rect = el.getBoundingClientRect();
+      // Cursor position relative to container
+      const cx = e.clientX - rect.left;
+      const cy = e.clientY - rect.top;
+      const { zoom: z, pan: p } = stateRef.current;
+      const newZoom = clamp(z * factor, 0.05, 16);
+      const ratio = newZoom / z;
+      // Zoom toward cursor: cx = pan.x + imgX * z  →  imgX = (cx - pan.x) / z
+      // After zoom: new_pan.x = cx - imgX * newZoom = cx - (cx - pan.x) * ratio
+      setZoom(newZoom);
+      setPan({ x: cx - (cx - p.x) * ratio, y: cy - (cy - p.y) * ratio });
+    };
+
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => el.removeEventListener("wheel", handler);
+    // stableRef — runs once; stateRef provides fresh values
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Corner dragging ───────────────────────────────────────────────────────
+  //
+  // All pointer coordinates are converted through screenToImage() so that
+  // zoom, pan, and container position are all accounted for correctly.
 
   const startDragCorner = useCallback(
     (e: React.PointerEvent, corner: CornerKey) => {
@@ -213,28 +306,28 @@ export default function MockupSurfaceEditor({
       e.stopPropagation();
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
       setSelectedCorner(corner);
+      // Compute the cursor's offset from the corner centre in image pixels.
+      // Subtracting this offset during move keeps the corner "under" the cursor.
+      const imgPt = screenToImage(e.clientX, e.clientY);
       dragRef.current = {
         corner,
-        startMx: e.clientX,
-        startMy: e.clientY,
-        startPx: corners[corner].x,
-        startPy: corners[corner].y,
+        offsetX: imgPt.x - corners[corner].x,
+        offsetY: imgPt.y - corners[corner].y,
       };
     },
-    [corners]
+    [corners, screenToImage]
   );
 
   const onPointerMove = useCallback(
     (e: React.PointerEvent) => {
       if (dragRef.current) {
-        const dr = dragRef.current;
-        const dx = (e.clientX - dr.startMx) / zoom;
-        const dy = (e.clientY - dr.startMy) / zoom;
+        const { corner, offsetX, offsetY } = dragRef.current;
+        const imgPt = screenToImage(e.clientX, e.clientY);
         setCorners((prev) => ({
           ...prev,
-          [dr.corner]: {
-            x: round3(clamp(dr.startPx + dx, 0, iw)),
-            y: round3(clamp(dr.startPy + dy, 0, ih)),
+          [corner]: {
+            x: round3(clamp(imgPt.x - offsetX, 0, iw)),
+            y: round3(clamp(imgPt.y - offsetY, 0, ih)),
           },
         }));
         return;
@@ -245,7 +338,7 @@ export default function MockupSurfaceEditor({
         setPan({ x: panStart.current.px + dx, y: panStart.current.py + dy });
       }
     },
-    [zoom, iw, ih]
+    [screenToImage, iw, ih]
   );
 
   const onPointerUp = useCallback(() => {
@@ -267,15 +360,7 @@ export default function MockupSurfaceEditor({
     [pan]
   );
 
-  // ── Wheel zoom ────────────────────────────────────────────────────────────
-
-  const onWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const factor = e.deltaY < 0 ? 1.1 : 0.9;
-    setZoom((z) => clamp(z * factor, 0.05, 16));
-  }, []);
-
-  // ── Keyboard nudging ──────────────────────────────────────────────────────
+  // ── Keyboard nudging (image-space pixels, zoom-independent) ──────────────
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -289,10 +374,10 @@ export default function MockupSurfaceEditor({
         const pt = prev[selectedCorner];
         let nx = pt.x;
         let ny = pt.y;
-        if (e.key === "ArrowLeft") nx = clamp(pt.x - step, 0, iw);
+        if (e.key === "ArrowLeft")  nx = clamp(pt.x - step, 0, iw);
         if (e.key === "ArrowRight") nx = clamp(pt.x + step, 0, iw);
-        if (e.key === "ArrowUp") ny = clamp(pt.y - step, 0, ih);
-        if (e.key === "ArrowDown") ny = clamp(pt.y + step, 0, ih);
+        if (e.key === "ArrowUp")    ny = clamp(pt.y - step, 0, ih);
+        if (e.key === "ArrowDown")  ny = clamp(pt.y + step, 0, ih);
         return { ...prev, [selectedCorner]: { x: round3(nx), y: round3(ny) } };
       });
     },
@@ -316,7 +401,7 @@ export default function MockupSurfaceEditor({
 
   const resetToDetected = () => {
     if (!detectedCorners) return;
-    setCorners(normToPixel(detectedCorners, iw, ih));
+    setCorners(normalizedToImage(detectedCorners, iw, ih));
   };
 
   const resetToCentered = () => {
@@ -327,23 +412,24 @@ export default function MockupSurfaceEditor({
 
   const handleSave = async () => {
     if (validationError) return;
-    const normalized = pixelToNorm(corners, iw, ih);
+    const normalized = imageToNormalized(corners, iw, ih);
     await onSave(normalized);
   };
 
-  // ── Polygon points string for SVG ─────────────────────────────────────────
+  // ── SVG polygon points (image-pixel space) ────────────────────────────────
+  // No transform needed — the SVG viewBox IS the image pixel space.
 
-  const polyPoints = CORNER_KEYS.map((k) => {
-    const d = toDisplay(corners[k]);
-    return `${d.x},${d.y}`;
-  }).join(" ");
+  const polyPoints = CORNER_KEYS.map((k) => `${corners[k].x},${corners[k].y}`).join(" ");
 
   // ── Zoom controls ─────────────────────────────────────────────────────────
 
-  const zoomIn = () => setZoom((z) => clamp(z * 1.25, 0.05, 16));
+  const zoomIn  = () => setZoom((z) => clamp(z * 1.25, 0.05, 16));
   const zoomOut = () => setZoom((z) => clamp(z / 1.25, 0.05, 16));
-
   const zoomPct = Math.round(zoom * 100);
+
+  // Handle radius in image pixels that results in ~8 CSS px on screen
+  const handleR = Math.max(3, 8 / zoom);
+  const strokeScale = 1 / zoom; // keeps stroke visually ~1 CSS px
 
   return (
     <div className="flex flex-col gap-3" style={{ userSelect: "none" }}>
@@ -385,11 +471,17 @@ export default function MockupSurfaceEditor({
           Centered default
         </Button>
         <p className="text-[10px] text-muted-foreground ml-auto">
-          Arrow keys nudge selected corner · Shift = 10px · Alt+drag or middle-mouse to pan
+          Arrow keys nudge · Shift = 10 px · Alt+drag or middle-mouse to pan · scroll to zoom
         </p>
       </div>
 
-      {/* Canvas */}
+      {/* ── Canvas ─────────────────────────────────────────────────────────── */}
+      {/*                                                                        */}
+      {/* Architecture: ONE content layer carries both <img> and <svg>.          */}
+      {/* CSS transform on that layer handles all zoom & pan.                    */}
+      {/* SVG viewBox="0 0 iw ih" makes SVG coords == image pixels.              */}
+      {/* Polygon points and handle positions are raw image pixels — no          */}
+      {/* manual scaling math needed.                                            */}
       <div
         ref={containerRef}
         className="relative rounded-md border bg-checkerboard overflow-hidden cursor-crosshair"
@@ -397,80 +489,111 @@ export default function MockupSurfaceEditor({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerDown={onCanvasPointerDown}
-        onWheel={onWheel}
         onKeyDown={onKeyDown}
         tabIndex={0}
         aria-label="Surface editor canvas — use arrow keys to nudge selected corner"
       >
-        {/* Background image */}
-        <img
-          src={backgroundImageUrl}
-          alt="Mockup template"
-          draggable={false}
+        {/* Single content layer: image + SVG share the same CSS transform */}
+        <div
           style={{
             position: "absolute",
-            left: pan.x,
-            top: pan.y,
-            width: iw * zoom,
-            height: ih * zoom,
-            pointerEvents: "none",
-            imageRendering: zoom > 2 ? "pixelated" : "auto",
-          }}
-        />
-
-        {/* SVG overlay */}
-        <svg
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", overflow: "visible" }}
-          onPointerDown={(e) => {
-            if (e.target === e.currentTarget) onCanvasPointerDown(e);
+            left: 0,
+            top: 0,
+            width: iw,
+            height: ih,
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+            transformOrigin: "top left",
           }}
         >
-          {/* Surface polygon fill */}
-          <polygon
-            points={polyPoints}
-            fill="rgba(59,130,246,0.15)"
-            stroke="rgba(59,130,246,0.8)"
-            strokeWidth={1.5}
-            strokeDasharray="5 3"
+          {/* Template background image at natural size */}
+          <img
+            src={backgroundImageUrl}
+            alt="Mockup template"
+            draggable={false}
+            width={iw}
+            height={ih}
+            style={{
+              display: "block",
+              width: iw,
+              height: ih,
+              pointerEvents: "none",
+              imageRendering: zoom > 2 ? "pixelated" : "auto",
+            }}
           />
 
-          {/* Corner handles */}
-          {CORNER_KEYS.map((key) => {
-            const d = toDisplay(corners[key]);
-            const color = CORNER_COLORS[key];
-            const isSelected = selectedCorner === key;
-            return (
-              <g key={key}>
-                <circle
-                  cx={d.x}
-                  cy={d.y}
-                  r={isSelected ? 8 : 6}
-                  fill={color}
-                  stroke="white"
-                  strokeWidth={2}
-                  style={{ cursor: "grab", filter: isSelected ? "drop-shadow(0 0 4px rgba(0,0,0,0.5))" : undefined }}
+          {/* SVG overlay — coordinate space = image pixels (viewBox matches) */}
+          <svg
+            style={{ position: "absolute", top: 0, left: 0, overflow: "visible" }}
+            width={iw}
+            height={ih}
+            viewBox={`0 0 ${iw} ${ih}`}
+            onPointerDown={(e) => {
+              // Clicks on SVG background (not on a handle) → pan
+              if (e.target === e.currentTarget) onCanvasPointerDown(e);
+            }}
+          >
+            {/* Surface polygon — vectorEffect keeps stroke visually constant */}
+            <polygon
+              points={polyPoints}
+              fill="rgba(59,130,246,0.15)"
+              stroke="rgba(59,130,246,0.8)"
+              strokeWidth={1.5 * strokeScale}
+              strokeDasharray={`${5 * strokeScale} ${3 * strokeScale}`}
+            />
+
+            {/* Corner handles — positioned in image pixels */}
+            {CORNER_KEYS.map((key) => {
+              const pt = corners[key];
+              const color = CORNER_COLORS[key];
+              const isSelected = selectedCorner === key;
+              const r = isSelected ? handleR * 1.2 : handleR;
+              return (
+                <g
+                  key={key}
                   onPointerDown={(e) => startDragCorner(e, key)}
                   onClick={() => setSelectedCorner(key)}
-                />
-                <text
-                  x={d.x}
-                  y={d.y + 1}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  fontSize={9}
-                  fontWeight={700}
-                  fill="white"
-                  style={{ pointerEvents: "none" }}
+                  style={{ cursor: "grab" }}
                 >
-                  {CORNER_LABELS[key]}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
+                  {/* Larger invisible hit area for easier grabbing */}
+                  <circle
+                    cx={pt.x}
+                    cy={pt.y}
+                    r={r * 1.8}
+                    fill="transparent"
+                  />
+                  <circle
+                    cx={pt.x}
+                    cy={pt.y}
+                    r={r}
+                    fill={color}
+                    stroke="white"
+                    strokeWidth={2 * strokeScale}
+                    style={{
+                      filter: isSelected
+                        ? `drop-shadow(0 0 ${3 * strokeScale}px rgba(0,0,0,0.5))`
+                        : undefined,
+                    }}
+                  />
+                  <text
+                    x={pt.x}
+                    y={pt.y + 0.5 * strokeScale}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fontSize={9 * strokeScale}
+                    fontWeight={700}
+                    fill="white"
+                    style={{ pointerEvents: "none" }}
+                  >
+                    {CORNER_LABELS[key]}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
       </div>
 
-      {/* Coordinate inputs */}
+      {/* Coordinate inputs (image-space pixels) */}
       <div className="grid grid-cols-2 gap-3">
         {CORNER_KEYS.map((key) => {
           const pt = corners[key];
@@ -514,7 +637,7 @@ export default function MockupSurfaceEditor({
                 </div>
               </div>
               <p className="text-[10px] text-muted-foreground/70">
-                {round3(pt.x / iw * 100)}% × {round3(pt.y / ih * 100)}%
+                {round3((pt.x / iw) * 100)}% × {round3((pt.y / ih) * 100)}%
               </p>
             </div>
           );

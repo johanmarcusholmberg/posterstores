@@ -1,0 +1,169 @@
+You are working in the Poster Stores project.
+
+Goal:
+Fix the MockupSurfaceEditor zoom/coordinate mismatch bug.
+
+Problem:
+When using the Corner / Poster Surface editor and zooming, the template image and poster surface overlay become misaligned. The selected corner handles and dashed polygon no longer match the visible poster/frame area. The screenshot shows the top-left handle appears on the poster, but the top-right / right edge is visually displaced from the actual image surface.
+
+This is likely a coordinate transform bug:
+
+* Image is rendered/scaled/centered one way.
+* Polygon/handles are rendered using another scale or offset.
+* Drag calculations may be using viewport coordinates instead of the actual transformed image coordinates.
+* Zoom/pan/fit likely do not share one single transform model.
+
+Important:
+
+* Do not refactor the whole mockup system.
+* Do not change public gallery behavior.
+* Do not change mockupSync or renderer unless the bug is proven to be there.
+* Do not change the DB model.
+* Do not remove the corner editor.
+* Do not create branches, PRs, commits, pushes, or GitHub automation.
+* Keep this fix targeted to the editor coordinate system.
+* Stop after reporting results.
+
+Files to inspect:
+
+* artifacts/poster-store/src/components/admin/MockupSurfaceEditor.tsx
+* Any helper functions it uses for:
+
+  * zoom
+  * pan
+  * corner dragging
+  * pixel/normalized conversion
+  * image natural dimensions
+  * overlay rendering
+
+Expected architecture:
+The editor must use one single coordinate system:
+
+1. Image space
+
+   * Native template image pixels.
+   * Example: x=668, y=311.
+   * This is the source of truth for editing.
+
+2. Screen/view space
+
+   * The visible editor viewport after fit/zoom/pan.
+   * Used only for rendering and pointer events.
+
+Implement or fix explicit transform helpers:
+
+* getEditorTransform()
+* imageToScreen(point)
+* screenToImage(point)
+* normalizedToImage(point)
+* imageToNormalized(point)
+
+Rules:
+
+* Image, SVG polygon, corner handles, and drag hitboxes must all use the same transform.
+* Dragging a handle must convert pointer coordinates through screenToImage().
+* Rendering a handle must use imageToScreen().
+* Pixel input fields must read/write image-space pixels.
+* Normalized coordinates must be derived from image-space pixels and naturalWidth/naturalHeight.
+* Clamp image-space coordinates to [0, naturalWidth] and [0, naturalHeight].
+
+Recommended implementation:
+Use a single transformed layer inside the editor viewport.
+
+Example structure:
+
+* viewport div: position relative; overflow hidden
+* content layer: position absolute; transform translate(imageLeft, imageTop) scale(scale); transform-origin top left
+* inside content layer:
+
+  * img with width=naturalWidth and height=naturalHeight
+  * svg overlay with width=naturalWidth and height=naturalHeight, viewBox="0 0 naturalWidth naturalHeight"
+  * polygon points in image pixels
+  * handle positions in image pixels
+
+This avoids separate scaling math for image and overlay.
+
+Zoom behavior:
+
+* Fit = compute fitScale from viewport size and natural image size.
+* 100% = scale 1.0.
+* 200% = scale 2.0.
+* 400% = scale 4.0.
+* Displayed percent should reflect the actual scale being used.
+* When zoom changes, image and overlay must remain locked together.
+
+Pan behavior:
+
+* Pan should move the same content layer that contains both image and overlay.
+* Alt+drag or middle mouse pan should translate the whole content layer.
+* Pan should not alter stored corner coordinates.
+
+Pointer/drag behavior:
+
+* Use pointer capture if possible.
+* On pointer down on a corner handle, select that corner.
+* On pointer move, convert pointer clientX/clientY to image-space coordinate using the current transform.
+* Update only that selected corner.
+* Do not use raw clientX/clientY directly as image coordinates.
+* Do not use percentage of viewport as image coordinates.
+
+Keyboard nudge:
+
+* Arrow keys update selected corner in image-space pixels:
+
+  * Arrow = 1 px
+  * Shift+Arrow = 10 px
+  * Alt+Arrow = 0.25 px if decimals are supported; otherwise 1 px
+* Nudge should work the same at all zoom levels.
+* Nudge should not depend on screen zoom.
+
+Pixel inputs:
+
+* Inputs should show image-space pixel coordinates.
+* Editing an input should update the same image-space corner value.
+* The overlay should move correctly at any zoom.
+
+Regression checks:
+Add low-cost tests for transform helpers if practical:
+
+* imageToScreen(screenToImage(point)) round-trips correctly.
+* normalizedToImage/imageToNormalized round-trip.
+* At Fit, 100%, 200%, and 400%, a corner at x/y maps consistently.
+* Pan affects screen position but not image coordinates.
+
+Manual QA:
+
+* Open the Corner / Poster Surface editor.
+* At Fit zoom, drag all four corners to match the visible poster/frame.
+* Switch to 100%, 200%, 400%.
+* The polygon and handles must remain visually locked to the same image points.
+* Pan while zoomed in.
+* The polygon and image must move together.
+* Drag a handle while zoomed in.
+* The handle should stay under the cursor and update correct pixel coordinates.
+* Enter pixel values manually.
+* The handle should appear at the exact image pixel location.
+* Save surface.
+* Reopen editor.
+* Corners should reload in the same exact locations.
+* Run Sync mockups.
+* Generated mockup should use the saved corners.
+
+Run:
+
+* pnpm --filter @workspace/poster-store run typecheck
+* pnpm run typecheck:libs if shared types/helpers changed
+* pnpm --filter @workspace/api-server run typecheck only if server files changed
+
+Deliverable:
+Report:
+
+1. Root cause found
+2. Files changed
+3. Transform model implemented/fixed
+4. Zoom/pan/drag behavior after fix
+5. Typecheck results
+6. Manual QA results
+7. Remaining limitations
+
+Do not commit or push. Stop after the report.
