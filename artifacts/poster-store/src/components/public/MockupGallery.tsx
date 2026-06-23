@@ -36,17 +36,31 @@ function hasPlacementData(t: PosterMockupTemplate | null): boolean {
 }
 
 /**
- * Returns true when a mockup should be shown to customers.
- * Inactive-template rows, orphaned template references, non-gallery mockups,
- * and failed-sync rows with no image are hidden.
+ * Returns true when a mockup should be shown to customers on the public storefront.
+ *
+ * Public visibility rules (in order):
+ *  1. isGallery=false  → hidden (admin explicitly excluded it from gallery)
+ *  2. No mockupImageUrl → hidden (live CSS composites / unsynced rows are admin-only)
+ *  3. status=failed    → hidden (broken render, no usable image)
+ *  4. ai_rendered without approvedForPublic → hidden (awaiting admin approval)
+ *  5. Inactive template → hidden
+ *  6. Everything else  → visible
+ *
+ * Note: CompositedMockup (live CSS overlay) is intentionally excluded from the
+ * public gallery. It is admin-preview-only. Only generated flat images (mockupImageUrl)
+ * are shown to customers.
  */
 function isVisible(m: PosterMockup): boolean {
-  // Respect gallery flag — false means "not for gallery display"
-  // (defaults to true for existing/manual mockups so this is non-breaking)
+  // 1. Respect gallery flag
   if (m.isGallery === false) return false;
-  // Failed sync rows with no image produce nothing useful
-  if (m.status === "failed" && !m.mockupImageUrl) return false;
-  if (!m.mockupTemplateId) return !!m.mockupImageUrl;
+  // 2. Must have a generated final image — unsynced/live-composite rows are admin-only
+  if (!m.mockupImageUrl) return false;
+  // 3. Failed renders are not customer-ready
+  if (m.status === "failed") return false;
+  // 4. AI-rendered mockups require explicit admin approval before going public
+  if (m.renderMode === "ai_rendered" && !m.approvedForPublic) return false;
+  // 5. Template must be active (orphaned rows without a template are fine if they have an image)
+  if (!m.mockupTemplateId) return true;
   if (m.template) return m.template.active !== false;
   return false;
 }
@@ -173,42 +187,17 @@ export const MockupGallery = ({
 }: MockupGalleryProps) => {
   const visibleMockups = mockups.filter(isVisible);
 
+  // isVisible() guarantees every entry in visibleMockups has a mockupImageUrl.
+  // Live CSS composites (no generated image) are filtered out before reaching here —
+  // they are admin-preview-only and never shown to public customers.
   const allImages: DisplayImage[] = [
     { url: fallbackImageUrl, label: "Poster" },
-    ...visibleMockups
-      .map((m) => {
-        // Generated final image is the source of truth — never show bare template
-        // background when a finalized composite already exists.
-        const hasGeneratedImage = !!m.mockupImageUrl;
-        // Only fall back to live CSS compositing when there is no pre-rendered image.
-        const canComposite =
-          !hasGeneratedImage &&
-          hasPlacementData(m.template) &&
-          !!m.template?.backgroundImageUrl;
-
-        const displayUrl =
-          m.mockupImageUrl ??
-          m.template?.backgroundImageUrl ??
-          m.template?.previewThumbnailUrl ??
-          null;
-
-        if (!displayUrl && !canComposite) return null;
-
-        return {
-          // Priority: generated image > live composite background > preview/thumbnail
-          url: hasGeneratedImage
-            ? m.mockupImageUrl!
-            : canComposite
-              ? m.template!.backgroundImageUrl!
-              : (displayUrl ?? fallbackImageUrl),
-          label: getFriendlyLabel(m),
-          mockup: m,
-          // isComposited only true when there is no pre-rendered image and we have
-          // placement data — prevents showing bare backgrounds in thumbnails/lightbox.
-          isComposited: canComposite,
-        } as DisplayImage;
-      })
-      .filter((img): img is DisplayImage => img !== null),
+    ...visibleMockups.map((m) => ({
+      url: m.mockupImageUrl!,   // always present after isVisible() filter
+      label: getFriendlyLabel(m),
+      mockup: m,
+      isComposited: false,      // public gallery never does live CSS compositing
+    } as DisplayImage)),
   ].filter((img, idx, arr) =>
     arr.findIndex((x) => x.url === img.url && x.label === img.label) === idx
   );
@@ -220,16 +209,12 @@ export const MockupGallery = ({
     visibleMockups.find((m) => m.isPrimary) ??
     null;
 
-  const primaryDisplayUrl = primaryMockup
-    ? (primaryMockup.mockupImageUrl ?? primaryMockup.template?.backgroundImageUrl ?? primaryMockup.template?.previewThumbnailUrl ?? null)
-    : null;
+  // All visible mockups have mockupImageUrl, so use that as the lookup key.
+  const primaryDisplayUrl = primaryMockup?.mockupImageUrl ?? null;
 
   const primaryIdx = primaryDisplayUrl
     ? allImages.findIndex(
-        (i) =>
-          i.url === primaryDisplayUrl ||
-          i.mockup === primaryMockup ||
-          (primaryMockup && i.mockup?.template?.backgroundImageUrl === primaryMockup.template?.backgroundImageUrl)
+        (i) => i.url === primaryDisplayUrl || i.mockup === primaryMockup
       )
     : 0;
 
@@ -328,6 +313,9 @@ export const MockupGallery = ({
   const activeItem = allImages[activeIdx] ?? { url: fallbackImageUrl, label: "Poster" };
 
   function renderMainImage(item: DisplayImage, className?: string) {
+    // isComposited is always false in the public gallery (isVisible() requires mockupImageUrl).
+    // The CompositedMockup branch below is retained as a safety net but will not execute
+    // for public storefront users. Live CSS compositing is admin-preview-only.
     if (
       item.isComposited &&
       item.mockup?.template &&
@@ -428,8 +416,6 @@ export const MockupGallery = ({
                 )}
                 style={{ width: 68, height: 68 }}
               >
-                {/* img.url is the final generated image when available (isComposited=false),
-                    or the background template when only live compositing is possible. */}
                 <img
                   src={img.url}
                   alt={img.label}
@@ -438,15 +424,6 @@ export const MockupGallery = ({
                   className="w-full h-full object-cover"
                   onError={(e) => { (e.target as HTMLImageElement).src = fallbackImageUrl; }}
                 />
-                {/* Live-composite only (no generated image yet) — small indicator */}
-                {img.isComposited && (
-                  <span
-                    className="absolute bottom-0.5 right-0.5 text-[7px] leading-none font-medium px-1 py-0.5 rounded bg-black/50 text-white/80 pointer-events-none"
-                    aria-hidden="true"
-                  >
-                    preview
-                  </span>
-                )}
               </button>
             ))}
           </div>
@@ -518,8 +495,6 @@ export const MockupGallery = ({
                     )}
                     style={{ width: 56, height: 56 }}
                   >
-                    {/* img.url is the generated image when available (isComposited=false),
-                        or the background template for live-composite-only items. */}
                     <img
                       src={img.url}
                       alt={img.label}
@@ -530,14 +505,6 @@ export const MockupGallery = ({
                         (e.target as HTMLImageElement).src = fallbackImageUrl;
                       }}
                     />
-                    {img.isComposited && (
-                      <span
-                        className="absolute bottom-0.5 right-0.5 text-[7px] leading-none font-medium px-1 py-0.5 rounded bg-black/50 text-white/80 pointer-events-none"
-                        aria-hidden="true"
-                      >
-                        preview
-                      </span>
-                    )}
                   </button>
                 ))}
               </div>
@@ -550,12 +517,11 @@ export const MockupGallery = ({
 };
 
 /**
- * Lightbox image renderer — uses object-contain so portraits/squares/mockups
- * all display at their natural aspect ratio without cropping or stretching.
+ * Lightbox image renderer.
  *
- * For composited mockups the container aspect ratio is derived from the
- * background image's natural dimensions so landscape/square templates are not
- * forced into the portrait 3/4 frame.
+ * Public gallery: isComposited is always false (isVisible() requires mockupImageUrl),
+ * so all items render as a plain <img> with object-contain. The CompositedMockup path
+ * is gone — live CSS compositing is admin-preview-only and never reaches the lightbox.
  */
 function LightboxImage({
   item,
@@ -566,52 +532,6 @@ function LightboxImage({
   fallbackImageUrl: string;
   alt: string;
 }) {
-  const [bgRatio, setBgRatio] = useState<string | null>(null);
-
-  const bgUrl =
-    item.isComposited && item.mockup?.template?.backgroundImageUrl
-      ? item.mockup.template.backgroundImageUrl
-      : null;
-
-  // Probe the background image to get its natural dimensions so we can set
-  // the container aspect ratio correctly without hardcoding 3/4.
-  useEffect(() => {
-    if (!bgUrl) return;
-    const probe = new window.Image();
-    probe.onload = () => {
-      if (probe.naturalWidth && probe.naturalHeight) {
-        setBgRatio(`${probe.naturalWidth}/${probe.naturalHeight}`);
-      }
-    };
-    probe.src = bgUrl;
-    return () => { probe.onload = null; };
-  }, [bgUrl]);
-
-  if (
-    item.isComposited &&
-    item.mockup?.template &&
-    hasPlacementData(item.mockup.template) &&
-    item.mockup.template.backgroundImageUrl
-  ) {
-    // Default to 3/4 only until the probe fires (usually instant if already cached).
-    // Using aspect-ratio + max-height + max-width lets the browser compute the
-    // correct size without cropping landscape or square templates.
-    const aspectRatio = bgRatio ?? "3/4";
-    return (
-      <div
-        style={{ aspectRatio, maxHeight: "82vh", maxWidth: "88vw" }}
-      >
-        <CompositedMockup
-          backgroundUrl={item.mockup.template.backgroundImageUrl!}
-          posterImageUrl={fallbackImageUrl}
-          template={item.mockup.template}
-          alt={alt}
-          className="w-full h-full"
-        />
-      </div>
-    );
-  }
-
   return (
     <img
       src={item.url}

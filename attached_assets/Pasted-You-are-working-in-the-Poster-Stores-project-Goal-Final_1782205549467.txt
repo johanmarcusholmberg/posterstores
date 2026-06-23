@@ -1,0 +1,73 @@
+You are working in the Poster Stores project.
+
+Goal:
+Finalize the mockup gallery behavior so public storefront pages only show finalized/generated mockup images, not live CSS-composited mockups.
+
+Context:
+- MockupGallery was fixed so generated mockupImageUrl wins over live compositing.
+- Detection is now non-destructive.
+- Thumbnail, main image, and lightbox now use the same flat generated image when available.
+- Remaining limitation: live CSS composites can still have aspect/scale mismatch when no generated mockupImageUrl exists.
+- Typechecks are currently clean.
+
+Important:
+- Do not refactor the whole mockup system.
+- Do not remove the admin preview/composite functionality.
+- Do not change deterministic Sharp rendering.
+- Do not make AI rendering default.
+- Do not create branches, PRs, commits, pushes, or GitHub automation.
+- Keep changes targeted.
+
+Task:
+Make live CSS compositing admin-preview-only for public product pages.
+
+Public product gallery rules:
+1. Normal poster images should show as before.
+2. Generated deterministic mockups with mockupImageUrl should show publicly.
+3. Approved AI mockups with mockupImageUrl and approved public flags should show publicly.
+4. Mockup templates or live composite configs without generated mockupImageUrl should not appear as finished public gallery images.
+5. If helpful, show an admin-only badge/state in admin saying “Sync needed”, but do not show unfinished mockups to normal storefront users.
+
+Check:
+- MockupGallery.tsx
+- Product page data mapping
+- GET /api/posters/:id/mockups response usage
+- Any isComposited / CompositedMockup public rendering paths
+
+Keep CompositedMockup only where it is useful:
+- Admin template preview
+- Admin placement preview
+- Possibly internal preview before sync
+
+But avoid using it in public product gallery/lightbox unless there is no better option and the user is admin.
+
+Also add or verify:
+- Public mockup visibility excludes AI-rendered mockups unless approvedForPublic=true and a public flag is true.
+- Public mockup visibility excludes generated=false / status=failed / no mockupImageUrl rows.
+- Deterministic generated mockups still appear when isGallery/isPrimary/isHoverMockup says they should.
+
+Manual QA:
+- Product page shows normal poster image.
+- Product page shows generated mockup thumbnails with poster inserted.
+- Product page does not show bare template backgrounds.
+- Product page does not show unfinished live composites.
+- Lightbox shows the same flat image as the selected gallery image.
+- Hover mockup still works if generated.
+- Primary mockup still works if generated.
+- Admin preview still works for templates before sync.
+
+Run:
+- pnpm run typecheck:libs
+- pnpm --filter @workspace/api-server run typecheck
+- pnpm --filter @workspace/poster-store run typecheck
+
+Deliverable:
+Report:
+1. Files changed
+2. Public gallery behavior changes
+3. Admin preview behavior
+4. Typecheck results
+5. Manual QA results
+6. Remaining limitations
+
+Do not commit or push. Stop after the report.
