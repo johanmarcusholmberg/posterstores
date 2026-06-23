@@ -5,7 +5,7 @@ import {
   posterMockupsTable,
   postersTable,
 } from "@workspace/db";
-import { eq, and, or, isNull, asc, inArray } from "drizzle-orm";
+import { eq, and, or, isNull, asc, inArray, sql } from "drizzle-orm";
 import { requireAdmin } from "../middleware/requireAdmin";
 import { adminLimiter } from "../middleware/rateLimiter";
 import { analyzeMockupPlacement } from "../lib/mockupPlacementAnalyzer";
@@ -419,6 +419,51 @@ router.get("/mockup-templates/all", requireAdmin, async (req, res) => {
   return res.json(templates);
 });
 
+router.post("/mockup-templates/reorder", requireAdmin, adminLimiter, async (req, res) => {
+  const { orderedTemplateIds, storeKey } = req.body;
+
+  if (!Array.isArray(orderedTemplateIds) || orderedTemplateIds.some((id) => !Number.isInteger(id))) {
+    return res.status(400).json({ error: "orderedTemplateIds must be an array of integers" });
+  }
+
+  if (orderedTemplateIds.length === 0) {
+    return res.json({ updated: 0, templates: [] });
+  }
+
+  const scopeCondition = storeKey
+    ? or(isNull(mockupTemplatesTable.storeKey), eq(mockupTemplatesTable.storeKey, storeKey))
+    : isNull(mockupTemplatesTable.storeKey);
+
+  const scopeTemplates = await db
+    .select({ id: mockupTemplatesTable.id })
+    .from(mockupTemplatesTable)
+    .where(scopeCondition);
+
+  const scopeIds = new Set(scopeTemplates.map((t) => t.id));
+  const invalid = orderedTemplateIds.filter((id) => !scopeIds.has(id));
+
+  if (invalid.length > 0) {
+    return res.status(400).json({ error: `Template IDs not in scope: ${invalid.join(", ")}` });
+  }
+
+  await db.transaction(async (tx) => {
+    for (let i = 0; i < orderedTemplateIds.length; i++) {
+      await tx
+        .update(mockupTemplatesTable)
+        .set({ sortOrder: i + 1, updatedAt: new Date() })
+        .where(eq(mockupTemplatesTable.id, orderedTemplateIds[i]));
+    }
+  });
+
+  const updated = await db
+    .select()
+    .from(mockupTemplatesTable)
+    .where(inArray(mockupTemplatesTable.id, orderedTemplateIds))
+    .orderBy(asc(mockupTemplatesTable.sortOrder), asc(mockupTemplatesTable.id));
+
+  return res.json({ updated: updated.length, templates: updated });
+});
+
 router.get("/mockup-templates/:id", async (req, res) => {
   const id = Number(req.params.id);
   if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
@@ -442,6 +487,20 @@ router.post("/mockup-templates", requireAdmin, async (req, res) => {
   try {
     validatePlacementBounds(rest);
 
+    let nextSortOrder: number;
+    if (rest.sortOrder != null) {
+      nextSortOrder = rest.sortOrder;
+    } else {
+      const scopeCond = rest.storeKey
+        ? or(isNull(mockupTemplatesTable.storeKey), eq(mockupTemplatesTable.storeKey, rest.storeKey))
+        : isNull(mockupTemplatesTable.storeKey);
+      const [maxRow] = await db
+        .select({ maxOrder: sql<number>`coalesce(max(sort_order), 0)` })
+        .from(mockupTemplatesTable)
+        .where(scopeCond);
+      nextSortOrder = ((maxRow?.maxOrder as number) ?? 0) + 1;
+    }
+
     const values: any = {
       name,
       templateKey,
@@ -454,7 +513,7 @@ router.post("/mockup-templates", requireAdmin, async (req, res) => {
       backgroundImageUrl: rest.backgroundImageUrl ?? null,
       storagePath: rest.storagePath ?? null,
       active: rest.active ?? true,
-      sortOrder: rest.sortOrder ?? 0,
+      sortOrder: nextSortOrder,
       category: rest.category ?? null,
       orientation: rest.orientation ?? null,
       supportedFormats: rest.supportedFormats ?? null,

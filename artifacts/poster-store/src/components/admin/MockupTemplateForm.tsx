@@ -977,14 +977,13 @@ export function MockupTemplateForm({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="mt-sort">Sort order</Label>
-            <Input
-              id="mt-sort"
-              type="number"
-              value={sortOrder}
-              onChange={(e) => setSortOrder(Number(e.target.value))}
-              className="w-24"
-            />
+            <Label className="text-sm font-medium">Sort order</Label>
+            <p className="text-xs text-muted-foreground">
+              Template order is managed in the mockup template list using the Up / Down buttons. Changes here are overwritten when you reorder there.
+            </p>
+            <div className="text-sm text-muted-foreground font-mono border rounded px-2.5 py-1.5 bg-muted/40 w-24 select-none">
+              #{sortOrder}
+            </div>
           </div>
         </div>
 

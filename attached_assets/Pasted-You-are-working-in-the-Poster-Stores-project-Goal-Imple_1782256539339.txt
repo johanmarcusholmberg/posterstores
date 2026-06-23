@@ -1,0 +1,173 @@
+You are working in the Poster Stores project.
+
+Goal:
+Implement Part 10 only: mockup template sorting in the mockup admin/template selection list.
+
+Current state:
+
+* mockup_templates.sort_order exists and is used by:
+
+  * GET /api/admin/mockup-templates
+  * GET /api/mockup-templates
+  * both order by sort_order ASC, id ASC
+* sort_order has no uniqueness constraint.
+* New admin-created templates default to 0.
+* The template form has a bare numeric Sort order input.
+* AdminMockupTemplateList.tsx has no sort controls.
+* Poster-specific image order is already handled separately by poster_mockups.sort_order in AdminPosterMockupManager.tsx.
+* Do not change poster-specific image order.
+
+Important:
+
+* This task is only about ordering mockup template pictures in the mockup admin/template selection UI.
+* Do not add poster_mockups.gallerySortOrder.
+* Do not move or change poster-specific product gallery ordering.
+* Do not change public storefront behavior.
+* Do not refactor the whole mockup system.
+* Do not create branches, PRs, commits, pushes, or GitHub automation.
+* Keep changes targeted.
+* Stop after reporting results.
+
+Desired model:
+
+* Template sort order controls the order mockup templates appear in admin lists and template selection lists.
+* Sort order should be unique within the visible template list/scope.
+* Product gallery order remains managed per poster and is not affected.
+
+Part 1 — Inspect current scope
+
+First inspect:
+
+* lib/db/src/schema/mockups.ts
+* artifacts/api-server/src/routes/mockups.ts
+* artifacts/poster-store/src/components/admin/AdminMockupTemplateList.tsx
+* artifacts/poster-store/src/components/admin/MockupTemplateForm.tsx
+* any API helpers in mockupApi.ts
+
+Determine the correct uniqueness scope:
+
+* If templates are store-specific, uniqueness should be per store.
+* If global templates and store templates appear together in one admin list, enforce uniqueness in the visible list scope using application logic.
+* Do not add a DB unique constraint unless the scope is clearly safe and will not break global/store template behavior.
+
+Part 2 — Move sorting UX into the template list
+
+Improve AdminMockupTemplateList.tsx so sorting is handled in the mockup template list/gallery, not mainly inside the individual template settings.
+
+Preferred minimal UX:
+
+* Show templates in sorted order.
+* Add Up / Down buttons on each template row/card.
+* Moving a template up/down should auto-renumber the visible list cleanly:
+
+  * 1, 2, 3, 4…
+* Save the updated sort_order values.
+* Disable Up on the first item and Down on the last item.
+* Show a small label:
+  “Order controls where this template appears in admin lists and mockup selection. Product gallery order is managed per poster.”
+
+If drag-and-drop is easy and already supported, it can be used instead, but up/down buttons are sufficient.
+
+Part 3 — Normalize existing sort orders
+
+Because current data may contain duplicates or zeros:
+
+* Add a “Normalize order” action if useful, or automatically normalize when the admin reorders.
+* Normalization should rewrite the current visible list to clean sequential values:
+
+  * first item sort_order = 1
+  * second = 2
+  * third = 3
+* Keep ordering stable when normalizing:
+
+  * current sort_order ASC
+  * created_at ASC if available
+  * id ASC
+
+Part 4 — Numeric sort order input
+
+The individual template form currently has a bare numeric Sort order input.
+
+Update it so it does not encourage duplicate/manual confusion.
+
+Preferred:
+
+* Remove or de-emphasize direct editing from MockupTemplateForm if the list now owns ordering.
+* Replace with read-only text or helper:
+  “Template order is managed in the mockup template list.”
+* If keeping the numeric field:
+
+  * Add help text:
+    “Controls the order this mockup template appears in admin lists and template selection. Product gallery order is managed separately per poster.”
+  * Validate duplicates before save.
+  * Show a clear inline error if duplicate sort_order would be saved in the same visible scope.
+
+Part 5 — Server-side duplicate prevention / reorder endpoint
+
+Add targeted server support if needed.
+
+Preferred:
+
+* Add an admin-protected reorder endpoint, for example:
+  POST /api/admin/mockup-templates/reorder
+  body: { storeId?, orderedTemplateIds: number[] }
+* It should:
+
+  * validate admin access
+  * validate all IDs belong to the intended visible scope
+  * update sort_order sequentially starting at 1
+  * return updated templates
+* Use a transaction if available.
+* This avoids saving duplicate sort values one template at a time.
+
+If adding a new endpoint is too much, implement safe existing PATCH flow, but duplicate sort orders must not remain after reorder.
+
+Part 6 — API ordering
+
+Verify admin and public template list endpoints still order by:
+
+* sort_order ASC
+* created_at ASC if available
+* id ASC
+
+If created_at is unavailable, use:
+
+* sort_order ASC
+* id ASC
+
+Part 7 — Manual QA
+
+Verify:
+
+* Newly created templates no longer all appear unpredictably with sort_order 0.
+* Existing duplicate/zero sort_order values can be normalized to 1, 2, 3…
+* Admin can move a mockup template up/down in the template list.
+* After moving, the list persists after refresh.
+* Two templates in the same visible admin/template selection list cannot keep the same sort number after reorder/save.
+* Template selection list follows the saved order.
+* Product-specific image order remains unchanged.
+* Public product gallery order remains unchanged.
+* Existing mockup sync behavior remains unchanged.
+
+Part 8 — Typechecks
+
+Run:
+
+* pnpm --filter @workspace/poster-store run typecheck
+* pnpm --filter @workspace/api-server run typecheck
+* pnpm run typecheck:libs if shared types changed
+
+Deliverable:
+Report:
+
+1. Files changed
+2. Sorting scope chosen
+3. UI changes in AdminMockupTemplateList
+4. Changes to MockupTemplateForm sort field
+5. Server/API changes
+6. How duplicates are prevented or normalized
+7. Typecheck results
+8. Manual QA results
+9. Remaining limitations
+
+Do not commit or push. Stop after report.

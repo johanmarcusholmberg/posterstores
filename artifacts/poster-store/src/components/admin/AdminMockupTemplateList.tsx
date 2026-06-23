@@ -4,6 +4,7 @@ import {
   adminListAllMockupTemplates,
   adminUpdateMockupTemplate,
   adminDeleteMockupTemplate,
+  adminReorderMockupTemplates,
   type MockupTemplate,
 } from "@/lib/mockupApi";
 import { Badge } from "@/components/ui/badge";
@@ -46,6 +47,9 @@ import {
   CheckCircle2,
   AlertCircle,
   PenLine,
+  ArrowUp,
+  ArrowDown,
+  ListOrdered,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -124,6 +128,7 @@ export const AdminMockupTemplateList = ({
   const [editTemplate, setEditTemplate] = useState<MockupTemplate | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<MockupTemplate | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [reordering, setReordering] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -142,6 +147,43 @@ export const AdminMockupTemplateList = ({
   useEffect(() => {
     load();
   }, [load]);
+
+  const handleMove = useCallback(async (templateId: number, direction: "up" | "down") => {
+    const prev = templates;
+    const idx = prev.findIndex((t) => t.id === templateId);
+    if (idx < 0) return;
+    if (direction === "up" && idx === 0) return;
+    if (direction === "down" && idx === prev.length - 1) return;
+
+    const newList = [...prev];
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    [newList[idx], newList[swapIdx]] = [newList[swapIdx], newList[idx]];
+    setTemplates(newList);
+
+    setReordering(true);
+    try {
+      await adminReorderMockupTemplates(newList.map((t) => t.id), storeKey || null);
+      load();
+    } catch (e: any) {
+      setTemplates(prev);
+      toast({ title: "Failed to reorder", description: e?.message, variant: "destructive" });
+    } finally {
+      setReordering(false);
+    }
+  }, [templates, storeKey, load, toast]);
+
+  const handleNormalize = useCallback(async () => {
+    setReordering(true);
+    try {
+      await adminReorderMockupTemplates(templates.map((t) => t.id), storeKey || null);
+      load();
+      toast({ title: "Sort order normalized" });
+    } catch (e: any) {
+      toast({ title: "Failed to normalize order", description: e?.message, variant: "destructive" });
+    } finally {
+      setReordering(false);
+    }
+  }, [templates, storeKey, load, toast]);
 
   const toggleActive = async (template: MockupTemplate) => {
     setToggling(template.id);
@@ -239,14 +281,27 @@ export const AdminMockupTemplateList = ({
               ))}
             </div>
           </div>
-          <Button
-            onClick={() => setCreateOpen(true)}
-            className="gap-1.5 shrink-0"
-            data-testid="add-mockup-template-btn"
-          >
-            <Plus className="w-4 h-4" />
-            Add mockup
-          </Button>
+          <div className="flex gap-2 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleNormalize}
+              disabled={reordering || templates.length === 0}
+              className="gap-1.5 h-9"
+              title="Rewrite all sort_order values to clean 1, 2, 3… based on current order"
+            >
+              <ListOrdered className="w-3.5 h-3.5" />
+              Normalize order
+            </Button>
+            <Button
+              onClick={() => setCreateOpen(true)}
+              className="gap-1.5"
+              data-testid="add-mockup-template-btn"
+            >
+              <Plus className="w-4 h-4" />
+              Add mockup
+            </Button>
+          </div>
         </div>
 
         <div className="flex gap-1.5 flex-wrap">
@@ -281,9 +336,12 @@ export const AdminMockupTemplateList = ({
             )}
           </div>
         ) : (
-          <div className="space-y-6">
-            {renderGroup(globalTemplates, "Global templates", toggleActive, toggling, setEditTemplate, setDeleteTarget)}
-            {renderGroup(storeTemplates, `Templates for ${storeKey}`, toggleActive, toggling, setEditTemplate, setDeleteTarget)}
+            <div className="space-y-6">
+            <p className="text-xs text-muted-foreground">
+              Order controls where this template appears in admin lists and mockup selection. Product gallery order is managed per poster.
+            </p>
+            {renderGroup(globalTemplates, "Global templates", templates, toggleActive, toggling, setEditTemplate, setDeleteTarget, handleMove, reordering)}
+            {renderGroup(storeTemplates, `Templates for ${storeKey}`, templates, toggleActive, toggling, setEditTemplate, setDeleteTarget, handleMove, reordering)}
           </div>
         )}
       </div>
@@ -354,10 +412,13 @@ export const AdminMockupTemplateList = ({
 function renderGroup(
   list: MockupTemplate[],
   label: string,
+  fullList: MockupTemplate[],
   toggleActive: (t: MockupTemplate) => void,
   toggling: number | null,
   onEdit: (t: MockupTemplate) => void,
-  onDelete: (t: MockupTemplate) => void
+  onDelete: (t: MockupTemplate) => void,
+  onMove: (id: number, dir: "up" | "down") => void,
+  reordering: boolean
 ) {
   if (list.length === 0) return null;
   return (
@@ -366,16 +427,25 @@ function renderGroup(
         {label}
       </h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {list.map((template) => (
-          <TemplateCard
-            key={template.id}
-            template={template}
-            toggling={toggling}
-            onToggle={toggleActive}
-            onEdit={onEdit}
-            onDelete={onDelete}
-          />
-        ))}
+        {list.map((template) => {
+          const fullIdx = fullList.findIndex((t) => t.id === template.id);
+          return (
+            <TemplateCard
+              key={template.id}
+              template={template}
+              toggling={toggling}
+              onToggle={toggleActive}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              position={fullIdx + 1}
+              isFirst={fullIdx === 0}
+              isLast={fullIdx === fullList.length - 1}
+              onMoveUp={() => onMove(template.id, "up")}
+              onMoveDown={() => onMove(template.id, "down")}
+              reordering={reordering}
+            />
+          );
+        })}
       </div>
     </div>
   );
@@ -387,12 +457,24 @@ function TemplateCard({
   onToggle,
   onEdit,
   onDelete,
+  position,
+  isFirst,
+  isLast,
+  onMoveUp,
+  onMoveDown,
+  reordering,
 }: {
   template: MockupTemplate;
   toggling: number | null;
   onToggle: (t: MockupTemplate) => void;
   onEdit: (t: MockupTemplate) => void;
   onDelete: (t: MockupTemplate) => void;
+  position: number;
+  isFirst: boolean;
+  isLast: boolean;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  reordering: boolean;
 }) {
   const thumbUrl = template.backgroundImageUrl || template.previewThumbnailUrl;
 
@@ -511,6 +593,34 @@ function TemplateCard({
           confidence={template.detectionConfidence}
           manuallyAdjusted={template.placementWasManuallyAdjusted}
         />
+
+        <div className="flex items-center justify-between pt-1 border-t border-border/50">
+          <span className="text-[10px] text-muted-foreground font-mono tabular-nums">
+            #{position}
+          </span>
+          <div className="flex gap-1">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-6 w-6"
+              onClick={onMoveUp}
+              disabled={isFirst || reordering}
+              title="Move up"
+            >
+              <ArrowUp className="w-3 h-3" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-6 w-6"
+              onClick={onMoveDown}
+              disabled={isLast || reordering}
+              title="Move down"
+            >
+              <ArrowDown className="w-3 h-3" />
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );

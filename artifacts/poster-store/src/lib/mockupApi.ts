@@ -308,6 +308,20 @@ export async function adminUpdateMockupTemplate(
   return res.json();
 }
 
+export async function adminReorderMockupTemplates(
+  orderedTemplateIds: number[],
+  storeKey?: string | null
+): Promise<{ updated: number; templates: MockupTemplate[] }> {
+  const res = await fetch(`${BASE}/mockup-templates/reorder`, {
+    method: "POST",
+    headers: jsonHeaders(),
+    credentials: "include",
+    body: JSON.stringify({ orderedTemplateIds, storeKey: storeKey ?? null }),
+  });
+  if (!res.ok) await handleError(res);
+  return res.json();
+}
+
 export async function adminDeleteMockupTemplate(
   id: number
 ): Promise<void> {
