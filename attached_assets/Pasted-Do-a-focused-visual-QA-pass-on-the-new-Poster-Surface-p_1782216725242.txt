@@ -1,0 +1,71 @@
+Do a focused visual QA pass on the new Poster Surface / perspective rendering system.
+
+Do not add new features.
+Do not refactor broadly.
+Do not commit or push.
+
+Verify these specific flows:
+
+1. Existing bounding-box template
+
+* Existing manual x/y/width/height template still syncs.
+* Sync result shows manual_bbox.
+* Product page shows generated mockupImageUrl.
+* Public gallery does not show templates without mockupImageUrl.
+
+2. Manual corner surface
+
+* Open template editor.
+* Use Edit corners.
+* Drag all four corners.
+* Save poster surface.
+* Confirm it writes placementConfig, not detectedPlacementConfig.
+* Confirm UI says Manual surface active.
+* Run Sync mockups.
+* Sync result shows manual_corners.
+* Product gallery shows the rendered mockup.
+
+3. AI detected surface
+
+* Run Detect surface.
+* Confirm detection writes detectedPlacementConfig only.
+* Confirm manual placementConfig is unchanged.
+* Approve detected surface.
+* Run Sync mockups.
+* Sync result shows auto_detected_corners or auto_detected_bbox.
+* Product gallery shows the rendered mockup.
+
+4. Failed detection
+
+* Trigger or simulate failed/low-confidence detection.
+* Confirm existing manual surface stays unchanged.
+* Confirm no fallback surface is written over the current surface.
+
+5. Angled/perspective mockup
+
+* Use a mockup template where the poster is angled, lying down, or seen from the side.
+* Set four corners around the true poster surface.
+* Run sync.
+* Confirm the poster is warped into the quadrilateral, not simply stretched into a rectangle.
+* Confirm no obvious overflow outside the selected surface.
+
+6. Public storefront
+
+* Thumbnail, main image, and lightbox all show the same generated image.
+* No bare template backgrounds.
+* No live CSS composites.
+* AI-rendered unapproved mockups remain hidden.
+
+Run:
+
+* pnpm run typecheck:libs
+* pnpm --filter @workspace/api-server run typecheck
+* pnpm --filter @workspace/poster-store run typecheck
+
+Report:
+
+1. Visual QA result
+2. Any bugs found
+3. Files changed, if any
+4. Typecheck results
+5. Whether this is safe to sync to GitHub
