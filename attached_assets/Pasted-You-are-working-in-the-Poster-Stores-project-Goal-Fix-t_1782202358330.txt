@@ -1,0 +1,183 @@
+You are working in the Poster Stores project.
+
+Goal:
+Fix the mockup workflow so product mockups behave like real finalized mockup images, not inconsistent live previews.
+
+Current problem:
+The current mockup/gallery behavior is inconsistent:
+1. Mockup placement/detection is still too dependent on x/y/width/height instead of a proper poster surface.
+2. If AI detection fails, it applies a fallback area and overwrites or changes the current selected area. This is bad — detection must be non-destructive.
+3. In the product image carousel/thumbnails, the poster is not visible inside the mockup until the mockup is selected. The thumbnail appears to show the bare mockup template/background.
+4. In the lightbox/zoom view, the poster size changes and no longer matches the mockup frame. The lightbox appears to re-render the composite differently from the selected product image.
+
+Important:
+- Do not refactor the entire mockup system.
+- Do not remove deterministic Sharp rendering.
+- Do not make AI rendering the default.
+- Do not create branches, PRs, commits, pushes, or GitHub automation.
+- Keep changes targeted.
+- Typecheck must pass.
+- Existing manual templates must continue working.
+- Existing public product gallery, hover image, primary image, and lightbox must continue working.
+
+Main principle:
+For public storefront views, use the final generated/flattened mockup image whenever it exists. Do not show a bare template background and do not recomposite differently in the thumbnail, main image, and lightbox.
+
+Part 1 — Make AI placement detection non-destructive
+
+Inspect the auto-placement detection flow in:
+- mockupPlacementAnalyzer.ts
+- analyze-placement endpoint
+- MockupTemplateForm.tsx
+- any placement fallback logic
+
+Fix behavior:
+- Pressing “Detect” or “Re-analyze” must never overwrite the current manual placement immediately.
+- The AI result should be stored as a detected candidate.
+- Admin must explicitly approve detected placement before it becomes active.
+- If AI detection fails, keep the existing placement exactly as it was.
+- If AI detection confidence is too low, keep existing placement exactly as it was and show “Needs review”.
+- Do not write a fallback bounding box over an existing selection.
+- Only create a fallback area if there is no existing placement at all, and even then store it only as a candidate/needs-review state, not active placement.
+
+Expected behavior:
+- Current manual area remains unchanged after failed detection.
+- Current approved auto-detected placement remains unchanged after failed re-analysis.
+- Failed detection stores detectedPlacementStatus = failed and detectedPlacementError, but does not change placementMode to a public-active mode.
+
+Part 2 — Define a single effective mockup image source for public UI
+
+Inspect:
+- MockupGallery.tsx
+- product page gallery data mapping
+- poster mockup API response
+- generated poster_mockups image fields
+- any CompositedMockup / LightboxImage components
+
+Implement a clear priority:
+
+For every mockup/gallery item:
+1. If poster_mockup.imageUrl / mockupImageUrl / generated final image exists:
+   - use that final image everywhere:
+     - thumbnail
+     - main gallery image
+     - lightbox
+2. Else if only a live composite config exists:
+   - use the same live composite component in thumbnail, main image, and lightbox, with the same geometry/aspect ratio
+3. Else:
+   - show template preview as “Template only / sync needed”, not as a finished mockup
+
+Do not allow this:
+- thumbnail = bare template background
+- main selected image = live composite
+- lightbox = different recomposition
+
+Part 3 — Fix carousel thumbnails
+
+Thumbnails should show the actual completed mockup if a completed mockup image exists.
+
+In MockupGallery:
+- For mockup thumbnails, use the generated final mockup image URL first.
+- Do not use the background/template image as the thumbnail when a generated composite exists.
+- If no generated composite exists, visually mark it as not generated or sync needed.
+- Keep thumbnail sizing/cropping consistent with existing UI.
+
+Manual QA target:
+When scrolling the product images, mockup thumbnails should already show the poster inserted into the mockup.
+
+Part 4 — Fix lightbox/zoom mockup consistency
+
+The lightbox must show the same visual result as the selected gallery image.
+
+Preferred:
+- If generated final mockup image exists, lightbox renders a plain img:
+  - max-width: 88vw
+  - max-height: 82vh
+  - width: auto
+  - height: auto
+  - object-fit: contain
+- Do not wrap it in a forced 3/4 or recomposed template container.
+- Do not scale the inserted poster separately from the mockup background.
+
+If there is no final image and live composite must be used:
+- Use exactly the same placement/transform/aspect-ratio logic as the main selected gallery image.
+- Do not use a separate hardcoded aspect ratio.
+- Do not make the inserted poster larger in the lightbox than in the main view.
+
+Manual QA target:
+Opening the mockup in lightbox should look like the same image, just larger. The inserted poster should not change size relative to the frame.
+
+Part 5 — Improve mockup template model toward professional workflow
+
+Without overbuilding, add or verify support for these template concepts:
+
+- poster surface corners
+- normalized bounding box
+- fit mode
+- render settings
+- optional mask/occlusion readiness
+- placement source: manual / auto_detected
+- reviewed/approved status
+
+If the existing detectedPlacementConfig already stores corners and bounding box, reuse it.
+Do not implement full PSD/layer support yet.
+Do not implement a full perspective renderer unless a safe existing dependency/path is already available.
+
+Add clear TODOs/report for future:
+- perspective transform renderer
+- mask/foreground occlusion layer
+- shadow/highlight layer import
+- visual drag/resize/corner editor
+
+Part 6 — Sync/rendering behavior
+
+Generated mockup images should be treated as the public source of truth.
+
+Verify mockupSync.ts:
+- deterministic sync generates and stores a final image URL
+- public gallery uses this image URL
+- hover mockup uses this image URL
+- primary mockup uses this image URL
+- duplicate prevention still works
+- AI-rendered mockups remain hidden until approved
+
+Part 7 — Tests / verification
+
+Run:
+- pnpm run typecheck:libs
+- pnpm --filter @workspace/api-server run typecheck
+- pnpm --filter @workspace/poster-store run typecheck
+
+Add low-cost tests if practical:
+- failed AI detection does not change active placement
+- generated mockup image URL wins over template background
+- lightbox uses final image when available
+- AI-rendered unapproved mockups remain hidden
+- deterministic mockups remain public when configured
+
+Manual QA checklist:
+- Existing manual template still works
+- Failed Detect does not move/change existing selected area
+- Low-confidence Detect does not activate automatically
+- Approved detected placement still works
+- Mockup thumbnail shows poster inserted, not bare template
+- Main selected mockup shows same result as thumbnail
+- Lightbox shows same result as main selected mockup
+- Poster does not grow/change relative to frame in lightbox
+- Product gallery still works for normal poster images
+- Hover mockup still works
+- Primary mockup still works
+- AI-rendered unapproved mockups remain hidden
+
+Deliverable:
+Report:
+1. Bugs found
+2. Files changed
+3. Detection behavior fixes
+4. Gallery/thumbnail/lightbox fixes
+5. Sync/rendering behavior changes
+6. Typecheck/test results
+7. Manual QA results
+8. Remaining limitations and recommended next step
+
+Do not commit or push. Stop after implementation and report.

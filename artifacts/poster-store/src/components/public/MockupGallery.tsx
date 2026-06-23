@@ -177,7 +177,15 @@ export const MockupGallery = ({
     { url: fallbackImageUrl, label: "Poster" },
     ...visibleMockups
       .map((m) => {
-        const canComposite = hasPlacementData(m.template) && !!m.template?.backgroundImageUrl;
+        // Generated final image is the source of truth — never show bare template
+        // background when a finalized composite already exists.
+        const hasGeneratedImage = !!m.mockupImageUrl;
+        // Only fall back to live CSS compositing when there is no pre-rendered image.
+        const canComposite =
+          !hasGeneratedImage &&
+          hasPlacementData(m.template) &&
+          !!m.template?.backgroundImageUrl;
+
         const displayUrl =
           m.mockupImageUrl ??
           m.template?.backgroundImageUrl ??
@@ -187,11 +195,16 @@ export const MockupGallery = ({
         if (!displayUrl && !canComposite) return null;
 
         return {
-          url: canComposite
-            ? m.template!.backgroundImageUrl!
-            : (displayUrl ?? fallbackImageUrl),
+          // Priority: generated image > live composite background > preview/thumbnail
+          url: hasGeneratedImage
+            ? m.mockupImageUrl!
+            : canComposite
+              ? m.template!.backgroundImageUrl!
+              : (displayUrl ?? fallbackImageUrl),
           label: getFriendlyLabel(m),
           mockup: m,
+          // isComposited only true when there is no pre-rendered image and we have
+          // placement data — prevents showing bare backgrounds in thumbnails/lightbox.
           isComposited: canComposite,
         } as DisplayImage;
       })
@@ -415,24 +428,24 @@ export const MockupGallery = ({
                 )}
                 style={{ width: 68, height: 68 }}
               >
-                {img.isComposited && img.mockup?.template?.backgroundImageUrl ? (
-                  <img
-                    src={img.mockup.template.backgroundImageUrl}
-                    alt={img.label}
-                    loading="lazy"
-                    decoding="async"
-                    className="w-full h-full object-cover"
-                    onError={(e) => { (e.target as HTMLImageElement).src = fallbackImageUrl; }}
-                  />
-                ) : (
-                  <img
-                    src={img.url}
-                    alt={img.label}
-                    loading="lazy"
-                    decoding="async"
-                    className="w-full h-full object-cover"
-                    onError={(e) => { (e.target as HTMLImageElement).src = fallbackImageUrl; }}
-                  />
+                {/* img.url is the final generated image when available (isComposited=false),
+                    or the background template when only live compositing is possible. */}
+                <img
+                  src={img.url}
+                  alt={img.label}
+                  loading="lazy"
+                  decoding="async"
+                  className="w-full h-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).src = fallbackImageUrl; }}
+                />
+                {/* Live-composite only (no generated image yet) — small indicator */}
+                {img.isComposited && (
+                  <span
+                    className="absolute bottom-0.5 right-0.5 text-[7px] leading-none font-medium px-1 py-0.5 rounded bg-black/50 text-white/80 pointer-events-none"
+                    aria-hidden="true"
+                  >
+                    preview
+                  </span>
                 )}
               </button>
             ))}
@@ -505,8 +518,10 @@ export const MockupGallery = ({
                     )}
                     style={{ width: 56, height: 56 }}
                   >
+                    {/* img.url is the generated image when available (isComposited=false),
+                        or the background template for live-composite-only items. */}
                     <img
-                      src={img.isComposited && img.mockup?.template?.backgroundImageUrl ? img.mockup.template.backgroundImageUrl : img.url}
+                      src={img.url}
                       alt={img.label}
                       loading="lazy"
                       decoding="async"
@@ -515,6 +530,14 @@ export const MockupGallery = ({
                         (e.target as HTMLImageElement).src = fallbackImageUrl;
                       }}
                     />
+                    {img.isComposited && (
+                      <span
+                        className="absolute bottom-0.5 right-0.5 text-[7px] leading-none font-medium px-1 py-0.5 rounded bg-black/50 text-white/80 pointer-events-none"
+                        aria-hidden="true"
+                      >
+                        preview
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>

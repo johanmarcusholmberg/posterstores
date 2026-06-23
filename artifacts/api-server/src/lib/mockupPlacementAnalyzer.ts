@@ -1,5 +1,52 @@
 import { openai } from "@workspace/integrations-openai-ai-server";
 
+// ─── Placement model overview ─────────────────────────────────────────────────
+//
+// Current fields (fully implemented):
+//   DetectedPlacementConfig
+//     • surfaceType      — poster / frame / paper / unknown
+//     • confidence       — 0–1 float from GPT vision
+//     • coordinateSystem — always "normalized" (0–1 range)
+//     • corners          — quad corners for the placement surface (topLeft…bottomLeft)
+//     • boundingBox      — AABB derived from corners or model output (x/y/width/height, 0–1)
+//     • rotation         — clockwise degrees (0 = upright)
+//     • recommendedFitMode  — cover / contain / stretch
+//     • recommendedRender   — shadow/highlight/blur/overlay/borderRadius hints
+//     • warnings         — low-confidence, tilt, multiple frames, occlusion notices
+//
+//   Template table fields (placement source & status):
+//     • placementMode    — "manual" | "auto_detected" | "auto_detected_needs_review"
+//     • detectedPlacementStatus — "not_analyzed" | "detected" | "needs_review" | "failed"
+//     • detectedPlacementConfig — stored DetectedPlacementConfig (JSONB)
+//     • detectedPlacementError  — human-readable error string on failure
+//     • analyzedAt       — timestamp of last analysis run
+//
+// Future work (TODOs for the next iteration):
+//   TODO: Perspective transform renderer
+//         The corners field captures the actual quad of the poster surface (including
+//         tilt). A perspective-correct render would warp the poster image into the quad
+//         using a homography matrix (e.g. via canvas 2D transform or a WebGL shader)
+//         rather than the current simple CSS/Sharp rectangle approach.
+//
+//   TODO: Mask / foreground occlusion layer
+//         Some templates partially occlude the poster surface (e.g. a hand holding a
+//         frame, or a plant in front of a wall print). A mask PNG stored alongside the
+//         background would let us composite: background → poster → mask → foreground,
+//         which prevents the poster from bleeding through foreground objects.
+//
+//   TODO: Shadow / highlight import layer
+//         For photorealistic compositing, import the template-specific shadow and
+//         highlight layer (alpha PNG or multiply/screen blend) and apply it on top of
+//         the composited poster. Currently shadow/highlight settings are approximated
+//         as CSS box-shadow and brightness filters.
+//
+//   TODO: Visual drag/resize/corner editor
+//         Replace the numeric X/Y/W/H input fields with a canvas overlay that lets
+//         admins drag the bounding box handles directly on the template image preview.
+//         The corner points from DetectedPlacementConfig.corners could drive a
+//         4-point drag handle UI for perspective-aware placement.
+// ─────────────────────────────────────────────────────────────────────────────
+
 export type SurfaceType = "poster" | "frame" | "paper" | "unknown";
 export type FitMode = "cover" | "contain" | "stretch";
 

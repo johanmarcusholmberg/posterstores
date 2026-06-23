@@ -496,6 +496,12 @@ export function MockupTemplateForm({
       setAnalysisDescription("");
       setHadDetectionBeforeEdit(false);
 
+      // Capture whether there is already a placement set BEFORE the async call.
+      // We use the setter form below to read the latest state from the closure
+      // at call time rather than relying on stale snapshot variables.
+      let hadExistingPlacement = false;
+      setPosterX((prev) => { hadExistingPlacement = prev !== ""; return prev; });
+
       try {
         const result = await analyzeMockupPlacement(imageUrl);
         if (
@@ -523,21 +529,30 @@ export function MockupTemplateForm({
             source: "ai",
             detectedAt: new Date().toISOString(),
           });
-          applyDetectedValues(detected);
+          // Store as candidate only — never auto-apply. Admin must click
+          // "Apply detected values" to activate the detected placement.
+          // This keeps existing manual placements intact.
           setAnalysisState("detected");
           setAnalysisDescription(result.description);
           setHadDetectionBeforeEdit(true);
         } else {
           setAnalysisState("not-detected");
           setAnalysisDescription(result.description ?? "No placement area found.");
-          applyFallbackPlacement(orientation);
+          // Only apply fallback when there is truly no placement set — never
+          // overwrite an existing selection just because detection failed.
+          if (!hadExistingPlacement) {
+            applyFallbackPlacement(orientation);
+          }
         }
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : "Analysis failed";
         setAnalysisState("error");
         setAnalysisDescription(msg);
         lastAnalyzedUrlRef.current = "";
-        applyFallbackPlacement(orientation);
+        // Only apply fallback when there is truly no placement set.
+        if (!hadExistingPlacement) {
+          applyFallbackPlacement(orientation);
+        }
       }
     },
     [orientation, applyFallbackPlacement]
@@ -1123,7 +1138,7 @@ export function MockupTemplateForm({
                     </div>
                     <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1">{analysisDescription}</p>
                     <p className="text-xs text-emerald-600/70 dark:text-emerald-500 mt-0.5">
-                      Values filled below — review and adjust as needed
+                      Placement detected — click <strong>Apply detected values</strong> below to use it. Your current values are unchanged until you do.
                     </p>
                   </div>
                 </>
@@ -1143,7 +1158,11 @@ export function MockupTemplateForm({
                   <div>
                     <p className="font-medium text-amber-800 dark:text-amber-300">No placement area detected</p>
                     <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">{analysisDescription}</p>
-                    <p className="text-xs text-amber-600/70 dark:text-amber-500 mt-1">Safe fallback values applied — adjust as needed</p>
+                    <p className="text-xs text-amber-600/70 dark:text-amber-500 mt-1">
+                      {hasPosterArea
+                        ? "Your existing placement was preserved — detection did not change anything."
+                        : "Safe fallback values applied — adjust as needed"}
+                    </p>
                   </div>
                 </>
               )}
@@ -1153,7 +1172,11 @@ export function MockupTemplateForm({
                   <div>
                     <p className="font-medium text-destructive">Detection failed</p>
                     <p className="text-xs text-muted-foreground mt-0.5">{analysisDescription}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Fallback values applied — adjust as needed</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {hasPosterArea
+                        ? "Your existing placement was preserved — detection did not change anything."
+                        : "Safe fallback values applied — adjust as needed"}
+                    </p>
                   </div>
                 </>
               )}
@@ -1372,14 +1395,21 @@ export function MockupTemplateForm({
                 {detectedValues && (
                   <Button
                     type="button"
-                    variant="ghost"
+                    variant={analysisState === "detected" ? "default" : "ghost"}
                     size="sm"
-                    className="h-7 gap-1 text-xs"
+                    className={cn(
+                      "h-7 gap-1 text-xs",
+                      analysisState === "detected" && "bg-emerald-600 hover:bg-emerald-700 text-white"
+                    )}
                     onClick={handleResetToDetected}
-                    title="Restore the AI-detected placement values"
+                    title={
+                      analysisState === "detected"
+                        ? "Apply the AI-detected placement to the form fields"
+                        : "Restore the AI-detected placement values"
+                    }
                   >
                     <RotateCcw className="w-3 h-3" />
-                    Reset to detected
+                    {analysisState === "detected" ? "Apply detected values" : "Reset to detected"}
                   </Button>
                 )}
                 {backgroundImageUrl && (
