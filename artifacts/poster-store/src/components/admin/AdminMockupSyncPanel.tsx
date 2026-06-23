@@ -61,20 +61,18 @@ export function AdminMockupSyncPanel({ storeKey }: AdminMockupSyncPanelProps) {
 
   const [status, setStatus] = useState<SyncStatus>("idle");
   const [results, setResults] = useState<SyncResult[] | null>(null);
-  const [summary, setSummary] = useState<{ generated: number; skipped: number; failed: number; plannedCount?: number } | null>(null);
+  const [summary, setSummary] = useState<{ generated: number; skipped: number; failed: number; plannedCount?: number; needsReviewCount?: number } | null>(null);
   const [syncNote, setSyncNote] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const syncableTemplates = templates.filter(
-    (t) =>
-      t.active &&
-      t.backgroundImageUrl &&
-      t.posterX != null &&
-      t.posterY != null &&
-      t.posterWidth != null &&
-      t.posterHeight != null
-  );
+  const syncableTemplates = templates.filter((t) => {
+    if (!t.active || !t.backgroundImageUrl) return false;
+    // AI-rendered templates don't need placement coordinates
+    if (t.renderMode === "ai_rendered") return true;
+    // Deterministic: need placement coordinates
+    return t.posterX != null && t.posterY != null && t.posterWidth != null && t.posterHeight != null;
+  });
 
   useEffect(() => {
     setLoadingTemplates(true);
@@ -112,7 +110,7 @@ export function AdminMockupSyncPanel({ storeKey }: AdminMockupSyncPanelProps) {
         dryRun,
       });
 
-      setSummary({ generated: resp.generated, skipped: resp.skipped, failed: resp.failed, plannedCount: resp.plannedCount });
+      setSummary({ generated: resp.generated, skipped: resp.skipped, failed: resp.failed, plannedCount: resp.plannedCount, needsReviewCount: resp.needsReviewCount });
       setResults(resp.results);
       setSyncNote(resp.note ?? null);
       setStatus("done");
@@ -321,6 +319,15 @@ export function AdminMockupSyncPanel({ storeKey }: AdminMockupSyncPanelProps) {
                 </span>
               </>
             )}
+            {(summary.needsReviewCount ?? 0) > 0 && (
+              <>
+                <span className="text-muted-foreground">·</span>
+                <span className="flex items-center gap-1 text-amber-600 font-medium">
+                  <AlertTriangle className="w-4 h-4" />
+                  {summary.needsReviewCount} need review
+                </span>
+              </>
+            )}
             {dryRun && <Badge variant="outline" className="text-xs">Dry run</Badge>}
           </div>
         )}
@@ -360,6 +367,7 @@ export function AdminMockupSyncPanel({ storeKey }: AdminMockupSyncPanelProps) {
                     <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Poster</th>
                     <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Template</th>
                     <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Result</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Renderer</th>
                     <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Detail</th>
                   </tr>
                 </thead>
@@ -367,16 +375,25 @@ export function AdminMockupSyncPanel({ storeKey }: AdminMockupSyncPanelProps) {
                   {results.map((r, i) => (
                     <tr key={i} className={cn(
                       r.action === "failed" && "bg-destructive/5",
-                      r.action === "generated" && dryRun && "bg-muted/30"
+                      r.needsReview && r.action === "generated" && "bg-amber-50/60 dark:bg-amber-950/20",
+                      r.action === "generated" && !r.needsReview && dryRun && "bg-muted/30"
                     )}>
                       <td className="px-3 py-2 text-xs">{r.posterTitle}</td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">{r.templateName}</td>
                       <td className="px-3 py-2">
                         {r.action === "generated" ? (
-                          <span className="flex items-center gap-1 text-xs font-medium text-emerald-600">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            {dryRun ? "Would generate" : "Generated"}
-                          </span>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="flex items-center gap-1 text-xs font-medium text-emerald-600">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              {dryRun ? "Would generate" : "Generated"}
+                            </span>
+                            {r.needsReview && !dryRun && (
+                              <span className="flex items-center gap-1 text-[10px] text-amber-600">
+                                <AlertTriangle className="w-3 h-3" />
+                                Needs review
+                              </span>
+                            )}
+                          </div>
                         ) : r.action === "skipped" ? (
                           <span className="flex items-center gap-1 text-xs text-muted-foreground">
                             <SkipForward className="w-3.5 h-3.5" />
@@ -389,8 +406,18 @@ export function AdminMockupSyncPanel({ storeKey }: AdminMockupSyncPanelProps) {
                           </span>
                         )}
                       </td>
+                      <td className="px-3 py-2">
+                        {r.renderMode === "ai_rendered" ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded border bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/30 dark:text-violet-400">
+                            <Wand2 className="w-2.5 h-2.5" />
+                            AI
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground">Sharp</span>
+                        )}
+                      </td>
                       <td className="px-3 py-2 text-xs text-muted-foreground max-w-xs truncate">
-                        {r.reason ?? (r.imageUrl ? "Stored" : "—")}
+                        {r.aiRenderWarning ?? r.reason ?? (r.imageUrl ? "Stored" : "—")}
                       </td>
                     </tr>
                   ))}

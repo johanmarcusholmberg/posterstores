@@ -1,0 +1,160 @@
+You are working in the Poster Stores project.
+
+Goal:
+Add an optional AI-rendered mockup mode, without replacing the existing smart placement + Sharp compositor system.
+
+Context:
+- Store admin owns mockup templates and poster mockup sync.
+- Smart mockup placement detection has been implemented.
+- mockup_templates now stores placement_mode, detected_placement_config, detected_placement_status, detected_placement_error, analyzed_at.
+- Admin approval is required before auto-detected placement is used.
+- mockupSync.ts currently uses resolveEffectiveMockupPlacement() and falls back to manual placement.
+- mockupCompositor.ts uses Sharp for deterministic compositing.
+- Existing system should remain the default and source of truth.
+
+Important:
+- Do not replace deterministic compositing.
+- Do not remove manual placement.
+- Do not auto-publish AI-rendered mockups.
+- Do not create branches, PRs, commits, pushes, or GitHub automation.
+- Keep changes targeted.
+- Typecheck must pass.
+
+New feature:
+Add an optional render mode for mockup templates:
+
+renderMode:
+- deterministic
+- ai_rendered
+
+Default must be deterministic.
+
+Purpose:
+- deterministic = exact poster fidelity, fast, repeatable, safe for product gallery/hover/primary
+- ai_rendered = more realistic lifestyle/mockup result, but requires admin review before public use
+
+Data model:
+Add idempotent migration fields as needed.
+
+Suggested fields on mockup_templates:
+- render_mode text default 'deterministic'
+- ai_render_prompt text nullable
+- ai_render_requires_review boolean default true
+
+Suggested fields on poster_mockups:
+- render_mode text default 'deterministic'
+- needs_review boolean default false
+- ai_render_warning text nullable
+- source_poster_image_url text nullable
+- source_template_image_url text nullable
+
+Adapt to existing schema if better.
+
+Server:
+Create an AI mockup renderer service, for example:
+
+artifacts/api-server/src/lib/aiMockupRenderer.ts
+
+The service should:
+- Accept poster image URL
+- Accept mockup template image URL
+- Accept detected placement config if available
+- Accept template render prompt / category
+- Use existing image generation/editing provider only if there is a clean reusable provider path
+- Ask the model to insert the poster artwork into the detected frame/poster area
+- Preserve the poster artwork exactly as much as possible
+- Preserve poster colors, text, border, crop, and aspect ratio
+- Preserve the room/mockup background
+- Add realistic lighting, paper texture, frame shadow, glass reflection only when appropriate
+- Return a final image buffer or image URL
+
+If the existing provider integration cannot support image editing cleanly:
+- Add the server structure and admin UI hooks
+- Leave a clear TODO/report
+- Do not fake a broken AI render
+
+AI render prompt requirements:
+- The poster artwork must remain unchanged.
+- Do not redesign, repaint, reinterpret, crop, or alter the poster.
+- Insert the poster naturally into the visible poster/frame area.
+- Match lighting, perspective, shadow, and surface texture.
+- Keep the surrounding room/mockup scene unchanged.
+- Return only the final mockup image.
+
+Sync behavior:
+Update mockupSync.ts:
+
+- If template.renderMode = deterministic:
+  - use existing smart placement + Sharp compositor
+  - generated mockups can follow current primary/hover/gallery rules
+
+- If template.renderMode = ai_rendered:
+  - use aiMockupRenderer
+  - store result as poster_mockup
+  - set needs_review = true
+  - do not automatically assign as primary or hover unless admin explicitly approves later
+  - can appear in admin preview but should not become public until approved
+  - include renderMode and aiRenderWarning in result logs
+
+Admin UI:
+Update MockupTemplateForm:
+
+Add “Render mode” section:
+- Deterministic compositor — recommended for product mockups
+- AI-rendered mockup — experimental / realistic / requires review
+
+For AI-rendered mode:
+- Show ai_render_prompt textarea
+- Show warning:
+  “AI-rendered mockups may slightly alter poster artwork. Use for marketing/lifestyle images and review before publishing.”
+- Keep auto placement visible because it can guide the AI prompt.
+
+Admin sync UI:
+- Show render mode in sync results
+- Show needs review count
+- Make it clear when an AI-rendered mockup was generated but not public
+
+Public behavior:
+- Deterministic mockups keep current behavior.
+- AI-rendered mockups must not appear publicly unless reviewed/approved.
+- Existing product gallery, hover, primary, and lightbox behavior must not break.
+
+Review/approval:
+If there is already an admin review/status workflow for poster_mockups, reuse it.
+Otherwise add a minimal approval flag:
+- approved_for_public boolean default false for ai_rendered
+- deterministic mockups can remain approved according to current rules
+
+Tests / verification:
+Run:
+- pnpm --filter @workspace/api-server run typecheck
+- pnpm --filter @workspace/poster-store run typecheck
+
+Add low-cost tests if practical:
+- deterministic remains default
+- AI render mode requires review
+- AI mockups are not public until approved
+- sync chooses correct renderer by template renderMode
+
+Manual QA:
+- Existing deterministic template still syncs
+- Auto-detected placement still works
+- Template can be switched to AI-rendered mode
+- AI render prompt saves
+- AI-rendered sync result is marked needs review
+- AI-rendered result does not become primary/hover/public automatically
+- Product gallery still works with deterministic mockups
+- Typechecks pass
+
+Deliverable:
+Report:
+1. Files changed
+2. DB migration summary
+3. AI renderer implementation summary
+4. Admin UI changes
+5. Sync behavior changes
+6. Public visibility / review behavior
+7. Typecheck results
+8. Limitations
+
+Do not commit or push. Stop after the report.

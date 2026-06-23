@@ -270,6 +270,10 @@ const ALLOWED_TEMPLATE_FIELDS = [
   "detectedPlacementStatus",
   "detectedPlacementError",
   "analyzedAt",
+  // AI render mode fields
+  "renderMode",
+  "aiRenderPrompt",
+  "aiRenderRequiresReview",
 ] as const;
 
 /**

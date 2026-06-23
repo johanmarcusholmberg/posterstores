@@ -251,6 +251,15 @@ export function MockupTemplateForm({
     template?.sourceImageHeight ?? null
   );
 
+  // AI render mode state
+  const [renderMode, setRenderMode] = useState<"deterministic" | "ai_rendered">(
+    (template?.renderMode as "deterministic" | "ai_rendered" | null | undefined) ?? "deterministic"
+  );
+  const [aiRenderPrompt, setAiRenderPrompt] = useState(template?.aiRenderPrompt ?? "");
+  const [aiRenderRequiresReview, setAiRenderRequiresReview] = useState(
+    template?.aiRenderRequiresReview ?? true
+  );
+
   // Smart placement state (DB-persisted)
   const [placementMode, setPlacementMode] = useState<PlacementMode>(
     (template?.placementMode as PlacementMode | null | undefined) ?? "manual"
@@ -706,6 +715,10 @@ export function MockupTemplateForm({
             }
           : {}),
         placementWasManuallyAdjusted,
+        // AI render mode
+        renderMode,
+        aiRenderPrompt: aiRenderPrompt.trim() || undefined,
+        aiRenderRequiresReview,
       };
 
       let saved: MockupTemplate;
@@ -1146,6 +1159,86 @@ export function MockupTemplateForm({
               )}
             </div>
           )}
+
+          {/* Render mode section */}
+          <div className={cn(
+            "space-y-2.5 rounded-md border p-3",
+            renderMode === "ai_rendered" ? "border-violet-300 bg-violet-50/50 dark:border-violet-700 dark:bg-violet-950/20" : "border-border bg-muted/20"
+          )}>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <p className="text-sm font-medium">Render mode</p>
+              <span className={cn(
+                "text-[10px] font-semibold px-1.5 py-0.5 rounded-full border",
+                renderMode === "ai_rendered"
+                  ? "bg-violet-100 text-violet-800 border-violet-300 dark:bg-violet-950/40 dark:text-violet-300"
+                  : "bg-muted text-muted-foreground border-border"
+              )}>
+                {renderMode === "ai_rendered" ? "AI rendered" : "Deterministic"}
+              </span>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setRenderMode("deterministic")}
+                className={cn(
+                  "flex flex-col gap-0.5 rounded border px-3 py-2.5 text-left text-sm transition-colors",
+                  renderMode === "deterministic"
+                    ? "border-primary bg-primary/5 ring-1 ring-primary/30"
+                    : "border-border hover:border-primary/40"
+                )}
+              >
+                <span className="font-medium">Deterministic compositor</span>
+                <span className="text-xs text-muted-foreground">Exact poster fidelity, fast, repeatable. Recommended for product gallery / primary / hover mockups.</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setRenderMode("ai_rendered")}
+                className={cn(
+                  "flex flex-col gap-0.5 rounded border px-3 py-2.5 text-left text-sm transition-colors",
+                  renderMode === "ai_rendered"
+                    ? "border-violet-500 bg-violet-50/60 ring-1 ring-violet-400/40 dark:bg-violet-950/30"
+                    : "border-border hover:border-violet-300"
+                )}
+              >
+                <span className="font-medium flex items-center gap-1.5">
+                  <Sparkles className="w-3 h-3" />
+                  AI-rendered mockup
+                </span>
+                <span className="text-xs text-muted-foreground">More realistic lifestyle result. Requires admin review — AI may subtly alter poster artwork.</span>
+              </button>
+            </div>
+            {renderMode === "ai_rendered" && (
+              <div className="space-y-2 pt-1">
+                <div className="rounded-md border border-amber-200 bg-amber-50/80 dark:border-amber-700 dark:bg-amber-950/20 px-3 py-2 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>AI-rendered mockups may slightly alter poster artwork. Use for marketing and lifestyle images only. Review carefully before publishing.</span>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Style / scene guidance prompt <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <Textarea
+                    value={aiRenderPrompt}
+                    onChange={(e) => setAiRenderPrompt(e.target.value)}
+                    placeholder="e.g. 'Warm natural lighting, slight shadow under frame, linen wall texture visible around edges.'"
+                    rows={3}
+                    className="text-sm resize-none"
+                  />
+                  <p className="text-[10px] text-muted-foreground">Supplements the base prompt. The poster artwork instructions are always enforced.</p>
+                </div>
+                <div className="flex items-center gap-2 pt-0.5">
+                  <Switch
+                    id="aiRenderRequiresReview"
+                    checked={aiRenderRequiresReview}
+                    onCheckedChange={setAiRenderRequiresReview}
+                    className="scale-90"
+                  />
+                  <Label htmlFor="aiRenderRequiresReview" className="text-xs font-normal cursor-pointer">
+                    Require admin review before publishing
+                    <span className="text-muted-foreground ml-1">(recommended)</span>
+                  </Label>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Auto placement mode — persisted in DB, only for existing templates */}
           {isEdit && (

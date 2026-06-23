@@ -84,6 +84,10 @@ export interface MockupTemplate {
   detectedPlacementStatus: DetectedPlacementStatus | null;
   detectedPlacementError: string | null;
   analyzedAt: string | null;
+  // AI render mode
+  renderMode: "deterministic" | "ai_rendered";
+  aiRenderPrompt: string | null;
+  aiRenderRequiresReview: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -137,6 +141,13 @@ export interface PosterMockup {
   status: string;
   generatedAt: string | null;
   errorMessage: string | null;
+  // AI render mode tracking
+  renderMode: "deterministic" | "ai_rendered";
+  needsReview: boolean;
+  aiRenderWarning: string | null;
+  sourcePosterImageUrl: string | null;
+  sourceTemplateImageUrl: string | null;
+  approvedForPublic: boolean;
   createdAt: string;
   template: PosterMockupTemplate | null;
 }
@@ -488,6 +499,11 @@ export interface SyncResult {
   reason?: string;
   mockupId?: number;
   imageUrl?: string;
+  placementSource?: "auto_detected" | "manual";
+  placementWarnings?: string[];
+  renderMode?: "deterministic" | "ai_rendered";
+  needsReview?: boolean;
+  aiRenderWarning?: string;
 }
 
 export interface SyncResponse {
@@ -496,6 +512,7 @@ export interface SyncResponse {
   failed: number;
   plannedCount?: number;
   dryRun: boolean;
+  needsReviewCount?: number;
   results: SyncResult[];
   note?: string;
 }

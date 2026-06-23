@@ -11,6 +11,7 @@ import { adminLimiter } from "../middleware/rateLimiter";
 import { compositePosterIntoTemplate } from "../lib/mockupCompositor";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { resolveEffectiveMockupPlacement } from "../lib/mockupPlacementAnalyzer";
+import { renderAiMockup } from "../lib/aiMockupRenderer";
 import { randomUUID } from "crypto";
 
 const router = Router();
@@ -31,7 +32,7 @@ async function tryDeleteOldComposite(
 ): Promise<void> {
   const GENERATED_PREFIX = "/api/storage/objects/mockup-composites/";
   if (!imageUrl || !imageUrl.startsWith(GENERATED_PREFIX)) return;
-  const subPath = imageUrl.slice("/api/storage/objects/".length); // "mockup-composites/…"
+  const subPath = imageUrl.slice("/api/storage/objects/".length);
   try {
     await storage.deleteObject(subPath);
   } catch (err) {
@@ -50,6 +51,9 @@ interface SyncResult {
   imageUrl?: string;
   placementSource?: "auto_detected" | "manual";
   placementWarnings?: string[];
+  renderMode?: "deterministic" | "ai_rendered";
+  needsReview?: boolean;
+  aiRenderWarning?: string;
 }
 
 interface SyncBody {
@@ -77,12 +81,10 @@ router.post(
     }
 
     // ── 1. Load posters ──────────────────────────────────────────────────────
-    let posterQuery = db
+    const allPosters = await db
       .select()
       .from(postersTable)
       .where(eq(postersTable.storeKey, storeKey));
-
-    const allPosters = await posterQuery;
 
     let targetPosters = allPosters.filter((p) => p.status === "published");
 
@@ -111,13 +113,15 @@ router.post(
         )
       );
 
-    // A template is compositable if it has a background image AND effective placement.
-    // Effective placement can come from auto_detected config OR manual posterX/Y/Width/Height.
+    // Filter eligible templates:
+    // - AI-rendered templates: need background image only (AI figures out placement)
+    // - Deterministic templates: need background image + effective placement (auto or manual)
     let targetTemplates = templateRows.filter((t) => {
       if (!t.backgroundImageUrl) return false;
+      if (t.renderMode === "ai_rendered") return true;
+      // Deterministic: need placement coordinates
       const { placementSource, posterX, posterY, posterWidth, posterHeight } = resolveEffectiveMockupPlacement(t);
       if (placementSource === "auto_detected") return true;
-      // manual: must have all four placement values
       return posterX != null && posterY != null && posterWidth != null && posterHeight != null;
     });
 
@@ -126,20 +130,23 @@ router.post(
     }
 
     if (targetTemplates.length === 0) {
-      return res.json({ generated: 0, skipped: 0, failed: 0, plannedCount: 0, results: [], note: "No active templates with placement data and background image found." });
+      return res.json({
+        generated: 0, skipped: 0, failed: 0, plannedCount: 0, results: [],
+        note: "No active templates with background image and placement data found.",
+      });
     }
 
     // ── 3. Safety-limit check ────────────────────────────────────────────────
     const plannedCount = targetPosters.length * targetTemplates.length;
     if (!dryRun && plannedCount > SYNC_HARD_LIMIT) {
       return res.status(400).json({
-        error: `Sync would generate ${plannedCount} combinations (${targetPosters.length} poster${targetPosters.length !== 1 ? "s" : ""} × ${targetTemplates.length} template${targetTemplates.length !== 1 ? "s" : ""}), which exceeds the safe limit of ${SYNC_HARD_LIMIT} per request. Reduce the number of posters or templates, or run multiple smaller syncs.`,
+        error: `Sync would generate ${plannedCount} combinations (${targetPosters.length} poster${targetPosters.length !== 1 ? "s" : ""} × ${targetTemplates.length} template${targetTemplates.length !== 1 ? "s" : ""}), which exceeds the safe limit of ${SYNC_HARD_LIMIT} per request.`,
         plannedCount,
         limit: SYNC_HARD_LIMIT,
       });
     }
 
-    // ── 4. Load existing poster_mockups for these posters ────────────────────
+    // ── 4. Load existing poster_mockups ──────────────────────────────────────
     const posterIdsTarget = targetPosters.map((p) => p.id);
     const existingMockups = await db
       .select()
@@ -155,9 +162,6 @@ router.post(
       existingMockups.map((m) => `${m.posterId}:${m.mockupTemplateId}`)
     );
 
-    // Track which posters already have a primary / hover assigned (pre-existing
-    // or just generated this run) so we never assign two primaries/hovers to
-    // the same poster within a single sync pass.
     const assignedPrimary = new Set(
       existingMockups.filter((m) => m.isPrimary).map((m) => m.posterId)
     );
@@ -165,7 +169,7 @@ router.post(
       existingMockups.filter((m) => m.isHoverMockup).map((m) => m.posterId)
     );
 
-    // ── 4. Build work plan ───────────────────────────────────────────────────
+    // ── 5. Main sync loop ────────────────────────────────────────────────────
     const results: SyncResult[] = [];
     let generated = 0;
     let skipped = 0;
@@ -175,23 +179,23 @@ router.post(
       for (const template of targetTemplates) {
         const pairKey = `${poster.id}:${template.id}`;
         const alreadyExists = existingSet.has(pairKey);
+        const templateRenderMode = (template.renderMode ?? "deterministic") as "deterministic" | "ai_rendered";
 
         if (alreadyExists && !overwrite) {
-          if (scope === "missing" || !overwrite) {
-            skipped++;
-            results.push({
-              posterId: poster.id,
-              posterTitle: poster.title,
-              templateId: template.id,
-              templateName: template.name,
-              action: "skipped",
-              reason: "Mockup already exists (use overwrite to regenerate)",
-            });
-            continue;
-          }
+          skipped++;
+          results.push({
+            posterId: poster.id,
+            posterTitle: poster.title,
+            templateId: template.id,
+            templateName: template.name,
+            action: "skipped",
+            reason: "Mockup already exists (use overwrite to regenerate)",
+            renderMode: templateRenderMode,
+          });
+          continue;
         }
 
-        // Resolve effective placement for this template
+        // Resolve placement (used for deterministic and as hint for AI)
         const effective = resolveEffectiveMockupPlacement(template);
         const { posterX, posterY, posterWidth, posterHeight, rotation, placementSource, warnings: placementWarnings } = effective;
 
@@ -203,14 +207,15 @@ router.post(
             templateId: template.id,
             templateName: template.name,
             action: "generated",
-            reason: `dry-run — not actually generated (placement: ${placementSource})`,
+            reason: `dry-run (renderer: ${templateRenderMode}, placement: ${placementSource})`,
             placementSource,
             placementWarnings,
+            renderMode: templateRenderMode,
+            needsReview: templateRenderMode === "ai_rendered",
           });
           continue;
         }
 
-        // Skip if poster has no image
         if (!poster.imageUrl) {
           failed++;
           results.push({
@@ -220,12 +225,13 @@ router.post(
             templateName: template.name,
             action: "failed",
             reason: "Poster has no imageUrl",
+            renderMode: templateRenderMode,
           });
           continue;
         }
 
-        // Skip if effective placement is null
-        if (posterX == null || posterY == null || posterWidth == null || posterHeight == null) {
+        // For deterministic, require placement
+        if (templateRenderMode === "deterministic" && (posterX == null || posterY == null || posterWidth == null || posterHeight == null)) {
           failed++;
           results.push({
             posterId: poster.id,
@@ -233,42 +239,86 @@ router.post(
             templateId: template.id,
             templateName: template.name,
             action: "failed",
-            reason: `Template has no valid placement (mode: ${placementSource})`,
+            reason: `Deterministic template has no valid placement (source: ${placementSource})`,
+            renderMode: templateRenderMode,
           });
           continue;
         }
 
         try {
-          const composited = await compositePosterIntoTemplate(
-            template.backgroundImageUrl!,
-            poster.imageUrl,
-            {
-              posterX,
-              posterY,
-              posterWidth,
-              posterHeight,
-              rotation,
-              fitMode: template.fitMode,
-              borderRadius: template.borderRadius,
-              brightness: template.brightness,
-              contrast: template.contrast,
-              saturation: template.saturation,
-            }
-          );
+          let imageBuffer: Buffer;
+          let aiRenderWarning: string | undefined;
 
+          if (templateRenderMode === "ai_rendered") {
+            // ── AI render path ─────────────────────────────────────────────
+            const aiResult = await renderAiMockup({
+              posterImageUrl: poster.imageUrl,
+              templateImageUrl: template.backgroundImageUrl!,
+              detectedPlacement:
+                placementSource === "auto_detected" && template.detectedPlacementConfig
+                  ? (template.detectedPlacementConfig as any)
+                  : null,
+              renderPrompt: template.aiRenderPrompt,
+              templateCategory: template.category,
+              templateName: template.name,
+            });
+
+            if (aiResult.status === "failed") {
+              failed++;
+              results.push({
+                posterId: poster.id,
+                posterTitle: poster.title,
+                templateId: template.id,
+                templateName: template.name,
+                action: "failed",
+                reason: `AI render failed: ${aiResult.error}`,
+                renderMode: templateRenderMode,
+              });
+              continue;
+            }
+
+            imageBuffer = aiResult.imageBuffer!;
+            aiRenderWarning = aiResult.warning;
+          } else {
+            // ── Deterministic compositor path ──────────────────────────────
+            imageBuffer = await compositePosterIntoTemplate(
+              template.backgroundImageUrl!,
+              poster.imageUrl,
+              {
+                posterX: posterX!,
+                posterY: posterY!,
+                posterWidth: posterWidth!,
+                posterHeight: posterHeight!,
+                rotation,
+                fitMode: template.fitMode,
+                borderRadius: template.borderRadius,
+                brightness: template.brightness,
+                contrast: template.contrast,
+                saturation: template.saturation,
+              }
+            );
+          }
+
+          // ── Upload result ──────────────────────────────────────────────
           const subPath = `mockup-composites/${storeKey}/${poster.id}/${template.id}-${randomUUID().slice(0, 8)}.jpg`;
-          const objectPath = await storage.uploadBuffer(subPath, composited, "image/jpeg");
+          const objectPath = await storage.uploadBuffer(subPath, imageBuffer, "image/jpeg");
           const imageUrl = `/api/storage${objectPath}`;
 
           const now = new Date();
 
+          // AI-rendered mockups NEVER become primary/hover/gallery automatically
+          // and always start as not approved for public
+          const isAiRendered = templateRenderMode === "ai_rendered";
+          const isPrimary = !isAiRendered && template.canBePrimary && !assignedPrimary.has(poster.id);
+          const isHover = !isAiRendered && template.canBeHover && !assignedHover.has(poster.id);
+          const isGallery = !isAiRendered && template.canBeGallery;
+          const needsReview = isAiRendered;
+
           if (alreadyExists && overwrite) {
-            // Update the existing record
             const existing = existingMockups.find(
               (m) => m.posterId === poster.id && m.mockupTemplateId === template.id
             );
             if (existing) {
-              // Delete the old generated composite from storage before overwriting
               await tryDeleteOldComposite(existing.mockupImageUrl, req.log);
 
               await db
@@ -278,6 +328,12 @@ router.post(
                   status: "generated",
                   generatedAt: now,
                   errorMessage: null,
+                  renderMode: templateRenderMode,
+                  needsReview,
+                  aiRenderWarning: aiRenderWarning ?? null,
+                  sourcePosterImageUrl: poster.imageUrl,
+                  sourceTemplateImageUrl: template.backgroundImageUrl ?? null,
+                  // Keep approvedForPublic as-is for overwrites (admin may have already approved)
                   updatedAt: now,
                 })
                 .where(eq(posterMockupsTable.id, existing.id));
@@ -293,21 +349,14 @@ router.post(
                 imageUrl,
                 placementSource,
                 placementWarnings,
+                renderMode: templateRenderMode,
+                needsReview,
+                aiRenderWarning,
               });
               continue;
             }
           }
 
-          // Use running sets (not stale snapshot) to decide primary/hover
-          // so we never assign two primaries or two hovers to the same poster
-          // within a single sync pass.
-          const isPrimary = template.canBePrimary && !assignedPrimary.has(poster.id);
-          const isHover = template.canBeHover && !assignedHover.has(poster.id);
-          const isGallery = template.canBeGallery;
-
-          // Plain insert — we already know this pair is new (alreadyExists is
-          // false). onConflictDoNothing guards against the rare case of a
-          // parallel sync running simultaneously (avoids partial-index issues).
           const [inserted] = await db
             .insert(posterMockupsTable)
             .values({
@@ -320,12 +369,17 @@ router.post(
               isGallery,
               status: "generated",
               generatedAt: now,
+              renderMode: templateRenderMode,
+              needsReview,
+              aiRenderWarning: aiRenderWarning ?? null,
+              sourcePosterImageUrl: poster.imageUrl,
+              sourceTemplateImageUrl: template.backgroundImageUrl ?? null,
+              approvedForPublic: false,
             })
             .onConflictDoNothing()
             .returning();
 
           if (!inserted) {
-            // Parallel sync race — treat as skipped
             skipped++;
             results.push({
               posterId: poster.id,
@@ -334,6 +388,7 @@ router.post(
               templateName: template.name,
               action: "skipped",
               reason: "Conflict — pair was already inserted by a concurrent sync",
+              renderMode: templateRenderMode,
             });
             continue;
           }
@@ -353,12 +408,14 @@ router.post(
             imageUrl,
             placementSource,
             placementWarnings,
+            renderMode: templateRenderMode,
+            needsReview,
+            aiRenderWarning,
           });
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";
-          req.log.error({ err, posterId: poster.id, templateId: template.id }, "Sync compositing failed");
+          req.log.error({ err, posterId: poster.id, templateId: template.id }, "Sync failed");
 
-          // Record failure in DB if entry exists
           const existing = existingMockups.find(
             (m) => m.posterId === poster.id && m.mockupTemplateId === template.id
           );
@@ -372,9 +429,11 @@ router.post(
                 sortOrder: 0,
                 isPrimary: false,
                 isHoverMockup: false,
-                isGallery: template.canBeGallery,
+                isGallery: false,
                 status: "failed",
                 errorMessage: msg,
+                renderMode: templateRenderMode,
+                needsReview: false,
               }).onConflictDoNothing();
             } catch {}
           } else {
@@ -391,10 +450,13 @@ router.post(
             templateName: template.name,
             action: "failed",
             reason: msg,
+            renderMode: templateRenderMode,
           });
         }
       }
     }
+
+    const needsReviewCount = results.filter((r) => r.action === "generated" && r.needsReview).length;
 
     return res.json({
       generated,
@@ -402,6 +464,7 @@ router.post(
       failed,
       plannedCount,
       dryRun,
+      needsReviewCount,
       results,
     });
   }
