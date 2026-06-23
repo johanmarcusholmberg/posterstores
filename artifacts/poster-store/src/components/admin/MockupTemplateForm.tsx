@@ -25,8 +25,9 @@ import {
   analyzeMockupPlacement,
   adminAnalyzeMockupTemplatePlacement,
 } from "@/lib/mockupApi";
-import { Upload, Loader2, Sparkles, CheckCircle2, AlertCircle, Info, RotateCcw } from "lucide-react";
+import { Upload, Loader2, Sparkles, CheckCircle2, AlertCircle, Info, RotateCcw, Pencil, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import MockupSurfaceEditor, { type SurfaceCorners } from "./MockupSurfaceEditor";
 
 const CATEGORIES = ["Wall", "Interior", "Café/Table", "Frame", "Lifestyle", "Minimal", "Decorative"];
 const FRAME_MATERIALS = [
@@ -271,6 +272,9 @@ export function MockupTemplateForm({
     template?.detectedPlacementConfig ?? null
   );
   const [analyzingTemplate, setAnalyzingTemplate] = useState(false);
+  const [showSurfaceEditor, setShowSurfaceEditor] = useState(false);
+  const [surfaceEditorSaving, setSurfaceEditorSaving] = useState(false);
+  const [surfaceChanged, setSurfaceChanged] = useState(false);
 
   const lastAnalyzedUrlRef = useRef<string>("");
   const [saving, setSaving] = useState(false);
@@ -658,10 +662,60 @@ export function MockupTemplateForm({
     try {
       await adminUpdateMockupTemplate(template.id, { placementMode: "manual" } as any);
       setPlacementMode("manual");
-      toast({ title: "Switched to manual placement" });
+      toast({ title: "Switched to manual surface" });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Update failed";
       toast({ variant: "destructive", title: "Failed to update", description: msg });
+    }
+  };
+
+  const handleSaveSurface = async (corners: SurfaceCorners) => {
+    if (!template?.id) return;
+    setSurfaceEditorSaving(true);
+    try {
+      const xs = [corners.topLeft.x, corners.topRight.x, corners.bottomRight.x, corners.bottomLeft.x];
+      const ys = [corners.topLeft.y, corners.topRight.y, corners.bottomRight.y, corners.bottomLeft.y];
+      const bbX = Math.min(...xs);
+      const bbY = Math.min(...ys);
+      const bbW = Math.max(...xs) - bbX;
+      const bbH = Math.max(...ys) - bbY;
+
+      const newConfig: DetectedPlacementConfig = {
+        surfaceType: "unknown",
+        confidence: 1,
+        coordinateSystem: "normalized",
+        corners,
+        boundingBox: { x: bbX, y: bbY, width: bbW, height: bbH },
+        rotation: 0,
+        recommendedFitMode: "cover",
+        recommendedRender: {
+          shadowOpacity: 0.3,
+          shadowBlur: 15,
+          highlightOpacity: 0,
+          overlayOpacity: 0,
+          borderRadius: 0,
+        },
+        warnings: [],
+        source: "manual_surface",
+      };
+
+      await adminUpdateMockupTemplate(template.id, {
+        placementMode: "auto_detected",
+        detectedPlacementConfig: newConfig,
+        detectedPlacementStatus: "detected",
+      } as any);
+
+      setStoredDetectedConfig(newConfig);
+      setPlacementMode("auto_detected");
+      setDetectedStatus("detected");
+      setShowSurfaceEditor(false);
+      setSurfaceChanged(true);
+      toast({ title: "Surface corners saved", description: "Run Sync mockups to regenerate images with the new surface." });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Save failed";
+      toast({ variant: "destructive", title: "Failed to save surface", description: msg });
+    } finally {
+      setSurfaceEditorSaving(false);
     }
   };
 
@@ -1119,8 +1173,8 @@ export function MockupTemplateForm({
                 <>
                   <Loader2 className="w-4 h-4 animate-spin mt-0.5 shrink-0 text-primary" />
                   <div>
-                    <p className="font-medium text-foreground">Detecting placement area…</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">AI is analyzing the image to find where the poster should go</p>
+                    <p className="font-medium text-foreground">Detecting surface area…</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">AI is analyzing the image to find the poster surface</p>
                   </div>
                 </>
               )}
@@ -1138,7 +1192,7 @@ export function MockupTemplateForm({
                     </div>
                     <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1">{analysisDescription}</p>
                     <p className="text-xs text-emerald-600/70 dark:text-emerald-500 mt-0.5">
-                      Placement detected — click <strong>Apply detected values</strong> below to use it. Your current values are unchanged until you do.
+                      Surface detected — click <strong>Apply detected surface</strong> below to use it. Your current values are unchanged until you do.
                     </p>
                   </div>
                 </>
@@ -1273,7 +1327,7 @@ export function MockupTemplateForm({
             )}>
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium">Auto placement mode</p>
+                  <p className="text-sm font-medium">Detected surface</p>
                   <span className={cn(
                     "text-[10px] font-semibold px-1.5 py-0.5 rounded-full border",
                     placementMode === "auto_detected" && "bg-indigo-100 text-indigo-800 border-indigo-300 dark:bg-indigo-950/40 dark:text-indigo-300",
@@ -1343,14 +1397,14 @@ export function MockupTemplateForm({
                         onClick={handleApproveDetected}
                       >
                         <CheckCircle2 className="w-3 h-3" />
-                        Approve detected placement
+                        Approve detected surface
                       </Button>
                     )}
                     {placementMode === "auto_detected" && (
                       <>
                         <span className="text-xs text-indigo-700 dark:text-indigo-400 flex items-center gap-1">
                           <CheckCircle2 className="w-3 h-3" />
-                          Sync will use auto-detected placement
+                          Sync will use auto-detected surface
                         </span>
                         <Button
                           type="button"
@@ -1376,7 +1430,7 @@ export function MockupTemplateForm({
                       </Button>
                     )}
                   </div>
-                  <p className="text-[10px] text-muted-foreground">Blue overlay on the image shows the detected area. White overlay shows manual placement.</p>
+                  <p className="text-[10px] text-muted-foreground">Blue overlay shows the AI-detected surface. Use the corner editor below to define it manually.</p>
                 </div>
               )}
             </div>
@@ -1386,8 +1440,8 @@ export function MockupTemplateForm({
           <div className="space-y-3 rounded-md border p-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
-                <p className="text-sm font-medium">Poster placement area</p>
-                <div title="Define where the poster image sits inside this mockup background. Values are percentages of the image dimensions.">
+                <p className="text-sm font-medium">Poster surface</p>
+                <div title="Define the bounding box (%) for the poster surface, or use the corner editor for perspective-correct compositing.">
                   <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
                 </div>
               </div>
@@ -1409,7 +1463,7 @@ export function MockupTemplateForm({
                     }
                   >
                     <RotateCcw className="w-3 h-3" />
-                    {analysisState === "detected" ? "Apply detected values" : "Reset to detected"}
+                    {analysisState === "detected" ? "Apply detected surface" : "Reset to detected"}
                   </Button>
                 )}
                 {backgroundImageUrl && (
@@ -1443,17 +1497,38 @@ export function MockupTemplateForm({
                     Detecting…
                   </span>
                 )}
+                {isEdit && backgroundImageUrl && (
+                  <Button
+                    type="button"
+                    variant={showSurfaceEditor ? "secondary" : "outline"}
+                    size="sm"
+                    className="h-7 gap-1 text-xs"
+                    onClick={() => setShowSurfaceEditor((v) => !v)}
+                    title="Open the 4-corner surface editor for perspective-correct compositing"
+                  >
+                    <Pencil className="w-3 h-3" />
+                    {showSurfaceEditor ? "Close editor" : "Edit corners"}
+                  </Button>
+                )}
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              Percentage values (0–100) defining where the poster image sits inside this background.
+              Percentage values (0–100) for the bounding box, or use <strong>Edit corners</strong> below for a 4-corner perspective surface.
               Leave empty if using the full image as a mockup photo (no compositing).
             </p>
+            {surfaceChanged && (
+              <div className="flex items-center gap-2 rounded-md border border-indigo-300 bg-indigo-50 dark:bg-indigo-950/30 px-3 py-2">
+                <RefreshCw className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                <p className="text-xs text-indigo-700 dark:text-indigo-400">
+                  Surface corners saved — run <strong>Sync mockups</strong> to regenerate composite images.
+                </p>
+              </div>
+            )}
 
             {placementWasManuallyAdjusted && detectedValues && (
               <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1">
                 <Info className="w-3 h-3 shrink-0" />
-                Placement was manually adjusted after detection
+                Surface was manually adjusted after detection
               </p>
             )}
 
@@ -1625,6 +1700,47 @@ export function MockupTemplateForm({
               <p className="text-[10px] text-muted-foreground/60">Legacy field — use Compositing section below for full control</p>
             </div>
           </div>
+
+          {/* 4-corner surface editor panel */}
+          {showSurfaceEditor && backgroundImageUrl && (
+            <div className="space-y-3 rounded-md border border-indigo-300 bg-indigo-50/30 dark:bg-indigo-950/10 p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-indigo-900 dark:text-indigo-200">Corner surface editor</p>
+                  <p className="text-xs text-indigo-700/70 dark:text-indigo-400/70 mt-0.5">
+                    Drag the four handles to match the exact poster area. Save to enable perspective-correct compositing.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setShowSurfaceEditor(false)}
+                >
+                  Close
+                </Button>
+              </div>
+              <MockupSurfaceEditor
+                backgroundImageUrl={backgroundImageUrl}
+                imageWidth={imgNaturalWidth}
+                imageHeight={imgNaturalHeight}
+                initialCorners={
+                  storedDetectedConfig?.source === "manual_surface" && storedDetectedConfig.corners
+                    ? (storedDetectedConfig.corners as SurfaceCorners)
+                    : null
+                }
+                detectedCorners={
+                  storedDetectedConfig?.source !== "manual_surface" && storedDetectedConfig?.corners
+                    ? (storedDetectedConfig.corners as SurfaceCorners)
+                    : null
+                }
+                onSave={handleSaveSurface}
+                onCancel={() => setShowSurfaceEditor(false)}
+                saving={surfaceEditorSaving}
+              />
+            </div>
+          )}
 
           {/* Compositing section */}
           <div className="space-y-3 rounded-md border p-4">

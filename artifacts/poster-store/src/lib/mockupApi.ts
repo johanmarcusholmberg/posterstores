@@ -21,6 +21,8 @@ export interface DetectedPlacementConfig {
     borderRadius: number;
   };
   warnings: string[];
+  /** Set to "manual_surface" when corners were saved via the admin surface editor, not AI detection. */
+  source?: "ai" | "manual_surface";
 }
 
 export type PlacementMode = "manual" | "auto_detected" | "auto_detected_needs_review";
@@ -501,6 +503,8 @@ export interface SyncResult {
   imageUrl?: string;
   placementSource?: "auto_detected" | "manual";
   placementWarnings?: string[];
+  surfaceSource?: "auto_detected_corners" | "auto_detected_bbox" | "manual_corners" | "manual_bbox" | "fallback";
+  surfaceWarning?: string;
   renderMode?: "deterministic" | "ai_rendered";
   needsReview?: boolean;
   aiRenderWarning?: string;

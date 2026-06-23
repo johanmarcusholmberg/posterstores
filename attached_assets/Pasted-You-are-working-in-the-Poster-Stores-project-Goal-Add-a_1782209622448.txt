@@ -1,0 +1,404 @@
+You are working in the Poster Stores project.
+
+Goal:
+Add a pixel-exact 4-corner mockup surface editor and deterministic perspective rendering for angled mockups, while making the mockup workflow clearer and self-explanatory.
+
+This is NOT a broad redesign. It is a targeted upgrade to the existing admin-owned mockup system.
+
+Current architecture:
+
+* Store admin owns mockup templates.
+* Public storefront only shows finalized/generated mockup images with mockupImageUrl.
+* Public storefront must not show live CSS composites or bare template backgrounds.
+* Deterministic Sharp rendering is the default for product mockups.
+* AI-rendered mockups are optional, paid, review-only, and not public until approved.
+* Smart AI surface detection already stores detectedPlacementConfig with boundingBox and corners.
+* Manual placement still exists and must continue working.
+* Typechecks are currently clean.
+
+Important:
+
+* Do not mix admin preview behavior with public storefront behavior.
+* Do not reintroduce live public compositing.
+* Do not make AI rendering the default.
+* Do not remove existing manual placement.
+* Do not break existing synced mockups.
+* Do not create branches, PRs, commits, pushes, or GitHub automation.
+* Keep changes targeted.
+* Stop after reporting results.
+
+Main product rule:
+Public storefront uses only finalized generated images:
+
+* mockupImageUrl exists and is public-eligible → show it
+* no mockupImageUrl → do not show it publicly
+
+Admin rule:
+Admin can preview/edit templates before sync.
+
+Core terminology recommendation:
+Do not use “placement” as the main user-facing term in admin UI. It is too technical and makes the workflow unclear.
+
+Use these names consistently in admin UI, labels, help text, result messages, and comments where practical:
+
+1. Mockup Template
+
+   * The empty background/template image.
+
+2. Poster Surface
+
+   * The selected area/corners where the poster artwork will be inserted.
+   * This replaces most user-facing uses of “placement”.
+
+3. Detected Surface
+
+   * AI-suggested poster surface that needs review.
+
+4. Manual Surface
+
+   * Admin-defined poster surface.
+
+5. Rendered Mockup
+
+   * The generated flattened image stored as mockupImageUrl.
+
+6. Public Usage
+
+   * Whether the rendered mockup is used as gallery, hover, or primary image.
+
+Avoid confusing phrases like:
+
+* “mockup image” when it is only the empty template background
+* “placement” as the main admin concept
+* “preview” when it is actually the final rendered mockup
+* “template” when it is actually a poster-specific rendered mockup
+
+Preferred workflow language:
+
+* Template setup
+* Poster surface
+* Render / Sync mockups
+* Public usage
+
+Part 1 — Audit and naming clarity
+
+Inspect existing mockup files first:
+
+* MockupTemplateForm.tsx
+* AdminPosterMockupManager.tsx
+* AdminMockups.tsx
+* MockupGallery.tsx
+* mockupCompositor.ts
+* mockupSync.ts
+* mockupPlacementAnalyzer.ts
+* mockupApi.ts
+* DB schema fields for mockup_templates and poster_mockups
+
+Before changing behavior, identify where the system currently uses:
+
+* template image/background
+* detected placement/surface
+* manual placement/surface
+* live admin preview
+* finalized mockupImageUrl
+* public gallery visibility
+
+Then improve admin UI labels/help text where needed.
+
+Examples:
+
+* Rename “Placement” section to “Poster surface”.
+* Rename “Detected placement” to “Detected surface”.
+* Rename “Apply detected values” to “Apply detected surface”.
+* Rename “Manual placement” to “Manual surface”.
+* Use “Rendered mockup” for generated poster-specific output.
+* Use “Sync required” after surface changes.
+
+Add a small explanatory help block in the template editor:
+
+“Poster surface defines where the poster artwork will be inserted when mockups are rendered. Public storefront images are not live previews — they are generated during Sync mockups and saved as rendered mockup images.”
+
+Also add a small note after surface changes:
+
+“Surface changed. Run Sync mockups to regenerate public images.”
+
+Do not overdo copy changes. Add only helpful labels/help text where the admin could otherwise confuse template preview with public output.
+
+Part 2 — Pixel-exact 4-corner Poster Surface editor
+
+Add a new reusable admin component, for example:
+
+artifacts/poster-store/src/components/admin/MockupSurfaceEditor.tsx
+
+Purpose:
+A zoomable/pannable editor for selecting the poster surface on the template image.
+
+Requirements:
+
+* Shows the template image.
+* Shows a 4-corner polygon overlay.
+* Shows draggable corner handles:
+
+  * topLeft
+  * topRight
+  * bottomRight
+  * bottomLeft
+* Uses the template image’s naturalWidth/naturalHeight.
+* Stores editing coordinates in image pixel coordinates for precision.
+* Converts to normalized 0–1 coordinates when saving.
+* Supports zoom:
+
+  * Fit
+  * 100%
+  * 200%
+  * 400%
+  * Zoom in/out buttons
+* Supports pan while zoomed.
+* Supports selecting one corner and nudging with keyboard:
+
+  * Arrow keys = 1 px
+  * Shift + Arrow = 10 px
+  * Alt + Arrow = 0.25 px if practical, otherwise 1 px minimum
+* Shows pixel coordinate inputs for each corner:
+
+  * TL x/y
+  * TR x/y
+  * BR x/y
+  * BL x/y
+* Shows normalized coordinates only as secondary/debug info, not the primary editing method.
+* Has buttons:
+
+  * Reset to detected surface
+  * Reset to current manual surface
+  * Center rectangle fallback
+  * Save poster surface
+* Has overlay opacity control if easy.
+* The editor must be usable on desktop first; mobile editing can remain basic/responsive.
+
+Data behavior:
+
+* Do not overwrite active surface until admin clicks Save/Apply.
+* AI-detected corners should be shown as a detected surface candidate.
+* Existing manual surface should remain unchanged until explicitly saved.
+* If image dimensions are unknown, disable save and show a clear message.
+
+Part 3 — Surface model without mixing old and new
+
+Do not remove existing placement fields. Add a clear resolution layer and keep backwards compatibility.
+
+Implement or improve helper logic, for example:
+
+* resolveEffectiveMockupSurface(template)
+* normalizeSurfaceCorners()
+* validateSurfaceCorners()
+* convertBoundingBoxToCorners()
+* convertCornersToBoundingBox()
+* getSurfaceSourceLabel()
+
+The effective surface should support:
+
+* manual bounding box
+* manual corners
+* approved auto-detected corners
+* approved auto-detected bounding box
+* fallback bounding box
+
+Add or reuse a surface config structure like:
+
+{
+"mode": "bounding_box" | "corners",
+"coordinateSystem": "normalized",
+"corners": {
+"topLeft": { "x": 0.0, "y": 0.0 },
+"topRight": { "x": 1.0, "y": 0.0 },
+"bottomRight": { "x": 1.0, "y": 1.0 },
+"bottomLeft": { "x": 0.0, "y": 1.0 }
+},
+"boundingBox": {
+"x": 0.0,
+"y": 0.0,
+"width": 1.0,
+"height": 1.0
+},
+"fitMode": "cover" | "contain" | "stretch"
+}
+
+If existing DB jsonb fields can store this safely, reuse them:
+
+* placement_config
+* detectedPlacementConfig
+
+Only add a migration if absolutely necessary.
+
+Internal code can still use placement_config for backwards compatibility, but user-facing labels should say “Poster surface”, not “placement”.
+
+Part 4 — Admin integration
+
+Integrate MockupSurfaceEditor into MockupTemplateForm.
+
+The admin should see a clear section:
+
+“Poster surface”
+
+Help text:
+“This defines where the poster artwork will be inserted when you sync mockups. Public storefront images are generated from this surface and saved as final rendered mockup images.”
+
+Show status:
+
+* Manual surface active
+* Detected surface needs review
+* Auto-detected surface approved
+* No surface selected
+* Sync required after surface changes
+
+Actions:
+
+* Edit surface
+* Apply detected surface
+* Switch to manual surface
+* Save template
+* Run sync later
+
+Important:
+
+* Changing the surface should not instantly alter public images.
+* Public images update only after sync creates a new mockupImageUrl.
+* Show a small note: “After changing the poster surface, run Sync mockups to regenerate public images.”
+
+Part 5 — Perspective renderer for angled mockups
+
+Update deterministic rendering so a poster can be adapted to angled surfaces.
+
+Current issue:
+x/y/width/height only works for straight-on mockups. For posters lying on a table, leaning against a wall, or photographed at an angle, the poster must be warped into the selected four-corner surface.
+
+Implement server-side perspective-aware rendering in or near:
+
+* mockupCompositor.ts
+
+Requirements:
+
+* If effective surface has valid corners, use them.
+* Convert normalized corners to pixel coordinates.
+* Warp the poster image into the four-corner quadrilateral.
+* Composite the warped poster onto the template background.
+* Preserve fit mode:
+
+  * cover
+  * contain
+  * stretch
+* Preserve existing render settings where practical:
+
+  * shadow opacity
+  * shadow blur
+  * highlight opacity
+  * overlay opacity
+  * border radius if applicable
+* Export final flattened JPEG as before.
+* Store in mockupImageUrl as before.
+* Public gallery behavior remains unchanged.
+
+Technical guidance:
+
+* Sharp alone may not support true 4-point perspective/homography.
+* First inspect dependencies.
+* If a safe existing dependency/path exists, use it.
+* If not, implement a small internal perspective warp utility:
+
+  * compute homography from poster rectangle to destination quadrilateral
+  * inverse-map pixels from destination bounding box to source poster image
+  * bilinear sample if practical
+  * output transparent PNG of the warped poster layer
+  * composite warped layer over the background using Sharp
+* Keep output sizes bounded to avoid memory issues.
+* If true perspective render cannot be safely completed in this pass, do not fake it silently:
+
+  * fall back to the old rectangle renderer
+  * return surfaceWarning: "Perspective surface configured, but renderer fell back to rectangle."
+  * report limitation clearly.
+
+Important:
+
+* Best-fit rotated rectangle is acceptable only as a fallback, not as the goal.
+* The target is real corner-to-corner perspective mapping.
+
+Part 6 — Sync behavior
+
+Update mockupSync.ts if needed:
+
+* Surface source should be reported in result rows:
+
+  * manual bounding box
+  * manual corners
+  * detected corners
+  * fallback bounding box
+* If corners are used, result should include surfaceSource = "corners" or similar.
+* If perspective fallback occurred, include surfaceWarning.
+* Generated mockupImageUrl remains the only public output.
+
+After a template surface changes:
+
+* Existing generated mockups may be stale.
+* If easy, show a “surface changed — sync required” hint in admin.
+* Do not automatically regenerate all public images on save.
+
+Part 7 — Keep public behavior clean
+
+Verify:
+
+* MockupGallery still only shows rows with mockupImageUrl.
+* No live CSS composite is shown publicly.
+* No bare template background is shown publicly.
+* Lightbox still renders plain image with object-contain.
+* AI-rendered mockups still require approvedForPublic=true and public flags.
+* Deterministic synced mockups still appear normally.
+
+Part 8 — Tests / verification
+
+Run:
+
+* pnpm run typecheck:libs
+* pnpm --filter @workspace/api-server run typecheck
+* pnpm --filter @workspace/poster-store run typecheck
+
+Add low-cost tests where practical:
+
+* pixel to normalized corner conversion
+* normalized to pixel corner conversion
+* invalid corners are rejected
+* bounding box converts to corners
+* effective surface chooses approved corners when available
+* public gallery still rejects rows without mockupImageUrl
+* perspective renderer helper with a simple rectangle case, if practical
+
+Manual QA:
+
+* Existing straight-on manual template still renders correctly.
+* Admin can open pixel/corner editor.
+* Admin can zoom and pan template image.
+* Admin can drag each corner.
+* Admin can nudge selected corner with keyboard.
+* Pixel coordinate inputs update correctly.
+* Saving surface does not instantly change public gallery.
+* Sync after surface save generates updated mockupImageUrl.
+* Angled mockup surface uses four corners and warps poster into the frame/table area.
+* Product page shows generated mockup only after sync.
+* Lightbox shows exact generated image.
+* Existing deterministic mockups still work.
+* AI-rendered mockups remain review-only.
+
+Deliverable:
+Report:
+
+1. Current mockup workflow audit
+2. Files changed
+3. Admin naming/UX clarity changes
+4. Pixel-exact Poster Surface editor details
+5. Perspective renderer implementation details
+6. Sync behavior changes
+7. Public behavior verification
+8. Typecheck/test results
+9. Manual QA results
+10. Remaining limitations and recommended next step
+
+Do not commit or push. Stop after implementation and report.

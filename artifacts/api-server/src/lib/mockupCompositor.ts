@@ -1,5 +1,7 @@
 import sharp from "sharp";
 
+// ─── Bounding-box compositor (original, backwards-compatible) ─────────────────
+
 export interface CompositorConfig {
   posterX: number;
   posterY: number;
@@ -13,22 +15,39 @@ export interface CompositorConfig {
   saturation?: number | null;
 }
 
-/**
- * Fetch a remote image and return its raw buffer.
- * Throws on HTTP errors or network failures.
- */
-async function fetchImageBuffer(url: string): Promise<Buffer> {
-  const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
-  if (!res.ok) {
-    throw new Error(`Failed to fetch image (${res.status}): ${url}`);
-  }
-  const arrayBuffer = await res.arrayBuffer();
-  return Buffer.from(arrayBuffer);
+// ─── Corner-based surface types (for perspective rendering) ───────────────────
+
+/** Normalized (0–1) four-corner surface definition. */
+export interface CornerPoints {
+  topLeft: { x: number; y: number };
+  topRight: { x: number; y: number };
+  bottomRight: { x: number; y: number };
+  bottomLeft: { x: number; y: number };
 }
 
-/**
- * Build a rounded-rectangle SVG mask for the given dimensions.
- */
+export interface PerspectiveCompositorConfig {
+  corners: CornerPoints;
+  fitMode?: string | null;
+  borderRadius?: number | null;
+  brightness?: number | null;
+  contrast?: number | null;
+  saturation?: number | null;
+}
+
+export interface PerspectiveCompositorResult {
+  buffer: Buffer;
+  /** Non-null when the renderer fell back from perspective to bounding-box. */
+  surfaceWarning?: string;
+}
+
+// ─── Shared utilities ─────────────────────────────────────────────────────────
+
+async function fetchImageBuffer(url: string): Promise<Buffer> {
+  const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+  if (!res.ok) throw new Error(`Failed to fetch image (${res.status}): ${url}`);
+  return Buffer.from(await res.arrayBuffer());
+}
+
 function buildRoundedMask(w: number, h: number, r: number): Buffer {
   const rx = Math.min(r, w / 2, h / 2);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
@@ -37,12 +56,204 @@ function buildRoundedMask(w: number, h: number, r: number): Buffer {
   return Buffer.from(svg);
 }
 
+/** Derive an axis-aligned bounding box from four normalized corners. */
+export function cornersToBoundingBox(
+  corners: CornerPoints
+): { x: number; y: number; width: number; height: number } {
+  const xs = [corners.topLeft.x, corners.topRight.x, corners.bottomRight.x, corners.bottomLeft.x];
+  const ys = [corners.topLeft.y, corners.topRight.y, corners.bottomRight.y, corners.bottomLeft.y];
+  const x = Math.min(...xs);
+  const y = Math.min(...ys);
+  return { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y };
+}
+
+/**
+ * Returns true when corners form a near-axis-aligned rectangle
+ * (i.e. perspective warp would not meaningfully differ from a bbox render).
+ */
+export function isRectangularCorners(corners: CornerPoints, tolerance = 0.005): boolean {
+  const { topLeft: TL, topRight: TR, bottomRight: BR, bottomLeft: BL } = corners;
+  return (
+    Math.abs(TL.y - TR.y) < tolerance &&
+    Math.abs(BL.y - BR.y) < tolerance &&
+    Math.abs(TL.x - BL.x) < tolerance &&
+    Math.abs(TR.x - BR.x) < tolerance
+  );
+}
+
+// ─── Perspective warp math ────────────────────────────────────────────────────
+
+/**
+ * Solve an 8×8 linear system A·h = b using Gaussian elimination with
+ * partial pivoting. Returns the solution vector or null if the system
+ * is singular or nearly singular.
+ */
+function solveLinear8(A: number[][], b: number[]): number[] | null {
+  const n = 8;
+  const M: number[][] = A.map((row, i) => [...row, b[i]]);
+
+  for (let col = 0; col < n; col++) {
+    let maxRow = col;
+    for (let row = col + 1; row < n; row++) {
+      if (Math.abs(M[row][col]) > Math.abs(M[maxRow][col])) maxRow = row;
+    }
+    if (Math.abs(M[maxRow][col]) < 1e-10) return null;
+    [M[col], M[maxRow]] = [M[maxRow], M[col]];
+
+    const pivot = M[col][col];
+    for (let row = 0; row < n; row++) {
+      if (row === col) continue;
+      const factor = M[row][col] / pivot;
+      for (let c = col; c <= n; c++) M[row][c] -= factor * M[col][c];
+    }
+  }
+  return M.map((row, i) => row[n] / row[i]);
+}
+
+/**
+ * Compute a 3×3 projective homography H such that dst[i] ≈ H · src[i]
+ * (in homogeneous coordinates). Returns a 9-element row-major array [h00..h22]
+ * with h22 = 1, or null if the system cannot be solved.
+ */
+function computeHomography(
+  src: [number, number][],
+  dst: [number, number][]
+): number[] | null {
+  const A: number[][] = [];
+  const b: number[] = [];
+  for (let i = 0; i < 4; i++) {
+    const [x, y] = src[i];
+    const [xp, yp] = dst[i];
+    A.push([x, y, 1, 0, 0, 0, -x * xp, -y * xp]);
+    b.push(xp);
+    A.push([0, 0, 0, x, y, 1, -x * yp, -y * yp]);
+    b.push(yp);
+  }
+  const h = solveLinear8(A, b);
+  return h ? [...h, 1] : null;
+}
+
+/** Invert a 3×3 matrix (row-major, 9 elements). Returns null if singular. */
+function invertMatrix3x3(H: number[]): number[] | null {
+  const [a, b, c, d, e, f, g, h, k] = H;
+  const det = a * (e * k - f * h) - b * (d * k - f * g) + c * (d * h - e * g);
+  if (Math.abs(det) < 1e-12) return null;
+  const di = 1 / det;
+  return [
+    (e * k - f * h) * di, (c * h - b * k) * di, (b * f - c * e) * di,
+    (f * g - d * k) * di, (a * k - c * g) * di, (c * d - a * f) * di,
+    (d * h - e * g) * di, (b * g - a * h) * di, (a * e - b * d) * di,
+  ];
+}
+
+/** Apply a 3×3 homography to point (px, py). Returns [-1,-1] on degenerate w. */
+function applyH(H: number[], px: number, py: number): [number, number] {
+  const w = H[6] * px + H[7] * py + H[8];
+  if (Math.abs(w) < 1e-10) return [-1, -1];
+  return [(H[0] * px + H[1] * py + H[2]) / w, (H[3] * px + H[4] * py + H[5]) / w];
+}
+
+// ─── Perspective warp core ────────────────────────────────────────────────────
+
+/**
+ * Warp posterBuf into the destination quadrilateral on a template-sized canvas
+ * using inverse perspective mapping + bilinear sampling.
+ *
+ * Returns a transparent PNG (templateW × templateH) with only the warped poster
+ * pixels filled in, ready to be composited over the template background.
+ * Returns null if the homography cannot be computed.
+ *
+ * Performance note: O(bbW × bbH) iterations where bbW/bbH is the bounding box
+ * of the destination quad. For a 2000 × 2000 template this is at most 4M pixels
+ * (~100–300 ms in Node.js, well within sync timeout budgets).
+ */
+async function perspectiveWarpPoster(
+  posterBuf: Buffer,
+  corners: CornerPoints,
+  templateW: number,
+  templateH: number,
+  fitMode: "cover" | "contain" | "stretch"
+): Promise<Buffer | null> {
+  const TL: [number, number] = [corners.topLeft.x * templateW, corners.topLeft.y * templateH];
+  const TR: [number, number] = [corners.topRight.x * templateW, corners.topRight.y * templateH];
+  const BR: [number, number] = [corners.bottomRight.x * templateW, corners.bottomRight.y * templateH];
+  const BL: [number, number] = [corners.bottomLeft.x * templateW, corners.bottomLeft.y * templateH];
+
+  const minX = Math.max(0, Math.floor(Math.min(TL[0], TR[0], BR[0], BL[0])));
+  const maxX = Math.min(templateW - 1, Math.ceil(Math.max(TL[0], TR[0], BR[0], BL[0])));
+  const minY = Math.max(0, Math.floor(Math.min(TL[1], TR[1], BR[1], BL[1])));
+  const maxY = Math.min(templateH - 1, Math.ceil(Math.max(TL[1], TR[1], BR[1], BL[1])));
+
+  if (maxX <= minX || maxY <= minY) return null;
+
+  const bbW = maxX - minX + 1;
+  const bbH = maxY - minY + 1;
+
+  const sharpFit: "cover" | "contain" | "fill" =
+    fitMode === "stretch" ? "fill" : fitMode === "contain" ? "contain" : "cover";
+
+  const { data: posterRgba, info } = await sharp(posterBuf)
+    .resize(bbW, bbH, { fit: sharpFit, withoutEnlargement: false })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const sampW = info.width;
+  const sampH = info.height;
+
+  // H maps poster-pixel space (0..sampW, 0..sampH) → template-pixel space
+  const src: [number, number][] = [[0, 0], [sampW, 0], [sampW, sampH], [0, sampH]];
+  const dst: [number, number][] = [TL, TR, BR, BL];
+
+  const H = computeHomography(src, dst);
+  if (!H) return null;
+  const H_inv = invertMatrix3x3(H);
+  if (!H_inv) return null;
+
+  const outBuf = Buffer.alloc(templateW * templateH * 4, 0);
+
+  for (let qy = minY; qy <= maxY; qy++) {
+    for (let qx = minX; qx <= maxX; qx++) {
+      const [sx, sy] = applyH(H_inv, qx + 0.5, qy + 0.5);
+      if (sx < 0 || sy < 0 || sx >= sampW || sy >= sampH) continue;
+
+      const x0 = Math.floor(sx);
+      const y0 = Math.floor(sy);
+      const x1 = Math.min(x0 + 1, sampW - 1);
+      const y1 = Math.min(y0 + 1, sampH - 1);
+      const tx = sx - x0;
+      const ty = sy - y0;
+
+      const i00 = (y0 * sampW + x0) * 4;
+      const i10 = (y0 * sampW + x1) * 4;
+      const i01 = (y1 * sampW + x0) * 4;
+      const i11 = (y1 * sampW + x1) * 4;
+      const out = (qy * templateW + qx) * 4;
+
+      for (let c = 0; c < 4; c++) {
+        outBuf[out + c] = Math.round(
+          posterRgba[i00 + c] * (1 - tx) * (1 - ty) +
+          posterRgba[i10 + c] * tx * (1 - ty) +
+          posterRgba[i01 + c] * (1 - tx) * ty +
+          posterRgba[i11 + c] * tx * ty
+        );
+      }
+    }
+  }
+
+  return sharp(outBuf, { raw: { width: templateW, height: templateH, channels: 4 } })
+    .png()
+    .toBuffer();
+}
+
+// ─── Exported compositors ─────────────────────────────────────────────────────
+
 /**
  * Composite a poster image into a mockup template image using the given
- * placement config. Returns a JPEG Buffer of the composited result.
+ * bounding-box placement config. Returns a JPEG Buffer of the composited result.
  *
  * Placement values (posterX, posterY, posterWidth, posterHeight) are
- * percentages of the template image's dimensions (0-100).
+ * percentages of the template image's dimensions (0–100).
  */
 export async function compositePosterIntoTemplate(
   templateImageUrl: string,
@@ -69,9 +280,7 @@ export async function compositePosterIntoTemplate(
   const areaW = Math.round(pwPct * templateW);
   const areaH = Math.round(phPct * templateH);
 
-  if (areaW <= 0 || areaH <= 0) {
-    throw new Error(`Invalid placement area: ${areaW}x${areaH}`);
-  }
+  if (areaW <= 0 || areaH <= 0) throw new Error(`Invalid placement area: ${areaW}x${areaH}`);
 
   const sharpFit: "cover" | "contain" | "fill" =
     fit === "stretch" ? "fill" : fit === "contain" ? "contain" : "cover";
@@ -82,12 +291,8 @@ export async function compositePosterIntoTemplate(
   });
 
   if (config.rotation) {
-    // Rotate expands the canvas — resize back to exactly areaW×areaH so the
-    // composited image doesn't bleed outside the intended placement area.
     posterResized = posterResized
-      .rotate(config.rotation, {
-        background: { r: 0, g: 0, b: 0, a: 0 },
-      })
+      .rotate(config.rotation, { background: { r: 0, g: 0, b: 0, a: 0 } })
       .resize(areaW, areaH, { fit: "cover" });
   }
 
@@ -108,25 +313,14 @@ export async function compositePosterIntoTemplate(
   }
 
   const modulations: { brightness?: number; saturation?: number } = {};
-  if (config.brightness != null && config.brightness !== 1) {
-    modulations.brightness = config.brightness;
-  }
-  if (config.saturation != null && config.saturation !== 1) {
-    modulations.saturation = config.saturation;
-  }
+  if (config.brightness != null && config.brightness !== 1) modulations.brightness = config.brightness;
+  if (config.saturation != null && config.saturation !== 1) modulations.saturation = config.saturation;
 
   let compositeSharp = sharp(templateBuffer).composite([
-    {
-      input: posterBuf,
-      left: areaLeft,
-      top: areaTop,
-      blend: "over",
-    },
+    { input: posterBuf, left: areaLeft, top: areaTop, blend: "over" },
   ]);
 
-  if (Object.keys(modulations).length > 0) {
-    compositeSharp = compositeSharp.modulate(modulations);
-  }
+  if (Object.keys(modulations).length > 0) compositeSharp = compositeSharp.modulate(modulations);
 
   if (config.contrast != null && config.contrast !== 1) {
     const linear = config.contrast;
@@ -135,4 +329,98 @@ export async function compositePosterIntoTemplate(
   }
 
   return compositeSharp.jpeg({ quality: 88, mozjpeg: true }).toBuffer();
+}
+
+/**
+ * Composite a poster into a template using a four-corner perspective surface.
+ *
+ * When corners define a non-rectangular quad, performs a full homographic
+ * perspective warp so the poster conforms to angled/tilted surfaces (e.g. a
+ * poster on a table or leaning against a wall).
+ *
+ * Falls back to bounding-box rendering and sets `surfaceWarning` in the result
+ * if the homography cannot be computed.
+ *
+ * Template is capped at 2000 px on the longest edge to bound memory use.
+ */
+export async function compositePosterWithCorners(
+  templateImageUrl: string,
+  posterImageUrl: string,
+  config: PerspectiveCompositorConfig
+): Promise<PerspectiveCompositorResult> {
+  const [templateBuffer, posterBuffer] = await Promise.all([
+    fetchImageBuffer(templateImageUrl),
+    fetchImageBuffer(posterImageUrl),
+  ]);
+
+  const rawMeta = await sharp(templateBuffer).metadata();
+  const rawW = rawMeta.width ?? 1000;
+  const rawH = rawMeta.height ?? 1000;
+
+  const MAX_DIM = 2000;
+  const scale = Math.min(1, MAX_DIM / Math.max(rawW, rawH));
+  const processW = Math.round(rawW * scale);
+  const processH = Math.round(rawH * scale);
+
+  const templateBuf =
+    scale < 1
+      ? await sharp(templateBuffer).resize(processW, processH).toBuffer()
+      : templateBuffer;
+
+  const fitStr = config.fitMode ?? "cover";
+  const fitMode = (["cover", "contain", "stretch"].includes(fitStr) ? fitStr : "cover") as
+    | "cover"
+    | "contain"
+    | "stretch";
+
+  let surfaceWarning: string | undefined;
+  let warpedPng: Buffer | null = null;
+
+  try {
+    warpedPng = await perspectiveWarpPoster(
+      posterBuffer,
+      config.corners,
+      processW,
+      processH,
+      fitMode
+    );
+  } catch (err) {
+    surfaceWarning = `Perspective warp error (${err instanceof Error ? err.message : "unknown"}) — falling back to bounding-box render`;
+  }
+
+  if (!warpedPng) {
+    if (!surfaceWarning) {
+      surfaceWarning =
+        "Perspective surface configured, but renderer fell back to rectangle. (Homography degenerate or corners too close.)";
+    }
+    const bb = cornersToBoundingBox(config.corners);
+    const fallback = await compositePosterIntoTemplate(templateImageUrl, posterImageUrl, {
+      posterX: bb.x * 100,
+      posterY: bb.y * 100,
+      posterWidth: bb.width * 100,
+      posterHeight: bb.height * 100,
+      fitMode: config.fitMode,
+      borderRadius: config.borderRadius,
+      brightness: config.brightness,
+      contrast: config.contrast,
+      saturation: config.saturation,
+    });
+    return { buffer: fallback, surfaceWarning };
+  }
+
+  let compositeSharp = sharp(templateBuf).composite([{ input: warpedPng, blend: "over" }]);
+
+  const modulations: { brightness?: number; saturation?: number } = {};
+  if (config.brightness != null && config.brightness !== 1) modulations.brightness = config.brightness;
+  if (config.saturation != null && config.saturation !== 1) modulations.saturation = config.saturation;
+  if (Object.keys(modulations).length > 0) compositeSharp = compositeSharp.modulate(modulations);
+
+  if (config.contrast != null && config.contrast !== 1) {
+    const linear = config.contrast;
+    const offset = Math.round(128 * (1 - linear));
+    compositeSharp = compositeSharp.linear(linear, offset);
+  }
+
+  const buffer = await compositeSharp.jpeg({ quality: 88, mozjpeg: true }).toBuffer();
+  return { buffer, surfaceWarning };
 }

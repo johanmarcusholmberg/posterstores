@@ -8,9 +8,16 @@ import {
 import { eq, and, inArray, isNull, or, isNotNull } from "drizzle-orm";
 import { requireAdmin } from "../middleware/requireAdmin";
 import { adminLimiter } from "../middleware/rateLimiter";
-import { compositePosterIntoTemplate } from "../lib/mockupCompositor";
+import {
+  compositePosterIntoTemplate,
+  compositePosterWithCorners,
+} from "../lib/mockupCompositor";
 import { ObjectStorageService } from "../lib/objectStorage";
-import { resolveEffectiveMockupPlacement } from "../lib/mockupPlacementAnalyzer";
+import {
+  resolveEffectiveMockupSurface,
+  getSurfaceSourceLabel,
+  type SurfaceSource,
+} from "../lib/mockupPlacementAnalyzer";
 import { renderAiMockup } from "../lib/aiMockupRenderer";
 import { randomUUID } from "crypto";
 
@@ -56,8 +63,11 @@ interface SyncResult {
   reason?: string;
   mockupId?: number;
   imageUrl?: string;
+  /** Kept for backwards compat — prefer surfaceSource. */
   placementSource?: "auto_detected" | "manual";
   placementWarnings?: string[];
+  surfaceSource?: SurfaceSource;
+  surfaceWarning?: string;
   renderMode?: "deterministic" | "ai_rendered";
   needsReview?: boolean;
   aiRenderWarning?: string;
@@ -124,14 +134,13 @@ router.post(
 
     // Filter eligible templates:
     // - AI-rendered templates: need background image only (AI figures out placement)
-    // - Deterministic templates: need background image + effective placement (auto or manual)
+    // - Deterministic templates: need background image + a valid poster surface
     let targetTemplates = templateRows.filter((t) => {
       if (!t.backgroundImageUrl) return false;
       if (t.renderMode === "ai_rendered") return true;
-      // Deterministic: need placement coordinates
-      const { placementSource, posterX, posterY, posterWidth, posterHeight } = resolveEffectiveMockupPlacement(t);
-      if (placementSource === "auto_detected") return true;
-      return posterX != null && posterY != null && posterWidth != null && posterHeight != null;
+      // Deterministic: need a valid poster surface
+      const surface = resolveEffectiveMockupSurface(t);
+      return surface.surfaceSource !== "fallback";
     });
 
     if (templateIds && templateIds.length > 0) {
@@ -141,7 +150,7 @@ router.post(
     if (targetTemplates.length === 0) {
       return res.json({
         generated: 0, skipped: 0, failed: 0, plannedCount: 0, results: [],
-        note: "No active templates with background image and placement data found.",
+        note: "No active templates with background image and poster surface data found.",
       });
     }
 
@@ -164,8 +173,7 @@ router.post(
       });
     }
 
-    // AI-specific hard limit — even a small number of AI renders costs money.
-    // Dry-run is exempt so admins can safely preview counts before committing.
+    // AI-specific hard limit
     if (!dryRun && aiRenderedPlannedCount > AI_RENDER_HARD_LIMIT) {
       return res.status(400).json({
         error: `Sync would generate ${aiRenderedPlannedCount} AI-rendered mockup${aiRenderedPlannedCount !== 1 ? "s" : ""} (${targetPosters.length} poster${targetPosters.length !== 1 ? "s" : ""} × ${aiTemplates.length} AI template${aiTemplates.length !== 1 ? "s" : ""}), which exceeds the AI render limit of ${AI_RENDER_HARD_LIMIT} per request. Reduce the number of selected posters or AI-rendered templates and try again. Consider using a deterministic template or running on fewer posters.`,
@@ -225,9 +233,26 @@ router.post(
           continue;
         }
 
-        // Resolve placement (used for deterministic and as hint for AI)
-        const effective = resolveEffectiveMockupPlacement(template);
-        const { posterX, posterY, posterWidth, posterHeight, rotation, placementSource, warnings: placementWarnings } = effective;
+        // Resolve the effective poster surface for this template
+        const surface = resolveEffectiveMockupSurface(template);
+        const {
+          posterX,
+          posterY,
+          posterWidth,
+          posterHeight,
+          rotation,
+          corners,
+          renderMode: surfaceRenderMode,
+          surfaceSource,
+          warnings: surfaceWarnings,
+        } = surface;
+
+        // Backwards-compat placementSource label
+        const placementSource: "auto_detected" | "manual" = surfaceSource.startsWith("auto")
+          ? "auto_detected"
+          : "manual";
+        const placementWarnings = surfaceWarnings;
+        const surfaceWarning = surfaceWarnings.length > 0 ? surfaceWarnings[0] : undefined;
 
         if (dryRun) {
           generated++;
@@ -237,9 +262,11 @@ router.post(
             templateId: template.id,
             templateName: template.name,
             action: "generated",
-            reason: `dry-run (renderer: ${templateRenderMode}, placement: ${placementSource})`,
+            reason: `dry-run (renderer: ${templateRenderMode}, surface: ${getSurfaceSourceLabel(surfaceSource)})`,
             placementSource,
             placementWarnings,
+            surfaceSource,
+            surfaceWarning,
             renderMode: templateRenderMode,
             needsReview: templateRenderMode === "ai_rendered",
             estimatedCostLabel: templateRenderMode === "ai_rendered" ? "Paid AI render" : undefined,
@@ -261,8 +288,11 @@ router.post(
           continue;
         }
 
-        // For deterministic, require placement
-        if (templateRenderMode === "deterministic" && (posterX == null || posterY == null || posterWidth == null || posterHeight == null)) {
+        // For deterministic, require a valid surface
+        if (
+          templateRenderMode === "deterministic" &&
+          surfaceSource === "fallback"
+        ) {
           failed++;
           results.push({
             posterId: poster.id,
@@ -270,7 +300,8 @@ router.post(
             templateId: template.id,
             templateName: template.name,
             action: "failed",
-            reason: `Deterministic template has no valid placement (source: ${placementSource})`,
+            reason: "Deterministic template has no valid poster surface defined",
+            surfaceSource,
             renderMode: templateRenderMode,
           });
           continue;
@@ -279,6 +310,7 @@ router.post(
         try {
           let imageBuffer: Buffer;
           let aiRenderWarning: string | undefined;
+          let finalSurfaceWarning: string | undefined = surfaceWarning;
 
           if (templateRenderMode === "ai_rendered") {
             // ── AI render path ─────────────────────────────────────────────
@@ -286,7 +318,7 @@ router.post(
               posterImageUrl: poster.imageUrl,
               templateImageUrl: template.backgroundImageUrl!,
               detectedPlacement:
-                placementSource === "auto_detected" && template.detectedPlacementConfig
+                surfaceSource.startsWith("auto") && template.detectedPlacementConfig
                   ? (template.detectedPlacementConfig as any)
                   : null,
               renderPrompt: template.aiRenderPrompt,
@@ -310,16 +342,51 @@ router.post(
 
             imageBuffer = aiResult.imageBuffer!;
             aiRenderWarning = aiResult.warning;
+          } else if (
+            surfaceRenderMode === "corners" &&
+            corners != null
+          ) {
+            // ── Perspective warp path ──────────────────────────────────────
+            const result = await compositePosterWithCorners(
+              template.backgroundImageUrl!,
+              poster.imageUrl,
+              {
+                corners,
+                fitMode: template.fitMode,
+                borderRadius: template.borderRadius,
+                brightness: template.brightness,
+                contrast: template.contrast,
+                saturation: template.saturation,
+              }
+            );
+            imageBuffer = result.buffer;
+            if (result.surfaceWarning) {
+              finalSurfaceWarning = result.surfaceWarning;
+            }
           } else {
-            // ── Deterministic compositor path ──────────────────────────────
+            // ── Deterministic bounding-box compositor path ─────────────────
+            if (posterX == null || posterY == null || posterWidth == null || posterHeight == null) {
+              failed++;
+              results.push({
+                posterId: poster.id,
+                posterTitle: poster.title,
+                templateId: template.id,
+                templateName: template.name,
+                action: "failed",
+                reason: `No valid placement found (surface: ${getSurfaceSourceLabel(surfaceSource)})`,
+                surfaceSource,
+                renderMode: templateRenderMode,
+              });
+              continue;
+            }
             imageBuffer = await compositePosterIntoTemplate(
               template.backgroundImageUrl!,
               poster.imageUrl,
               {
-                posterX: posterX!,
-                posterY: posterY!,
-                posterWidth: posterWidth!,
-                posterHeight: posterHeight!,
+                posterX,
+                posterY,
+                posterWidth,
+                posterHeight,
                 rotation,
                 fitMode: template.fitMode,
                 borderRadius: template.borderRadius,
@@ -380,6 +447,8 @@ router.post(
                 imageUrl,
                 placementSource,
                 placementWarnings,
+                surfaceSource,
+                surfaceWarning: finalSurfaceWarning,
                 renderMode: templateRenderMode,
                 needsReview,
                 aiRenderWarning,
@@ -440,6 +509,8 @@ router.post(
             imageUrl,
             placementSource,
             placementWarnings,
+            surfaceSource,
+            surfaceWarning: finalSurfaceWarning,
             renderMode: templateRenderMode,
             needsReview,
             aiRenderWarning,
