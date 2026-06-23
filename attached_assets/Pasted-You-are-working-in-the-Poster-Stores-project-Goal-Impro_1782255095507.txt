@@ -1,0 +1,482 @@
+You are working in the Poster Stores project.
+
+Goal:
+Improve the mockup template admin workflow so it is clear, precise, and safe to use. This is a targeted UI/UX and sync-scope improvement pass for the existing mockup system.
+
+Current context:
+
+* Store admin owns mockup templates.
+* Public storefront only shows finalized/generated mockup images via mockupImageUrl.
+* Template/background images are admin-only assets.
+* Manual poster surfaces are stored in placementConfig.
+* AI-detected candidate surfaces are stored in detectedPlacementConfig.
+* Deterministic rendering is the default for product mockups.
+* AI-rendered mockups are optional, paid, review-only, and not public until approved.
+* Corner surface editor exists and uses image/SVG shared transform.
+* Poster-specific image order is already handled in the poster settings / poster mockup admin. Do not move or duplicate that logic.
+* Typechecks are currently clean.
+
+Important:
+
+* Do not change public storefront behavior.
+* Do not reintroduce public live compositing.
+* Do not make AI rendering default.
+* Do not refactor the whole mockup system.
+* Do not change DB schema unless absolutely necessary.
+* Do not create branches, PRs, commits, pushes, or GitHub automation.
+* Keep changes targeted.
+* Stop after reporting results.
+
+Main public rule:
+Public storefront may only use finalized generated mockup images:
+
+* mockupImageUrl exists and public-eligible → show it
+* no mockupImageUrl → do not show it publicly
+* never show template background images publicly
+* never show live CSS composites publicly
+
+Admin workflow terminology:
+Use clear user-facing terms:
+
+* Mockup Template = empty background/template image
+* Poster Surface = the area/corners where the poster will be inserted
+* Surface Preview = small preview of the active surface
+* Precision Surface Editor = zoomable 4-corner editor
+* Rendered Mockup = generated flattened mockupImageUrl
+* Public Usage = gallery / hover / primary assignment
+
+Avoid using “placement” as the main admin-facing concept. Use “Poster surface” instead.
+
+Part 1 — Corner editor navigation / pan improvements
+
+Update MockupSurfaceEditor.tsx.
+
+Current issue:
+When zooming in, the image can move partly out of view and there is no obvious way to reposition/pan the view.
+
+Add visible navigation controls:
+
+* Pan / hand mode toggle
+* Fit image
+* Fit surface or Center on surface
+* 100%
+* 200%
+* 400%
+* Zoom in / zoom out
+
+Behavior:
+
+* When Pan mode is active, dragging empty canvas pans the view.
+* Spacebar + drag should pan if practical.
+* Alt + drag and middle mouse pan can remain, but must not be the only visible way.
+* Wheel zoom should continue to zoom toward cursor.
+* Fit image should fit the full template image inside the editor viewport.
+* Fit surface / Center on surface should zoom/center around the current selected poster surface/corners.
+* The image should never feel lost after zooming. Provide a clear recovery button.
+
+Update helper text:
+“Use Pan mode or hold Space/Alt and drag to move around. Scroll to zoom.”
+
+Part 2 — Pixel-perfect corner handle styling
+
+Current issue:
+The colored corner handles/labels cover the exact corner point, making pixel-accurate placement difficult.
+
+Improve handle styling:
+
+* Use small hollow rings/crosshair handles instead of large filled colored circles.
+* The exact corner pixel should remain visible.
+* TL/TR/BR/BL labels should be offset away from the corner point, not centered on it.
+* Selected corner can have a stronger outline/ring.
+* Polygon line should be thin but visible.
+* Handle visual size should remain stable across zoom.
+* Keep labels readable but avoid blocking placement.
+
+Optional if easy:
+
+* Add “Show labels” toggle.
+* Add “Precision mode” toggle.
+* Add a small magnifier/loupe while dragging.
+
+Part 3 — Clarify Surface Preview vs Precision Surface Editor
+
+Current issue:
+The UI has both a “Corner surface editor” and a “Poster area” overlay, which is confusing.
+
+Rename/clarify:
+
+* “Poster area” → “Surface preview”
+* “Corner surface editor” → “Precision surface editor”
+* “Poster placement area” → “Poster surface”
+
+Add explanatory copy:
+
+* Surface preview: “Shows the currently active poster surface on the template.”
+* Precision surface editor: “Use this to adjust the exact four corners used when rendering mockups.”
+
+The small preview should mainly be for status/overview. The Precision Surface Editor should be the main detailed editing tool.
+
+Part 4 — Explain Render modes better
+
+Update Render mode section copy.
+
+Deterministic compositor:
+“Fast, repeatable, and preserves the poster artwork exactly. Uses the selected poster surface to generate a final rendered mockup image. Recommended for product gallery, primary, and hover mockups.”
+
+AI-rendered mockup:
+“Uses paid AI image editing for a more realistic lifestyle result. May slightly alter poster artwork, so generated images require admin review before they can appear publicly.”
+
+Add short badges/labels:
+
+* Deterministic: “Best for product images”
+* AI-rendered: “Experimental / paid / review required”
+
+Part 5 — Explain Compositing better
+
+Current issue:
+The Compositing section is not self-explanatory.
+
+Update copy:
+“Poster surface controls where the poster goes. Compositing controls how the inserted poster blends into the mockup.”
+
+Explain fields briefly:
+
+* Fit mode: how the poster fills the selected surface
+* Drop shadow: shadow behind the inserted poster
+* Inner shadow: subtle edge shading inside a frame
+* Brightness / contrast / saturation: matches the poster to the room/template lighting
+* Blur: slight softening so the poster does not look pasted on
+
+Important:
+If settings are applied during sync/rendering, do not say “Applied at display time — no re-upload needed.”
+
+Use:
+“Applied when mockups are synced/rendered. Run Sync mockups after changing these settings.”
+
+Part 6 — Make Poster Surface and Compositing collapsible
+
+In MockupTemplateForm, make these sections collapsible:
+
+* Poster Surface
+* Detected Surface, if separate
+* Compositing
+* Advanced settings, if practical
+
+Default behavior:
+
+* Keep essential setup visible:
+
+  * Template image
+  * Upload/replace template image button
+  * Active/global/use flags
+  * Render mode
+* Poster Surface should default open if no valid surface exists.
+* Poster Surface can default collapsed if a valid manual/detected surface exists.
+* Compositing can default collapsed.
+* Remembering open/closed state is nice but not required.
+
+Section headers should show useful status badges:
+
+* Poster Surface: “Manual corners active”, “Detected surface approved”, “No surface”, “Sync required”
+* Compositing: “Default settings” or “Custom settings”
+
+Part 7 — Add clear Upload template image button
+
+Current issue:
+Uploading a mockup image is not obvious because the user must interact with the image area.
+
+Add a clear button:
+
+* If no image exists: “Upload template image”
+* If image exists: “Replace template image”
+
+Keep drag/drop or click-on-image upload if it exists, but do not rely on it.
+
+Keep paste URL as a secondary option.
+
+Label the image field:
+“Template image”
+
+Add helper text:
+“This is the empty mockup background. Posters are inserted later when you run Sync mockups.”
+
+If a hidden file input already exists, wire the button to it. Reuse existing upload handlers.
+
+Part 8 — Clarify Detect vs Re-analyze
+
+Current issue:
+There is both a “Detect” button and a “Re-analyze & save” button, and the difference is unclear.
+
+Audit both buttons:
+
+* Detect near upload/URL
+* Re-analyze & save in Detected Surface section
+
+Preferred UX:
+Use clearer labels:
+
+* First-time / after image change: “Analyze poster surface”
+* Existing detected result: “Re-analyze surface”
+
+Avoid “save” in the label unless it actually saves immediately.
+
+Add context copy:
+
+* Near upload/URL: “Analyze the template image to suggest a poster surface.”
+* In Detected Surface section: “Run again to replace the current AI-detected surface candidate.”
+
+Important:
+
+* AI analysis must remain non-destructive.
+* AI analysis must never overwrite placementConfig/manual surface.
+* AI analysis writes detectedPlacementConfig only.
+* Admin must still approve/apply detected surface before it becomes active.
+
+Part 9 — Sync only posters where the mockup is selected
+
+Current problem:
+When syncing mockups today, selecting a mockup template can generate that mockup for every poster in the gallery/store, even for posters where that mockup has not been selected.
+
+This is wrong.
+
+Desired rule:
+A mockup sync/update must only render mockups for posters where that mockup/template is actually selected for that poster.
+
+In other words:
+
+* Active template = available to choose
+* Selected mockup for poster = should be rendered for that poster
+* Sync must use selected poster/mockup relationships, not all active templates for all posters
+
+Correct behavior:
+
+1. Poster-specific sync
+   If the admin is editing one poster’s mockups:
+
+* Sync should only update mockups selected for that poster.
+* It must not apply the same template to other posters.
+
+Example:
+Poster A has templates 1 and 2 selected.
+Poster B has template 3 selected.
+If admin syncs Poster A, only Poster A + templates 1 and 2 should be rendered.
+
+2. Selected mockup template sync
+   If the admin selects a mockup template and runs sync:
+
+* Only posters that already have that mockup/template selected should be updated.
+* Do not create new poster_mockup rows for every poster.
+* Do not apply the template to posters where it has not been selected.
+
+Example:
+Template 5 is selected for Poster A and Poster C only.
+Syncing Template 5 should render Poster A + Template 5 and Poster C + Template 5 only.
+It must not generate Template 5 for Poster B, D, E, etc.
+
+3. Selected poster + selected mockup pairs
+   If the UI allows selecting both posters and templates:
+
+* Render only the intersection where the template is selected for that poster.
+* If a template is selected in the UI but not assigned/selected for a poster, skip that poster/template pair and show a clear skipped reason.
+
+Example:
+Selected posters: A, B, C
+Selected template: 5
+Template 5 is selected only for A and C.
+Sync result:
+
+* A + 5 generated/updated
+* C + 5 generated/updated
+* B + 5 skipped: “Mockup not selected for this poster”
+
+4. Bulk sync
+   If bulk sync remains:
+
+* It should mean “update all existing selected poster/mockup relationships”
+* It should not mean “apply all active templates to all posters”
+* Label it clearly:
+  “Bulk update selected mockups”
+  not “Sync all mockups”
+
+If there is a separate action to apply templates to all posters, it must be a different explicit action:
+“Apply selected template to all posters”
+This action should require strong confirmation and should not be part of normal sync.
+
+Server behavior:
+Update mockupSync.ts so it builds work items from existing selected poster_mockup relationships, not from all posters × active templates.
+
+Required server rules:
+
+* Do not create poster_mockup rows for posters unless the mockup/template is explicitly selected for that poster.
+* Do not use all published posters as the default target.
+* Do not generate active templates for all posters automatically.
+* Reject ambiguous sync requests that do not specify either:
+
+  * poster IDs
+  * template IDs
+  * existing poster_mockup IDs
+  * or explicit bulk update of existing selected rows
+* If poster IDs and template IDs are supplied, filter to existing selected poster_mockup rows only.
+* If a requested poster/template pair does not exist as a selected mockup row, skip it and report:
+  “Mockup not selected for this poster.”
+
+UI behavior:
+
+* Rename “Run sync” if needed to make it clear:
+
+  * “Update selected mockups”
+  * “Sync this poster’s selected mockups”
+  * “Bulk update selected mockups”
+* Show planned count based on existing selected relationships:
+  “5 selected poster/mockup pairs will be updated”
+* Do not show a count based on all posters × all templates unless the action is explicitly applying templates to all posters.
+* If nothing is selected for update, disable sync and show:
+  “No selected mockups to sync.”
+
+Manual QA:
+
+* Template selected for one poster only → sync updates only that poster.
+* Template selected for two posters only → sync updates only those two posters.
+* Syncing one poster updates only mockups selected for that poster.
+* Syncing one template does not create that mockup for unrelated posters.
+* Active templates are not automatically applied to every poster.
+* Bulk update updates existing selected rows only.
+* Existing AI cost limits and general sync hard limits still apply.
+
+Part 10 — Mockup template sorting in mockup admin
+
+Clarification:
+The order of images for each poster is already handled in the poster settings / poster mockup admin. Do not move or duplicate that logic.
+
+This task is only about the order of mockup template pictures in the mockup admin/template selection list.
+
+Current problem:
+Mockup templates can have the same sort order number, which makes the mockup admin/template list order unclear and unpredictable.
+
+Desired behavior:
+
+* Sort order controls the order of mockup template pictures in the mockup admin and mockup template selection UI.
+* It does not control poster-specific product gallery order.
+* Poster-specific gallery image order should remain where it already exists today.
+
+Rules:
+
+1. Mockup template sort order should be unique within the relevant template list.
+
+   * If templates are store-specific, uniqueness should be per store.
+   * If global templates are shown together with store templates, decide the visible list scope and make ordering stable there.
+
+2. It should not be possible for two mockup templates in the same visible admin list to keep the same sort number.
+
+3. Prefer auto-renumbering over hard errors:
+
+   * Display templates as position 1, 2, 3, 4…
+   * If a template is moved, renumber the list cleanly.
+   * Avoid duplicate values.
+
+4. If numeric sort order input remains:
+
+   * Validate duplicates.
+   * Show a clear inline error.
+   * Explain what the number controls.
+
+5. Better UX if practical:
+
+   * Move sorting out of the individual template settings and into the mockup template gallery/list.
+   * Add up/down controls or drag-and-drop ordering.
+   * Save the resulting order as clean sort_order values.
+
+6. If drag-and-drop is too much for this pass:
+
+   * Add up/down buttons.
+   * Or add a “Normalize sort order” action that rewrites current templates to 1, 2, 3, 4… in the displayed order.
+
+UI copy:
+Near template sort order, use:
+“Controls the order this mockup template appears in the admin mockup list and template selection. Product gallery order is managed separately per poster.”
+
+If sorting is moved to the template gallery/list, use:
+“Drag to reorder mockup templates. This only affects the admin/template selection order.”
+
+Backend/data:
+
+* Inspect current mockup_templates.sort_order usage.
+* Add server-side validation or save logic so duplicate sort_order values are not kept within the same scope.
+* If adding a DB constraint is safe and practical, add an idempotent unique index for the correct scope.
+* If uniqueness scope is complicated because of global + store templates, enforce uniqueness in application logic and use stable fallback ordering.
+* Stable fallback order should be:
+
+  * sort_order ASC
+  * created_at ASC
+  * id ASC
+
+Do not:
+
+* Add poster_mockups.gallerySortOrder.
+* Move poster-specific image order logic.
+* Change product gallery ordering unless needed to avoid regressions.
+* Confuse template order with poster gallery order.
+
+Part 11 — Visual cleanup
+
+Make small targeted improvements:
+
+* Reduce duplicate status badges.
+* Avoid showing both “Detected” and “Manual corners active” in a way that implies both are active.
+* If manual surface is active and detected surface exists, say:
+  “Manual surface active. AI-detected surface is available but not active.”
+* If detected surface is approved and active, say:
+  “Detected surface active.”
+* If no valid surface exists, say:
+  “No poster surface selected — sync will skip this template.”
+* Keep the form from feeling like a collection of technical fields.
+
+Part 12 — Verification
+
+Run:
+
+* pnpm --filter @workspace/poster-store run typecheck
+* pnpm run typecheck:libs if shared types changed
+* pnpm --filter @workspace/api-server run typecheck if server/shared files changed
+
+Manual QA:
+
+* Upload template image button is visible and works.
+* Paste URL still works.
+* Surface Preview and Precision Surface Editor have clear different purposes.
+* Pan mode works.
+* Space/Alt drag pan works if implemented.
+* Fit image works.
+* Fit/center surface works.
+* Zooming no longer makes the image feel lost.
+* Corner handles no longer block the exact corner point.
+* Pixel placement is easier at 200%/400%.
+* Render mode descriptions are understandable.
+* Compositing section explains what settings do.
+* Poster Surface and Compositing sections can collapse/hide.
+* Sort order help text is clear.
+* Duplicate sort order cannot be kept in the same visible mockup template list.
+* Detect/Re-analyze wording is understandable.
+* Existing surface saving still writes placementConfig.
+* AI detection still writes detectedPlacementConfig only.
+* Sync selected mockups only updates selected poster/mockup pairs.
+* Explicit bulk update, if kept, updates existing selected rows only and requires confirmation.
+* Public storefront behavior unchanged.
+
+Deliverable:
+Report:
+
+1. Files changed
+2. Corner editor navigation improvements
+3. Corner handle/precision improvements
+4. UI terminology and explanation changes
+5. Collapsible section changes
+6. Upload image button behavior
+7. Detect/Re-analyze behavior clarification
+8. Sync scope changes
+9. Mockup template sorting changes
+10. Typecheck results
+11. Manual QA results
+12. Remaining limitations
+
+Do not commit or push. Stop after report.
