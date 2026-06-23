@@ -5,7 +5,7 @@ import {
   posterMockupsTable,
   postersTable,
 } from "@workspace/db";
-import { eq, and, inArray, isNull, or, isNotNull } from "drizzle-orm";
+import { eq, and, inArray, isNull, isNotNull } from "drizzle-orm";
 import { requireAdmin } from "../middleware/requireAdmin";
 import { adminLimiter } from "../middleware/rateLimiter";
 import {
@@ -99,73 +99,98 @@ router.post(
       return res.status(400).json({ error: "scope must be 'all', 'missing', or 'selected'" });
     }
 
-    // ── 1. Load posters ──────────────────────────────────────────────────────
-    const allPosters = await db
-      .select()
-      .from(postersTable)
-      .where(eq(postersTable.storeKey, storeKey));
+    // ── 1. Build filter conditions for existing poster_mockup rows ────────────
+    //
+    // Sync ONLY operates on existing poster_mockup rows — it never creates new
+    // rows for poster/template pairs that have not been explicitly selected by
+    // the admin. Creating new poster_mockup associations is a separate action.
 
-    let targetPosters = allPosters.filter((p) => p.status === "published");
+    const filterConditions = [
+      isNotNull(posterMockupsTable.mockupTemplateId),
+    ];
 
-    if (scope === "selected") {
-      if (!posterIds || posterIds.length === 0) {
-        return res.status(400).json({ error: "posterIds required when scope is 'selected'" });
-      }
-      targetPosters = targetPosters.filter((p) => posterIds.includes(p.id));
+    if (scope === "missing") {
+      filterConditions.push(isNull(posterMockupsTable.mockupImageUrl));
+    }
+    if (posterIds && posterIds.length > 0) {
+      filterConditions.push(inArray(posterMockupsTable.posterId, posterIds));
+    }
+    if (templateIds && templateIds.length > 0) {
+      filterConditions.push(inArray(posterMockupsTable.mockupTemplateId as any, templateIds));
     }
 
-    if (targetPosters.length === 0) {
-      return res.json({ generated: 0, skipped: 0, failed: 0, results: [] });
-    }
+    // ── 2. Load existing selected poster_mockup rows ──────────────────────────
+    //
+    // These rows represent the posters × templates that the admin has explicitly
+    // selected. Sync only renders this set.
 
-    // ── 2. Load active templates ─────────────────────────────────────────────
-    const templateRows = await db
-      .select()
-      .from(mockupTemplatesTable)
+    const mockupRows = await db
+      .select({
+        mockup: posterMockupsTable,
+        poster: postersTable,
+        template: mockupTemplatesTable,
+      })
+      .from(posterMockupsTable)
+      .innerJoin(postersTable, eq(posterMockupsTable.posterId, postersTable.id))
+      .innerJoin(
+        mockupTemplatesTable,
+        eq(posterMockupsTable.mockupTemplateId as any, mockupTemplatesTable.id)
+      )
       .where(
         and(
+          eq(postersTable.storeKey, storeKey),
+          eq(postersTable.status, "published"),
           eq(mockupTemplatesTable.active, true),
-          or(
-            isNull(mockupTemplatesTable.storeKey),
-            eq(mockupTemplatesTable.storeKey, storeKey)
-          )
+          isNotNull(mockupTemplatesTable.backgroundImageUrl),
+          ...filterConditions
         )
       );
 
-    // Filter eligible templates:
-    // - AI-rendered templates: need background image only (AI figures out placement)
-    // - Deterministic templates: need background image + a valid poster surface
-    let targetTemplates = templateRows.filter((t) => {
-      if (!t.backgroundImageUrl) return false;
-      if (t.renderMode === "ai_rendered") return true;
-      // Deterministic: need a valid poster surface
-      const surface = resolveEffectiveMockupSurface(t);
-      return surface.surfaceSource !== "fallback";
-    });
-
-    if (templateIds && templateIds.length > 0) {
-      targetTemplates = targetTemplates.filter((t) => templateIds.includes(t.id));
-    }
-
-    if (targetTemplates.length === 0) {
+    if (mockupRows.length === 0) {
+      const hint = scope === "selected" && posterIds?.length === 0 && templateIds?.length === 0
+        ? "No poster or template IDs specified."
+        : "No selected poster/mockup pairs found for the given filters.";
       return res.json({
-        generated: 0, skipped: 0, failed: 0, plannedCount: 0, results: [],
-        note: "No active templates with background image and poster surface data found.",
+        generated: 0,
+        skipped: 0,
+        failed: 0,
+        plannedCount: 0,
+        results: [],
+        note: hint + " Sync only updates mockups that have already been selected for a poster.",
       });
     }
 
-    // ── 3. Safety-limit checks ───────────────────────────────────────────────
-    const deterministicTemplates = targetTemplates.filter((t) => (t.renderMode ?? "deterministic") !== "ai_rendered");
-    const aiTemplates = targetTemplates.filter((t) => (t.renderMode ?? "deterministic") === "ai_rendered");
+    // ── 3. Filter eligible rows ───────────────────────────────────────────────
+    //
+    // Deterministic templates need a valid poster surface; AI templates need
+    // only a background image (already guaranteed by the query above).
 
-    const plannedCount = targetPosters.length * targetTemplates.length;
-    const deterministicPlannedCount = targetPosters.length * deterministicTemplates.length;
-    const aiRenderedPlannedCount = targetPosters.length * aiTemplates.length;
+    const eligibleRows = mockupRows.filter(({ template, mockup }) => {
+      if (!template.backgroundImageUrl) return false;
+      if (template.renderMode === "ai_rendered") return true;
+      const surface = resolveEffectiveMockupSurface(template);
+      if (surface.surfaceSource === "fallback") return false;
+      // Skip already-generated unless overwrite is set
+      if (scope !== "missing" && !overwrite && mockup.mockupImageUrl) return false;
+      return true;
+    });
 
-    // Overall hard limit (all renderers)
+    // Count by renderer type
+    const deterministicRows = eligibleRows.filter(
+      ({ template }) => (template.renderMode ?? "deterministic") !== "ai_rendered"
+    );
+    const aiRows = eligibleRows.filter(
+      ({ template }) => (template.renderMode ?? "deterministic") === "ai_rendered"
+    );
+
+    const plannedCount = eligibleRows.length;
+    const deterministicPlannedCount = deterministicRows.length;
+    const aiRenderedPlannedCount = aiRows.length;
+
+    // Overall hard limit
     if (!dryRun && plannedCount > SYNC_HARD_LIMIT) {
       return res.status(400).json({
-        error: `Sync would generate ${plannedCount} combinations (${targetPosters.length} poster${targetPosters.length !== 1 ? "s" : ""} × ${targetTemplates.length} template${targetTemplates.length !== 1 ? "s" : ""}), which exceeds the safe limit of ${SYNC_HARD_LIMIT} per request.`,
+        error: `Sync would update ${plannedCount} selected mockup${plannedCount !== 1 ? "s" : ""}, which exceeds the safe limit of ${SYNC_HARD_LIMIT} per request. Narrow your selection and try again.`,
         plannedCount,
         deterministicPlannedCount,
         aiRenderedPlannedCount,
@@ -176,7 +201,7 @@ router.post(
     // AI-specific hard limit
     if (!dryRun && aiRenderedPlannedCount > AI_RENDER_HARD_LIMIT) {
       return res.status(400).json({
-        error: `Sync would generate ${aiRenderedPlannedCount} AI-rendered mockup${aiRenderedPlannedCount !== 1 ? "s" : ""} (${targetPosters.length} poster${targetPosters.length !== 1 ? "s" : ""} × ${aiTemplates.length} AI template${aiTemplates.length !== 1 ? "s" : ""}), which exceeds the AI render limit of ${AI_RENDER_HARD_LIMIT} per request. Reduce the number of selected posters or AI-rendered templates and try again. Consider using a deterministic template or running on fewer posters.`,
+        error: `Sync would generate ${aiRenderedPlannedCount} AI-rendered mockup${aiRenderedPlannedCount !== 1 ? "s" : ""}, which exceeds the AI render limit of ${AI_RENDER_HARD_LIMIT} per request. Reduce the selection and try again.`,
         plannedCount,
         deterministicPlannedCount,
         aiRenderedPlannedCount,
@@ -184,379 +209,265 @@ router.post(
       });
     }
 
-    // ── 4. Load existing poster_mockups ──────────────────────────────────────
-    const posterIdsTarget = targetPosters.map((p) => p.id);
-    const existingMockups = await db
-      .select()
-      .from(posterMockupsTable)
-      .where(
-        and(
-          inArray(posterMockupsTable.posterId, posterIdsTarget),
-          isNotNull(posterMockupsTable.mockupTemplateId)
-        )
-      );
+    // ── 4. Report skipped rows (already has image, overwrite = false) ─────────
+    const skippedRows = mockupRows.filter(({ mockup }) => {
+      if (scope === "missing") return false; // query already filtered
+      return !overwrite && !!mockup.mockupImageUrl;
+    });
 
-    const existingSet = new Set(
-      existingMockups.map((m) => `${m.posterId}:${m.mockupTemplateId}`)
-    );
-
-    const assignedPrimary = new Set(
-      existingMockups.filter((m) => m.isPrimary).map((m) => m.posterId)
-    );
-    const assignedHover = new Set(
-      existingMockups.filter((m) => m.isHoverMockup).map((m) => m.posterId)
-    );
-
-    // ── 5. Main sync loop ────────────────────────────────────────────────────
+    // ── 5. Main sync loop ─────────────────────────────────────────────────────
     const results: SyncResult[] = [];
     let generated = 0;
     let skipped = 0;
     let failed = 0;
 
-    for (const poster of targetPosters) {
-      for (const template of targetTemplates) {
-        const pairKey = `${poster.id}:${template.id}`;
-        const alreadyExists = existingSet.has(pairKey);
-        const templateRenderMode = (template.renderMode ?? "deterministic") as "deterministic" | "ai_rendered";
+    // Report pre-skipped rows
+    for (const { mockup, poster, template } of skippedRows) {
+      skipped++;
+      const templateRenderMode = (template.renderMode ?? "deterministic") as "deterministic" | "ai_rendered";
+      results.push({
+        posterId: poster.id,
+        posterTitle: poster.title,
+        templateId: template.id,
+        templateName: template.name,
+        action: "skipped",
+        reason: "Mockup already generated (use overwrite to regenerate)",
+        mockupId: mockup.id,
+        imageUrl: mockup.mockupImageUrl ?? undefined,
+        renderMode: templateRenderMode,
+      });
+    }
 
-        if (alreadyExists && !overwrite) {
-          skipped++;
-          results.push({
-            posterId: poster.id,
-            posterTitle: poster.title,
-            templateId: template.id,
-            templateName: template.name,
-            action: "skipped",
-            reason: "Mockup already exists (use overwrite to regenerate)",
-            renderMode: templateRenderMode,
-          });
-          continue;
-        }
+    for (const { mockup, poster, template } of eligibleRows) {
+      const templateRenderMode = (template.renderMode ?? "deterministic") as "deterministic" | "ai_rendered";
 
-        // Resolve the effective poster surface for this template
-        const surface = resolveEffectiveMockupSurface(template);
-        const {
-          posterX,
-          posterY,
-          posterWidth,
-          posterHeight,
-          rotation,
-          corners,
-          geometryMode: surfaceGeometryMode,
+      // Resolve the effective poster surface for this template
+      const surface = resolveEffectiveMockupSurface(template);
+      const {
+        posterX,
+        posterY,
+        posterWidth,
+        posterHeight,
+        rotation,
+        corners,
+        geometryMode: surfaceGeometryMode,
+        surfaceSource,
+        warnings: surfaceWarnings,
+      } = surface;
+
+      const placementSource: "auto_detected" | "manual" = surfaceSource.startsWith("auto")
+        ? "auto_detected"
+        : "manual";
+      const placementWarnings = surfaceWarnings;
+      const surfaceWarning = surfaceWarnings.length > 0 ? surfaceWarnings[0] : undefined;
+
+      if (dryRun) {
+        generated++;
+        results.push({
+          posterId: poster.id,
+          posterTitle: poster.title,
+          templateId: template.id,
+          templateName: template.name,
+          action: "generated",
+          reason: `dry-run (renderer: ${templateRenderMode}, surface: ${getSurfaceSourceLabel(surfaceSource)})`,
+          mockupId: mockup.id,
+          placementSource,
+          placementWarnings,
           surfaceSource,
-          warnings: surfaceWarnings,
-        } = surface;
+          surfaceWarning,
+          renderMode: templateRenderMode,
+          needsReview: templateRenderMode === "ai_rendered",
+          estimatedCostLabel: templateRenderMode === "ai_rendered" ? "Paid AI render" : undefined,
+        });
+        continue;
+      }
 
-        // Backwards-compat placementSource label
-        const placementSource: "auto_detected" | "manual" = surfaceSource.startsWith("auto")
-          ? "auto_detected"
-          : "manual";
-        const placementWarnings = surfaceWarnings;
-        const surfaceWarning = surfaceWarnings.length > 0 ? surfaceWarnings[0] : undefined;
+      if (!poster.imageUrl) {
+        failed++;
+        results.push({
+          posterId: poster.id,
+          posterTitle: poster.title,
+          templateId: template.id,
+          templateName: template.name,
+          action: "failed",
+          reason: "Poster has no imageUrl",
+          mockupId: mockup.id,
+          renderMode: templateRenderMode,
+        });
+        continue;
+      }
 
-        if (dryRun) {
-          generated++;
-          results.push({
-            posterId: poster.id,
-            posterTitle: poster.title,
-            templateId: template.id,
+      if (
+        templateRenderMode === "deterministic" &&
+        surfaceSource === "fallback"
+      ) {
+        failed++;
+        results.push({
+          posterId: poster.id,
+          posterTitle: poster.title,
+          templateId: template.id,
+          templateName: template.name,
+          action: "failed",
+          reason: "Deterministic template has no valid poster surface defined",
+          mockupId: mockup.id,
+          surfaceSource,
+          renderMode: templateRenderMode,
+        });
+        continue;
+      }
+
+      try {
+        let imageBuffer: Buffer;
+        let aiRenderWarning: string | undefined;
+        let finalSurfaceWarning: string | undefined = surfaceWarning;
+
+        if (templateRenderMode === "ai_rendered") {
+          const aiResult = await renderAiMockup({
+            posterImageUrl: poster.imageUrl,
+            templateImageUrl: template.backgroundImageUrl!,
+            detectedPlacement:
+              surfaceSource.startsWith("auto") && template.detectedPlacementConfig
+                ? (template.detectedPlacementConfig as any)
+                : null,
+            renderPrompt: template.aiRenderPrompt,
+            templateCategory: template.category,
             templateName: template.name,
-            action: "generated",
-            reason: `dry-run (renderer: ${templateRenderMode}, surface: ${getSurfaceSourceLabel(surfaceSource)})`,
-            placementSource,
-            placementWarnings,
-            surfaceSource,
-            surfaceWarning,
-            renderMode: templateRenderMode,
-            needsReview: templateRenderMode === "ai_rendered",
-            estimatedCostLabel: templateRenderMode === "ai_rendered" ? "Paid AI render" : undefined,
           });
-          continue;
-        }
 
-        if (!poster.imageUrl) {
-          failed++;
-          results.push({
-            posterId: poster.id,
-            posterTitle: poster.title,
-            templateId: template.id,
-            templateName: template.name,
-            action: "failed",
-            reason: "Poster has no imageUrl",
-            renderMode: templateRenderMode,
-          });
-          continue;
-        }
-
-        // For deterministic, require a valid surface
-        if (
-          templateRenderMode === "deterministic" &&
-          surfaceSource === "fallback"
-        ) {
-          failed++;
-          results.push({
-            posterId: poster.id,
-            posterTitle: poster.title,
-            templateId: template.id,
-            templateName: template.name,
-            action: "failed",
-            reason: "Deterministic template has no valid poster surface defined",
-            surfaceSource,
-            renderMode: templateRenderMode,
-          });
-          continue;
-        }
-
-        try {
-          let imageBuffer: Buffer;
-          let aiRenderWarning: string | undefined;
-          let finalSurfaceWarning: string | undefined = surfaceWarning;
-
-          if (templateRenderMode === "ai_rendered") {
-            // ── AI render path ─────────────────────────────────────────────
-            const aiResult = await renderAiMockup({
-              posterImageUrl: poster.imageUrl,
-              templateImageUrl: template.backgroundImageUrl!,
-              detectedPlacement:
-                surfaceSource.startsWith("auto") && template.detectedPlacementConfig
-                  ? (template.detectedPlacementConfig as any)
-                  : null,
-              renderPrompt: template.aiRenderPrompt,
-              templateCategory: template.category,
-              templateName: template.name,
-            });
-
-            if (aiResult.status === "failed") {
-              failed++;
-              results.push({
-                posterId: poster.id,
-                posterTitle: poster.title,
-                templateId: template.id,
-                templateName: template.name,
-                action: "failed",
-                reason: `AI render failed: ${aiResult.error}`,
-                renderMode: templateRenderMode,
-              });
-              continue;
-            }
-
-            imageBuffer = aiResult.imageBuffer!;
-            aiRenderWarning = aiResult.warning;
-          } else if (
-            surfaceGeometryMode === "corners" &&
-            corners != null
-          ) {
-            // ── Perspective warp path ──────────────────────────────────────
-            const result = await compositePosterWithCorners(
-              template.backgroundImageUrl!,
-              poster.imageUrl,
-              {
-                corners,
-                fitMode: template.fitMode,
-                borderRadius: template.borderRadius,
-                brightness: template.brightness,
-                contrast: template.contrast,
-                saturation: template.saturation,
-              }
-            );
-            imageBuffer = result.buffer;
-            if (result.surfaceWarning) {
-              finalSurfaceWarning = result.surfaceWarning;
-            }
-          } else {
-            // ── Deterministic bounding-box compositor path ─────────────────
-            if (posterX == null || posterY == null || posterWidth == null || posterHeight == null) {
-              failed++;
-              results.push({
-                posterId: poster.id,
-                posterTitle: poster.title,
-                templateId: template.id,
-                templateName: template.name,
-                action: "failed",
-                reason: `No valid placement found (surface: ${getSurfaceSourceLabel(surfaceSource)})`,
-                surfaceSource,
-                renderMode: templateRenderMode,
-              });
-              continue;
-            }
-            imageBuffer = await compositePosterIntoTemplate(
-              template.backgroundImageUrl!,
-              poster.imageUrl,
-              {
-                posterX,
-                posterY,
-                posterWidth,
-                posterHeight,
-                rotation,
-                fitMode: template.fitMode,
-                borderRadius: template.borderRadius,
-                brightness: template.brightness,
-                contrast: template.contrast,
-                saturation: template.saturation,
-              }
-            );
-          }
-
-          // ── Upload result ──────────────────────────────────────────────
-          const subPath = `mockup-composites/${storeKey}/${poster.id}/${template.id}-${randomUUID().slice(0, 8)}.jpg`;
-          const objectPath = await storage.uploadBuffer(subPath, imageBuffer, "image/jpeg");
-          const imageUrl = `/api/storage${objectPath}`;
-
-          const now = new Date();
-
-          // AI-rendered mockups NEVER become primary/hover/gallery automatically
-          // and always start as not approved for public
-          const isAiRendered = templateRenderMode === "ai_rendered";
-          const isPrimary = !isAiRendered && template.canBePrimary && !assignedPrimary.has(poster.id);
-          const isHover = !isAiRendered && template.canBeHover && !assignedHover.has(poster.id);
-          const isGallery = !isAiRendered && template.canBeGallery;
-          const needsReview = isAiRendered;
-
-          if (alreadyExists && overwrite) {
-            const existing = existingMockups.find(
-              (m) => m.posterId === poster.id && m.mockupTemplateId === template.id
-            );
-            if (existing) {
-              await tryDeleteOldComposite(existing.mockupImageUrl, req.log);
-
-              await db
-                .update(posterMockupsTable)
-                .set({
-                  mockupImageUrl: imageUrl,
-                  status: "generated",
-                  generatedAt: now,
-                  errorMessage: null,
-                  renderMode: templateRenderMode,
-                  needsReview,
-                  aiRenderWarning: aiRenderWarning ?? null,
-                  sourcePosterImageUrl: poster.imageUrl,
-                  sourceTemplateImageUrl: template.backgroundImageUrl ?? null,
-                  // Keep approvedForPublic as-is for overwrites (admin may have already approved)
-                  updatedAt: now,
-                })
-                .where(eq(posterMockupsTable.id, existing.id));
-
-              generated++;
-              results.push({
-                posterId: poster.id,
-                posterTitle: poster.title,
-                templateId: template.id,
-                templateName: template.name,
-                action: "generated",
-                mockupId: existing.id,
-                imageUrl,
-                placementSource,
-                placementWarnings,
-                surfaceSource,
-                surfaceWarning: finalSurfaceWarning,
-                renderMode: templateRenderMode,
-                needsReview,
-                aiRenderWarning,
-                estimatedCostLabel: isAiRendered ? "Paid AI render" : undefined,
-              });
-              continue;
-            }
-          }
-
-          const [inserted] = await db
-            .insert(posterMockupsTable)
-            .values({
-              posterId: poster.id,
-              mockupTemplateId: template.id,
-              mockupImageUrl: imageUrl,
-              sortOrder: existingMockups.filter((m) => m.posterId === poster.id).length,
-              isPrimary,
-              isHoverMockup: isHover,
-              isGallery,
-              status: "generated",
-              generatedAt: now,
-              renderMode: templateRenderMode,
-              needsReview,
-              aiRenderWarning: aiRenderWarning ?? null,
-              sourcePosterImageUrl: poster.imageUrl,
-              sourceTemplateImageUrl: template.backgroundImageUrl ?? null,
-              approvedForPublic: false,
-            })
-            .onConflictDoNothing()
-            .returning();
-
-          if (!inserted) {
-            skipped++;
+          if (aiResult.status === "failed") {
+            failed++;
             results.push({
               posterId: poster.id,
               posterTitle: poster.title,
               templateId: template.id,
               templateName: template.name,
-              action: "skipped",
-              reason: "Conflict — pair was already inserted by a concurrent sync",
+              action: "failed",
+              reason: `AI render failed: ${aiResult.error}`,
+              mockupId: mockup.id,
               renderMode: templateRenderMode,
             });
             continue;
           }
 
-          existingSet.add(pairKey);
-          if (isPrimary) assignedPrimary.add(poster.id);
-          if (isHover) assignedHover.add(poster.id);
+          imageBuffer = aiResult.imageBuffer!;
+          aiRenderWarning = aiResult.warning;
+        } else if (surfaceGeometryMode === "corners" && corners != null) {
+          const result = await compositePosterWithCorners(
+            template.backgroundImageUrl!,
+            poster.imageUrl,
+            {
+              corners,
+              fitMode: template.fitMode,
+              borderRadius: template.borderRadius,
+              brightness: template.brightness,
+              contrast: template.contrast,
+              saturation: template.saturation,
+            }
+          );
+          imageBuffer = result.buffer;
+          if (result.surfaceWarning) {
+            finalSurfaceWarning = result.surfaceWarning;
+          }
+        } else {
+          if (posterX == null || posterY == null || posterWidth == null || posterHeight == null) {
+            failed++;
+            results.push({
+              posterId: poster.id,
+              posterTitle: poster.title,
+              templateId: template.id,
+              templateName: template.name,
+              action: "failed",
+              reason: `No valid placement found (surface: ${getSurfaceSourceLabel(surfaceSource)})`,
+              mockupId: mockup.id,
+              surfaceSource,
+              renderMode: templateRenderMode,
+            });
+            continue;
+          }
+          imageBuffer = await compositePosterIntoTemplate(
+            template.backgroundImageUrl!,
+            poster.imageUrl,
+            {
+              posterX,
+              posterY,
+              posterWidth,
+              posterHeight,
+              rotation,
+              fitMode: template.fitMode,
+              borderRadius: template.borderRadius,
+              brightness: template.brightness,
+              contrast: template.contrast,
+              saturation: template.saturation,
+            }
+          );
+        }
 
-          generated++;
-          results.push({
-            posterId: poster.id,
-            posterTitle: poster.title,
-            templateId: template.id,
-            templateName: template.name,
-            action: "generated",
-            mockupId: inserted.id,
-            imageUrl,
-            placementSource,
-            placementWarnings,
-            surfaceSource,
-            surfaceWarning: finalSurfaceWarning,
+        // ── Upload result ──────────────────────────────────────────────
+        await tryDeleteOldComposite(mockup.mockupImageUrl, req.log);
+
+        const subPath = `mockup-composites/${storeKey}/${poster.id}/${template.id}-${randomUUID().slice(0, 8)}.jpg`;
+        const objectPath = await storage.uploadBuffer(subPath, imageBuffer, "image/jpeg");
+        const imageUrl = `/api/storage${objectPath}`;
+
+        const now = new Date();
+        const isAiRendered = templateRenderMode === "ai_rendered";
+        const needsReview = isAiRendered;
+
+        // ── Always UPDATE the existing row — never INSERT ──────────────
+        await db
+          .update(posterMockupsTable)
+          .set({
+            mockupImageUrl: imageUrl,
+            status: "generated",
+            generatedAt: now,
+            errorMessage: null,
             renderMode: templateRenderMode,
             needsReview,
-            aiRenderWarning,
-            estimatedCostLabel: isAiRendered ? "Paid AI render" : undefined,
-          });
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : "Unknown error";
-          req.log.error({ err, posterId: poster.id, templateId: template.id }, "Sync failed");
+            aiRenderWarning: aiRenderWarning ?? null,
+            sourcePosterImageUrl: poster.imageUrl,
+            sourceTemplateImageUrl: template.backgroundImageUrl ?? null,
+            updatedAt: now,
+          })
+          .where(eq(posterMockupsTable.id, mockup.id));
 
-          const existing = existingMockups.find(
-            (m) => m.posterId === poster.id && m.mockupTemplateId === template.id
-          );
+        generated++;
+        results.push({
+          posterId: poster.id,
+          posterTitle: poster.title,
+          templateId: template.id,
+          templateName: template.name,
+          action: "generated",
+          mockupId: mockup.id,
+          imageUrl,
+          placementSource,
+          placementWarnings,
+          surfaceSource,
+          surfaceWarning: finalSurfaceWarning,
+          renderMode: templateRenderMode,
+          needsReview,
+          aiRenderWarning,
+          estimatedCostLabel: isAiRendered ? "Paid AI render" : undefined,
+        });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        req.log.error({ err, posterId: poster.id, templateId: template.id }, "Sync failed");
 
-          if (!existing) {
-            try {
-              await db.insert(posterMockupsTable).values({
-                posterId: poster.id,
-                mockupTemplateId: template.id,
-                mockupImageUrl: null,
-                sortOrder: 0,
-                isPrimary: false,
-                isHoverMockup: false,
-                isGallery: false,
-                status: "failed",
-                errorMessage: msg,
-                renderMode: templateRenderMode,
-                needsReview: false,
-              }).onConflictDoNothing();
-            } catch {}
-          } else {
-            await db.update(posterMockupsTable)
-              .set({ status: "failed", errorMessage: msg, updatedAt: new Date() })
-              .where(eq(posterMockupsTable.id, existing.id));
-          }
+        await db
+          .update(posterMockupsTable)
+          .set({ status: "failed", errorMessage: msg, updatedAt: new Date() })
+          .where(eq(posterMockupsTable.id, mockup.id));
 
-          failed++;
-          results.push({
-            posterId: poster.id,
-            posterTitle: poster.title,
-            templateId: template.id,
-            templateName: template.name,
-            action: "failed",
-            reason: msg,
-            renderMode: templateRenderMode,
-          });
-        }
+        failed++;
+        results.push({
+          posterId: poster.id,
+          posterTitle: poster.title,
+          templateId: template.id,
+          templateName: template.name,
+          action: "failed",
+          reason: msg,
+          mockupId: mockup.id,
+          renderMode: templateRenderMode,
+        });
       }
     }
 

@@ -231,7 +231,7 @@ export const PosterCard = ({ poster, favoritedIds, priority = false }: PosterCar
             aria-hidden="true"
           >
             <span className="bg-background/85 backdrop-blur-sm text-foreground text-xs font-medium px-4 py-1.5 rounded-full shadow-sm border border-border/40 tracking-wide">
-              {hoverImage ? "View in room" : "View poster"}
+              View poster
             </span>
           </div>
         </div>

@@ -26,7 +26,7 @@ import {
   analyzeMockupPlacement,
   adminAnalyzeMockupTemplatePlacement,
 } from "@/lib/mockupApi";
-import { Upload, Loader2, Sparkles, CheckCircle2, AlertCircle, Info, RotateCcw, Pencil, RefreshCw } from "lucide-react";
+import { Upload, Loader2, Sparkles, CheckCircle2, AlertCircle, Info, RotateCcw, Pencil, RefreshCw, ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MockupSurfaceEditor, { type SurfaceCorners } from "./MockupSurfaceEditor";
 
@@ -282,6 +282,17 @@ export function MockupTemplateForm({
   const [surfaceChanged, setSurfaceChanged] = useState(false);
 
   const lastAnalyzedUrlRef = useRef<string>("");
+  // Collapsible section state (Part 6)
+  const [showPosterSurface, setShowPosterSurface] = useState(() => {
+    // Default open when no valid surface exists
+    if (!template) return true;
+    const hasManual = !!(template.placementConfig as ManualSurfaceConfig | null | undefined)?.corners ||
+      (template.posterX != null && template.posterY != null);
+    const hasDetected = template.detectedPlacementStatus === "detected";
+    return !(hasManual || hasDetected);
+  });
+  const [showCompositing, setShowCompositing] = useState(false);
+
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -980,7 +991,29 @@ export function MockupTemplateForm({
         {/* Right column — image + placement */}
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>Background image</Label>
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <Label>Template image</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  This is the empty mockup background. Posters are inserted later when you run Sync mockups.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 text-xs shrink-0"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadProgress === "uploading"}
+              >
+                {uploadProgress === "uploading" ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Upload className="w-3.5 h-3.5" />
+                )}
+                {displayImageUrl ? "Replace template image" : "Upload template image"}
+              </Button>
+            </div>
             <div
               ref={containerRef}
               className={cn(
@@ -1040,7 +1073,7 @@ export function MockupTemplateForm({
                       {/* Live label */}
                       <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 pointer-events-none">
                         <span className="text-white text-xs font-semibold drop-shadow bg-black/60 px-1.5 py-0.5 rounded">
-                          Poster area
+                          Surface preview
                         </span>
                         <span className="text-white/80 text-[9px] drop-shadow bg-black/50 px-1 py-0.5 rounded font-mono leading-tight text-center">
                           {imgNaturalWidth && imgNaturalHeight ? (
@@ -1143,12 +1176,12 @@ export function MockupTemplateForm({
                   ) : (
                     <Sparkles className="w-3 h-3" />
                   )}
-                  Detect
+                  Analyze poster surface
                 </Button>
               </div>
               <p className="text-[11px] text-muted-foreground flex items-center gap-1">
                 <Info className="w-3 h-3 shrink-0" />
-                Auto-detection uses AI and may have a small cost. You can also set placement manually.
+                Analyze the template image to suggest a poster surface. Uses AI — may have a small cost.
               </p>
             </div>
           </div>
@@ -1254,30 +1287,40 @@ export function MockupTemplateForm({
                 type="button"
                 onClick={() => setRenderMode("deterministic")}
                 className={cn(
-                  "flex flex-col gap-0.5 rounded border px-3 py-2.5 text-left text-sm transition-colors",
+                  "flex flex-col gap-1 rounded border px-3 py-2.5 text-left text-sm transition-colors",
                   renderMode === "deterministic"
                     ? "border-primary bg-primary/5 ring-1 ring-primary/30"
                     : "border-border hover:border-primary/40"
                 )}
               >
-                <span className="font-medium">Deterministic compositor</span>
-                <span className="text-xs text-muted-foreground">Exact poster fidelity, fast, repeatable. Recommended for product gallery / primary / hover mockups.</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-medium">Deterministic compositor</span>
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-700">
+                    Best for product images
+                  </span>
+                </div>
+                <span className="text-xs text-muted-foreground">Fast, repeatable, and preserves the poster artwork exactly. Uses the selected poster surface to generate a final rendered mockup image. Recommended for product gallery, primary, and hover mockups.</span>
               </button>
               <button
                 type="button"
                 onClick={() => setRenderMode("ai_rendered")}
                 className={cn(
-                  "flex flex-col gap-0.5 rounded border px-3 py-2.5 text-left text-sm transition-colors",
+                  "flex flex-col gap-1 rounded border px-3 py-2.5 text-left text-sm transition-colors",
                   renderMode === "ai_rendered"
                     ? "border-violet-500 bg-violet-50/60 ring-1 ring-violet-400/40 dark:bg-violet-950/30"
                     : "border-border hover:border-violet-300"
                 )}
               >
-                <span className="font-medium flex items-center gap-1.5">
-                  <Sparkles className="w-3 h-3" />
-                  AI-rendered mockup
-                </span>
-                <span className="text-xs text-muted-foreground">More realistic lifestyle result. Requires admin review — AI may subtly alter poster artwork.</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-medium flex items-center gap-1.5">
+                    <Sparkles className="w-3 h-3" />
+                    AI-rendered mockup
+                  </span>
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-800 border border-violet-300 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-700">
+                    Experimental / paid / review required
+                  </span>
+                </div>
+                <span className="text-xs text-muted-foreground">Uses paid AI image editing for a more realistic lifestyle result. May slightly alter poster artwork, so generated images require admin review before they can appear publicly.</span>
               </button>
             </div>
             {renderMode === "ai_rendered" && (
@@ -1350,12 +1393,12 @@ export function MockupTemplateForm({
                   onClick={handleAnalyzeAndSave}
                 >
                   {analyzingTemplate ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                  {analyzingTemplate ? "Analyzing…" : "Re-analyze & save"}
+                  {analyzingTemplate ? "Analyzing…" : (storedDetectedConfig ? "Re-analyze surface" : "Analyze poster surface")}
                 </Button>
               </div>
 
               {detectedStatus === "not_analyzed" && !storedDetectedConfig && (
-                <p className="text-xs text-muted-foreground">No analysis saved yet. Click "Re-analyze & save" to run AI placement detection.</p>
+                <p className="text-xs text-muted-foreground">No analysis saved yet. Click "Analyze poster surface" to run AI placement detection. The result is stored as a candidate — you must approve it before it becomes active.</p>
               )}
               {detectedStatus === "failed" && (
                 <p className="text-xs text-destructive">Last analysis failed. Try re-analyzing or set placement manually.</p>
@@ -1441,10 +1484,33 @@ export function MockupTemplateForm({
           )}
 
           {/* Placement area inputs */}
-          <div className="space-y-3 rounded-md border p-4">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div className="flex items-center gap-2">
+          <div className="space-y-0 rounded-md border overflow-hidden">
+            <button
+              type="button"
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/40 transition-colors text-left"
+              onClick={() => setShowPosterSurface((v) => !v)}
+            >
+              <div className="flex items-center gap-2 flex-wrap">
                 <p className="text-sm font-medium">Poster surface</p>
+                {storedManualSurface?.mode === "corners" ? (
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-300 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-700">Manual corners active</span>
+                ) : placementMode === "auto_detected" ? (
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-300 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-700">Detected surface approved</span>
+                ) : hasPosterArea ? (
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">Manual bbox active</span>
+                ) : (
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-700">No surface</span>
+                )}
+                {surfaceChanged && (
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-300 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-700">Sync required</span>
+                )}
+              </div>
+              {showPosterSurface ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
+            </button>
+            {showPosterSurface && <div className="space-y-3 px-4 pb-4 pt-1 border-t">
+            <div className="flex items-center justify-between flex-wrap gap-2 mt-2">
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-muted-foreground">Shows the currently active poster surface on the template.</p>
                 <div title="Define the bounding box (%) for the poster surface, or use the corner editor for perspective-correct compositing.">
                   <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
                 </div>
@@ -1703,16 +1769,16 @@ export function MockupTemplateForm({
               />
               <p className="text-[10px] text-muted-foreground/60">Legacy field — use Compositing section below for full control</p>
             </div>
-          </div>
+          </div>}
 
           {/* 4-corner surface editor panel */}
           {showSurfaceEditor && backgroundImageUrl && (
             <div className="space-y-3 rounded-md border border-indigo-300 bg-indigo-50/30 dark:bg-indigo-950/10 p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-indigo-900 dark:text-indigo-200">Corner surface editor</p>
+                  <p className="text-sm font-medium text-indigo-900 dark:text-indigo-200">Precision surface editor</p>
                   <p className="text-xs text-indigo-700/70 dark:text-indigo-400/70 mt-0.5">
-                    Drag the four handles to match the exact poster area. Save to enable perspective-correct compositing.
+                    Use this to adjust the exact four corners used when rendering mockups. Drag handles to match the poster area; save to enable perspective-correct compositing.
                   </p>
                 </div>
                 <Button
@@ -1745,16 +1811,34 @@ export function MockupTemplateForm({
               />
             </div>
           )}
+          </div>
 
           {/* Compositing section */}
-          <div className="space-y-3 rounded-md border p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium">Compositing</p>
+          <div className="space-y-0 rounded-md border overflow-hidden">
+            <button
+              type="button"
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/40 transition-colors text-left"
+              onClick={() => setShowCompositing((v) => !v)}
+            >
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium">Compositing</p>
+                {(brightness !== "0.94" || contrast !== "0.97" || saturation !== "0.92" ||
+                  compositeBlur !== "0" || !shadowEnabled || !innerShadowEnabled) ? (
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-300 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-700">Custom settings</span>
+                ) : (
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">Default settings</span>
+                )}
+              </div>
+              {showCompositing ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
+            </button>
+            {showCompositing && <div className="space-y-3 px-4 pb-4 pt-1 border-t">
+            <div className="flex items-center justify-between mt-2">
+              <p className="text-xs text-muted-foreground">Poster surface controls where the poster goes. Compositing controls how the inserted poster blends into the mockup.</p>
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-7 text-xs gap-1"
+                className="h-7 text-xs gap-1 shrink-0 ml-2"
                 onClick={() => {
                   setFitMode("cover");
                   setShadowEnabled(true);
@@ -1774,10 +1858,14 @@ export function MockupTemplateForm({
                 Reset to defaults
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">Controls how the poster image is rendered over the background. Applied at display time — no re-upload needed.</p>
+            <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1">
+              <Info className="w-3 h-3 shrink-0" />
+              Applied when mockups are synced/rendered. Run Sync mockups after changing these settings.
+            </p>
 
             <div className="space-y-1">
               <Label className="text-xs">Fit mode</Label>
+              <p className="text-[10px] text-muted-foreground">How the poster fills the selected surface.</p>
               <Select value={fitMode} onValueChange={setFitMode}>
                 <SelectTrigger className="h-8 text-sm">
                   <SelectValue />
@@ -1792,7 +1880,10 @@ export function MockupTemplateForm({
 
             <div className="grid grid-cols-2 gap-2">
               <div className="flex items-center justify-between rounded border px-2.5 py-2 col-span-2">
-                <Label className="text-xs font-medium">Drop shadow</Label>
+                <div>
+                  <Label className="text-xs font-medium">Drop shadow</Label>
+                  <p className="text-[10px] text-muted-foreground">Shadow behind the inserted poster.</p>
+                </div>
                 <Switch checked={shadowEnabled} onCheckedChange={setShadowEnabled} />
               </div>
               {shadowEnabled && (
@@ -1846,6 +1937,7 @@ export function MockupTemplateForm({
                 <Input type="number" value={compositeBlur} onChange={(e) => setCompositeBlur(e.target.value)} className="h-7 text-xs" min={0} max={3} step={0.1} />
               </div>
             </div>
+            </div>}
           </div>
         </div>
       </div>

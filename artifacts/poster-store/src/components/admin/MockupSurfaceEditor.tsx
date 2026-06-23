@@ -12,6 +12,9 @@ import {
   X,
   AlertCircle,
   Info,
+  Hand,
+  MousePointer2,
+  Focus,
 } from "lucide-react";
 
 export interface CornerPoint {
@@ -62,8 +65,16 @@ const CORNER_LABELS_LONG: Record<CornerKey, string> = {
   bottomLeft: "Bottom-left",
 };
 
+// Label offsets (in image-space pixels, scaled by strokeScale later)
+// Each label nudges away from the corner so the exact pixel stays visible
+const LABEL_OFFSETS: Record<CornerKey, { dx: number; dy: number }> = {
+  topLeft:     { dx: -18, dy: -12 },
+  topRight:    { dx:  18, dy: -12 },
+  bottomRight: { dx:  18, dy:  12 },
+  bottomLeft:  { dx: -18, dy:  12 },
+};
+
 // ─── Pure coordinate helpers ─────────────────────────────────────────────────
-// These functions have no side effects and can be unit-tested independently.
 
 function round3(n: number): number {
   return Math.round(n * 1000) / 1000;
@@ -73,7 +84,6 @@ function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
 
-/** Build a default surface inset 15% from each edge. */
 function defaultCorners(iw: number, ih: number): SurfaceCorners {
   const r = 0.15;
   return {
@@ -84,10 +94,6 @@ function defaultCorners(iw: number, ih: number): SurfaceCorners {
   };
 }
 
-/**
- * normalizedToImage — 0-1 normalized → image-space pixels.
- * Round-trips with imageToNormalized.
- */
 export function normalizedToImage(c: SurfaceCorners, iw: number, ih: number): SurfaceCorners {
   const conv = (p: CornerPoint) => ({ x: round3(p.x * iw), y: round3(p.y * ih) });
   return {
@@ -96,10 +102,6 @@ export function normalizedToImage(c: SurfaceCorners, iw: number, ih: number): Su
   };
 }
 
-/**
- * imageToNormalized — image-space pixels → 0-1 normalized.
- * Round-trips with normalizedToImage.
- */
 export function imageToNormalized(c: SurfaceCorners, iw: number, ih: number): SurfaceCorners {
   const conv = (p: CornerPoint) => ({ x: round3(p.x / iw), y: round3(p.y / ih) });
   return {
@@ -139,7 +141,6 @@ export default function MockupSurfaceEditor({
   const iw = imageWidth ?? 1000;
   const ih = imageHeight ?? 1000;
 
-  // Corners are stored in IMAGE-SPACE PIXELS (0 … iw, 0 … ih).
   const [corners, setCorners] = useState<SurfaceCorners>(() => {
     if (initialCorners) return normalizedToImage(initialCorners, iw, ih);
     if (detectedCorners) return normalizedToImage(detectedCorners, iw, ih);
@@ -150,20 +151,18 @@ export default function MockupSurfaceEditor({
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [panMode, setPanMode] = useState(false);
+  const spaceHeld = useRef(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // ── Live-state refs for non-React event handlers (wheel) ──────────────────
-  // useLayoutEffect keeps them updated synchronously before each paint.
-  const stateRef = useRef({ zoom, pan });
+  const stateRef = useRef({ zoom, pan, panMode });
   useLayoutEffect(() => {
-    stateRef.current = { zoom, pan };
+    stateRef.current = { zoom, pan, panMode };
   });
 
-  // ── Drag ref ──────────────────────────────────────────────────────────────
   const dragRef = useRef<{
     corner: CornerKey;
-    /** Cursor offset from corner centre in image-space pixels at drag start. */
     offsetX: number;
     offsetY: number;
   } | null>(null);
@@ -171,37 +170,16 @@ export default function MockupSurfaceEditor({
   const isPanning = useRef(false);
   const panStart = useRef({ mx: 0, my: 0, px: 0, py: 0 });
 
-  // Validate whenever corners change
   useEffect(() => {
     setValidationError(validatePixelCorners(corners, iw, ih));
   }, [corners, iw, ih]);
 
   // ── Transform helpers ─────────────────────────────────────────────────────
-  //
-  // The editor uses ONE coordinate system: image-space pixels (0…iw, 0…ih).
-  // Screen rendering is done by a single CSS transform on a content layer
-  // that contains BOTH the <img> and the <svg>, so they are always locked.
-  //
-  // getEditorTransform() describes that CSS transform.
-  // screenToImage()      converts viewport pointer coords to image pixels.
-  // imageToScreen()      converts image pixels to container-relative pixels
-  //                      (useful for debug/display — not used for rendering).
 
-  /** The CSS transform applied to the content layer. */
   const getEditorTransform = useCallback(() => {
     return { scale: zoom, tx: pan.x, ty: pan.y };
   }, [zoom, pan]);
 
-  /**
-   * screenToImage — converts viewport clientX/clientY to image-space pixels.
-   *
-   * Accounts for:
-   *  • Container position in the page (getBoundingClientRect)
-   *  • Current pan offset
-   *  • Current zoom scale
-   *
-   * Round-trip: imageToScreen(screenToImage(pt)) ≈ pt
-   */
   const screenToImage = useCallback(
     (clientX: number, clientY: number): CornerPoint => {
       const rect = containerRef.current!.getBoundingClientRect();
@@ -213,10 +191,6 @@ export default function MockupSurfaceEditor({
     [pan, zoom]
   );
 
-  /**
-   * imageToScreen — converts image-space pixels to container-relative CSS pixels.
-   * (Used only for external callers / tests, not needed for rendering.)
-   */
   const imageToScreen = useCallback(
     (pt: CornerPoint): CornerPoint => ({
       x: pt.x * zoom + pan.x,
@@ -225,7 +199,6 @@ export default function MockupSurfaceEditor({
     [zoom, pan]
   );
 
-  // Expose helpers on window in dev so the browser console can test them
   useEffect(() => {
     if (import.meta.env.DEV) {
       (window as unknown as Record<string, unknown>).__surfaceEditor = {
@@ -260,15 +233,51 @@ export default function MockupSurfaceEditor({
     });
   }, [iw, ih]);
 
+  // ── Fit-to-surface ────────────────────────────────────────────────────────
+
+  const fitSurface = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const containerW = el.clientWidth;
+    const containerH = el.clientHeight;
+    const padding = 60;
+
+    const xs = CORNER_KEYS.map((k) => corners[k].x);
+    const ys = CORNER_KEYS.map((k) => corners[k].y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+    const surfW = maxX - minX;
+    const surfH = maxY - minY;
+
+    if (surfW < 1 || surfH < 1) return;
+
+    const newZoom = Math.max(
+      0.05,
+      Math.min(16,
+        Math.min(
+          (containerW - padding * 2) / surfW,
+          (containerH - padding * 2) / surfH
+        )
+      )
+    );
+
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    setZoom(newZoom);
+    setPan({
+      x: containerW / 2 - centerX * newZoom,
+      y: containerH / 2 - centerY * newZoom,
+    });
+  }, [corners]);
+
   useEffect(() => {
     fitView();
   }, [fitView]);
 
-  // ── Wheel zoom (toward cursor, non-passive) ───────────────────────────────
-  //
-  // Attached via addEventListener with { passive: false } so preventDefault
-  // reliably suppresses page scroll. The handler reads zoom/pan from stateRef
-  // to avoid stale closures without needing to re-register on every render.
+  // ── Wheel zoom ────────────────────────────────────────────────────────────
 
   useEffect(() => {
     const el = containerRef.current;
@@ -278,27 +287,46 @@ export default function MockupSurfaceEditor({
       e.preventDefault();
       const factor = e.deltaY < 0 ? 1.1 : 0.9;
       const rect = el.getBoundingClientRect();
-      // Cursor position relative to container
       const cx = e.clientX - rect.left;
       const cy = e.clientY - rect.top;
       const { zoom: z, pan: p } = stateRef.current;
       const newZoom = clamp(z * factor, 0.05, 16);
       const ratio = newZoom / z;
-      // Zoom toward cursor: cx = pan.x + imgX * z  →  imgX = (cx - pan.x) / z
-      // After zoom: new_pan.x = cx - imgX * newZoom = cx - (cx - pan.x) * ratio
       setZoom(newZoom);
       setPan({ x: cx - (cx - p.x) * ratio, y: cy - (cy - p.y) * ratio });
     };
 
     el.addEventListener("wheel", handler, { passive: false });
     return () => el.removeEventListener("wheel", handler);
-    // stableRef — runs once; stateRef provides fresh values
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Spacebar pan mode ─────────────────────────────────────────────────────
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code === "Space" && !e.repeat && document.activeElement === el) {
+        e.preventDefault();
+        spaceHeld.current = true;
+      }
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === "Space") {
+        spaceHeld.current = false;
+      }
+    };
+
+    el.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      el.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+    };
+  }, []);
+
   // ── Corner dragging ───────────────────────────────────────────────────────
-  //
-  // All pointer coordinates are converted through screenToImage() so that
-  // zoom, pan, and container position are all accounted for correctly.
 
   const startDragCorner = useCallback(
     (e: React.PointerEvent, corner: CornerKey) => {
@@ -306,8 +334,6 @@ export default function MockupSurfaceEditor({
       e.stopPropagation();
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
       setSelectedCorner(corner);
-      // Compute the cursor's offset from the corner centre in image pixels.
-      // Subtracting this offset during move keeps the corner "under" the cursor.
       const imgPt = screenToImage(e.clientX, e.clientY);
       dragRef.current = {
         corner,
@@ -346,24 +372,30 @@ export default function MockupSurfaceEditor({
     isPanning.current = false;
   }, []);
 
-  // ── Canvas panning (middle mouse or Alt+drag) ─────────────────────────────
+  // ── Canvas panning ────────────────────────────────────────────────────────
 
   const onCanvasPointerDown = useCallback(
     (e: React.PointerEvent) => {
-      if (e.button === 1 || e.altKey) {
+      const shouldPan = panMode || spaceHeld.current || e.button === 1 || e.altKey;
+      if (shouldPan) {
         e.preventDefault();
         isPanning.current = true;
         panStart.current = { mx: e.clientX, my: e.clientY, px: pan.x, py: pan.y };
         (e.target as HTMLElement).setPointerCapture(e.pointerId);
       }
     },
-    [pan]
+    [pan, panMode]
   );
 
-  // ── Keyboard nudging (image-space pixels, zoom-independent) ──────────────
+  // ── Keyboard nudging ──────────────────────────────────────────────────────
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      if (e.code === "Space") {
+        e.preventDefault();
+        spaceHeld.current = true;
+        return;
+      }
       if (!selectedCorner) return;
       const arrows = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
       if (!arrows.includes(e.key)) return;
@@ -383,6 +415,12 @@ export default function MockupSurfaceEditor({
     },
     [selectedCorner, iw, ih]
   );
+
+  const onKeyUp = useCallback((e: React.KeyboardEvent) => {
+    if (e.code === "Space") {
+      spaceHeld.current = false;
+    }
+  }, []);
 
   // ── Input field helpers ───────────────────────────────────────────────────
 
@@ -416,38 +454,126 @@ export default function MockupSurfaceEditor({
     await onSave(normalized);
   };
 
-  // ── SVG polygon points (image-pixel space) ────────────────────────────────
-  // No transform needed — the SVG viewBox IS the image pixel space.
-
-  const polyPoints = CORNER_KEYS.map((k) => `${corners[k].x},${corners[k].y}`).join(" ");
-
-  // ── Zoom controls ─────────────────────────────────────────────────────────
+  // ── Zoom helpers ──────────────────────────────────────────────────────────
 
   const zoomIn  = () => setZoom((z) => clamp(z * 1.25, 0.05, 16));
   const zoomOut = () => setZoom((z) => clamp(z / 1.25, 0.05, 16));
+
+  const setZoomLevel = (level: number) => {
+    const el = containerRef.current;
+    if (!el) return;
+    const containerW = el.clientWidth;
+    const containerH = el.clientHeight;
+    // Zoom toward image center
+    const imgCenterX = iw / 2;
+    const imgCenterY = ih / 2;
+    setZoom(level);
+    setPan({
+      x: containerW / 2 - imgCenterX * level,
+      y: containerH / 2 - imgCenterY * level,
+    });
+  };
+
   const zoomPct = Math.round(zoom * 100);
 
-  // Handle radius in image pixels that results in ~8 CSS px on screen
-  const handleR = Math.max(3, 8 / zoom);
-  const strokeScale = 1 / zoom; // keeps stroke visually ~1 CSS px
+  // ── SVG rendering helpers ─────────────────────────────────────────────────
+
+  const polyPoints = CORNER_KEYS.map((k) => `${corners[k].x},${corners[k].y}`).join(" ");
+  const strokeScale = 1 / zoom;
+  // Handle ring radius in image pixels that results in ~6 CSS px on screen
+  const ringR = Math.max(2, 6 / zoom);
+  // Crosshair arm length
+  const crosshairArm = Math.max(4, 10 / zoom);
+
+  const effectivePanMode = panMode;
 
   return (
     <div className="flex flex-col gap-3" style={{ userSelect: "none" }}>
-      {/* Toolbar */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="flex items-center gap-1 rounded border px-1.5 py-1">
-          <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={zoomOut}>
-            <ZoomOut className="w-3.5 h-3.5" />
+      {/* ── Toolbar ───────────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {/* Mode toggle */}
+        <div className="flex items-center rounded border overflow-hidden">
+          <Button
+            type="button"
+            variant={!effectivePanMode ? "secondary" : "ghost"}
+            size="icon"
+            className="h-7 w-7 rounded-none"
+            title="Select / move corners"
+            onClick={() => setPanMode(false)}
+          >
+            <MousePointer2 className="w-3.5 h-3.5" />
           </Button>
-          <span className="text-xs text-muted-foreground min-w-[36px] text-center">{zoomPct}%</span>
-          <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={zoomIn}>
-            <ZoomIn className="w-3.5 h-3.5" />
+          <Button
+            type="button"
+            variant={effectivePanMode ? "secondary" : "ghost"}
+            size="icon"
+            className="h-7 w-7 rounded-none"
+            title="Pan mode — drag to move around"
+            onClick={() => setPanMode(true)}
+          >
+            <Hand className="w-3.5 h-3.5" />
           </Button>
         </div>
-        <Button type="button" variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={fitView}>
+
+        {/* Separator */}
+        <div className="w-px h-5 bg-border" />
+
+        {/* Zoom controls */}
+        <div className="flex items-center gap-0.5 rounded border px-1 py-0.5">
+          <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={zoomOut} title="Zoom out">
+            <ZoomOut className="w-3 h-3" />
+          </Button>
+          <span className="text-xs text-muted-foreground min-w-[36px] text-center tabular-nums">{zoomPct}%</span>
+          <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={zoomIn} title="Zoom in">
+            <ZoomIn className="w-3 h-3" />
+          </Button>
+        </div>
+
+        {/* Preset zoom levels */}
+        {([100, 200, 400] as const).map((level) => (
+          <Button
+            key={level}
+            type="button"
+            variant={zoomPct === level ? "secondary" : "outline"}
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={() => setZoomLevel(level / 100)}
+          >
+            {level}%
+          </Button>
+        ))}
+
+        {/* Separator */}
+        <div className="w-px h-5 bg-border" />
+
+        {/* Fit controls */}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 gap-1 text-xs"
+          onClick={fitView}
+          title="Fit the full template image in view"
+        >
           <Maximize2 className="w-3 h-3" />
-          Fit
+          Fit image
         </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 gap-1 text-xs"
+          onClick={fitSurface}
+          title="Zoom and center on the current poster surface"
+        >
+          <Focus className="w-3 h-3" />
+          Fit surface
+        </Button>
+
+        {/* Separator */}
+        <div className="w-px h-5 bg-border" />
+
+        {/* Reset helpers */}
         {detectedCorners && (
           <Button
             type="button"
@@ -468,30 +594,30 @@ export default function MockupSurfaceEditor({
           onClick={resetToCentered}
         >
           <RotateCcw className="w-3 h-3" />
-          Centered default
+          Center default
         </Button>
-        <p className="text-[10px] text-muted-foreground ml-auto">
-          Arrow keys nudge · Shift = 10 px · Alt+drag or middle-mouse to pan · scroll to zoom
-        </p>
       </div>
 
+      {/* Helper text */}
+      <p className="text-[10px] text-muted-foreground">
+        Use <strong>Pan mode</strong> or hold <kbd className="px-1 py-0.5 rounded bg-muted border text-[9px]">Space</kbd> / <kbd className="px-1 py-0.5 rounded bg-muted border text-[9px]">Alt</kbd> and drag to move around. Scroll to zoom. Arrow keys nudge selected corner (<kbd className="px-1 py-0.5 rounded bg-muted border text-[9px]">Shift</kbd> = 10 px).
+      </p>
+
       {/* ── Canvas ─────────────────────────────────────────────────────────── */}
-      {/*                                                                        */}
-      {/* Architecture: ONE content layer carries both <img> and <svg>.          */}
-      {/* CSS transform on that layer handles all zoom & pan.                    */}
-      {/* SVG viewBox="0 0 iw ih" makes SVG coords == image pixels.              */}
-      {/* Polygon points and handle positions are raw image pixels — no          */}
-      {/* manual scaling math needed.                                            */}
       <div
         ref={containerRef}
-        className="relative rounded-md border bg-checkerboard overflow-hidden cursor-crosshair"
+        className={cn(
+          "relative rounded-md border bg-checkerboard overflow-hidden",
+          effectivePanMode ? "cursor-grab active:cursor-grabbing" : "cursor-crosshair"
+        )}
         style={{ height: 440, touchAction: "none" }}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerDown={onCanvasPointerDown}
         onKeyDown={onKeyDown}
+        onKeyUp={onKeyUp}
         tabIndex={0}
-        aria-label="Surface editor canvas — use arrow keys to nudge selected corner"
+        aria-label="Precision surface editor — use arrow keys to nudge selected corner"
       >
         {/* Single content layer: image + SVG share the same CSS transform */}
         <div
@@ -505,7 +631,6 @@ export default function MockupSurfaceEditor({
             transformOrigin: "top left",
           }}
         >
-          {/* Template background image at natural size */}
           <img
             src={backgroundImageUrl}
             alt="Mockup template"
@@ -521,67 +646,110 @@ export default function MockupSurfaceEditor({
             }}
           />
 
-          {/* SVG overlay — coordinate space = image pixels (viewBox matches) */}
+          {/* SVG overlay — coordinate space = image pixels */}
           <svg
             style={{ position: "absolute", top: 0, left: 0, overflow: "visible" }}
             width={iw}
             height={ih}
             viewBox={`0 0 ${iw} ${ih}`}
             onPointerDown={(e) => {
-              // Clicks on SVG background (not on a handle) → pan
               if (e.target === e.currentTarget) onCanvasPointerDown(e);
             }}
           >
-            {/* Surface polygon — vectorEffect keeps stroke visually constant */}
+            {/* Surface polygon */}
             <polygon
               points={polyPoints}
-              fill="rgba(59,130,246,0.15)"
-              stroke="rgba(59,130,246,0.8)"
+              fill="rgba(59,130,246,0.10)"
+              stroke="rgba(59,130,246,0.75)"
               strokeWidth={1.5 * strokeScale}
               strokeDasharray={`${5 * strokeScale} ${3 * strokeScale}`}
+              pointerEvents="none"
             />
 
-            {/* Corner handles — positioned in image pixels */}
+            {/* Corner handles — hollow ring + crosshair style */}
             {CORNER_KEYS.map((key) => {
               const pt = corners[key];
               const color = CORNER_COLORS[key];
               const isSelected = selectedCorner === key;
-              const r = isSelected ? handleR * 1.2 : handleR;
+              const labelOff = LABEL_OFFSETS[key];
+
               return (
                 <g
                   key={key}
-                  onPointerDown={(e) => startDragCorner(e, key)}
-                  onClick={() => setSelectedCorner(key)}
-                  style={{ cursor: "grab" }}
+                  onPointerDown={(e) => {
+                    if (!effectivePanMode) startDragCorner(e, key);
+                  }}
+                  onClick={() => { if (!effectivePanMode) setSelectedCorner(key); }}
+                  style={{ cursor: effectivePanMode ? "inherit" : "grab" }}
                 >
-                  {/* Larger invisible hit area for easier grabbing */}
+                  {/* Large invisible hit area */}
                   <circle
                     cx={pt.x}
                     cy={pt.y}
-                    r={r * 1.8}
+                    r={ringR * 2.5}
                     fill="transparent"
                   />
+
+                  {/* Crosshair lines (behind ring) */}
+                  <line
+                    x1={pt.x - crosshairArm}
+                    y1={pt.y}
+                    x2={pt.x + crosshairArm}
+                    y2={pt.y}
+                    stroke={color}
+                    strokeWidth={strokeScale}
+                    opacity={0.6}
+                    pointerEvents="none"
+                  />
+                  <line
+                    x1={pt.x}
+                    y1={pt.y - crosshairArm}
+                    x2={pt.x}
+                    y2={pt.y + crosshairArm}
+                    stroke={color}
+                    strokeWidth={strokeScale}
+                    opacity={0.6}
+                    pointerEvents="none"
+                  />
+
+                  {/* Hollow ring — thicker when selected */}
                   <circle
                     cx={pt.x}
                     cy={pt.y}
-                    r={r}
+                    r={ringR}
+                    fill="none"
+                    stroke={color}
+                    strokeWidth={isSelected ? 2.5 * strokeScale : 1.5 * strokeScale}
+                    style={{
+                      filter: isSelected
+                        ? `drop-shadow(0 0 ${3 * strokeScale}px ${color}88)`
+                        : undefined,
+                    }}
+                    pointerEvents="none"
+                  />
+                  {/* White inner dot at exact corner pixel */}
+                  <circle
+                    cx={pt.x}
+                    cy={pt.y}
+                    r={strokeScale * 1.2}
+                    fill="white"
+                    stroke={color}
+                    strokeWidth={strokeScale * 0.5}
+                    pointerEvents="none"
+                  />
+
+                  {/* Label — offset away from corner so pixel stays visible */}
+                  <text
+                    x={pt.x + labelOff.dx * strokeScale}
+                    y={pt.y + labelOff.dy * strokeScale}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fontSize={8 * strokeScale}
+                    fontWeight={700}
                     fill={color}
                     stroke="white"
                     strokeWidth={2 * strokeScale}
-                    style={{
-                      filter: isSelected
-                        ? `drop-shadow(0 0 ${3 * strokeScale}px rgba(0,0,0,0.5))`
-                        : undefined,
-                    }}
-                  />
-                  <text
-                    x={pt.x}
-                    y={pt.y + 0.5 * strokeScale}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    fontSize={9 * strokeScale}
-                    fontWeight={700}
-                    fill="white"
+                    paintOrder="stroke"
                     style={{ pointerEvents: "none" }}
                   >
                     {CORNER_LABELS[key]}
@@ -593,7 +761,7 @@ export default function MockupSurfaceEditor({
         </div>
       </div>
 
-      {/* Coordinate inputs (image-space pixels) */}
+      {/* Coordinate inputs */}
       <div className="grid grid-cols-2 gap-3">
         {CORNER_KEYS.map((key) => {
           const pt = corners[key];
