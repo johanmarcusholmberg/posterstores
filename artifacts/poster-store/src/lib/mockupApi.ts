@@ -504,6 +504,8 @@ export interface SyncResult {
   renderMode?: "deterministic" | "ai_rendered";
   needsReview?: boolean;
   aiRenderWarning?: string;
+  /** Human-readable cost label, e.g. "Paid AI render". Present for AI-rendered combinations. */
+  estimatedCostLabel?: string;
 }
 
 export interface SyncResponse {
@@ -511,10 +513,16 @@ export interface SyncResponse {
   skipped: number;
   failed: number;
   plannedCount?: number;
+  /** Combinations destined for the deterministic Sharp compositor. */
+  deterministicPlannedCount?: number;
+  /** Combinations destined for the paid AI renderer. */
+  aiRenderedPlannedCount?: number;
   dryRun: boolean;
   needsReviewCount?: number;
   results: SyncResult[];
   note?: string;
+  /** Set when server blocked the request due to AI render limit. */
+  aiRenderLimit?: number;
 }
 
 export async function adminRunMockupSync(params: {

@@ -131,6 +131,29 @@ function buildRenderPrompt(opts: AiRenderOptions): string {
     .trim();
 }
 
+// ─── Quality / size ───────────────────────────────────────────────────────────
+
+/**
+ * TODO: AI render quality control
+ *
+ * The `editImages` helper from @workspace/integrations-openai-ai-server does NOT
+ * currently expose a quality or size parameter — the underlying `openai.images.edit`
+ * call uses the provider default for gpt-image-1 with no `quality` or `size` field.
+ *
+ * The gpt-image-1 image-edit endpoint does support a `quality` parameter
+ * ("low" | "medium" | "high", default "auto") and a `size` parameter.
+ * To enable admin-configurable quality:
+ *   1. Update `editImages()` in lib/integrations-openai-ai-server/src/image/client.ts
+ *      to accept an optional options argument: `{ quality?: "low" | "medium" | "high"; size?: string }`
+ *   2. Pass `options.quality` to the `openai.images.edit` call.
+ *   3. Expose a `quality` field on AiRenderOptions and thread it from the template or sync call.
+ *   4. Store `aiRenderQuality: "low" | "medium" | "high"` on mockup_templates (default "low").
+ *
+ * Until the helper exposes quality, all AI renders use the provider's default quality.
+ * "low" is recommended for review renders; admins should regenerate with "medium" or
+ * "high" after confirming composition is acceptable.
+ */
+
 // ─── Main renderer ────────────────────────────────────────────────────────────
 
 /**

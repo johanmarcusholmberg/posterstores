@@ -1,0 +1,138 @@
+You are working in the Poster Stores project.
+
+Goal:
+Add cost-control guardrails for the optional AI-rendered mockup mode.
+
+Context:
+
+* Deterministic Sharp mockup rendering is the default and should remain the default.
+* AI-rendered mockups have been added using gpt-image-1 image editing.
+* AI-rendered mockups are useful for premium/lifestyle images but cost money per render.
+* AI-rendered sync currently sets needsReview=true and does not publish automatically.
+* Typechecks are currently clean.
+
+Important:
+
+* Do not remove AI-rendered mode.
+* Do not make AI-rendered mode the default.
+* Do not change deterministic sync behavior except where needed for shared UI.
+* Do not create branches, PRs, commits, pushes, or GitHub automation.
+* Keep changes targeted.
+* Stop after reporting results.
+
+Implement cost-control and safety UX.
+
+1. AI render limits
+
+Add safe limits for AI-rendered mockup sync.
+
+Server-side:
+
+* Add AI_RENDER_HARD_LIMIT, suggested default: 5 combinations per request.
+* This limit should apply only to templates where renderMode = "ai_rendered".
+* Deterministic templates can keep the existing broader sync limit.
+* If a sync request would generate more than 5 AI-rendered mockups, block it with HTTP 400 and a clear admin-facing message.
+* Dry-run should be allowed and should return counts.
+
+Return separate planned counts:
+
+* plannedCount
+* deterministicPlannedCount
+* aiRenderedPlannedCount
+
+2. AI cost warning in admin sync panel
+
+Update AdminMockupSyncPanel:
+
+* Show how many AI-rendered mockups are planned.
+* If aiRenderedPlannedCount > 0, show a clear amber warning:
+  “AI-rendered mockups use paid image generation. Use only for selected templates/posters.”
+* If aiRenderedPlannedCount exceeds the server limit, show an inline blocked message explaining that the operator should reduce selected posters/templates.
+* Make deterministic mockups visually separate from AI-rendered mockups in the summary.
+
+3. Require explicit confirmation for AI sync
+
+Before running a live sync that includes any AI-rendered combinations:
+
+* Require the admin to tick a checkbox:
+  “I understand AI-rendered mockups use paid image generation.”
+* Disable Run sync until this is checked.
+* Do not require this checkbox for deterministic-only sync.
+
+4. AI render quality/size setting
+
+Add a simple admin setting for AI render quality if supported by the existing gpt-image-1 helper.
+
+Suggested:
+
+* aiRenderQuality: "low" | "medium" | "high"
+* Default should be "low" or "medium", not high.
+* Store this on mockup_templates if practical, otherwise keep a server default.
+* Make the UI explain:
+
+  * Low = cheaper/faster, good for review
+  * Medium = better quality
+  * High = expensive, use sparingly
+
+If the existing helper does not expose quality safely:
+
+* Do not invent unsupported behavior.
+* Add a TODO/report explaining that quality is controlled by the provider helper.
+
+5. Disable bulk AI by default
+
+In the sync UI:
+
+* If “all posters” is selected and any selected template is AI-rendered, show a strong warning.
+* Prefer blocking “all posters + AI-rendered templates” unless the resulting planned AI count is within the hard limit.
+* The intended workflow should be:
+
+  * AI render one poster/template
+  * Review
+  * Then optionally generate a few more
+
+6. Result logging
+
+In sync results, include:
+
+* renderMode
+* needsReview
+* aiRenderWarning
+* estimatedCostLabel if possible, for example “Paid AI render”
+* Do not display fake exact prices unless pricing is already stored/configured.
+
+7. Tests / verification
+
+Run:
+
+* pnpm run typecheck:libs
+* pnpm --filter @workspace/api-server run typecheck
+* pnpm --filter @workspace/poster-store run typecheck
+
+Add low-cost tests if practical:
+
+* deterministic sync unaffected
+* AI sync over limit blocked
+* dry-run reports AI planned count
+* Run button disabled until paid-AI confirmation is checked
+
+Manual QA:
+
+* Deterministic sync works without confirmation
+* AI sync shows paid warning
+* AI sync requires confirmation
+* AI sync over limit is blocked clearly
+* AI dry-run shows AI planned count
+* AI result rows show needs review
+* Product gallery remains unaffected
+
+Deliverable:
+Report:
+
+1. Files changed
+2. Server guardrails
+3. Admin UI guardrails
+4. Typecheck/test results
+5. Remaining limitations
+
+Do not commit or push. Stop after the report.

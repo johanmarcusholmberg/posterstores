@@ -17,8 +17,15 @@ import { randomUUID } from "crypto";
 const router = Router();
 const storage = new ObjectStorageService();
 
-/** Maximum poster × template combinations allowed per non-dry-run request. */
+/** Maximum poster × template combinations allowed per non-dry-run request (all renderers). */
 const SYNC_HARD_LIMIT = 100;
+
+/**
+ * Maximum AI-rendered poster × template combinations allowed per request.
+ * AI renders are paid calls (~seconds each) — keep this low to prevent
+ * accidental large bills. Dry-run is exempt from this limit.
+ */
+const AI_RENDER_HARD_LIMIT = 5;
 
 /**
  * If the old imageUrl is a generated mockup-composite stored in our object
@@ -54,6 +61,8 @@ interface SyncResult {
   renderMode?: "deterministic" | "ai_rendered";
   needsReview?: boolean;
   aiRenderWarning?: string;
+  /** Human-readable cost label shown in admin sync results. */
+  estimatedCostLabel?: string;
 }
 
 interface SyncBody {
@@ -136,13 +145,34 @@ router.post(
       });
     }
 
-    // ── 3. Safety-limit check ────────────────────────────────────────────────
+    // ── 3. Safety-limit checks ───────────────────────────────────────────────
+    const deterministicTemplates = targetTemplates.filter((t) => (t.renderMode ?? "deterministic") !== "ai_rendered");
+    const aiTemplates = targetTemplates.filter((t) => (t.renderMode ?? "deterministic") === "ai_rendered");
+
     const plannedCount = targetPosters.length * targetTemplates.length;
+    const deterministicPlannedCount = targetPosters.length * deterministicTemplates.length;
+    const aiRenderedPlannedCount = targetPosters.length * aiTemplates.length;
+
+    // Overall hard limit (all renderers)
     if (!dryRun && plannedCount > SYNC_HARD_LIMIT) {
       return res.status(400).json({
         error: `Sync would generate ${plannedCount} combinations (${targetPosters.length} poster${targetPosters.length !== 1 ? "s" : ""} × ${targetTemplates.length} template${targetTemplates.length !== 1 ? "s" : ""}), which exceeds the safe limit of ${SYNC_HARD_LIMIT} per request.`,
         plannedCount,
+        deterministicPlannedCount,
+        aiRenderedPlannedCount,
         limit: SYNC_HARD_LIMIT,
+      });
+    }
+
+    // AI-specific hard limit — even a small number of AI renders costs money.
+    // Dry-run is exempt so admins can safely preview counts before committing.
+    if (!dryRun && aiRenderedPlannedCount > AI_RENDER_HARD_LIMIT) {
+      return res.status(400).json({
+        error: `Sync would generate ${aiRenderedPlannedCount} AI-rendered mockup${aiRenderedPlannedCount !== 1 ? "s" : ""} (${targetPosters.length} poster${targetPosters.length !== 1 ? "s" : ""} × ${aiTemplates.length} AI template${aiTemplates.length !== 1 ? "s" : ""}), which exceeds the AI render limit of ${AI_RENDER_HARD_LIMIT} per request. Reduce the number of selected posters or AI-rendered templates and try again. Consider using a deterministic template or running on fewer posters.`,
+        plannedCount,
+        deterministicPlannedCount,
+        aiRenderedPlannedCount,
+        aiRenderLimit: AI_RENDER_HARD_LIMIT,
       });
     }
 
@@ -212,6 +242,7 @@ router.post(
             placementWarnings,
             renderMode: templateRenderMode,
             needsReview: templateRenderMode === "ai_rendered",
+            estimatedCostLabel: templateRenderMode === "ai_rendered" ? "Paid AI render" : undefined,
           });
           continue;
         }
@@ -352,6 +383,7 @@ router.post(
                 renderMode: templateRenderMode,
                 needsReview,
                 aiRenderWarning,
+                estimatedCostLabel: isAiRendered ? "Paid AI render" : undefined,
               });
               continue;
             }
@@ -411,6 +443,7 @@ router.post(
             renderMode: templateRenderMode,
             needsReview,
             aiRenderWarning,
+            estimatedCostLabel: isAiRendered ? "Paid AI render" : undefined,
           });
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : "Unknown error";
@@ -463,6 +496,8 @@ router.post(
       skipped,
       failed,
       plannedCount,
+      deterministicPlannedCount,
+      aiRenderedPlannedCount,
       dryRun,
       needsReviewCount,
       results,
