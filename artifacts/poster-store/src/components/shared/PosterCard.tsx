@@ -38,9 +38,11 @@ export const PosterCard = ({ poster, favoritedIds, priority = false }: PosterCar
            different from imageUrl (i.e. a mockup has been assigned at all)
         3. null — no hover image; use the scale fallback instead
 
-    This means any poster with at least one mockup assigned gets the crossfade.
-    The previous code showed the mockup as the main image, leaving nothing to
-    reveal on hover — this is the reason "nothing happened".
+    Public cards may only use rendered mockupImageUrl, never template background
+    images. This rule is enforced server-side in posterEnrichment.ts:
+    primaryDisplayImageUrl and hoverDisplayImageUrl are null unless a generated
+    mockupImageUrl exists, the template is active, status ≠ failed, and (for
+    AI-rendered mockups) approvedForPublic = true.
   */
   const baseImage = poster.imageUrl;
 
@@ -49,6 +51,7 @@ export const PosterCard = ({ poster, favoritedIds, priority = false }: PosterCar
 
   // Prefer the dedicated hover mockup; fall back to the primary mockup if it
   // differs from the raw poster image (crossfade from art → room context).
+  // Both are guaranteed to be rendered mockupImageUrl values or null.
   const hoverImage: string | null =
     dedicatedHover ??
     (primaryMockup && primaryMockup !== baseImage ? primaryMockup : null);

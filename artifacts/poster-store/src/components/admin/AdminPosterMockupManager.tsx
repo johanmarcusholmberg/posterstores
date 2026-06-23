@@ -481,6 +481,15 @@ export const AdminPosterMockupManager = ({
                           Hover
                         </span>
                       )}
+                      {/* Warn when this row is marked primary or hover but has
+                          no rendered image — the shop card will fall back to
+                          poster.imageUrl until Sync mockups is run. */}
+                      {(draft.isPrimary || draft.isHoverMockup) && !draft.mockupImageUrl && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-orange-600 bg-orange-50 border border-orange-200 rounded px-1.5 py-0.5">
+                          <ImageIcon className="w-2.5 h-2.5" />
+                          Sync required — not shown publicly
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0">

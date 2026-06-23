@@ -1,0 +1,178 @@
+You are working in the Poster Stores project.
+
+Goal:
+Fix public storefront mockup image selection so template/background mockup images are never shown as product images. Public shop cards, product primary image, hover image, thumbnails, gallery, and lightbox must only use rendered/generated mockupImageUrl for mockups.
+
+Current problems:
+
+1. If a mockup is selected as the primary picture, the shop card shows the empty mockup template/background image, not the rendered mockup with the poster inserted.
+2. On the product detail page, mockup pictures are not visible in the gallery.
+
+Important:
+
+* Do not change admin preview behavior.
+* Do not reintroduce public live CSS compositing.
+* Do not show bare template backgrounds publicly.
+* Do not make AI rendering default.
+* Do not remove the existing sync workflow.
+* Do not create branches, PRs, commits, pushes, or GitHub automation.
+* Keep the fix targeted.
+* Typechecks must pass.
+
+Core public rule:
+A mockup is public-eligible only when:
+
+* mockupImageUrl exists
+* status is not failed
+* template is active
+* for gallery: isGallery = true
+* for primary: isPrimary = true
+* for hover: isHoverMockup = true
+* for AI-rendered mockups: approvedForPublic = true
+
+If a mockup row is marked primary/hover/gallery but has no mockupImageUrl:
+
+* do not use template background
+* do not use template preview
+* do not use live composite
+* fall back to the poster’s normal image
+
+Part 1 — Audit public image selection
+
+Inspect all public-facing image selection logic:
+
+* PosterCard.tsx
+* Shop page poster mapping
+* Home featured/new arrivals mapping
+* Product page image/gallery mapping
+* MockupGallery.tsx
+* public poster API routes
+* any computed fields such as:
+
+  * primaryDisplayUrl
+  * hoverDisplayImageUrl
+  * displayImageUrl
+  * primaryImageUrl
+  * mockupImageUrl
+  * backgroundImageUrl
+  * template image URL
+  * preview image URL
+
+Find any place where public UI can use:
+
+* mockup template background image
+* template preview image
+* backgroundImageUrl
+* live composite config
+* mockup.template.backgroundImageUrl
+
+as if it were a product image.
+
+Fix those paths.
+
+Part 2 — Shop/card primary image fix
+
+For shop/product cards:
+
+* If a primary mockup exists and has mockupImageUrl, use mockupImageUrl.
+* If primary mockup exists but mockupImageUrl is missing, ignore it and use the poster’s normal primary image.
+* Never use the mockup template background as the card image.
+* Never use a live composite in the card.
+
+Hover behavior:
+
+* If a hover mockup exists and has mockupImageUrl, use mockupImageUrl.
+* If hover mockup exists but mockupImageUrl is missing, ignore it.
+* Never use template background as hover image.
+
+Add a clear code comment near the selection logic:
+“Public cards may only use rendered mockupImageUrl, never template background images.”
+
+Part 3 — Product detail gallery fix
+
+For product detail page:
+
+* Normal poster image should always appear.
+* Generated gallery mockups should appear when they have mockupImageUrl and are public-eligible.
+* Primary mockup should also be allowed to appear in the gallery if it has mockupImageUrl and isGallery=true, or if the current UX expects primary image only outside the gallery.
+* Do not hide valid deterministic generated mockups accidentally.
+* AI-rendered mockups must stay hidden unless approvedForPublic=true.
+
+If the product has mockup rows but no mockupImageUrl:
+
+* keep them hidden on public product page
+* do not show template background
+* admin tools can show “Sync required”, but public storefront should not
+
+Part 4 — Backend/public API safeguards
+
+If public poster list APIs return display/hover/primary URLs:
+
+* Ensure they only resolve mockup URLs from poster_mockups.mockupImageUrl.
+* Do not return template.backgroundImageUrl as primary/hover/display image.
+* If no generated mockupImageUrl exists, return the poster’s own image URL.
+
+If GET /api/posters/:id/mockups is used:
+
+* Ensure it returns mockupImageUrl for generated rows.
+* Ensure public visibility rules are defensively applied:
+
+  * no mockupImageUrl → exclude or let frontend exclude
+  * status failed → exclude
+  * AI unapproved → exclude
+  * inactive template → exclude
+
+Part 5 — Admin clarity
+
+Do not change admin preview behavior.
+
+But if practical, add/verify admin labels:
+
+* “Template image” for empty background
+* “Rendered mockup” for generated mockupImageUrl
+* “Sync required” when a primary/hover/gallery mockup does not yet have mockupImageUrl
+
+This helps explain why a mockup selected as primary does not appear publicly until synced.
+
+Part 6 — Tests / verification
+
+Run:
+
+* pnpm run typecheck:libs
+* pnpm --filter @workspace/api-server run typecheck
+* pnpm --filter @workspace/poster-store run typecheck
+
+Add low-cost tests if practical:
+
+* primary mockup without mockupImageUrl falls back to poster image
+* hover mockup without mockupImageUrl is ignored
+* generated primary mockup with mockupImageUrl is used
+* generated gallery mockup with mockupImageUrl appears on product page
+* template background URL is never used in public card/gallery image selection
+* AI-rendered unapproved mockup is hidden
+
+Manual QA:
+
+* Shop card with primary mockup but no mockupImageUrl shows poster image, not template background.
+* After running Sync mockups, shop card with primary mockup shows rendered mockup with poster inserted.
+* Product page normal poster image appears.
+* Product page generated mockups appear after sync.
+* Product page does not show bare template backgrounds.
+* Hover mockup works only when generated mockupImageUrl exists.
+* Lightbox shows same generated image as gallery thumbnail.
+* Admin preview still shows template/surface editor as before.
+
+Deliverable:
+Report:
+
+1. Root cause found
+2. Files changed
+3. Public image selection rules fixed
+4. Shop/card primary/hover behavior
+5. Product gallery behavior
+6. Backend/API safeguards
+7. Typecheck/test results
+8. Manual QA results
+9. Remaining limitations
+
+Do not commit or push. Stop after report.

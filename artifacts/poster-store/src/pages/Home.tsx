@@ -217,6 +217,10 @@ function FeaturedPosterCard({ poster, priority = false }: { poster: Poster; prio
       ? `From ${formatPrice(displayPrice, displayCurrency)}`
       : formatPrice(displayPrice, displayCurrency);
 
+  // Public cards may only use rendered mockupImageUrl, never template backgrounds.
+  // primaryDisplayImageUrl is null unless a flat mockupImageUrl exists (enforced
+  // in posterEnrichment.ts), so the poster.imageUrl fallback is the correct path
+  // for unsynced mockups.
   const displayImage = poster.primaryDisplayImageUrl ?? poster.imageUrl;
   const cardTitle = (poster as any).displayTitle || poster.title;
 
@@ -625,6 +629,7 @@ export default function Home() {
                         {collectionPreviewPosters.map((poster, idx) => {
                           const slug = (poster as any).slug as string | undefined;
                           const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
+                          // Public cards may only use rendered mockupImageUrl, never template backgrounds.
                           const displayImg = poster.primaryDisplayImageUrl ?? poster.imageUrl;
                           return (
                             <Link

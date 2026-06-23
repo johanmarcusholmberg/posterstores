@@ -11,6 +11,20 @@ export function serializePosterSize(s: typeof posterSizesTable.$inferSelect) {
   };
 }
 
+/**
+ * Public image selection rule (enforced here and in MockupGallery.isVisible):
+ *   Public cards/hover may only use a rendered mockupImageUrl — never a template
+ *   background image, preview thumbnail, or live CSS composite.
+ *
+ * A mockup row is public-eligible for display URLs only when:
+ *   • mockupImageUrl is present (the flat generated render exists)
+ *   • status is not "failed"
+ *   • if renderMode is "ai_rendered", approvedForPublic must be true
+ *   • the template is active (or the row has no template)
+ *
+ * If none of these conditions are met, return null so callers fall back to
+ * poster.imageUrl.
+ */
 export async function attachPrimaryDisplayImages(
   posters: { id: number; imageUrl: string }[]
 ): Promise<Map<number, string | null>> {
@@ -23,10 +37,11 @@ export async function attachPrimaryDisplayImages(
     .select({
       posterId: posterMockupsTable.posterId,
       mockupImageUrl: posterMockupsTable.mockupImageUrl,
+      status: posterMockupsTable.status,
+      renderMode: posterMockupsTable.renderMode,
+      approvedForPublic: posterMockupsTable.approvedForPublic,
       templateId: posterMockupsTable.mockupTemplateId,
       templateActive: mockupTemplatesTable.active,
-      previewThumbnailUrl: mockupTemplatesTable.previewThumbnailUrl,
-      backgroundImageUrl: mockupTemplatesTable.backgroundImageUrl,
     })
     .from(posterMockupsTable)
     .leftJoin(
@@ -41,10 +56,15 @@ export async function attachPrimaryDisplayImages(
     );
 
   for (const m of primaryMockups) {
+    // Rule 1: template must be active
     if (m.templateId !== null && m.templateActive === false) continue;
-    const url =
-      m.mockupImageUrl ?? m.previewThumbnailUrl ?? m.backgroundImageUrl ?? null;
-    if (url) imageMap.set(m.posterId, url);
+    // Rule 2: must have a generated flat image — never fall through to template backgrounds
+    if (!m.mockupImageUrl) continue;
+    // Rule 3: failed renders are not customer-ready
+    if (m.status === "failed") continue;
+    // Rule 4: AI-rendered mockups require explicit approval
+    if (m.renderMode === "ai_rendered" && !m.approvedForPublic) continue;
+    imageMap.set(m.posterId, m.mockupImageUrl);
   }
 
   return imageMap;
@@ -62,10 +82,11 @@ export async function attachHoverDisplayImages(
     .select({
       posterId: posterMockupsTable.posterId,
       mockupImageUrl: posterMockupsTable.mockupImageUrl,
+      status: posterMockupsTable.status,
+      renderMode: posterMockupsTable.renderMode,
+      approvedForPublic: posterMockupsTable.approvedForPublic,
       templateId: posterMockupsTable.mockupTemplateId,
       templateActive: mockupTemplatesTable.active,
-      previewThumbnailUrl: mockupTemplatesTable.previewThumbnailUrl,
-      backgroundImageUrl: mockupTemplatesTable.backgroundImageUrl,
     })
     .from(posterMockupsTable)
     .leftJoin(
@@ -80,10 +101,15 @@ export async function attachHoverDisplayImages(
     );
 
   for (const m of hoverMockups) {
+    // Rule 1: template must be active
     if (m.templateId !== null && m.templateActive === false) continue;
-    const url =
-      m.mockupImageUrl ?? m.previewThumbnailUrl ?? m.backgroundImageUrl ?? null;
-    if (url) imageMap.set(m.posterId, url);
+    // Rule 2: must have a generated flat image — never fall through to template backgrounds
+    if (!m.mockupImageUrl) continue;
+    // Rule 3: failed renders are not customer-ready
+    if (m.status === "failed") continue;
+    // Rule 4: AI-rendered mockups require explicit approval
+    if (m.renderMode === "ai_rendered" && !m.approvedForPublic) continue;
+    imageMap.set(m.posterId, m.mockupImageUrl);
   }
 
   return imageMap;
