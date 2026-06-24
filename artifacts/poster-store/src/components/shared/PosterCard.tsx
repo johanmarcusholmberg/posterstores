@@ -151,7 +151,7 @@ export const PosterCard = ({ poster, favoritedIds, priority = false }: PosterCar
               "absolute inset-0 object-contain w-full h-full",
               "motion-reduce:transition-none",
               hoverImage
-                ? "transition-opacity duration-[280ms] ease-out opacity-100 group-hover:opacity-0 group-focus-within:opacity-0"
+                ? "transition-opacity duration-[600ms] ease-out opacity-100 group-hover:opacity-0 group-focus-within:opacity-0"
                 : "transition-transform duration-[300ms] ease-out scale-100 group-hover:scale-[1.08] group-focus-within:scale-[1.08]",
             ].join(" ")}
             data-testid={`img-poster-${poster.id}`}
@@ -180,7 +180,7 @@ export const PosterCard = ({ poster, favoritedIds, priority = false }: PosterCar
               decoding="async"
               className={[
                 "absolute inset-0 object-cover w-full h-full",
-                "transition-[opacity,transform] duration-[280ms] ease-out",
+                "transition-[opacity,transform] duration-[600ms] ease-out",
                 "motion-reduce:transition-none",
                 "opacity-0 scale-100",
                 "group-hover:opacity-100 group-hover:scale-[1.03]",

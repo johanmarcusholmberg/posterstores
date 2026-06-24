@@ -1,0 +1,133 @@
+We need to fix bugs from the latest homepage/admin improvements. Do not create branches, PRs, GitHub automation, or push. Make changes only, then report back with files changed and typecheck result.
+
+Current issues:
+
+1. Poster artwork is fixed on homepage but still cropped on the poster detail page
+
+* Example: poster “Test 2” now shows the full artwork in Featured posters, but the poster detail/product page still crops it.
+* Inspect the product page gallery/main image rendering.
+* For actual poster artwork, use object-contain so the full artwork is visible.
+* Keep lifestyle/mockup images using object-cover where that is appropriate.
+* Make sure this applies to:
+
+  * product page main image
+  * product page thumbnails if relevant
+  * lightbox/plain poster image if relevant
+* Do not break mockup/lifestyle image behavior.
+
+Also adjust the poster card hover transition:
+
+* The hover swap to mockup currently feels too fast.
+* Make the image hover fade/blend slower and smoother.
+* Suggested transition duration: around 500–700ms.
+* Keep it responsive and not sluggish.
+
+2. Collection banner text position settings do not persist
+
+* In Admin → Collection banners → Layout, selecting Text position and saving reverts back to the default “Left”.
+* Fix persistence end-to-end:
+
+  * Admin form state
+  * save payload
+  * API/backend validation/schema
+  * DB JSON/config storage
+  * refetch after save
+  * public homepage rendering
+* Check for field-name mismatches or default-normalization code overwriting saved values.
+
+Also add a fine-position adjustment:
+
+* Keep the existing Left / Center / Right selector.
+* Add additional pixel mover controls for fine tuning.
+* Add at least horizontal offset in pixels.
+* Prefer both:
+
+  * Text offset X px
+  * Text offset Y px
+* Suggested range: -300 to +300 px.
+* Default should be 0.
+* These offsets should apply in addition to the selected anchor position.
+* They should persist after save and affect the public collection banner.
+* Keep the controls simple, for example number inputs or sliders with numeric input.
+
+3. Collection mobile mode “Hidden on mobile” does not persist
+
+* In Admin → Collection banners → Layout, choosing Hidden on mobile and saving reverts back.
+* Fix persistence end-to-end.
+* Make sure the selected mode remains selected after save/refetch.
+* Make sure the public homepage respects it.
+
+4. Hero extra buttons are visible on mobile by default
+
+* Extra buttons should not be visible on mobile by default unless explicitly enabled.
+* Fix defaults for missing/legacy config.
+* Primary and secondary buttons can keep their intended defaults, but extra buttons should default to:
+
+  * showDesktop: true
+  * showMobile: false
+* If an admin explicitly changes the mobile visibility, that choice must persist.
+
+5. Hero button visibility settings do not reliably persist
+
+* Review all hero button showMobile/showDesktop fields.
+* Fix persistence end-to-end for:
+
+  * primary button
+  * secondary button
+  * extra buttons
+* Verify hidden buttons do not leave awkward spacing on mobile or desktop.
+
+6. Trust badges revert to defaults
+
+* In Admin → Hero → Trust badges, edits do not persist.
+* Selecting/deselecting mobile visibility, removing badges, and creating new badges revert to standard/default badges.
+* Fix persistence end-to-end:
+
+  * editing badge text
+  * adding badge
+  * removing badge
+  * mobile visibility toggle
+  * reset to defaults
+* Important: defaults should only be used as fallback when config is missing, not overwrite a saved empty/custom list.
+* If the admin removes all trust badges, that should persist as an empty list and the public hero should render no trust badges.
+
+Likely root cause to investigate:
+
+* New config fields may exist only in frontend state but are not included in the saved payload.
+* Backend validation/zod/openapi schemas may be stripping unknown fields.
+* Store config normalization may be overwriting saved values with defaults.
+* Refetch/reset logic may be replacing saved values with default values after save.
+* Collection banner settings and hero settings may need schema/type updates in shared API types.
+
+Implementation requirements:
+
+* Keep changes targeted and low-risk.
+* Use the existing config/storage pattern already introduced for these features.
+* If DB changes are needed, make migrations idempotent and safe.
+* Do not remove existing store data.
+* Do not rewrite unrelated homepage/admin sections.
+* Add or update tests where practical for config normalization/persistence logic.
+* Run typecheck.
+
+Manual QA acceptance criteria:
+
+1. “Test 2” shows the full artwork on the homepage and the poster detail page.
+2. Poster hover mockup fades in more slowly and smoothly.
+3. Collection banner Text position saves and remains selected after refresh.
+4. Collection banner pixel offsets save and affect the public homepage.
+5. Collection mobile mode “Hidden on mobile” saves and hides the banner on mobile.
+6. Extra hero buttons are hidden on mobile by default unless enabled.
+7. Hero button mobile/desktop visibility saves for primary, secondary, and extra buttons.
+8. Trust badge edits/add/remove/mobile visibility persist after save and page refresh.
+9. Removing all trust badges remains an empty list and does not revert to defaults.
+10. Typecheck passes with zero errors.
+
+Report back with:
+
+1. Root cause found
+2. Files changed
+3. Any DB/schema/API changes
+4. What was fixed for product page image rendering
+5. What was fixed for collection banner persistence and pixel offsets
+6. What was fixed for hero buttons and trust badges
+7. Typecheck/test result

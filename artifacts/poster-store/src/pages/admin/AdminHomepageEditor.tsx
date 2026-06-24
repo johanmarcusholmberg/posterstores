@@ -583,6 +583,38 @@ function CollectionBannerEditor({ banner, bannerLabel, totalBanners, onUpdate, o
             </div>
           </div>
 
+          {/* Fine-position offsets */}
+          <div className="space-y-2 pt-1">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Fine position (px)</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Offset X</Label>
+                <div className="flex items-center gap-2">
+                  <Slider
+                    min={-300} max={300} step={5}
+                    value={[banner.textOffsetX ?? 0]}
+                    onValueChange={([v]) => onUpdate({ textOffsetX: v === 0 ? undefined : v })}
+                    className="flex-1"
+                  />
+                  <span className="text-xs tabular-nums w-12 text-right">{banner.textOffsetX ?? 0}px</span>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Offset Y</Label>
+                <div className="flex items-center gap-2">
+                  <Slider
+                    min={-300} max={300} step={5}
+                    value={[banner.textOffsetY ?? 0]}
+                    onValueChange={([v]) => onUpdate({ textOffsetY: v === 0 ? undefined : v })}
+                    className="flex-1"
+                  />
+                  <span className="text-xs tabular-nums w-12 text-right">{banner.textOffsetY ?? 0}px</span>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">Fine-tune text position on top of the selected anchor. Range: −300 to +300 px. Default: 0.</p>
+          </div>
+
           {/* Banner visual overrides */}
           <CollapsibleOverridePanel title="Banner visual overrides">
             <div className="grid grid-cols-2 gap-3">

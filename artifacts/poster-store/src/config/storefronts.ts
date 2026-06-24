@@ -102,6 +102,10 @@ export interface CollectionBannerVisualConfig {
   textOverlay?: "none" | "soft-panel" | "gradient";
   /** How the banner is rendered on mobile screens. Default: "simplified-card". */
   mobileMode?: "full-banner" | "simplified-card" | "hidden";
+  /** Fine-tune horizontal position of the text column in pixels. Default: 0. */
+  textOffsetX?: number;
+  /** Fine-tune vertical position of the text column in pixels. Default: 0. */
+  textOffsetY?: number;
 }
 
 export type HomepageSectionType =

@@ -654,6 +654,14 @@ const heroButtonConfigSchema = z.object({
   variant: z.enum(["filled", "outline"]).optional(),
   visible: z.boolean().optional(),
   style: heroButtonStyleSchema,
+  showDesktop: z.boolean().optional(),
+  showMobile: z.boolean().optional(),
+});
+
+const heroTrustBadgeSchema = z.object({
+  id: z.string(),
+  text: z.string(),
+  showMobile: z.boolean().optional(),
 });
 
 const heroVisualSchema = z.object({
@@ -664,11 +672,16 @@ const heroVisualSchema = z.object({
   primaryButtonVariant: z.enum(["filled", "outline"]).optional(),
   primaryButtonLink: z.string().nullable().optional(),
   primaryButtonStyle: heroButtonStyleSchema,
+  primaryButtonShowMobile: z.boolean().optional(),
+  primaryButtonShowDesktop: z.boolean().optional(),
   secondaryButtonText: z.string().nullable().optional(),
   secondaryButtonVariant: z.enum(["filled", "outline"]).optional(),
   secondaryButtonLink: z.string().nullable().optional(),
   secondaryButtonStyle: heroButtonStyleSchema,
+  secondaryButtonShowMobile: z.boolean().optional(),
+  secondaryButtonShowDesktop: z.boolean().optional(),
   extraButtons: z.array(heroButtonConfigSchema).optional(),
+  trustBadges: z.array(heroTrustBadgeSchema).optional(),
 }).optional();
 
 const sectionFontOverridesSchema = z.object({
@@ -706,6 +719,13 @@ const collectionBannerVisualBaseSchema = z.object({
   showPosterCards: z.boolean().optional(),
   fontOverrides: sectionFontOverridesSchema,
   colorOverrides: sectionColorOverridesSchema,
+  textHAlign: z.enum(["left", "center", "right"]).optional(),
+  textVAlign: z.enum(["top", "center", "bottom"]).optional(),
+  textMaxWidth: z.enum(["narrow", "medium", "wide"]).optional(),
+  textOverlay: z.enum(["none", "soft-panel", "gradient"]).optional(),
+  mobileMode: z.enum(["full-banner", "simplified-card", "hidden"]).optional(),
+  textOffsetX: z.number().min(-300).max(300).optional(),
+  textOffsetY: z.number().min(-300).max(300).optional(),
 });
 
 const collectionBannerVisualSchema = collectionBannerVisualBaseSchema.optional();

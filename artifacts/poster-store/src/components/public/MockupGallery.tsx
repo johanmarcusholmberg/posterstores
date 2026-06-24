@@ -177,6 +177,8 @@ interface DisplayImage {
   label: string;
   mockup?: PosterMockup;
   isComposited?: boolean;
+  /** True for the raw poster artwork — use object-contain so no cropping occurs. */
+  isPosterArtwork?: boolean;
 }
 
 export const MockupGallery = ({
@@ -191,7 +193,7 @@ export const MockupGallery = ({
   // Live CSS composites (no generated image) are filtered out before reaching here —
   // they are admin-preview-only and never shown to public customers.
   const allImages: DisplayImage[] = [
-    { url: fallbackImageUrl, label: "Poster" },
+    { url: fallbackImageUrl, label: "Poster", isPosterArtwork: true },
     ...visibleMockups.map((m) => ({
       url: m.mockupImageUrl!,   // always present after isVisible() filter
       label: getFriendlyLabel(m),
@@ -338,6 +340,7 @@ export const MockupGallery = ({
         fallback={fallbackImageUrl}
         alt={alt}
         className={className}
+        isPosterArtwork={item.isPosterArtwork}
       />
     );
   }
@@ -421,7 +424,7 @@ export const MockupGallery = ({
                   alt={img.label}
                   loading="lazy"
                   decoding="async"
-                  className="w-full h-full object-cover"
+                  className={cn("w-full h-full", img.isPosterArtwork ? "object-contain" : "object-cover")}
                   onError={(e) => { (e.target as HTMLImageElement).src = fallbackImageUrl; }}
                 />
               </button>
@@ -500,7 +503,7 @@ export const MockupGallery = ({
                       alt={img.label}
                       loading="lazy"
                       decoding="async"
-                      className="w-full h-full object-cover"
+                      className={cn("w-full h-full", img.isPosterArtwork ? "object-contain" : "object-cover")}
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = fallbackImageUrl;
                       }}
@@ -548,11 +551,13 @@ function MainImage({
   fallback,
   alt,
   className,
+  isPosterArtwork,
 }: {
   src: string;
   fallback: string;
   alt: string;
   className?: string;
+  isPosterArtwork?: boolean;
 }) {
   const [loaded, setLoaded] = useState(false);
   const [errored, setErrored] = useState(false);
@@ -568,7 +573,8 @@ function MainImage({
         fetchPriority="high"
         decoding="async"
         className={cn(
-          "w-full h-full object-cover transition-opacity duration-300",
+          "w-full h-full transition-opacity duration-300",
+          isPosterArtwork ? "object-contain" : "object-cover",
           loaded ? "opacity-100" : "opacity-0"
         )}
         data-testid="mockup-gallery-main-image"

@@ -27,9 +27,10 @@ const DEFAULT_TRUST_BADGES: HeroTrustBadge[] = [
   { id: "sustainably-made", text: "Sustainably made" },
 ];
 
-/** Compute className for a hero button wrapper based on its mobile/desktop visibility. */
-function heroBtnWrapperCls(showMobile: boolean | undefined, showDesktop: boolean | undefined): string {
-  const m = showMobile !== false;
+/** Compute className for a hero button wrapper based on its mobile/desktop visibility.
+ * @param defaultMobile - whether to show on mobile when showMobile is undefined (default true; use false for extra buttons). */
+function heroBtnWrapperCls(showMobile: boolean | undefined, showDesktop: boolean | undefined, defaultMobile = true): string {
+  const m = showMobile !== undefined ? showMobile : defaultMobile;
   const d = showDesktop !== false;
   if (m && d) return "w-full sm:w-auto";
   if (!m && !d) return "hidden";
@@ -508,7 +509,7 @@ function HeroSection({ store, resolvedRoutePrefix, sectionConfig }: HeroSectionP
               const extraHref = resolveHomepageLink(resolvedRoutePrefix, btn.link || null);
               const isFilled = btn.variant === "filled";
               return (
-                <SmartLink key={btn.id} href={extraHref} className={heroBtnWrapperCls(btn.showMobile, btn.showDesktop)}>
+                <SmartLink key={btn.id} href={extraHref} className={heroBtnWrapperCls(btn.showMobile, btn.showDesktop, false)}>
                   <Button
                     size="default"
                     variant={isFilled ? "default" : "outline"}
@@ -630,6 +631,12 @@ function CollectionBannerSection({
   const textMaxWidth = banner.textMaxWidth ?? "medium";
   const textOverlay = banner.textOverlay ?? "none";
   const mobileMode = banner.mobileMode ?? "simplified-card";
+  const textOffsetX = banner.textOffsetX ?? 0;
+  const textOffsetY = banner.textOffsetY ?? 0;
+  const textOffsetStyle: React.CSSProperties =
+    (textOffsetX !== 0 || textOffsetY !== 0)
+      ? { transform: `translate(${textOffsetX}px, ${textOffsetY}px)` }
+      : {};
 
   const textMaxWidthClass =
     textMaxWidth === "narrow" ? "max-w-xs" : textMaxWidth === "wide" ? "max-w-md" : "max-w-sm";
@@ -824,7 +831,10 @@ function CollectionBannerSection({
       >
         <div className="flex flex-col sm:flex-row sm:items-center gap-7 sm:gap-10 lg:gap-14 w-full">
           {/* Text column */}
-          <div className={cn("flex-1 min-w-0", textColumnAlignClass, textOverlayCls)}>
+          <div
+            className={cn("flex-1 min-w-0", textColumnAlignClass, textOverlayCls)}
+            style={Object.keys(textOffsetStyle).length > 0 ? textOffsetStyle : undefined}
+          >
             {cbEyebrow && (
               <p
                 className={cn(
