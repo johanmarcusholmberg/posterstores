@@ -687,6 +687,14 @@ export async function fetchPublicStores(): Promise<AdminStore[]> {
 
 // ─── Homepage visual config ────────────────────────────────────────────────
 
+export interface HeroButtonConfig {
+  id: string;
+  label: string;
+  link: string;
+  variant?: "filled" | "outline";
+  visible?: boolean;
+}
+
 export interface HeroVisualConfig {
   backgroundImageUrl?: string | null;
   backgroundStoragePath?: string | null;
@@ -697,6 +705,11 @@ export interface HeroVisualConfig {
   secondaryButtonText?: string | null;
   secondaryButtonVariant?: "filled" | "outline";
   secondaryButtonLink?: string | null;
+  /**
+   * Optional extra hero buttons shown after the primary/secondary buttons.
+   * Existing primary/secondary fields remain the main backwards-compatible buttons.
+   */
+  extraButtons?: HeroButtonConfig[];
 }
 
 export interface SectionFontOverrides {

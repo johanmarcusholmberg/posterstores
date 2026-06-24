@@ -641,6 +641,14 @@ router.get("/stores/resolve", async (req, res) => {
 
 // ── Homepage visual config (admin) ────────────────────────────────────────────
 
+const heroButtonConfigSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  link: z.string(),
+  variant: z.enum(["filled", "outline"]).optional(),
+  visible: z.boolean().optional(),
+});
+
 const heroVisualSchema = z.object({
   backgroundImageUrl: z.string().nullable().optional(),
   backgroundStoragePath: z.string().nullable().optional(),
@@ -651,6 +659,7 @@ const heroVisualSchema = z.object({
   secondaryButtonText: z.string().nullable().optional(),
   secondaryButtonVariant: z.enum(["filled", "outline"]).optional(),
   secondaryButtonLink: z.string().nullable().optional(),
+  extraButtons: z.array(heroButtonConfigSchema).optional(),
 }).optional();
 
 const sectionFontOverridesSchema = z.object({

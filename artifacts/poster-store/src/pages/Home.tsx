@@ -343,7 +343,7 @@ function HeroSection({ store, resolvedRoutePrefix }: HeroSectionProps) {
         >
           {store.homepage?.heroSubtitle || "Mediterranean places, colors and moments — printed for your home."}
         </p>
-        <div className="flex flex-col sm:flex-row gap-2.5 justify-center">
+        <div className="flex flex-col sm:flex-row gap-2.5 justify-center flex-wrap">
           <SmartLink href={primaryHref} className="w-full sm:w-auto">
             <Button
               size="default"
@@ -377,6 +377,30 @@ function HeroSection({ store, resolvedRoutePrefix }: HeroSectionProps) {
               {heroVisual?.secondaryButtonText || store.homepage?.secondaryCta || "View all regions"}
             </Button>
           </SmartLink>
+          {(heroVisual?.extraButtons ?? [])
+            .filter(btn => btn.visible !== false && btn.label.trim())
+            .map(btn => {
+              const extraHref = resolveHomepageLink(resolvedRoutePrefix, btn.link || null);
+              const isFilled = btn.variant === "filled";
+              return (
+                <SmartLink key={btn.id} href={extraHref} className="w-full sm:w-auto">
+                  <Button
+                    size="default"
+                    variant={isFilled ? "default" : "outline"}
+                    className={cn(
+                      "w-full sm:w-auto h-11 px-6 text-sm",
+                      isFilled && hasHeroBg && !useStoreHeroVars && "bg-white text-primary hover:bg-white/90 border-0",
+                      !isFilled && !useStoreHeroVars && (hasHeroBg
+                        ? "border-white/60 text-white hover:bg-white/10 bg-transparent"
+                        : "border-primary/30 text-primary hover:bg-primary/5")
+                    )}
+                  >
+                    {btn.label}
+                  </Button>
+                </SmartLink>
+              );
+            })
+          }
         </div>
         <div
           className={cn(

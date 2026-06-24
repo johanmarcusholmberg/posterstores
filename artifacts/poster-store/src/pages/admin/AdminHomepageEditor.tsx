@@ -9,6 +9,7 @@ import {
   requestStorageUploadUrl,
   type HomepageVisualConfig,
   type HeroVisualConfig,
+  type HeroButtonConfig,
   type CollectionBannerVisualConfig,
   type HomepageSectionConfig,
   type AdminStore,
@@ -207,14 +208,14 @@ function normalizeSortOrders(sections: HomepageSectionConfig[]): HomepageSection
 
 interface CollectionBannerEditorProps {
   banner: CollectionBannerVisualConfig;
-  index: number;
+  bannerLabel: string;
   totalBanners: number;
   onUpdate: (patch: Partial<CollectionBannerVisualConfig>) => void;
   onDuplicate: () => void;
   onRemove: () => void;
 }
 
-function CollectionBannerEditor({ banner, index, totalBanners, onUpdate, onDuplicate, onRemove }: CollectionBannerEditorProps) {
+function CollectionBannerEditor({ banner, bannerLabel, totalBanners, onUpdate, onDuplicate, onRemove }: CollectionBannerEditorProps) {
   const [expanded, setExpanded] = useState(true);
   const overlayPct = Math.round((banner.backgroundOverlayOpacity ?? 0.35) * 100);
   const imageFit = banner.imageFit ?? "cover";
@@ -227,7 +228,7 @@ function CollectionBannerEditor({ banner, index, totalBanners, onUpdate, onDupli
           className="flex-1 flex items-center gap-2 text-left min-w-0">
           <ChevronRight className={cn("w-4 h-4 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-90")} />
           <span className="font-medium text-sm truncate">
-            {banner.title || `Collection banner ${index + 1}`}
+            {bannerLabel}
           </span>
         </button>
         <div className="flex items-center gap-1 shrink-0">
@@ -440,22 +441,32 @@ export default function AdminHomepageEditor() {
   }, []);
 
   const moveSectionUp = (id: string) => {
-    updateSections(prev => {
-      const sorted = [...prev].sort((a, b) => a.sortOrder - b.sortOrder);
-      const idx = sorted.findIndex(s => s.id === id);
-      if (idx <= 0) return sorted;
-      [sorted[idx - 1], sorted[idx]] = [sorted[idx], sorted[idx - 1]];
-      return sorted;
+    setConfig(c => {
+      const sections = normalizeSortOrders(
+        c.sections && c.sections.length > 0 ? [...c.sections] : [...DEFAULT_HOMEPAGE_SECTIONS]
+      );
+      const idx = sections.findIndex(s => s.id === id);
+      if (idx <= 0) return c;
+      // Swap the sortOrder values so normalizeSortOrders re-sorts correctly
+      const tmp = sections[idx].sortOrder;
+      sections[idx] = { ...sections[idx], sortOrder: sections[idx - 1].sortOrder };
+      sections[idx - 1] = { ...sections[idx - 1], sortOrder: tmp };
+      return { ...c, sections: normalizeSortOrders(sections) };
     });
   };
 
   const moveSectionDown = (id: string) => {
-    updateSections(prev => {
-      const sorted = [...prev].sort((a, b) => a.sortOrder - b.sortOrder);
-      const idx = sorted.findIndex(s => s.id === id);
-      if (idx < 0 || idx >= sorted.length - 1) return sorted;
-      [sorted[idx], sorted[idx + 1]] = [sorted[idx + 1], sorted[idx]];
-      return sorted;
+    setConfig(c => {
+      const sections = normalizeSortOrders(
+        c.sections && c.sections.length > 0 ? [...c.sections] : [...DEFAULT_HOMEPAGE_SECTIONS]
+      );
+      const idx = sections.findIndex(s => s.id === id);
+      if (idx < 0 || idx >= sections.length - 1) return c;
+      // Swap the sortOrder values so normalizeSortOrders re-sorts correctly
+      const tmp = sections[idx].sortOrder;
+      sections[idx] = { ...sections[idx], sortOrder: sections[idx + 1].sortOrder };
+      sections[idx + 1] = { ...sections[idx + 1], sortOrder: tmp };
+      return { ...c, sections: normalizeSortOrders(sections) };
     });
   };
 
@@ -463,8 +474,26 @@ export default function AdminHomepageEditor() {
     updateSections(prev => prev.map(s => s.id === id ? { ...s, visible: !s.visible } : s));
   };
 
-  const resetSections = () => {
-    setConfig(c => ({ ...c, sections: normalizeSortOrders([...DEFAULT_HOMEPAGE_SECTIONS]) }));
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  const restoreDefaultOrder = () => {
+    setConfig(c => {
+      const existingSections = c.sections && c.sections.length > 0
+        ? c.sections
+        : [...DEFAULT_HOMEPAGE_SECTIONS];
+      const defaultIds = new Set(DEFAULT_HOMEPAGE_SECTIONS.map(s => s.id));
+      // Rebuild default sections, preserving existing visibility flags
+      const defaultSections: HomepageSectionConfig[] = DEFAULT_HOMEPAGE_SECTIONS.map(def => {
+        const existing = existingSections.find(s => s.id === def.id);
+        return { ...def, visible: existing !== undefined ? existing.visible : def.visible };
+      });
+      // Preserve any custom collection banner sections not in the defaults
+      const customBannerSections = existingSections.filter(
+        s => !defaultIds.has(s.id) && s.type === "collectionBanner"
+      );
+      return { ...c, sections: normalizeSortOrders([...defaultSections, ...customBannerSections]) };
+    });
+    setShowResetConfirm(false);
   };
 
   // ── Banner operations ─────────────────────────────────────────────────────
@@ -705,17 +734,20 @@ export default function AdminHomepageEditor() {
             {/* ── Homepage layout ─────────────────────────────────────── */}
             <SectionCard
               title="Homepage layout"
-              description="Drag sections up/down to reorder. Toggle eye icon to show or hide a section."
+              description="Use the arrows to reorder sections. Toggle the eye icon to show or hide a section."
             >
               <div className="space-y-1.5">
                 {workingSections.map((section, idx) => {
                   const isFirst = idx === 0;
                   const isLast = idx === workingSections.length - 1;
+                  const bannerIdx = section.type === "collectionBanner"
+                    ? orderedBannerSections.findIndex(s => s.id === section.id)
+                    : -1;
                   const bannerTitle = section.type === "collectionBanner" && section.bannerId
                     ? bannerById[section.bannerId]?.title
                     : null;
                   const label = section.type === "collectionBanner"
-                    ? `Collection banner${bannerTitle ? `: ${bannerTitle}` : ""}`
+                    ? `Collection banner ${bannerIdx + 1}${bannerTitle ? ` · ${bannerTitle}` : ""}`
                     : SECTION_LABELS[section.type];
 
                   return (
@@ -763,11 +795,28 @@ export default function AdminHomepageEditor() {
                   <Plus className="w-3.5 h-3.5" />
                   Add collection banner
                 </Button>
-                <Button type="button" variant="ghost" size="sm" onClick={resetSections} className="gap-1.5 text-muted-foreground">
+                <Button type="button" variant="ghost" size="sm"
+                  onClick={() => setShowResetConfirm(true)}
+                  className="gap-1.5 text-muted-foreground">
                   <RotateCcw className="w-3.5 h-3.5" />
-                  Reset to default order
+                  Restore default order
                 </Button>
               </div>
+
+              {showResetConfirm && (
+                <div className="rounded-md border border-border bg-muted/30 p-4 space-y-3 mt-1">
+                  <div>
+                    <p className="font-medium text-sm">Restore default section order?</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      This will reorder sections but will not delete your collection banners or their content.
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="button" size="sm" onClick={restoreDefaultOrder}>Restore order</Button>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => setShowResetConfirm(false)}>Cancel</Button>
+                  </div>
+                </div>
+              )}
             </SectionCard>
 
             {/* ── Hero section ─────────────────────────────────────────── */}
@@ -840,6 +889,97 @@ export default function AdminHomepageEditor() {
                   </p>
                 </div>
               </div>
+
+              {/* Extra buttons */}
+              <div className="space-y-3 pt-1 border-t border-border">
+                <div className="flex items-center justify-between pt-1">
+                  <div>
+                    <Label>Extra buttons</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Additional buttons shown after primary and secondary. Accepts /shop, /about, or https://example.com.
+                    </p>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" className="gap-1.5 shrink-0"
+                    onClick={() => {
+                      const newBtn: HeroButtonConfig = {
+                        id: `btn-${Date.now()}`,
+                        label: "",
+                        link: "",
+                        variant: "outline",
+                        visible: true,
+                      };
+                      setHero({ extraButtons: [...(hero.extraButtons ?? []), newBtn] });
+                    }}>
+                    <Plus className="w-3.5 h-3.5" />
+                    Add hero button
+                  </Button>
+                </div>
+                {(hero.extraButtons ?? []).length === 0 && (
+                  <p className="text-xs text-muted-foreground italic">No extra buttons configured.</p>
+                )}
+                {(hero.extraButtons ?? []).map((btn, bIdx) => (
+                  <div key={btn.id} className="rounded-md border border-border bg-muted/20 p-3 space-y-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-medium text-muted-foreground flex-1">
+                        Button {bIdx + 1}{btn.label ? ` · ${btn.label}` : ""}
+                      </span>
+                      <button type="button"
+                        onClick={() => {
+                          const btns = [...(hero.extraButtons ?? [])];
+                          btns[bIdx] = { ...btns[bIdx], visible: btns[bIdx].visible !== false ? false : true };
+                          setHero({ extraButtons: btns });
+                        }}
+                        className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground"
+                        title={btn.visible !== false ? "Hide button" : "Show button"}>
+                        {btn.visible !== false ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                      </button>
+                      <button type="button"
+                        onClick={() => setHero({ extraButtons: (hero.extraButtons ?? []).filter((_, i) => i !== bIdx) })}
+                        className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-destructive transition-colors"
+                        title="Remove button">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label>Button label</Label>
+                        <Input value={btn.label}
+                          placeholder="View collection"
+                          onChange={e => {
+                            const btns = [...(hero.extraButtons ?? [])];
+                            btns[bIdx] = { ...btns[bIdx], label: e.target.value };
+                            setHero({ extraButtons: btns });
+                          }} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Style</Label>
+                        <Select value={btn.variant ?? "outline"}
+                          onValueChange={v => {
+                            const btns = [...(hero.extraButtons ?? [])];
+                            btns[bIdx] = { ...btns[bIdx], variant: v as "filled" | "outline" };
+                            setHero({ extraButtons: btns });
+                          }}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="filled">Filled</SelectItem>
+                            <SelectItem value="outline">Outline</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="sm:col-span-2 space-y-1.5">
+                        <Label>Destination link</Label>
+                        <Input value={btn.link}
+                          placeholder="/shop or /shop?category=Coastal+Posters or https://example.com"
+                          onChange={e => {
+                            const btns = [...(hero.extraButtons ?? [])];
+                            btns[bIdx] = { ...btns[bIdx], link: e.target.value };
+                            setHero({ extraButtons: btns });
+                          }} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </SectionCard>
 
             {/* ── Collection banners ────────────────────────────────────── */}
@@ -855,7 +995,7 @@ export default function AdminHomepageEditor() {
                     <CollectionBannerEditor
                       key={bannerId}
                       banner={banner}
-                      index={idx}
+                      bannerLabel={`Collection banner ${idx + 1}${banner.title ? ` · ${banner.title}` : ""}`}
                       totalBanners={orderedBannerSections.length}
                       onUpdate={(patch) => updateBanner(bannerId, patch)}
                       onDuplicate={() => duplicateBanner(bannerId)}
