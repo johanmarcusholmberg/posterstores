@@ -18,7 +18,24 @@ import {
   type CollectionBannerVisualConfig,
   type HomepageSectionConfig,
   type HeroButtonStyleConfig,
+  type HeroTrustBadge,
 } from "@/config/storefronts";
+
+const DEFAULT_TRUST_BADGES: HeroTrustBadge[] = [
+  { id: "fine-art", text: "Fine art prints" },
+  { id: "ships-worldwide", text: "Ships worldwide" },
+  { id: "sustainably-made", text: "Sustainably made" },
+];
+
+/** Compute className for a hero button wrapper based on its mobile/desktop visibility. */
+function heroBtnWrapperCls(showMobile: boolean | undefined, showDesktop: boolean | undefined): string {
+  const m = showMobile !== false;
+  const d = showDesktop !== false;
+  if (m && d) return "w-full sm:w-auto";
+  if (!m && !d) return "hidden";
+  if (!m) return "hidden sm:block sm:w-auto"; // desktop only
+  return "sm:hidden w-full"; // mobile only
+}
 
 const VALUE_PROPS = [
   { title: "Museum quality", description: "Archival inks on premium fine art paper" },
@@ -137,12 +154,12 @@ function HomePosterCard({ poster }: { poster: Poster }) {
     >
       <div className="relative aspect-[3/4] overflow-hidden bg-[#f4f0eb] shadow-[0_1px_4px_rgba(0,0,0,0.06)] group-hover:shadow-[0_3px_14px_rgba(0,0,0,0.11)] transition-shadow duration-300">
         <img
-          src={getOptimizedImageUrl(baseImage, { width: 400, quality: 75 })}
+          src={getOptimizedImageUrl(baseImage, { width: 600, quality: 85 })}
           alt={poster.title}
           loading="lazy"
           decoding="async"
           className={[
-            "absolute inset-0 object-cover w-full h-full",
+            "absolute inset-0 object-contain w-full h-full",
             "motion-reduce:transition-none",
             hoverImage
               ? "transition-opacity duration-[280ms] ease-out opacity-100 group-hover:opacity-0"
@@ -152,7 +169,7 @@ function HomePosterCard({ poster }: { poster: Poster }) {
         />
         {hoverImage && (
           <img
-            src={getOptimizedImageUrl(hoverImage, { width: 400, quality: 75 })}
+            src={getOptimizedImageUrl(hoverImage, { width: 600, quality: 80 })}
             alt=""
             aria-hidden="true"
             loading="lazy"
@@ -286,12 +303,12 @@ function FeaturedPosterCard({
       ].join(" ")}>
         <div className="relative aspect-[3/4] overflow-hidden bg-[#ede8e0]">
           <img
-            src={getOptimizedImageUrl(displayImage, { width: 400, quality: 75 })}
+            src={getOptimizedImageUrl(displayImage, { width: 600, quality: 85 })}
             alt={poster.title}
             loading={priority ? "eager" : "lazy"}
             fetchPriority={priority ? "high" : undefined}
             decoding="async"
-            className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.04] motion-reduce:transition-none"
+            className="absolute inset-0 w-full h-full object-contain transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.04] motion-reduce:transition-none"
             onError={(e) => { (e.target as HTMLImageElement).src = poster.imageUrl; }}
           />
           {poster.isNew && <div className={NEW_BADGE_CLS}>NEW</div>}
@@ -417,6 +434,11 @@ function HeroSection({ store, resolvedRoutePrefix, sectionConfig }: HeroSectionP
     ? { backgroundColor: bgColorOverride }
     : {};
 
+  // Trust badges — use store config, fall back to hardcoded defaults
+  const trustBadges = (heroVisual?.trustBadges && heroVisual.trustBadges.length > 0)
+    ? heroVisual.trustBadges
+    : DEFAULT_TRUST_BADGES;
+
   return (
     <section
       className={cn("relative overflow-hidden", !hasHeroBg && !bgColorOverride && "bg-sand")}
@@ -445,7 +467,7 @@ function HeroSection({ store, resolvedRoutePrefix, sectionConfig }: HeroSectionP
           {store.homepage?.heroSubtitle || "Mediterranean places, colors and moments — printed for your home."}
         </p>
         <div className="flex flex-col sm:flex-row gap-2.5 justify-center flex-wrap">
-          <SmartLink href={primaryHref} className="w-full sm:w-auto">
+          <SmartLink href={primaryHref} className={heroBtnWrapperCls(heroVisual?.primaryButtonShowMobile, heroVisual?.primaryButtonShowDesktop)}>
             <Button
               size="default"
               data-testid="btn-hero-primary"
@@ -465,7 +487,7 @@ function HeroSection({ store, resolvedRoutePrefix, sectionConfig }: HeroSectionP
               {heroVisual?.primaryButtonText || store.homepage?.primaryCta || "Browse posters"}
             </Button>
           </SmartLink>
-          <SmartLink href={secondaryHref} className="w-full sm:w-auto">
+          <SmartLink href={secondaryHref} className={heroBtnWrapperCls(heroVisual?.secondaryButtonShowMobile, heroVisual?.secondaryButtonShowDesktop)}>
             <Button
               size="default"
               variant="outline"
@@ -486,7 +508,7 @@ function HeroSection({ store, resolvedRoutePrefix, sectionConfig }: HeroSectionP
               const extraHref = resolveHomepageLink(resolvedRoutePrefix, btn.link || null);
               const isFilled = btn.variant === "filled";
               return (
-                <SmartLink key={btn.id} href={extraHref} className="w-full sm:w-auto">
+                <SmartLink key={btn.id} href={extraHref} className={heroBtnWrapperCls(btn.showMobile, btn.showDesktop)}>
                   <Button
                     size="default"
                     variant={isFilled ? "default" : "outline"}
@@ -513,9 +535,11 @@ function HeroSection({ store, resolvedRoutePrefix, sectionConfig }: HeroSectionP
           )}
           style={Object.keys(bulletStyle).length > 0 ? bulletStyle : undefined}
         >
-          <span>✦ Fine art prints</span>
-          <span>✦ Ships worldwide</span>
-          <span>✦ Sustainably made</span>
+          {trustBadges.filter(b => b.text.trim()).map(badge => (
+            <span key={badge.id} className={badge.showMobile === false ? "hidden sm:inline" : undefined}>
+              ✦ {badge.text}
+            </span>
+          ))}
         </div>
       </div>
     </section>
@@ -600,6 +624,28 @@ function CollectionBannerSection({
   const objectPos = focalToObjectPosition(banner.focalPointX, banner.focalPointY);
   const showPosters = banner.showPosterCards === true;
 
+  // Layout controls (new fields, all default to existing behaviour)
+  const textHAlign = banner.textHAlign ?? "left";
+  const textVAlign = banner.textVAlign ?? "center";
+  const textMaxWidth = banner.textMaxWidth ?? "medium";
+  const textOverlay = banner.textOverlay ?? "none";
+  const mobileMode = banner.mobileMode ?? "simplified-card";
+
+  const textMaxWidthClass =
+    textMaxWidth === "narrow" ? "max-w-xs" : textMaxWidth === "wide" ? "max-w-md" : "max-w-sm";
+
+  // Vertical alignment of the absolute content layer
+  const contentVAlignClass =
+    textVAlign === "top" ? "items-start pt-8" : textVAlign === "bottom" ? "items-end pb-8" : "items-center";
+
+  // Horizontal alignment of the text column
+  const textColumnAlignClass =
+    textHAlign === "center" ? "mx-auto text-center" : textHAlign === "right" ? "ml-auto text-right" : "";
+
+  // Optional semi-transparent panel behind the text block
+  const textOverlayCls =
+    textOverlay === "soft-panel" ? "bg-black/35 backdrop-blur-sm rounded-xl px-5 py-4" : "";
+
   const cbTitle = banner.title ?? staticBanner?.title ?? "Mediterranean Walls";
   const cbText = banner.text ?? staticBanner?.text;
   const cbCtaText = banner.ctaText ?? staticBanner?.ctaText ?? "Explore collection";
@@ -645,117 +691,205 @@ function CollectionBannerSection({
   };
   const ctaStyle: React.CSSProperties = bannerLinkColor ? { color: bannerLinkColor } : {};
 
+  // ── Text content block (reused in both desktop banner and mobile simplified card) ──
+  const textContent = (
+    <>
+      {cbEyebrow && (
+        <p
+          className={cn(
+            "text-[10px] font-semibold uppercase tracking-[0.18em] mb-2.5",
+            !bannerEyebrowColor && "text-foreground/45"
+          )}
+          style={Object.keys(eyebrowStyle).length > 0 ? eyebrowStyle : undefined}
+        >
+          {cbEyebrow}
+        </p>
+      )}
+      <h2
+        className={cn(
+          "font-serif text-2xl sm:text-3xl font-bold leading-tight mb-3",
+          !bannerHeadingColor && "text-primary"
+        )}
+        style={Object.keys(headingStyle).length > 0 ? headingStyle : undefined}
+      >
+        {cbTitle}
+      </h2>
+      {cbText && (
+        <p
+          className={cn(
+            "text-sm leading-relaxed mb-5",
+            textMaxWidthClass,
+            !bannerTextColor && "text-foreground/65"
+          )}
+          style={Object.keys(textStyle).length > 0 ? textStyle : undefined}
+        >
+          {cbText}
+        </p>
+      )}
+      <Link
+        href={resolvedCtaHref}
+        className={cn(
+          "inline-flex items-center gap-1.5 text-sm font-semibold hover:underline",
+          !bannerLinkColor && "text-primary"
+        )}
+        style={Object.keys(ctaStyle).length > 0 ? ctaStyle : undefined}
+      >
+        {cbCtaText} &rarr;
+      </Link>
+    </>
+  );
+
+  // Poster mini-cards (right column on desktop banner)
+  const posterCards = showPosters && collectionPreviewPosters.length > 0 ? (
+    <div className="flex-none flex items-end gap-2.5 sm:gap-3">
+      {collectionPreviewPosters.map((poster, idx) => {
+        const slug = (poster as any).slug as string | undefined;
+        const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
+        const displayImg = poster.primaryDisplayImageUrl ?? poster.imageUrl;
+        return (
+          <Link
+            key={poster.id}
+            href={href}
+            className={["flex-none group", idx === 2 ? "hidden sm:block" : ""].join(" ")}
+          >
+            <div className="w-[60px] sm:w-[72px] lg:w-[84px] bg-[#faf8f4] p-1 pb-2.5 rounded-[2px] shadow-[0_4px_14px_rgba(0,0,0,0.22)] group-hover:-translate-y-1 transition-transform duration-200">
+              <div className="relative aspect-[3/4] bg-[#ece7de] overflow-hidden">
+                <img
+                  src={displayImg}
+                  alt={poster.title}
+                  loading="lazy"
+                  decoding="async"
+                  className="absolute inset-0 w-full h-full object-contain"
+                  onError={(e) => { (e.target as HTMLImageElement).src = poster.imageUrl; }}
+                />
+              </div>
+            </div>
+          </Link>
+        );
+      })}
+    </div>
+  ) : null;
+
+  // ── Gradient text overlay on desktop banner ────────────────────────────────
+  const gradientOverlay = textOverlay === "gradient" && hasCollBg ? (
+    <div
+      className={cn(
+        "absolute inset-0 pointer-events-none",
+        textHAlign === "right"
+          ? "bg-gradient-to-l from-black/55 via-black/20 to-transparent"
+          : textHAlign === "center"
+          ? "bg-gradient-to-b from-black/35 via-black/10 to-transparent"
+          : "bg-gradient-to-r from-black/55 via-black/20 to-transparent"
+      )}
+    />
+  ) : null;
+
+  // ── Desktop banner ─────────────────────────────────────────────────────────
+  const desktopBanner = (
+    <div
+      className={cn(
+        "relative overflow-hidden rounded-2xl shadow-[0_2px_20px_rgba(0,0,0,0.10)]",
+        mobileMode === "simplified-card" && "hidden sm:block",
+        mobileMode === "hidden" && "hidden sm:block",
+      )}
+      style={!hasCollBg ? { backgroundColor: bannerBgColor ?? "#EBD9C4" } : undefined}
+    >
+      {hasCollBg ? (
+        <>
+          <img
+            src={banner.backgroundImageUrl ?? undefined}
+            alt=""
+            aria-hidden="true"
+            loading="lazy"
+            decoding="async"
+            className={cn(
+              "w-full aspect-[18/5] sm:aspect-[13/2] block",
+              imageFit === "contain" ? "object-contain bg-sand" : "object-cover"
+            )}
+            style={imageFit === "cover" ? { objectPosition: objectPos } : undefined}
+          />
+          <div className="absolute inset-0" style={overlayStyle} />
+          {gradientOverlay}
+        </>
+      ) : null}
+
+      {/* Content */}
+      <div
+        className={cn(
+          "z-10 px-6 lg:px-10",
+          hasCollBg
+            ? cn("absolute inset-0 flex", contentVAlignClass)
+            : "relative py-8 lg:py-10"
+        )}
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center gap-7 sm:gap-10 lg:gap-14 w-full">
+          {/* Text column */}
+          <div className={cn("flex-1 min-w-0", textColumnAlignClass, textOverlayCls)}>
+            {cbEyebrow && (
+              <p
+                className={cn(
+                  "text-[10px] font-semibold uppercase tracking-[0.18em] mb-2.5",
+                  !bannerEyebrowColor && (hasCollBg ? "text-white/60" : "text-foreground/45")
+                )}
+                style={Object.keys(eyebrowStyle).length > 0 ? eyebrowStyle : undefined}
+              >
+                {cbEyebrow}
+              </p>
+            )}
+            <h2
+              className={cn(
+                "font-serif text-2xl sm:text-3xl font-bold leading-tight mb-3",
+                !bannerHeadingColor && (hasCollBg ? "text-white" : "text-primary")
+              )}
+              style={Object.keys(headingStyle).length > 0 ? headingStyle : undefined}
+            >
+              {cbTitle}
+            </h2>
+            {cbText && (
+              <p
+                className={cn(
+                  "text-sm leading-relaxed mb-5",
+                  textMaxWidthClass,
+                  !bannerTextColor && (hasCollBg ? "text-white/75" : "text-foreground/65")
+                )}
+                style={Object.keys(textStyle).length > 0 ? textStyle : undefined}
+              >
+                {cbText}
+              </p>
+            )}
+            <Link
+              href={resolvedCtaHref}
+              className={cn(
+                "inline-flex items-center gap-1.5 text-sm font-semibold hover:underline",
+                !bannerLinkColor && (hasCollBg ? "text-white" : "text-primary")
+              )}
+              style={Object.keys(ctaStyle).length > 0 ? ctaStyle : undefined}
+            >
+              {cbCtaText} &rarr;
+            </Link>
+          </div>
+
+          {posterCards}
+        </div>
+      </div>
+    </div>
+  );
+
+  // ── Mobile simplified card (no background image) ───────────────────────────
+  const mobileCard = mobileMode === "simplified-card" ? (
+    <div
+      className="sm:hidden rounded-2xl px-5 py-6"
+      style={{ backgroundColor: bannerBgColor ?? "#EBD9C4" }}
+    >
+      {textContent}
+    </div>
+  ) : null;
+
   return (
     <section className="py-2 lg:py-3">
-      <div className="container mx-auto max-w-screen-2xl px-6 lg:px-10">
-        <div
-          className="relative overflow-hidden rounded-2xl shadow-[0_2px_20px_rgba(0,0,0,0.10)]"
-          style={!hasCollBg ? { backgroundColor: bannerBgColor ?? "#EBD9C4" } : undefined}
-        >
-          {hasCollBg ? (
-            <>
-              <img
-                src={banner.backgroundImageUrl ?? undefined}
-                alt=""
-                aria-hidden="true"
-                loading="lazy"
-                decoding="async"
-                className={cn(
-                  "w-full aspect-[18/5] sm:aspect-[13/2] block",
-                  imageFit === "contain" ? "object-contain bg-sand" : "object-cover"
-                )}
-                style={imageFit === "cover" ? { objectPosition: objectPos } : undefined}
-              />
-              <div className="absolute inset-0" style={overlayStyle} />
-            </>
-          ) : null}
-
-          {/* Content */}
-          <div
-            className={cn(
-              "z-10 px-6 lg:px-10",
-              hasCollBg ? "absolute inset-0 flex items-center" : "relative py-8 lg:py-10"
-            )}
-          >
-            <div className="flex flex-col sm:flex-row sm:items-center gap-7 sm:gap-10 lg:gap-14 w-full">
-              {/* Left column — text + CTA */}
-              <div className="flex-1 min-w-0">
-                {cbEyebrow && (
-                  <p
-                    className={cn(
-                      "text-[10px] font-semibold uppercase tracking-[0.18em] mb-2.5",
-                      !bannerEyebrowColor && (hasCollBg ? "text-white/60" : "text-foreground/45")
-                    )}
-                    style={Object.keys(eyebrowStyle).length > 0 ? eyebrowStyle : undefined}
-                  >
-                    {cbEyebrow}
-                  </p>
-                )}
-                <h2
-                  className={cn(
-                    "font-serif text-2xl sm:text-3xl font-bold leading-tight mb-3",
-                    !bannerHeadingColor && (hasCollBg ? "text-white" : "text-primary")
-                  )}
-                  style={Object.keys(headingStyle).length > 0 ? headingStyle : undefined}
-                >
-                  {cbTitle}
-                </h2>
-                {cbText && (
-                  <p
-                    className={cn(
-                      "text-sm leading-relaxed mb-5 max-w-sm",
-                      !bannerTextColor && (hasCollBg ? "text-white/75" : "text-foreground/65")
-                    )}
-                    style={Object.keys(textStyle).length > 0 ? textStyle : undefined}
-                  >
-                    {cbText}
-                  </p>
-                )}
-                <Link
-                  href={resolvedCtaHref}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 text-sm font-semibold hover:underline",
-                    !bannerLinkColor && (hasCollBg ? "text-white" : "text-primary")
-                  )}
-                  style={Object.keys(ctaStyle).length > 0 ? ctaStyle : undefined}
-                >
-                  {cbCtaText} &rarr;
-                </Link>
-              </div>
-
-              {/* Right column — poster cards (only when showPosterCards is true) */}
-              {showPosters && collectionPreviewPosters.length > 0 && (
-                <div className="flex-none flex items-end gap-2.5 sm:gap-3">
-                  {collectionPreviewPosters.map((poster, idx) => {
-                    const slug = (poster as any).slug as string | undefined;
-                    const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
-                    const displayImg = poster.primaryDisplayImageUrl ?? poster.imageUrl;
-                    return (
-                      <Link
-                        key={poster.id}
-                        href={href}
-                        className={["flex-none group", idx === 2 ? "hidden sm:block" : ""].join(" ")}
-                      >
-                        <div className="w-[60px] sm:w-[72px] lg:w-[84px] bg-[#faf8f4] p-1 pb-2.5 rounded-[2px] shadow-[0_4px_14px_rgba(0,0,0,0.22)] group-hover:-translate-y-1 transition-transform duration-200">
-                          <div className="relative aspect-[3/4] bg-[#ece7de] overflow-hidden">
-                            <img
-                              src={displayImg}
-                              alt={poster.title}
-                              loading="lazy"
-                              decoding="async"
-                              className="absolute inset-0 w-full h-full object-contain"
-                              onError={(e) => { (e.target as HTMLImageElement).src = poster.imageUrl; }}
-                            />
-                          </div>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+      <div className={cn("container mx-auto max-w-screen-2xl px-6 lg:px-10", mobileMode === "simplified-card" && "space-y-2 sm:space-y-0")}>
+        {mobileCard}
+        {desktopBanner}
       </div>
     </section>
   );

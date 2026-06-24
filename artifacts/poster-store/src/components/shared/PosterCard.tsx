@@ -142,13 +142,13 @@ export const PosterCard = ({ poster, favoritedIds, priority = false }: PosterCar
             card looks correct with no animation.
           */}
           <img
-            src={getOptimizedImageUrl(baseImage, { width: 400, quality: 75 })}
+            src={getOptimizedImageUrl(baseImage, { width: 600, quality: 85 })}
             alt={poster.title}
             loading={priority ? "eager" : "lazy"}
             fetchPriority={priority ? "high" : undefined}
             decoding="async"
             className={[
-              "absolute inset-0 object-cover w-full h-full",
+              "absolute inset-0 object-contain w-full h-full",
               "motion-reduce:transition-none",
               hoverImage
                 ? "transition-opacity duration-[280ms] ease-out opacity-100 group-hover:opacity-0 group-focus-within:opacity-0"
@@ -173,7 +173,7 @@ export const PosterCard = ({ poster, favoritedIds, priority = false }: PosterCar
           */}
           {hoverImage && (
             <img
-              src={getOptimizedImageUrl(hoverImage, { width: 400, quality: 75 })}
+              src={getOptimizedImageUrl(hoverImage, { width: 600, quality: 80 })}
               alt=""
               aria-hidden="true"
               loading="lazy"

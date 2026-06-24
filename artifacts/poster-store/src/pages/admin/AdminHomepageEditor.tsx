@@ -11,16 +11,19 @@ import {
   type HeroVisualConfig,
   type HeroButtonConfig,
   type HeroButtonStyleConfig,
+  type HeroTrustBadge,
   type CollectionBannerVisualConfig,
   type HomepageSectionConfig,
   type SectionFontOverrides,
   type SectionColorOverrides,
   type AdminStore,
 } from "@/lib/adminApi";
+
 import {
   DEFAULT_HOMEPAGE_SECTIONS,
   type HomepageSectionType,
 } from "@/config/storefronts";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,6 +56,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { STORE_FONT_OPTIONS, INHERIT_FONT_VALUE } from "@/lib/storeFonts";
+
+const DEFAULT_TRUST_BADGE_TEXTS = ["Fine art prints", "Ships worldwide", "Sustainably made"];
 
 // ─── Upload helpers ────────────────────────────────────────────────────────
 
@@ -501,6 +506,81 @@ function CollectionBannerEditor({ banner, bannerLabel, totalBanners, onUpdate, o
               checked={banner.showPosterCards ?? false}
               onCheckedChange={(v) => onUpdate({ showPosterCards: v })}
             />
+          </div>
+
+          {/* Layout controls */}
+          <div className="space-y-3 pt-1 border-t border-border">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide pt-1">Layout</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Text position</Label>
+                <Select
+                  value={banner.textHAlign ?? "left"}
+                  onValueChange={v => onUpdate({ textHAlign: v as "left" | "center" | "right" })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="left">Left</SelectItem>
+                    <SelectItem value="center">Center</SelectItem>
+                    <SelectItem value="right">Right</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Vertical position</Label>
+                <Select
+                  value={banner.textVAlign ?? "center"}
+                  onValueChange={v => onUpdate({ textVAlign: v as "top" | "center" | "bottom" })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="top">Top</SelectItem>
+                    <SelectItem value="center">Center</SelectItem>
+                    <SelectItem value="bottom">Bottom</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Text max width</Label>
+                <Select
+                  value={banner.textMaxWidth ?? "medium"}
+                  onValueChange={v => onUpdate({ textMaxWidth: v as "narrow" | "medium" | "wide" })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="narrow">Narrow</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="wide">Wide</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Readable overlay</Label>
+                <Select
+                  value={banner.textOverlay ?? "none"}
+                  onValueChange={v => onUpdate({ textOverlay: v as "none" | "soft-panel" | "gradient" })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    <SelectItem value="soft-panel">Soft panel</SelectItem>
+                    <SelectItem value="gradient">Gradient</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Mobile mode</Label>
+              <Select
+                value={banner.mobileMode ?? "simplified-card"}
+                onValueChange={v => onUpdate({ mobileMode: v as "full-banner" | "simplified-card" | "hidden" })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="full-banner">Full banner</SelectItem>
+                  <SelectItem value="simplified-card">Simplified card (recommended)</SelectItem>
+                  <SelectItem value="hidden">Hidden on mobile</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                "Simplified card" shows a clean text + image card on mobile instead of the full-bleed banner.
+              </p>
+            </div>
           </div>
 
           {/* Banner visual overrides */}
@@ -1083,6 +1163,22 @@ export default function AdminHomepageEditor() {
                     />
                   </div>
                 </CollapsibleOverridePanel>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                    <p className="text-sm">Show on mobile</p>
+                    <Switch
+                      checked={hero.primaryButtonShowMobile !== false}
+                      onCheckedChange={v => setHero({ primaryButtonShowMobile: v ? undefined : false })}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                    <p className="text-sm">Show on desktop</p>
+                    <Switch
+                      checked={hero.primaryButtonShowDesktop !== false}
+                      onCheckedChange={v => setHero({ primaryButtonShowDesktop: v ? undefined : false })}
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Secondary button */}
@@ -1133,6 +1229,22 @@ export default function AdminHomepageEditor() {
                     />
                   </div>
                 </CollapsibleOverridePanel>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                    <p className="text-sm">Show on mobile</p>
+                    <Switch
+                      checked={hero.secondaryButtonShowMobile !== false}
+                      onCheckedChange={v => setHero({ secondaryButtonShowMobile: v ? undefined : false })}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                    <p className="text-sm">Show on desktop</p>
+                    <Switch
+                      checked={hero.secondaryButtonShowDesktop !== false}
+                      onCheckedChange={v => setHero({ secondaryButtonShowDesktop: v ? undefined : false })}
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Extra buttons */}
@@ -1252,8 +1364,100 @@ export default function AdminHomepageEditor() {
                         }}
                       />
                     </div>
+                    {/* Per-button mobile/desktop visibility */}
+                    <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/50">
+                      <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                        <p className="text-xs">Show on mobile</p>
+                        <Switch
+                          checked={btn.showMobile !== false}
+                          onCheckedChange={v => {
+                            const btns = [...(hero.extraButtons ?? [])];
+                            btns[bIdx] = { ...btns[bIdx], showMobile: v ? undefined : false };
+                            setHero({ extraButtons: btns });
+                          }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                        <p className="text-xs">Show on desktop</p>
+                        <Switch
+                          checked={btn.showDesktop !== false}
+                          onCheckedChange={v => {
+                            const btns = [...(hero.extraButtons ?? [])];
+                            btns[bIdx] = { ...btns[bIdx], showDesktop: v ? undefined : false };
+                            setHero({ extraButtons: btns });
+                          }}
+                        />
+                      </div>
+                    </div>
                   </div>
                 ))}
+              </div>
+
+              {/* Trust badges */}
+              <div className="space-y-3 pt-1 border-t border-border">
+                <div className="flex items-center justify-between pt-1">
+                  <div>
+                    <Label>Trust badges</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Short labels shown below the hero buttons. Defaults: {DEFAULT_TRUST_BADGE_TEXTS.join(" · ")}.
+                    </p>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" className="gap-1.5 shrink-0"
+                    onClick={() => {
+                      const newBadge: HeroTrustBadge = { id: `badge-${Date.now()}`, text: "" };
+                      const current = hero.trustBadges && hero.trustBadges.length > 0
+                        ? hero.trustBadges
+                        : DEFAULT_TRUST_BADGE_TEXTS.map((t, i) => ({ id: `default-${i}`, text: t }));
+                      setHero({ trustBadges: [...current, newBadge] });
+                    }}>
+                    <Plus className="w-3.5 h-3.5" />
+                    Add badge
+                  </Button>
+                </div>
+                {(!hero.trustBadges || hero.trustBadges.length === 0) ? (
+                  <p className="text-xs text-muted-foreground italic">
+                    Using defaults: {DEFAULT_TRUST_BADGE_TEXTS.join(" · ")}
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {hero.trustBadges.map((badge, bIdx) => (
+                      <div key={badge.id} className="flex items-center gap-2 rounded-md border border-border bg-muted/20 p-2">
+                        <Input
+                          value={badge.text}
+                          placeholder={DEFAULT_TRUST_BADGE_TEXTS[bIdx] ?? "Fine art prints"}
+                          className="h-8 text-sm flex-1"
+                          onChange={e => {
+                            const badges = [...(hero.trustBadges ?? [])];
+                            badges[bIdx] = { ...badges[bIdx], text: e.target.value };
+                            setHero({ trustBadges: badges });
+                          }}
+                        />
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="text-xs text-muted-foreground">Mobile</span>
+                          <Switch
+                            checked={badge.showMobile !== false}
+                            onCheckedChange={v => {
+                              const badges = [...(hero.trustBadges ?? [])];
+                              badges[bIdx] = { ...badges[bIdx], showMobile: v ? undefined : false };
+                              setHero({ trustBadges: badges });
+                            }}
+                          />
+                        </div>
+                        <button type="button"
+                          onClick={() => setHero({ trustBadges: (hero.trustBadges ?? []).filter((_, i) => i !== bIdx) })}
+                          className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-destructive transition-colors"
+                          title="Remove badge">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                    <button type="button"
+                      className="text-xs text-muted-foreground hover:text-foreground underline"
+                      onClick={() => setHero({ trustBadges: undefined })}>
+                      Reset to defaults
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Hero visual overrides */}

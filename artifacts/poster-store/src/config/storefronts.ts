@@ -11,6 +11,17 @@ export interface HeroButtonConfig {
   variant?: "filled" | "outline";
   visible?: boolean;
   style?: HeroButtonStyleConfig | null;
+  /** If false, button is hidden on desktop screens (≥sm). Defaults to true. */
+  showDesktop?: boolean;
+  /** If false, button is hidden on mobile screens (<sm). Defaults to true. */
+  showMobile?: boolean;
+}
+
+export interface HeroTrustBadge {
+  id: string;
+  text: string;
+  /** If false, badge is hidden on mobile screens (<sm). Defaults to true. */
+  showMobile?: boolean;
 }
 
 export interface HeroVisualConfig {
@@ -30,6 +41,19 @@ export interface HeroVisualConfig {
    * Existing primary/secondary fields remain the main backwards-compatible buttons.
    */
   extraButtons?: HeroButtonConfig[];
+  /** If false, the primary button is hidden on mobile (<sm). Defaults to true. */
+  primaryButtonShowMobile?: boolean;
+  /** If false, the primary button is hidden on desktop (≥sm). Defaults to true. */
+  primaryButtonShowDesktop?: boolean;
+  /** If false, the secondary button is hidden on mobile (<sm). Defaults to true. */
+  secondaryButtonShowMobile?: boolean;
+  /** If false, the secondary button is hidden on desktop (≥sm). Defaults to true. */
+  secondaryButtonShowDesktop?: boolean;
+  /**
+   * Editable trust badges rendered below the buttons.
+   * Falls back to the three default badges when absent.
+   */
+  trustBadges?: HeroTrustBadge[];
 }
 
 export interface SectionFontOverrides {
@@ -68,6 +92,16 @@ export interface CollectionBannerVisualConfig {
   showPosterCards?: boolean;
   fontOverrides?: SectionFontOverrides | null;
   colorOverrides?: SectionColorOverrides | null;
+  /** Horizontal alignment of the text column. Default: "left". */
+  textHAlign?: "left" | "center" | "right";
+  /** Vertical alignment of the text content when banner has a background image. Default: "center". */
+  textVAlign?: "top" | "center" | "bottom";
+  /** Max-width cap for the text column. Default: "medium". */
+  textMaxWidth?: "narrow" | "medium" | "wide";
+  /** Semi-transparent overlay behind the text block for improved readability. Default: "none". */
+  textOverlay?: "none" | "soft-panel" | "gradient";
+  /** How the banner is rendered on mobile screens. Default: "simplified-card". */
+  mobileMode?: "full-banner" | "simplified-card" | "hidden";
 }
 
 export type HomepageSectionType =
