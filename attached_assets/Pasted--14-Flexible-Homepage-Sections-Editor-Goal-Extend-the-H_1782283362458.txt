@@ -1,0 +1,478 @@
+#14 — Flexible Homepage Sections Editor
+
+## Goal
+
+Extend the Homepage Editor and public `Home.tsx` rendering so every homepage section except the footer can be reordered, shown/hidden, and individually configured.
+
+This phase must support:
+
+* reorderable homepage sections, including Hero
+* multiple collection banner instances
+* configurable Hero button destination links
+* collection banner image fit: `cover` or `contain`
+* cover-mode focal point controls
+* backwards compatibility with existing stores using the old single `collectionBanner` shape
+* a read-only “Global brand defaults” summary in the Homepage Editor with a link to Store Settings
+
+## Workflow constraints
+
+* Do not create branches.
+* Do not commit or push.
+* Make code changes only.
+* Keep the implementation targeted.
+* Avoid broad unrelated refactors.
+* Preserve existing homepage behavior when no new homepage section config exists.
+* At the end, report changed files, what was implemented, what was deferred, and typecheck/test status.
+
+## Done looks like
+
+1. Admin Homepage Editor shows all homepage sections except footer as reorderable rows:
+
+   * Hero
+   * Featured posters
+   * Collection banner(s)
+   * Explore links
+   * New arrivals
+   * Brand story
+   * Value props
+
+2. Each section row has:
+
+   * up/down arrows
+   * show/hide toggle
+   * clear label
+   * normalized ordering
+
+3. Multiple collection banners can be:
+
+   * added
+   * duplicated
+   * removed
+   * shown/hidden
+   * reordered like other homepage sections
+
+4. Each collection banner has its own expandable editor with:
+
+   * eyebrow
+   * title
+   * text/description
+   * CTA text
+   * CTA link
+   * background image URL/storage path
+   * overlay opacity
+   * image fit: `cover` or `contain`
+   * focal point controls for cover mode: horizontal `left | center | right`, vertical `top | center | bottom`
+   * `showPosterCards` toggle
+   * placeholder note for future section-level font/color overrides
+
+5. Hero section editor keeps existing controls and adds:
+
+   * Primary button link
+   * Secondary button link
+
+6. Public homepage uses Hero button links:
+
+   * blank link defaults to `/shop`
+   * relative links like `/shop`, `/shop?category=Coastal+Posters`, `/about` must respect the current route prefix behavior
+   * absolute `http://` or `https://` URLs should work safely without being prefixed
+
+7. Collection banner rendering:
+
+   * `imageFit: "cover"` uses `object-cover` and focal point via `object-position`
+   * `imageFit: "contain"` uses `object-contain` with a suitable background color
+   * poster card strip only renders when `showPosterCards` is true
+   * existing `isCollectionBanner` poster flag remains the data source for preview poster cards in this phase
+
+8. Image uploaders show recommended dimensions:
+
+   * Hero: `1920×600 recommended`
+   * Collection banner: `1920×295 or wider recommended (13:2 ratio)`
+   * Mention that cover mode may crop edges and contain mode keeps the full image visible
+
+9. Public `Home.tsx` renders sections according to `homepageVisualConfig.sections` sorted by `sortOrder`.
+
+10. When `sections` is absent, the original fixed order is used as fallback with no visual regression.
+
+11. Existing stores with only old `homepageVisualConfig.collectionBanner` continue to render correctly. Treat the old field as the first collection banner if `collectionBanners` is absent.
+
+12. Homepage Editor shows a “Global brand defaults” read-only summary card:
+
+* current theme colors
+* current typography defaults
+* link/button to the existing Store Settings route
+* do not duplicate the full Store Settings editor in this phase
+
+13. Backend PUT endpoint accepts and validates the new shape with Zod, while still accepting the old shape.
+
+14. Typecheck passes with no new errors.
+
+## Out of scope for this phase
+
+* Applying section-level font/color overrides in public rendering
+* Full UI for section-level font/color overrides
+* Mobile-specific background images
+* Per-banner selected poster IDs
+* Full embedding of Store Settings editors inside Homepage Editor
+* Browser image dimension auto-detection after upload
+* Aspect-ratio mismatch warning after upload
+
+Add type fields for future section-level overrides, but keep the admin UI as a placeholder note and do not apply those overrides in `Home.tsx` yet.
+
+## Implementation details
+
+### 1. Extend frontend types
+
+Update:
+
+* `artifacts/poster-store/src/config/storefronts.ts`
+* `artifacts/poster-store/src/lib/adminApi.ts`
+
+Add:
+
+```ts
+export type HomepageSectionType =
+  | "hero"
+  | "featuredPosters"
+  | "collectionBanner"
+  | "exploreLinks"
+  | "newArrivals"
+  | "brandStory"
+  | "valueProps";
+
+export interface SectionFontOverrides {
+  headingFont?: string | null;
+  bodyFont?: string | null;
+}
+
+export interface SectionColorOverrides {
+  eyebrowColor?: string | null;
+  headingColor?: string | null;
+  textColor?: string | null;
+  linkColor?: string | null;
+  buttonTextColor?: string | null;
+  backgroundColor?: string | null;
+  overlayColor?: string | null;
+  overlayOpacity?: number | null;
+}
+
+export interface HomepageSectionConfig {
+  id: string;
+  type: HomepageSectionType;
+  visible: boolean;
+  sortOrder: number;
+  titleOverride?: string | null;
+  bannerId?: string | null;
+  fontOverrides?: SectionFontOverrides | null;
+  colorOverrides?: SectionColorOverrides | null;
+}
+```
+
+Extend `HeroVisualConfig`:
+
+```ts
+primaryButtonLink?: string | null;
+secondaryButtonLink?: string | null;
+```
+
+Extend `CollectionBannerVisualConfig`:
+
+```ts
+id?: string;
+visible?: boolean;
+imageFit?: "cover" | "contain";
+focalPointX?: "left" | "center" | "right";
+focalPointY?: "top" | "center" | "bottom";
+showPosterCards?: boolean;
+fontOverrides?: SectionFontOverrides | null;
+colorOverrides?: SectionColorOverrides | null;
+```
+
+Extend `HomepageVisualConfig`:
+
+```ts
+sections?: HomepageSectionConfig[];
+collectionBanners?: CollectionBannerVisualConfig[];
+/** Deprecated legacy field; keep as backwards-compatible fallback. */
+collectionBanner?: CollectionBannerVisualConfig;
+```
+
+### 2. Add shared default sections helper
+
+Create or place near existing homepage config code:
+
+```ts
+export const DEFAULT_HOMEPAGE_SECTIONS: HomepageSectionConfig[] = [
+  { id: "hero", type: "hero", visible: true, sortOrder: 10 },
+  { id: "featured-posters", type: "featuredPosters", visible: true, sortOrder: 20 },
+  { id: "collection-banner-default", type: "collectionBanner", visible: true, sortOrder: 30, bannerId: "default" },
+  { id: "explore-links", type: "exploreLinks", visible: true, sortOrder: 40 },
+  { id: "new-arrivals", type: "newArrivals", visible: true, sortOrder: 50 },
+  { id: "brand-story", type: "brandStory", visible: true, sortOrder: 60 },
+  { id: "value-props", type: "valueProps", visible: true, sortOrder: 70 },
+];
+```
+
+Use this as fallback in both:
+
+* `AdminHomepageEditor`
+* `Home.tsx`
+
+Avoid duplicated constants if possible.
+
+### 3. Extend backend Zod schema
+
+Update:
+
+* `artifacts/api-server/src/routes/stores.ts`
+
+Widen:
+
+* `heroVisualSchema`
+* `collectionBannerVisualSchema`
+* `homepageVisualConfigSchema`
+
+Accept:
+
+* new hero button link fields
+* collection banner `id`, `visible`, `imageFit`, `focalPointX`, `focalPointY`, `showPosterCards`
+* `sections`
+* `collectionBanners`
+* old `collectionBanner`
+
+Add Zod schemas for:
+
+* `HomepageSectionType`
+* `HomepageSectionConfig`
+* optional `fontOverrides`
+* optional `colorOverrides`
+
+Keep validation permissive enough to avoid breaking existing store data, but still validate known enum fields.
+
+Also widen any storage cleanup logic so it handles:
+
+* legacy `collectionBanner.backgroundStoragePath`
+* all `collectionBanners[].backgroundStoragePath`
+* hero background path
+
+No DB migration is needed because `homepage_visual_config` is already JSONB.
+
+### 4. Refactor `AdminHomepageEditor`
+
+Update:
+
+* `artifacts/poster-store/src/pages/admin/AdminHomepageEditor.tsx`
+
+Rebuild the editor into these main areas:
+
+#### A. Global brand defaults
+
+Add a read-only summary card showing current:
+
+* theme colors
+* logo/heading/body fonts if available
+* hero text mode if available
+
+Add a link/button to the existing Store Settings route. Search the existing admin routes and use the real route rather than inventing a new one. If there is no single route, link to the current store edit/settings page.
+
+This phase should not duplicate the full Store Settings editor.
+
+#### B. Homepage layout
+
+Show all sections from `config.sections` or `DEFAULT_HOMEPAGE_SECTIONS`.
+
+Each row:
+
+* label
+* type
+* visible switch
+* up button
+* down button
+* for collection banner rows, show the associated banner title if available
+
+Actions:
+
+* move up/down by changing `sortOrder`
+* normalize order after moves
+* show/hide toggle
+* reset to default sections
+* add collection banner
+
+When adding a collection banner:
+
+* create unique `banner.id`
+* add a matching `HomepageSectionConfig` row with `type: "collectionBanner"` and `bannerId`
+* append to the end by default
+* give default values:
+
+  * `visible: true`
+  * `imageFit: "cover"`
+  * `focalPointX: "center"`
+  * `focalPointY: "center"`
+  * `showPosterCards: false`
+  * overlay opacity default 0.35
+
+#### C. Hero section editor
+
+Keep existing controls and add:
+
+* Primary button link
+* Secondary button link
+
+Placeholders:
+
+* `/shop`
+* `/shop?category=Coastal+Posters`
+* `/shop?region=Andalusia`
+* `/about`
+* `https://example.com`
+
+Blank should mean default `/shop`.
+
+#### D. Collection banner editors
+
+For each banner in `collectionBanners` or legacy fallback:
+
+* render a distinct expandable card
+* support duplicate/remove
+* support all existing text/image/CTA fields
+* add `imageFit`
+* add focal-point controls
+* add `showPosterCards`
+* add placeholder note: “Section-level font and color overrides are planned for next phase.”
+
+Image uploader:
+
+* add `recommendedSpec` prop
+* show helper text:
+
+  * hero: `1920×600 recommended`
+  * collection: `1920×295 or wider recommended (13:2 ratio)`
+* keep existing upload validation
+* no dimension detection in this phase
+
+### 5. Refactor public `Home.tsx`
+
+Update:
+
+* `artifacts/poster-store/src/pages/Home.tsx`
+
+Extract render functions/components:
+
+* `renderHero`
+* `renderFeaturedPosters`
+* `renderCollectionBanner`
+* `renderExploreLinks`
+* `renderNewArrivals`
+* `renderBrandStory`
+* `renderValueProps`
+
+Main rendering behavior:
+
+* Build normalized section list:
+
+  * if `homepageVisualConfig.sections` exists and has rows, use it sorted by `sortOrder`
+  * otherwise use the original hardcoded order via `DEFAULT_HOMEPAGE_SECTIONS`
+* Skip sections where `visible === false`
+* For `collectionBanner`, resolve the banner by `section.bannerId`
+* If no `collectionBanners` exists, treat legacy `collectionBanner` as banner id `default`
+
+Important:
+
+* Existing stores with no section config must look the same as before.
+* Existing stores with old single `collectionBanner` must still show one collection banner.
+
+### 6. Hero button link wiring
+
+Create a helper for homepage links, for example:
+
+```ts
+function resolveHomepageLink(routePrefix: string | null, href?: string | null): string {
+  if (!href || !href.trim()) return makeShopUrl(routePrefix);
+  const trimmed = href.trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (trimmed.startsWith("/")) {
+    return routePrefix ? `/${routePrefix}${trimmed}` : trimmed;
+  }
+  return routePrefix ? `/${routePrefix}/${trimmed}` : `/${trimmed}`;
+}
+```
+
+Use it for:
+
+* Hero primary button
+* Hero secondary button
+* Collection banner CTA where appropriate
+
+For external URLs, use a safe `<a href>` rather than Wouter `<Link>` if needed. For internal URLs, use existing `<Link>`.
+
+### 7. Collection banner image rendering
+
+For collection banner background image:
+
+Cover mode:
+
+* `object-cover`
+* `object-position` based on focal fields
+
+Map:
+
+* `left` → `0%`
+* `center` → `50%`
+* `right` → `100%`
+* `top` → `0%`
+* `center` → `50%`
+* `bottom` → `100%`
+
+Contain mode:
+
+* `object-contain`
+* keep full image visible
+* use suitable background color from theme/sand fallback
+
+Use existing aspect ratio behavior:
+
+* desktop `13:2`
+* mobile `18:5`
+
+Only show poster cards when:
+
+* `banner.showPosterCards === true`
+
+Keep existing `isCollectionBanner` poster selection fallback.
+
+### 8. Backwards compatibility checks
+
+Verify these cases by reasoning and/or local run:
+
+* no `homepage_visual_config`
+* old shape with only `collectionBanner`
+* new shape with `sections` but no `collectionBanners`
+* new shape with multiple collection banners
+* hidden sections
+* hero button links blank
+* hero button custom internal links
+* hero button external links
+* collection banner `cover`
+* collection banner `contain`
+
+### 9. Typecheck
+
+Run:
+
+```bash
+pnpm --filter @workspace/poster-store run typecheck
+pnpm --filter @workspace/api-server run typecheck
+```
+
+Fix all new errors before reporting.
+
+## Report format
+
+Return:
+
+1. Files changed
+2. Summary of implemented behavior
+3. Backwards compatibility notes
+4. What is deferred to next phase
+5. Typecheck results
+6. Any risks or manual QA notes

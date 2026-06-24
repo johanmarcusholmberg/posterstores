@@ -693,11 +693,31 @@ export interface HeroVisualConfig {
   backgroundOverlayOpacity?: number;
   primaryButtonText?: string | null;
   primaryButtonVariant?: "filled" | "outline";
+  primaryButtonLink?: string | null;
   secondaryButtonText?: string | null;
   secondaryButtonVariant?: "filled" | "outline";
+  secondaryButtonLink?: string | null;
+}
+
+export interface SectionFontOverrides {
+  headingFont?: string | null;
+  bodyFont?: string | null;
+}
+
+export interface SectionColorOverrides {
+  eyebrowColor?: string | null;
+  headingColor?: string | null;
+  textColor?: string | null;
+  linkColor?: string | null;
+  buttonTextColor?: string | null;
+  backgroundColor?: string | null;
+  overlayColor?: string | null;
+  overlayOpacity?: number | null;
 }
 
 export interface CollectionBannerVisualConfig {
+  id?: string;
+  visible?: boolean;
   backgroundImageUrl?: string | null;
   backgroundStoragePath?: string | null;
   backgroundOverlayOpacity?: number;
@@ -706,10 +726,39 @@ export interface CollectionBannerVisualConfig {
   text?: string | null;
   ctaText?: string | null;
   ctaLink?: string | null;
+  imageFit?: "cover" | "contain";
+  focalPointX?: "left" | "center" | "right";
+  focalPointY?: "top" | "center" | "bottom";
+  showPosterCards?: boolean;
+  fontOverrides?: SectionFontOverrides | null;
+  colorOverrides?: SectionColorOverrides | null;
+}
+
+export type HomepageSectionType =
+  | "hero"
+  | "featuredPosters"
+  | "collectionBanner"
+  | "exploreLinks"
+  | "newArrivals"
+  | "brandStory"
+  | "valueProps";
+
+export interface HomepageSectionConfig {
+  id: string;
+  type: HomepageSectionType;
+  visible: boolean;
+  sortOrder: number;
+  titleOverride?: string | null;
+  bannerId?: string | null;
+  fontOverrides?: SectionFontOverrides | null;
+  colorOverrides?: SectionColorOverrides | null;
 }
 
 export interface HomepageVisualConfig {
   hero?: HeroVisualConfig;
+  sections?: HomepageSectionConfig[];
+  collectionBanners?: CollectionBannerVisualConfig[];
+  /** @deprecated Legacy single-banner field — kept as backwards-compatible fallback. */
   collectionBanner?: CollectionBannerVisualConfig;
 }
 

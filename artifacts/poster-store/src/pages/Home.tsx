@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Link } from "wouter";
 import { useStorefront } from "@/context/StorefrontContext";
 import {
@@ -13,24 +13,17 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { getOptimizedImageUrl } from "@/lib/imageUrl";
+import {
+  DEFAULT_HOMEPAGE_SECTIONS,
+  type CollectionBannerVisualConfig,
+  type HomepageSectionConfig,
+} from "@/config/storefronts";
 
 const VALUE_PROPS = [
-  {
-    title: "Museum quality",
-    description: "Archival inks on premium fine art paper",
-  },
-  {
-    title: "Made to order",
-    description: "Printed especially for you when you order",
-  },
-  {
-    title: "Worldwide shipping",
-    description: "Carefully packed and shipped to your door",
-  },
-  {
-    title: "Better choice",
-    description: "Sustainably made with responsible materials",
-  },
+  { title: "Museum quality", description: "Archival inks on premium fine art paper" },
+  { title: "Made to order", description: "Printed especially for you when you order" },
+  { title: "Worldwide shipping", description: "Carefully packed and shipped to your door" },
+  { title: "Better choice", description: "Sustainably made with responsible materials" },
 ];
 
 function formatPrice(price: number, currency: string): string {
@@ -46,15 +39,62 @@ function makeShopUrl(routePrefix: string | null, query?: string): string {
   return query ? `${base}?${query}` : base;
 }
 
+/**
+ * Resolve a homepage link respecting route prefix.
+ * - Blank/null → default /shop
+ * - Absolute http(s) URL → returned as-is (no prefix)
+ * - Relative starting with "/" → prefix prepended
+ */
+function resolveHomepageLink(routePrefix: string | null, href?: string | null): string {
+  if (!href || !href.trim()) return makeShopUrl(routePrefix);
+  const trimmed = href.trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (trimmed.startsWith("/")) {
+    return routePrefix ? `/${routePrefix}${trimmed}` : trimmed;
+  }
+  return routePrefix ? `/${routePrefix}/${trimmed}` : `/${trimmed}`;
+}
+
+/** Use <a> for external URLs, <Link> for internal routes. */
+function SmartLink({
+  href,
+  children,
+  className,
+}: {
+  href: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  if (/^https?:\/\//i.test(href)) {
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" className={className}>
+        {children}
+      </a>
+    );
+  }
+  return <Link href={href} className={className}>{children}</Link>;
+}
+
+/** Map focal point label to CSS percentage for object-position. */
+const FOCAL_X: Record<string, string> = { left: "0%", center: "50%", right: "100%" };
+const FOCAL_Y: Record<string, string> = { top: "0%", center: "50%", bottom: "100%" };
+
+function focalToObjectPosition(
+  x: string | null | undefined,
+  y: string | null | undefined
+): string {
+  return `${FOCAL_X[x ?? "center"] ?? "50%"} ${FOCAL_Y[y ?? "center"] ?? "50%"}`;
+}
+
 /** Shared badge class constants for card overlays */
 const NEW_BADGE_CLS =
   "absolute top-2 right-2 z-10 pointer-events-none rounded-full border border-[#c9a08a]/70 text-[#9e6b4e] bg-[#fefcfa]/80 backdrop-blur-[2px] text-[10px] font-medium tracking-[0.12em] uppercase px-2.5 py-[3px]";
 
-/** Compact card used only on the homepage featured/new-arrivals rows */
+// ─── Card components ─────────────────────────────────────────────────────────
+
 function HomePosterCard({ poster }: { poster: Poster }) {
   const slug = (poster as any).slug as string | undefined;
   const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
-
   const activeSizes = poster.posterSizes?.filter((s) => s.active) ?? [];
   const lowestPrice = poster.lowestActivePrice;
   const displayPrice = lowestPrice != null ? lowestPrice : poster.price;
@@ -63,7 +103,6 @@ function HomePosterCard({ poster }: { poster: Poster }) {
     activeSizes.length > 1
       ? `From ${formatPrice(displayPrice, displayCurrency)}`
       : formatPrice(displayPrice, displayCurrency);
-
   const baseImage = poster.imageUrl;
   const primaryMockup = poster.primaryDisplayImageUrl ?? null;
   const dedicatedHover = poster.hoverDisplayImageUrl ?? null;
@@ -76,7 +115,6 @@ function HomePosterCard({ poster }: { poster: Poster }) {
       href={href}
       className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
-      {/* Image */}
       <div className="relative aspect-[3/4] overflow-hidden bg-[#f4f0eb] shadow-[0_1px_4px_rgba(0,0,0,0.06)] group-hover:shadow-[0_3px_14px_rgba(0,0,0,0.11)] transition-shadow duration-300">
         <img
           src={getOptimizedImageUrl(baseImage, { width: 400, quality: 75 })}
@@ -90,9 +128,7 @@ function HomePosterCard({ poster }: { poster: Poster }) {
               ? "transition-opacity duration-[280ms] ease-out opacity-100 group-hover:opacity-0"
               : "transition-transform duration-[300ms] ease-out scale-100 group-hover:scale-[1.07]",
           ].join(" ")}
-          onError={(e) => {
-            (e.target as HTMLImageElement).src = poster.imageUrl;
-          }}
+          onError={(e) => { (e.target as HTMLImageElement).src = poster.imageUrl; }}
         />
         {hoverImage && (
           <img
@@ -102,19 +138,12 @@ function HomePosterCard({ poster }: { poster: Poster }) {
             loading="lazy"
             decoding="async"
             className="absolute inset-0 object-cover w-full h-full transition-opacity duration-[280ms] ease-out opacity-0 group-hover:opacity-100 motion-reduce:transition-none motion-reduce:opacity-0"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = "none";
-            }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
           />
         )}
-        <div
-          className="absolute inset-0 ring-1 ring-inset ring-black/[0.06] pointer-events-none"
-          aria-hidden="true"
-        />
+        <div className="absolute inset-0 ring-1 ring-inset ring-black/[0.06] pointer-events-none" aria-hidden="true" />
         {poster.isNew && <div className={NEW_BADGE_CLS}>NEW</div>}
       </div>
-
-      {/* Info */}
       <div className="mt-1.5 min-w-0">
         <h3 className="font-serif font-semibold text-sm text-foreground truncate leading-snug">
           {(poster as any).displayTitle || poster.title}
@@ -125,15 +154,9 @@ function HomePosterCard({ poster }: { poster: Poster }) {
   );
 }
 
-/**
- * Card used in the New Arrivals horizontal carousel.
- * Default state: image + title only (no price).
- * Desktop hover: gradient overlay reveals price, available sizes, and "View poster →".
- */
 function NewArrivalCard({ poster }: { poster: Poster }) {
   const slug = (poster as any).slug as string | undefined;
   const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
-
   const activeSizes = poster.posterSizes?.filter((s) => s.active) ?? [];
   const lowestPrice = poster.lowestActivePrice;
   const displayPrice = lowestPrice != null ? lowestPrice : poster.price;
@@ -147,7 +170,6 @@ function NewArrivalCard({ poster }: { poster: Poster }) {
     .slice(0, 4)
     .map((s) => (s as any).size as string | undefined)
     .filter(Boolean) as string[];
-
   const baseImage = poster.imageUrl;
 
   return (
@@ -155,7 +177,6 @@ function NewArrivalCard({ poster }: { poster: Poster }) {
       href={href}
       className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
-      {/* Image */}
       <div className="relative aspect-[3/4] overflow-hidden bg-[#f4f0eb] shadow-[0_1px_4px_rgba(0,0,0,0.06)] group-hover:shadow-[0_4px_18px_rgba(0,0,0,0.13)] transition-shadow duration-300">
         <img
           src={getOptimizedImageUrl(baseImage, { width: 400, quality: 75 })}
@@ -164,29 +185,19 @@ function NewArrivalCard({ poster }: { poster: Poster }) {
           decoding="async"
           className="absolute inset-0 object-cover w-full h-full transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.05] motion-reduce:transition-none"
         />
-        {/* Hover overlay — desktop only */}
         <div
           className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-250 flex flex-col justify-end p-3 pointer-events-none"
           aria-hidden="true"
         >
-          {hasPrice && (
-            <p className="text-white text-[11px] font-semibold mb-0.5">{priceLabel}</p>
-          )}
+          {hasPrice && <p className="text-white text-[11px] font-semibold mb-0.5">{priceLabel}</p>}
           {sizeLabels.length > 0 && (
-            <p className="text-white/65 text-[10px] mb-1.5 leading-tight">
-              {sizeLabels.join(" · ")}
-            </p>
+            <p className="text-white/65 text-[10px] mb-1.5 leading-tight">{sizeLabels.join(" · ")}</p>
           )}
           <span className="text-white/90 text-[11px] font-medium">View poster →</span>
         </div>
-        <div
-          className="absolute inset-0 ring-1 ring-inset ring-black/[0.06] pointer-events-none"
-          aria-hidden="true"
-        />
+        <div className="absolute inset-0 ring-1 ring-inset ring-black/[0.06] pointer-events-none" aria-hidden="true" />
         {poster.isNew && <div className={NEW_BADGE_CLS}>NEW</div>}
       </div>
-
-      {/* Info — title always; price shown on mobile where hover overlay is inaccessible */}
       <div className="mt-1.5 min-w-0">
         <h3 className="font-serif font-semibold text-sm text-foreground truncate leading-snug">
           {(poster as any).displayTitle || poster.title}
@@ -199,15 +210,9 @@ function NewArrivalCard({ poster }: { poster: Poster }) {
   );
 }
 
-/**
- * Polaroid-inspired card used exclusively in the Featured posters section.
- * Warm paper background, padded frame, larger bottom caption area, soft shadow.
- * Cards are straight (no tilt) and stretch to equal grid-row height.
- */
 function FeaturedPosterCard({ poster, priority = false }: { poster: Poster; priority?: boolean }) {
   const slug = (poster as any).slug as string | undefined;
   const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
-
   const activeSizes = poster.posterSizes?.filter((s) => s.active) ?? [];
   const lowestPrice = poster.lowestActivePrice;
   const displayPrice = lowestPrice != null ? lowestPrice : poster.price;
@@ -216,11 +221,6 @@ function FeaturedPosterCard({ poster, priority = false }: { poster: Poster; prio
     activeSizes.length > 1
       ? `From ${formatPrice(displayPrice, displayCurrency)}`
       : formatPrice(displayPrice, displayCurrency);
-
-  // Public cards may only use rendered mockupImageUrl, never template backgrounds.
-  // primaryDisplayImageUrl is null unless a flat mockupImageUrl exists (enforced
-  // in posterEnrichment.ts), so the poster.imageUrl fallback is the correct path
-  // for unsynced mockups.
   const displayImage = poster.primaryDisplayImageUrl ?? poster.imageUrl;
   const cardTitle = (poster as any).displayTitle || poster.title;
 
@@ -229,18 +229,15 @@ function FeaturedPosterCard({ poster, priority = false }: { poster: Poster; prio
       href={href}
       className="group flex flex-col h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
-      <div
-        className={[
-          "flex flex-col flex-1",
-          "bg-[#faf8f3] rounded-[2px]",
-          "shadow-[0_2px_8px_rgba(0,0,0,0.09),0_1px_3px_rgba(0,0,0,0.06)]",
-          "group-hover:shadow-[0_6px_20px_rgba(0,0,0,0.14),0_2px_6px_rgba(0,0,0,0.09)]",
-          "group-hover:-translate-y-0.5",
-          "transition-all duration-300 ease-out",
-          "p-2 pb-0",
-        ].join(" ")}
-      >
-        {/* Image inset — paper-border feel from outer padding */}
+      <div className={[
+        "flex flex-col flex-1",
+        "bg-[#faf8f3] rounded-[2px]",
+        "shadow-[0_2px_8px_rgba(0,0,0,0.09),0_1px_3px_rgba(0,0,0,0.06)]",
+        "group-hover:shadow-[0_6px_20px_rgba(0,0,0,0.14),0_2px_6px_rgba(0,0,0,0.09)]",
+        "group-hover:-translate-y-0.5",
+        "transition-all duration-300 ease-out",
+        "p-2 pb-0",
+      ].join(" ")}>
         <div className="relative aspect-[3/4] overflow-hidden bg-[#ede8e0]">
           <img
             src={getOptimizedImageUrl(displayImage, { width: 400, quality: 75 })}
@@ -249,14 +246,10 @@ function FeaturedPosterCard({ poster, priority = false }: { poster: Poster; prio
             fetchPriority={priority ? "high" : undefined}
             decoding="async"
             className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.04] motion-reduce:transition-none"
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = poster.imageUrl;
-            }}
+            onError={(e) => { (e.target as HTMLImageElement).src = poster.imageUrl; }}
           />
           {poster.isNew && <div className={NEW_BADGE_CLS}>NEW</div>}
         </div>
-
-        {/* Polaroid caption tab — fixed min-height keeps bottom edges aligned */}
         <div className="px-0.5 pt-2.5 pb-3 min-h-[52px] flex flex-col justify-start min-w-0">
           <h3 className="font-serif font-semibold text-[13px] sm:text-xs text-foreground/85 truncate leading-snug">
             {cardTitle}
@@ -268,7 +261,6 @@ function FeaturedPosterCard({ poster, priority = false }: { poster: Poster; prio
   );
 }
 
-/** Skeleton card matching the Polaroid style for the featured loading state */
 function FeaturedPosterCardSkeleton() {
   return (
     <div className="bg-[#faf8f3] rounded-[2px] shadow-[0_2px_8px_rgba(0,0,0,0.07)] p-2 pb-0">
@@ -281,7 +273,6 @@ function FeaturedPosterCardSkeleton() {
   );
 }
 
-/** Skeleton card for loading states (used in New arrivals horizontal scroll) */
 function PosterCardSkeleton() {
   return (
     <div className="flex-none w-[155px] sm:w-[170px] lg:w-[185px] snap-start">
@@ -292,13 +283,455 @@ function PosterCardSkeleton() {
   );
 }
 
+// ─── Section components ───────────────────────────────────────────────────────
+
+interface HeroSectionProps {
+  store: ReturnType<typeof useStorefront>;
+  resolvedRoutePrefix: string | null;
+}
+
+function HeroSection({ store, resolvedRoutePrefix }: HeroSectionProps) {
+  const heroVisual = store.homepageVisualConfig?.hero;
+  const hasHeroBg = !!heroVisual?.backgroundImageUrl;
+  const heroTextMode = store.typographyConfig?.heroTextMode;
+  const heroOverlayMode = store.typographyConfig?.heroOverlayMode;
+  const useStoreHeroVars = !!heroTextMode;
+  const useStoreOverlay = !!heroOverlayMode;
+
+  const primaryHref = resolveHomepageLink(resolvedRoutePrefix, heroVisual?.primaryButtonLink);
+  const secondaryHref = resolveHomepageLink(resolvedRoutePrefix, heroVisual?.secondaryButtonLink);
+
+  return (
+    <section
+      className={cn("relative overflow-hidden", !hasHeroBg && "bg-sand")}
+      style={
+        hasHeroBg
+          ? {
+              backgroundImage: `url(${heroVisual!.backgroundImageUrl})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }
+          : undefined
+      }
+    >
+      {hasHeroBg && (
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundColor: useStoreOverlay
+              ? "var(--store-hero-overlay-color)"
+              : `rgba(0,0,0,${heroVisual?.backgroundOverlayOpacity ?? 0.3})`,
+          }}
+        />
+      )}
+      <div className="relative z-10 container mx-auto max-w-screen-2xl px-6 lg:px-10 pt-3 pb-5 lg:pt-4 lg:pb-6 text-center">
+        <h1
+          className={cn(
+            "font-serif text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 leading-tight",
+            !useStoreHeroVars && (hasHeroBg ? "text-white" : "text-primary")
+          )}
+          style={useStoreHeroVars ? { color: "var(--store-hero-heading-color)" } : undefined}
+        >
+          {store.homepage?.heroTitle || "Posters inspired by Spain"}
+        </h1>
+        <p
+          className={cn(
+            "text-sm mb-5 max-w-xl mx-auto leading-relaxed",
+            !useStoreHeroVars && (hasHeroBg ? "text-white/80" : "text-foreground/65")
+          )}
+          style={useStoreHeroVars ? { color: "var(--store-hero-subtitle-color)" } : undefined}
+        >
+          {store.homepage?.heroSubtitle || "Mediterranean places, colors and moments — printed for your home."}
+        </p>
+        <div className="flex flex-col sm:flex-row gap-2.5 justify-center">
+          <SmartLink href={primaryHref} className="w-full sm:w-auto">
+            <Button
+              size="default"
+              data-testid="btn-hero-primary"
+              variant={
+                hasHeroBg && !useStoreHeroVars
+                  ? "default"
+                  : heroVisual?.primaryButtonVariant === "outline"
+                  ? "outline"
+                  : "default"
+              }
+              className={cn(
+                "w-full sm:w-auto h-11 px-6 text-sm",
+                hasHeroBg && !useStoreHeroVars && "bg-white text-primary hover:bg-white/90 border-0"
+              )}
+            >
+              {heroVisual?.primaryButtonText || store.homepage?.primaryCta || "Browse posters"}
+            </Button>
+          </SmartLink>
+          <SmartLink href={secondaryHref} className="w-full sm:w-auto">
+            <Button
+              size="default"
+              variant="outline"
+              className={cn(
+                "w-full sm:w-auto h-11 px-6 text-sm",
+                !useStoreHeroVars && (hasHeroBg
+                  ? "border-white/60 text-white hover:bg-white/10 bg-transparent"
+                  : "border-primary/30 text-primary hover:bg-primary/5")
+              )}
+            >
+              {heroVisual?.secondaryButtonText || store.homepage?.secondaryCta || "View all regions"}
+            </Button>
+          </SmartLink>
+        </div>
+        <div
+          className={cn(
+            "mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 justify-center text-xs",
+            !useStoreHeroVars && (hasHeroBg ? "text-white/50" : "text-foreground/40")
+          )}
+          style={useStoreHeroVars ? { color: "var(--store-hero-bullet-color)" } : undefined}
+        >
+          <span>✦ Fine art prints</span>
+          <span>✦ Ships worldwide</span>
+          <span>✦ Sustainably made</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+interface FeaturedPostersSectionProps {
+  featured: Poster[] | undefined;
+  resolvedRoutePrefix: string | null;
+}
+
+function FeaturedPostersSection({ featured, resolvedRoutePrefix }: FeaturedPostersSectionProps) {
+  const FEATURED_LIMIT = 6;
+  return (
+    <section className="pt-4 pb-5 lg:pt-4 lg:pb-6">
+      <div className="container mx-auto max-w-screen-2xl px-6 lg:px-10">
+        <div className="flex items-center justify-between mb-5 lg:mb-6">
+          <h2 className="font-serif text-xl font-bold text-foreground">Featured posters</h2>
+          <Link
+            href={makeShopUrl(resolvedRoutePrefix)}
+            className="text-sm text-primary font-medium hover:underline shrink-0 ml-4"
+          >
+            View all &rarr;
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-5 lg:gap-4 items-stretch">
+          {featured && featured.length > 0
+            ? featured.slice(0, FEATURED_LIMIT).map((poster, i) => (
+                <div key={poster.id} className={["h-full", i >= 4 ? "hidden sm:block" : ""].filter(Boolean).join(" ")}>
+                  <FeaturedPosterCard poster={poster} priority={i < 2} />
+                </div>
+              ))
+            : Array.from({ length: FEATURED_LIMIT }).map((_, i) => (
+                <div key={i} className={["h-full", i >= 4 ? "hidden sm:block" : ""].filter(Boolean).join(" ")}>
+                  <FeaturedPosterCardSkeleton />
+                </div>
+              ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+interface CollectionBannerSectionProps {
+  banner: CollectionBannerVisualConfig;
+  staticBanner?: { title: string; text: string; ctaText?: string; ctaLink?: string } | null;
+  collectionPreviewPosters: Poster[];
+  resolvedRoutePrefix: string | null;
+}
+
+function CollectionBannerSection({
+  banner,
+  staticBanner,
+  collectionPreviewPosters,
+  resolvedRoutePrefix,
+}: CollectionBannerSectionProps) {
+  const hasCollBg = !!banner.backgroundImageUrl;
+  const imageFit = banner.imageFit ?? "cover";
+  const objectPos = focalToObjectPosition(banner.focalPointX, banner.focalPointY);
+  const showPosters = banner.showPosterCards === true;
+
+  const cbTitle = banner.title ?? staticBanner?.title ?? "Mediterranean Walls";
+  const cbText = banner.text ?? staticBanner?.text;
+  const cbCtaText = banner.ctaText ?? staticBanner?.ctaText ?? "Explore collection";
+  const cbCtaLink = banner.ctaLink ?? staticBanner?.ctaLink;
+  const cbEyebrow = banner.eyebrow;
+
+  const resolvedCtaHref = cbCtaLink
+    ? resolveHomepageLink(resolvedRoutePrefix, cbCtaLink)
+    : makeShopUrl(resolvedRoutePrefix);
+
+  return (
+    <section className="py-2 lg:py-3">
+      <div className="container mx-auto max-w-screen-2xl px-6 lg:px-10">
+        <div
+          className="relative overflow-hidden rounded-2xl shadow-[0_2px_20px_rgba(0,0,0,0.10)]"
+          style={!hasCollBg ? { backgroundColor: "#EBD9C4" } : undefined}
+        >
+          {hasCollBg ? (
+            <>
+              <img
+                src={banner.backgroundImageUrl ?? undefined}
+                alt=""
+                aria-hidden="true"
+                loading="lazy"
+                decoding="async"
+                className={cn(
+                  "w-full aspect-[18/5] sm:aspect-[13/2] block",
+                  imageFit === "contain" ? "object-contain bg-sand" : "object-cover"
+                )}
+                style={imageFit === "cover" ? { objectPosition: objectPos } : undefined}
+              />
+              <div
+                className="absolute inset-0"
+                style={{
+                  backgroundColor: `rgba(0,0,0,${banner.backgroundOverlayOpacity ?? 0.35})`,
+                }}
+              />
+            </>
+          ) : null}
+
+          {/* Content */}
+          <div
+            className={cn(
+              "z-10 px-6 lg:px-10",
+              hasCollBg ? "absolute inset-0 flex items-center" : "relative py-8 lg:py-10"
+            )}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center gap-7 sm:gap-10 lg:gap-14 w-full">
+              {/* Left column — text + CTA */}
+              <div className="flex-1 min-w-0">
+                {cbEyebrow && (
+                  <p
+                    className={cn(
+                      "text-[10px] font-semibold uppercase tracking-[0.18em] mb-2.5",
+                      hasCollBg ? "text-white/60" : "text-foreground/45"
+                    )}
+                  >
+                    {cbEyebrow}
+                  </p>
+                )}
+                <h2
+                  className={cn(
+                    "font-serif text-2xl sm:text-3xl font-bold leading-tight mb-3",
+                    hasCollBg ? "text-white" : "text-primary"
+                  )}
+                >
+                  {cbTitle}
+                </h2>
+                {cbText && (
+                  <p
+                    className={cn(
+                      "text-sm leading-relaxed mb-5 max-w-sm",
+                      hasCollBg ? "text-white/75" : "text-foreground/65"
+                    )}
+                  >
+                    {cbText}
+                  </p>
+                )}
+                <Link
+                  href={resolvedCtaHref}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 text-sm font-semibold hover:underline",
+                    hasCollBg ? "text-white" : "text-primary"
+                  )}
+                >
+                  {cbCtaText} &rarr;
+                </Link>
+              </div>
+
+              {/* Right column — poster cards (only when showPosterCards is true) */}
+              {showPosters && collectionPreviewPosters.length > 0 && (
+                <div className="flex-none flex items-end gap-2.5 sm:gap-3">
+                  {collectionPreviewPosters.map((poster, idx) => {
+                    const slug = (poster as any).slug as string | undefined;
+                    const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
+                    const displayImg = poster.primaryDisplayImageUrl ?? poster.imageUrl;
+                    return (
+                      <Link
+                        key={poster.id}
+                        href={href}
+                        className={["flex-none group", idx === 2 ? "hidden sm:block" : ""].join(" ")}
+                      >
+                        <div className="w-[60px] sm:w-[72px] lg:w-[84px] bg-[#faf8f4] p-1 pb-2.5 rounded-[2px] shadow-[0_4px_14px_rgba(0,0,0,0.22)] group-hover:-translate-y-1 transition-transform duration-200">
+                          <div className="relative aspect-[3/4] bg-[#ece7de] overflow-hidden">
+                            <img
+                              src={displayImg}
+                              alt={poster.title}
+                              loading="lazy"
+                              decoding="async"
+                              className="absolute inset-0 w-full h-full object-contain"
+                              onError={(e) => { (e.target as HTMLImageElement).src = poster.imageUrl; }}
+                            />
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+interface ExploreLinksProps {
+  regionChips: string[];
+  categoryChips: string[];
+  resolvedRoutePrefix: string | null;
+  regionFilterLabel: string;
+}
+
+function ExploreLinksSection({ regionChips, categoryChips, resolvedRoutePrefix, regionFilterLabel }: ExploreLinksProps) {
+  if (regionChips.length === 0 && categoryChips.length === 0) return null;
+  return (
+    <section className="py-3 lg:py-4" data-testid="shop-by-region-section">
+      <div className="container mx-auto max-w-screen-2xl px-6 lg:px-10">
+        <h2 className="font-serif text-lg font-bold text-foreground mb-4">{regionFilterLabel}</h2>
+        <div className="flex flex-wrap gap-2">
+          {regionChips.map((region) => (
+            <Link
+              key={region}
+              href={makeShopUrl(resolvedRoutePrefix, `region=${encodeURIComponent(region)}`)}
+              className="flex-1 min-w-fit inline-flex items-center justify-center px-3.5 py-1.5 rounded-full border border-border text-sm text-foreground/75 bg-surface hover:bg-sand/60 hover:border-primary/30 hover:text-primary transition-colors duration-150"
+            >
+              {region}
+            </Link>
+          ))}
+          {categoryChips.map((cat) => (
+            <Link
+              key={cat}
+              href={makeShopUrl(resolvedRoutePrefix, `category=${encodeURIComponent(cat)}`)}
+              className="flex-1 min-w-fit inline-flex items-center justify-center px-3.5 py-1.5 rounded-full border border-border text-sm text-foreground/75 bg-surface hover:bg-sand/60 hover:border-primary/30 hover:text-primary transition-colors duration-150"
+            >
+              {cat}
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+interface NewArrivalsSectionProps {
+  newArrivals: Poster[];
+  resolvedRoutePrefix: string | null;
+  naCanScrollLeft: boolean;
+  naCanScrollRight: boolean;
+  trackRef: React.RefObject<HTMLDivElement | null>;
+  onScroll: () => void;
+  onScrollLeft: () => void;
+  onScrollRight: () => void;
+}
+
+function NewArrivalsSection({
+  newArrivals,
+  resolvedRoutePrefix,
+  naCanScrollLeft,
+  naCanScrollRight,
+  trackRef,
+  onScroll,
+  onScrollLeft,
+  onScrollRight,
+}: NewArrivalsSectionProps) {
+  if (newArrivals.length === 0) return null;
+  return (
+    <section className="pt-3 pb-4 lg:pt-4 lg:pb-5" data-testid="new-arrivals-section">
+      <div className="container mx-auto max-w-screen-2xl px-6 lg:px-10 mb-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-serif text-xl font-bold text-foreground">New arrivals</h2>
+          <Link
+            href={makeShopUrl(resolvedRoutePrefix, "sort=newest")}
+            className="text-sm text-primary font-medium hover:underline shrink-0 ml-4"
+          >
+            View all &rarr;
+          </Link>
+        </div>
+      </div>
+      <div className="container mx-auto max-w-screen-2xl pl-6 lg:pl-10 pr-0">
+        <div className="relative">
+          <div
+            ref={trackRef}
+            className="flex gap-4 overflow-x-auto pb-3 scroll-smooth snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            onScroll={onScroll}
+          >
+            {newArrivals.map((poster) => (
+              <div key={poster.id} className="flex-none snap-start w-[74vw] sm:w-[240px] lg:w-[260px]">
+                <NewArrivalCard poster={poster} />
+              </div>
+            ))}
+            <div className="flex-none w-4 lg:w-6" aria-hidden="true" />
+          </div>
+          <div
+            className="absolute inset-y-0 right-0 w-14 lg:w-20 bg-gradient-to-l from-background to-transparent pointer-events-none"
+            aria-hidden="true"
+          />
+          {naCanScrollLeft && (
+            <button
+              onClick={onScrollLeft}
+              aria-label="Scroll New arrivals left"
+              className="hidden sm:flex absolute left-0 top-1/2 -translate-y-1/2 z-10 items-center justify-center w-8 h-8 rounded-full bg-background/95 border border-border shadow-md text-foreground/80 hover:text-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+          )}
+          {naCanScrollRight && (
+            <button
+              onClick={onScrollRight}
+              aria-label="Scroll New arrivals right"
+              className="hidden sm:flex absolute right-0 top-1/2 -translate-y-1/2 z-10 items-center justify-center w-8 h-8 rounded-full bg-background/95 border border-border shadow-md text-foreground/80 hover:text-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function BrandStorySection({ brandStory }: { brandStory: string }) {
+  return (
+    <section className="py-8 lg:py-10" data-testid="brand-story-section">
+      <div className="max-w-2xl mx-auto px-6 text-center">
+        <p className="font-serif text-xl md:text-2xl text-foreground/75 leading-relaxed italic">
+          &ldquo;{brandStory}&rdquo;
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function ValuePropsSection() {
+  return (
+    <section className="border-t border-border py-8 lg:py-10">
+      <div className="container mx-auto max-w-screen-2xl px-6 lg:px-10">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          {VALUE_PROPS.map((prop, i) => (
+            <div
+              key={i}
+              className="text-center px-4 py-5 bg-surface border border-border/50 rounded-xl"
+              data-testid={`value-card-${i}`}
+            >
+              <h3 className="font-serif font-bold text-sm mb-1.5">{prop.title}</h3>
+              <p className="text-xs text-muted-foreground leading-relaxed">{prop.description}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
 export default function Home() {
   const store = useStorefront();
   const { resolvedRoutePrefix } = store;
-
   const FEATURED_LIMIT = 6;
 
-  // ── New arrivals carousel scroll state ──
+  // New arrivals carousel scroll state
   const newArrivalsTrackRef = useRef<HTMLDivElement>(null);
   const [naCanScrollLeft, setNaCanScrollLeft] = useState(false);
   const [naCanScrollRight, setNaCanScrollRight] = useState(false);
@@ -319,21 +752,11 @@ export default function Home() {
 
   const { data: featured } = useGetFeaturedPosters(
     { storeKey: store.storeKey, limit: FEATURED_LIMIT },
-    {
-      query: {
-        queryKey: getGetFeaturedPostersQueryKey({ storeKey: store.storeKey, limit: FEATURED_LIMIT }),
-      },
-    }
+    { query: { queryKey: getGetFeaturedPostersQueryKey({ storeKey: store.storeKey, limit: FEATURED_LIMIT }) } }
   );
 
   const { data: newArrivalsData } = useListPosters(
-    {
-      storeKey: store.storeKey,
-      isNew: true,
-      sort: ListPostersSort.newest,
-      limit: 12,
-      status: "published",
-    },
+    { storeKey: store.storeKey, isNew: true, sort: ListPostersSort.newest, limit: 12, status: "published" },
     {
       query: {
         queryKey: getListPostersQueryKey({
@@ -351,25 +774,13 @@ export default function Home() {
     (store as any).homepage?.brandStory ??
     "A curated poster collection inspired by cities, landscapes, food, architecture and everyday moments.";
 
-  const collectionBanner = store.shop?.collectionBanner;
-  const heroVisual = store.homepageVisualConfig?.hero;
-  const collectionVisual = store.homepageVisualConfig?.collectionBanner;
-  const hasHeroBg = !!heroVisual?.backgroundImageUrl;
-  const hasCollBg = !!collectionVisual?.backgroundImageUrl;
-
-  const heroTextMode = store.typographyConfig?.heroTextMode;
-  const heroOverlayMode = store.typographyConfig?.heroOverlayMode;
-  const useStoreHeroVars = !!heroTextMode;
-  const useStoreOverlay = !!heroOverlayMode;
-
-  // Up to 3 posters explicitly marked "Show in collection banner strip".
-  // No fallback — if zero are selected the banner shows background image only.
-  const collectionPreviewPosters: Poster[] = React.useMemo(() => {
+  // Collection preview posters (from isCollectionBanner flag)
+  const collectionPreviewPosters: Poster[] = useMemo(() => {
     const pool = [...(featured ?? []), ...(newArrivalsData?.posters ?? [])];
     const seen = new Set<number>();
     return pool
-      .filter(p => (p as any).isCollectionBanner && p.imageUrl)
-      .filter(p => {
+      .filter((p) => (p as any).isCollectionBanner && p.imageUrl)
+      .filter((p) => {
         if (seen.has(p.id)) return false;
         seen.add(p.id);
         return true;
@@ -377,427 +788,130 @@ export default function Home() {
       .slice(0, 3);
   }, [featured, newArrivalsData]);
 
-  // Build discovery chips: up to 5 regions + up to 4 categories
   const regionChips = (store.regions ?? []).slice(0, 5);
   const categoryChips = (store.categories ?? []).slice(0, 4);
 
-  // New arrivals: dedupe against featured (by id), show up to 12
   const featuredIds = new Set((featured ?? []).map((p) => p.id));
   const newArrivals = (newArrivalsData?.posters ?? [])
     .filter((p) => !featuredIds.has(p.id))
     .slice(0, 12);
-  const showNewArrivals = newArrivals.length > 0;
 
-  // Update scroll arrow state when data loads or window resizes
-  useEffect(() => {
-    updateNaScrollState();
-  }, [newArrivals, updateNaScrollState]);
-
+  useEffect(() => { updateNaScrollState(); }, [newArrivals, updateNaScrollState]);
   useEffect(() => {
     window.addEventListener("resize", updateNaScrollState);
     return () => window.removeEventListener("resize", updateNaScrollState);
   }, [updateNaScrollState]);
 
+  // ── Build banner lookup ────────────────────────────────────────────────────
+  // collectionBanners array takes precedence; fall back to legacy single field as id="default"
+  const bannerLookup = useMemo((): Record<string, CollectionBannerVisualConfig> => {
+    const map: Record<string, CollectionBannerVisualConfig> = {};
+    const banners = store.homepageVisualConfig?.collectionBanners;
+    if (banners && banners.length > 0) {
+      for (const b of banners) { if (b.id) map[b.id] = b; }
+    } else if (store.homepageVisualConfig?.collectionBanner) {
+      map["default"] = { ...store.homepageVisualConfig.collectionBanner, id: "default", showPosterCards: true };
+    }
+    return map;
+  }, [store.homepageVisualConfig]);
+
+  // ── Build active sections list ─────────────────────────────────────────────
+  // Use configured sections if present; otherwise fall back to DEFAULT_HOMEPAGE_SECTIONS
+  const activeSections = useMemo((): HomepageSectionConfig[] => {
+    const cfg = store.homepageVisualConfig?.sections;
+    if (cfg && cfg.length > 0) {
+      return [...cfg].sort((a, b) => a.sortOrder - b.sortOrder);
+    }
+    // Fallback: use defaults, but only show collection banner if we have banner data
+    return DEFAULT_HOMEPAGE_SECTIONS.filter((s) => {
+      if (s.type === "collectionBanner") {
+        return Object.keys(bannerLookup).length > 0 || !!store.shop?.collectionBanner;
+      }
+      return true;
+    });
+  }, [store.homepageVisualConfig, bannerLookup, store.shop]);
+
+  const staticCollectionBanner = store.shop?.collectionBanner ?? null;
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
   return (
     <div className="min-h-screen pb-16">
+      {activeSections.map((section) => {
+        if (!section.visible) return null;
 
-      {/* ── Compact intro ── */}
-      <section
-        className={cn("relative overflow-hidden", !hasHeroBg && "bg-sand")}
-        style={
-          hasHeroBg
-            ? {
-                backgroundImage: `url(${heroVisual!.backgroundImageUrl})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }
-            : undefined
-        }
-      >
-        {hasHeroBg && (
-          <div
-            className="absolute inset-0"
-            style={{
-              backgroundColor: useStoreOverlay
-                ? "var(--store-hero-overlay-color)"
-                : `rgba(0,0,0,${heroVisual?.backgroundOverlayOpacity ?? 0.3})`,
-            }}
-          />
-        )}
-        <div className="relative z-10 container mx-auto max-w-screen-2xl px-6 lg:px-10 pt-3 pb-5 lg:pt-4 lg:pb-6 text-center">
-          <h1
-            className={cn(
-              "font-serif text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 leading-tight",
-              !useStoreHeroVars && (hasHeroBg ? "text-white" : "text-primary")
-            )}
-            style={useStoreHeroVars ? { color: "var(--store-hero-heading-color)" } : undefined}
-          >
-            {store.homepage?.heroTitle || "Posters inspired by Spain"}
-          </h1>
-          <p
-            className={cn(
-              "text-sm mb-5 max-w-xl mx-auto leading-relaxed",
-              !useStoreHeroVars && (hasHeroBg ? "text-white/80" : "text-foreground/65")
-            )}
-            style={useStoreHeroVars ? { color: "var(--store-hero-subtitle-color)" } : undefined}
-          >
-            {store.homepage?.heroSubtitle || "Mediterranean places, colors and moments — printed for your home."}
-          </p>
-          <div className="flex flex-col sm:flex-row gap-2.5 justify-center">
-            <Link href={makeShopUrl(resolvedRoutePrefix)}>
-              <Button
-                size="default"
-                data-testid="btn-hero-primary"
-                variant={
-                  hasHeroBg && !useStoreHeroVars
-                    ? "default"
-                    : heroVisual?.primaryButtonVariant === "outline"
-                    ? "outline"
-                    : "default"
-                }
-                className={cn(
-                  "w-full sm:w-auto h-11 px-6 text-sm",
-                  hasHeroBg && !useStoreHeroVars && "bg-white text-primary hover:bg-white/90 border-0"
-                )}
-              >
-                {heroVisual?.primaryButtonText || store.homepage?.primaryCta || "Browse posters"}
-              </Button>
-            </Link>
-            <Link href={makeShopUrl(resolvedRoutePrefix)}>
-              <Button
-                size="default"
-                variant="outline"
-                className={cn(
-                  "w-full sm:w-auto h-11 px-6 text-sm",
-                  !useStoreHeroVars && (hasHeroBg
-                    ? "border-white/60 text-white hover:bg-white/10 bg-transparent"
-                    : "border-primary/30 text-primary hover:bg-primary/5")
-                )}
-              >
-                {heroVisual?.secondaryButtonText || store.homepage?.secondaryCta || "View all regions"}
-              </Button>
-            </Link>
-          </div>
-          <div
-            className={cn(
-              "mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 justify-center text-xs",
-              !useStoreHeroVars && (hasHeroBg ? "text-white/50" : "text-foreground/40")
-            )}
-            style={useStoreHeroVars ? { color: "var(--store-hero-bullet-color)" } : undefined}
-          >
-            <span>✦ Fine art prints</span>
-            <span>✦ Ships worldwide</span>
-            <span>✦ Sustainably made</span>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Featured posters grid ── */}
-      {/*
-        Layout:
-          Desktop (≥1024px lg): 6 columns × 1 row — all 6 posters visible
-          Tablet  (640–1023px sm): 3 columns × 2 rows — all 6 posters visible
-          Mobile  (<640px): 2 columns × 2 rows — only first 4 shown (items 4+5 hidden on mobile)
-        Polaroid-style cards apply only here; the normal shop grid is unchanged.
-      */}
-      <section className="pt-4 pb-5 lg:pt-4 lg:pb-6">
-        <div className="container mx-auto max-w-screen-2xl px-6 lg:px-10">
-          <div className="flex items-center justify-between mb-5 lg:mb-6">
-            <h2 className="font-serif text-xl font-bold text-foreground">Featured posters</h2>
-            <Link
-              href={makeShopUrl(resolvedRoutePrefix)}
-              className="text-sm text-primary font-medium hover:underline shrink-0 ml-4"
-            >
-              View all &rarr;
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-5 lg:gap-4 items-stretch">
-            {featured && featured.length > 0
-              ? featured.slice(0, FEATURED_LIMIT).map((poster, i) => (
-                  <div
-                    key={poster.id}
-                    className={["h-full", i >= 4 ? "hidden sm:block" : ""].filter(Boolean).join(" ")}
-                  >
-                    <FeaturedPosterCard poster={poster} priority={i < 2} />
-                  </div>
-                ))
-              : Array.from({ length: FEATURED_LIMIT }).map((_, i) => (
-                  <div key={i} className={["h-full", i >= 4 ? "hidden sm:block" : ""].filter(Boolean).join(" ")}>
-                    <FeaturedPosterCardSkeleton />
-                  </div>
-                ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Collection / discovery banner ── */}
-      {(collectionBanner || collectionVisual) && (() => {
-        const cbTitle = collectionVisual?.title ?? collectionBanner?.title ?? "Mediterranean Walls";
-        const cbText = collectionVisual?.text ?? collectionBanner?.text;
-        const cbCtaText = collectionVisual?.ctaText ?? collectionBanner?.ctaText ?? "Explore collection";
-        const cbCtaLink = collectionVisual?.ctaLink ?? collectionBanner?.ctaLink;
-        const cbEyebrow = collectionVisual?.eyebrow;
-        const resolvedCtaHref = cbCtaLink
-          ? resolvedRoutePrefix
-            ? `/${resolvedRoutePrefix}${cbCtaLink}`
-            : cbCtaLink
-          : makeShopUrl(resolvedRoutePrefix);
-
-        return (
-          <section className="py-2 lg:py-3">
-            <div className="container mx-auto max-w-screen-2xl px-6 lg:px-10">
-              {/* Card — rounded corners, background image scoped inside */}
-              <div
-                className="relative overflow-hidden rounded-2xl shadow-[0_2px_20px_rgba(0,0,0,0.10)]"
-                style={!hasCollBg ? { backgroundColor: "#EBD9C4" } : undefined}
-              >
-                {hasCollBg ? (
-                  <>
-                    {/* img drives the container height; aspect-[32/7] gives a slim feature-card feel */}
-                    <img
-                      src={collectionVisual!.backgroundImageUrl ?? undefined}
-                      alt=""
-                      aria-hidden="true"
-                      loading="lazy"
-                      decoding="async"
-                      className="w-full aspect-[18/5] sm:aspect-[13/2] object-cover object-[center_72%] block"
-                    />
-                    <div
-                      className="absolute inset-0"
-                      style={{
-                        backgroundColor: `rgba(0,0,0,${collectionVisual?.backgroundOverlayOpacity ?? 0.35})`,
-                      }}
-                    />
-                  </>
-                ) : null}
-                {/* Content — absolutely positioned over image, or normal-flow when no image */}
-                <div
-                  className={cn(
-                    "z-10 px-6 lg:px-10",
-                    hasCollBg
-                      ? "absolute inset-0 flex items-center"
-                      : "relative py-8 lg:py-10"
-                  )}
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-7 sm:gap-10 lg:gap-14 w-full">
-
-                    {/* Left column — text + CTA */}
-                    <div className="flex-1 min-w-0">
-                      {cbEyebrow && (
-                        <p
-                          className={cn(
-                            "text-[10px] font-semibold uppercase tracking-[0.18em] mb-2.5",
-                            hasCollBg ? "text-white/60" : "text-foreground/45"
-                          )}
-                        >
-                          {cbEyebrow}
-                        </p>
-                      )}
-                      <h2
-                        className={cn(
-                          "font-serif text-2xl sm:text-3xl font-bold leading-tight mb-3",
-                          hasCollBg ? "text-white" : "text-primary"
-                        )}
-                      >
-                        {cbTitle}
-                      </h2>
-                      {cbText && (
-                        <p
-                          className={cn(
-                            "text-sm leading-relaxed mb-5 max-w-sm",
-                            hasCollBg ? "text-white/75" : "text-foreground/65"
-                          )}
-                        >
-                          {cbText}
-                        </p>
-                      )}
-                      <Link
-                        href={resolvedCtaHref}
-                        className={cn(
-                          "inline-flex items-center gap-1.5 text-sm font-semibold hover:underline",
-                          hasCollBg ? "text-white" : "text-primary"
-                        )}
-                      >
-                        {cbCtaText} &rarr;
-                      </Link>
-                    </div>
-
-                    {/* Right column — poster cards (only when explicitly selected) */}
-                    {collectionPreviewPosters.length > 0 && (
-                      <div className="flex-none flex items-end gap-2.5 sm:gap-3">
-                        {collectionPreviewPosters.map((poster, idx) => {
-                          const slug = (poster as any).slug as string | undefined;
-                          const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
-                          // Public cards may only use rendered mockupImageUrl, never template backgrounds.
-                          const displayImg = poster.primaryDisplayImageUrl ?? poster.imageUrl;
-                          return (
-                            <Link
-                              key={poster.id}
-                              href={href}
-                              className={[
-                                "flex-none group",
-                                idx === 2 ? "hidden sm:block" : "",
-                              ].join(" ")}
-                            >
-                              {/* Paper-frame poster card */}
-                              <div className="w-[60px] sm:w-[72px] lg:w-[84px] bg-[#faf8f4] p-1 pb-2.5 rounded-[2px] shadow-[0_4px_14px_rgba(0,0,0,0.22)] group-hover:-translate-y-1 transition-transform duration-200">
-                                <div className="relative aspect-[3/4] bg-[#ece7de] overflow-hidden">
-                                  <img
-                                    src={displayImg}
-                                    alt={poster.title}
-                                    loading="lazy"
-                                    decoding="async"
-                                    className="absolute inset-0 w-full h-full object-contain"
-                                    onError={(e) => {
-                                      (e.target as HTMLImageElement).src = poster.imageUrl;
-                                    }}
-                                  />
-                                </div>
-                              </div>
-                            </Link>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-        );
-      })()}
-
-      {/* ── Shop by region / category ── */}
-      {(regionChips.length > 0 || categoryChips.length > 0) && (
-        <section className="py-3 lg:py-4" data-testid="shop-by-region-section">
-          <div className="container mx-auto max-w-screen-2xl px-6 lg:px-10">
-            <h2 className="font-serif text-lg font-bold text-foreground mb-4">
-              {store.shop?.regionFilterLabel ?? "Explore Spain"}
-            </h2>
-            <div className="flex flex-wrap gap-2">
-              {regionChips.map((region) => (
-                <Link
-                  key={region}
-                  href={makeShopUrl(resolvedRoutePrefix, `region=${encodeURIComponent(region)}`)}
-                  className="flex-1 min-w-fit inline-flex items-center justify-center px-3.5 py-1.5 rounded-full border border-border text-sm text-foreground/75 bg-surface hover:bg-sand/60 hover:border-primary/30 hover:text-primary transition-colors duration-150"
-                >
-                  {region}
-                </Link>
-              ))}
-              {categoryChips.map((cat) => (
-                <Link
-                  key={cat}
-                  href={makeShopUrl(resolvedRoutePrefix, `category=${encodeURIComponent(cat)}`)}
-                  className="flex-1 min-w-fit inline-flex items-center justify-center px-3.5 py-1.5 rounded-full border border-border text-sm text-foreground/75 bg-surface hover:bg-sand/60 hover:border-primary/30 hover:text-primary transition-colors duration-150"
-                >
-                  {cat}
-                </Link>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* ── New arrivals ── */}
-      {showNewArrivals && (
-        <section className="pt-3 pb-4 lg:pt-4 lg:pb-5" data-testid="new-arrivals-section">
-          {/* Header — full symmetric padding so "View all" aligns with right container edge */}
-          <div className="container mx-auto max-w-screen-2xl px-6 lg:px-10 mb-4">
-            <div className="flex items-center justify-between">
-              <h2 className="font-serif text-xl font-bold text-foreground">New arrivals</h2>
-              <Link
-                href={makeShopUrl(resolvedRoutePrefix, "sort=newest")}
-                className="text-sm text-primary font-medium hover:underline shrink-0 ml-4"
-              >
-                View all &rarr;
-              </Link>
-            </div>
-          </div>
-          {/*
-            Scroll track container: left padding only (pr-0) so the first card's
-            left edge matches the heading, while the right side is unconstrained —
-            cards overflow and scroll within the track's own box.
-          */}
-          <div className="container mx-auto max-w-screen-2xl pl-6 lg:pl-10 pr-0">
-            <div className="relative">
-              <div
-                ref={newArrivalsTrackRef}
-                className="flex gap-4 overflow-x-auto pb-3 scroll-smooth snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                onScroll={updateNaScrollState}
-              >
-                {newArrivals.map((poster) => (
-                  <div
-                    key={poster.id}
-                    className="flex-none snap-start w-[74vw] sm:w-[240px] lg:w-[260px]"
-                  >
-                    <NewArrivalCard poster={poster} />
-                  </div>
-                ))}
-                {/* Trailing spacer so the last card clears the right-edge fade */}
-                <div className="flex-none w-4 lg:w-6" aria-hidden="true" />
-              </div>
-
-              {/* Right-edge fade — signals more content is scrollable */}
-              <div
-                className="absolute inset-y-0 right-0 w-14 lg:w-20 bg-gradient-to-l from-background to-transparent pointer-events-none"
-                aria-hidden="true"
+        switch (section.type) {
+          case "hero":
+            return (
+              <HeroSection
+                key={section.id}
+                store={store}
+                resolvedRoutePrefix={resolvedRoutePrefix}
               />
+            );
 
-              {/* Left arrow — hidden on mobile, shown on sm+ when scrolled right */}
-              {naCanScrollLeft && (
-                <button
-                  onClick={() => scrollNa("left")}
-                  aria-label="Scroll New arrivals left"
-                  className="hidden sm:flex absolute left-0 top-1/2 -translate-y-1/2 z-10 items-center justify-center w-8 h-8 rounded-full bg-background/95 border border-border shadow-md text-foreground/80 hover:text-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-              )}
+          case "featuredPosters":
+            return (
+              <FeaturedPostersSection
+                key={section.id}
+                featured={featured}
+                resolvedRoutePrefix={resolvedRoutePrefix}
+              />
+            );
 
-              {/* Right arrow — hidden on mobile, shown on sm+ when more content exists */}
-              {naCanScrollRight && (
-                <button
-                  onClick={() => scrollNa("right")}
-                  aria-label="Scroll New arrivals right"
-                  className="hidden sm:flex absolute right-0 top-1/2 -translate-y-1/2 z-10 items-center justify-center w-8 h-8 rounded-full bg-background/95 border border-border shadow-md text-foreground/80 hover:text-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-          </div>
-        </section>
-      )}
+          case "collectionBanner": {
+            const bannerId = section.bannerId ?? "default";
+            const banner = bannerLookup[bannerId];
+            // No banner data → render static fallback if available
+            if (!banner && !staticCollectionBanner) return null;
+            const effectiveBanner: CollectionBannerVisualConfig = banner ?? {};
+            return (
+              <CollectionBannerSection
+                key={section.id}
+                banner={effectiveBanner}
+                staticBanner={staticCollectionBanner}
+                collectionPreviewPosters={collectionPreviewPosters}
+                resolvedRoutePrefix={resolvedRoutePrefix}
+              />
+            );
+          }
 
-      {/* ── Brand quote ── */}
-      <section className="py-8 lg:py-10" data-testid="brand-story-section">
-        <div className="max-w-2xl mx-auto px-6 text-center">
-          <p className="font-serif text-xl md:text-2xl text-foreground/75 leading-relaxed italic">
-            &ldquo;{brandStory}&rdquo;
-          </p>
-        </div>
-      </section>
+          case "exploreLinks":
+            return (
+              <ExploreLinksSection
+                key={section.id}
+                regionChips={regionChips}
+                categoryChips={categoryChips}
+                resolvedRoutePrefix={resolvedRoutePrefix}
+                regionFilterLabel={store.shop?.regionFilterLabel ?? "Explore Spain"}
+              />
+            );
 
-      {/* ── Value props ── */}
-      <section className="border-t border-border py-8 lg:py-10">
-        <div className="container mx-auto max-w-screen-2xl px-6 lg:px-10">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            {VALUE_PROPS.map((prop, i) => (
-              <div
-                key={i}
-                className="text-center px-4 py-5 bg-surface border border-border/50 rounded-xl"
-                data-testid={`value-card-${i}`}
-              >
-                <h3 className="font-serif font-bold text-sm mb-1.5">{prop.title}</h3>
-                <p className="text-xs text-muted-foreground leading-relaxed">{prop.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+          case "newArrivals":
+            return (
+              <NewArrivalsSection
+                key={section.id}
+                newArrivals={newArrivals}
+                resolvedRoutePrefix={resolvedRoutePrefix}
+                naCanScrollLeft={naCanScrollLeft}
+                naCanScrollRight={naCanScrollRight}
+                trackRef={newArrivalsTrackRef}
+                onScroll={updateNaScrollState}
+                onScrollLeft={() => scrollNa("left")}
+                onScrollRight={() => scrollNa("right")}
+              />
+            );
 
+          case "brandStory":
+            return <BrandStorySection key={section.id} brandStory={brandStory} />;
+
+          case "valueProps":
+            return <ValuePropsSection key={section.id} />;
+
+          default:
+            return null;
+        }
+      })}
     </div>
   );
 }

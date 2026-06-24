@@ -593,11 +593,31 @@ const heroVisualSchema = z.object({
   backgroundOverlayOpacity: z.number().min(0).max(1).optional(),
   primaryButtonText: z.string().nullable().optional(),
   primaryButtonVariant: z.enum(["filled", "outline"]).optional(),
+  primaryButtonLink: z.string().nullable().optional(),
   secondaryButtonText: z.string().nullable().optional(),
   secondaryButtonVariant: z.enum(["filled", "outline"]).optional(),
+  secondaryButtonLink: z.string().nullable().optional(),
 }).optional();
 
-const collectionBannerVisualSchema = z.object({
+const sectionFontOverridesSchema = z.object({
+  headingFont: z.string().nullable().optional(),
+  bodyFont: z.string().nullable().optional(),
+}).nullable().optional();
+
+const sectionColorOverridesSchema = z.object({
+  eyebrowColor: z.string().nullable().optional(),
+  headingColor: z.string().nullable().optional(),
+  textColor: z.string().nullable().optional(),
+  linkColor: z.string().nullable().optional(),
+  buttonTextColor: z.string().nullable().optional(),
+  backgroundColor: z.string().nullable().optional(),
+  overlayColor: z.string().nullable().optional(),
+  overlayOpacity: z.number().nullable().optional(),
+}).nullable().optional();
+
+const collectionBannerVisualBaseSchema = z.object({
+  id: z.string().optional(),
+  visible: z.boolean().optional(),
   backgroundImageUrl: z.string().nullable().optional(),
   backgroundStoragePath: z.string().nullable().optional(),
   backgroundOverlayOpacity: z.number().min(0).max(1).optional(),
@@ -606,10 +626,41 @@ const collectionBannerVisualSchema = z.object({
   text: z.string().nullable().optional(),
   ctaText: z.string().nullable().optional(),
   ctaLink: z.string().nullable().optional(),
-}).optional();
+  imageFit: z.enum(["cover", "contain"]).optional(),
+  focalPointX: z.enum(["left", "center", "right"]).optional(),
+  focalPointY: z.enum(["top", "center", "bottom"]).optional(),
+  showPosterCards: z.boolean().optional(),
+  fontOverrides: sectionFontOverridesSchema,
+  colorOverrides: sectionColorOverridesSchema,
+});
+
+const collectionBannerVisualSchema = collectionBannerVisualBaseSchema.optional();
+
+const homepageSectionTypeSchema = z.enum([
+  "hero",
+  "featuredPosters",
+  "collectionBanner",
+  "exploreLinks",
+  "newArrivals",
+  "brandStory",
+  "valueProps",
+]);
+
+const homepageSectionConfigSchema = z.object({
+  id: z.string(),
+  type: homepageSectionTypeSchema,
+  visible: z.boolean(),
+  sortOrder: z.number(),
+  titleOverride: z.string().nullable().optional(),
+  bannerId: z.string().nullable().optional(),
+  fontOverrides: sectionFontOverridesSchema,
+  colorOverrides: sectionColorOverridesSchema,
+});
 
 const homepageVisualConfigSchema = z.object({
   hero: heroVisualSchema,
+  sections: z.array(homepageSectionConfigSchema).optional(),
+  collectionBanners: z.array(collectionBannerVisualBaseSchema).optional(),
   collectionBanner: collectionBannerVisualSchema,
 });
 
@@ -634,26 +685,39 @@ router.put("/admin/stores/:storeKey/homepage-visual", requireAdmin, async (req, 
   const existing = (store.homepageVisualConfig ?? {}) as Record<string, unknown>;
   const incoming = parsed.data as Record<string, unknown>;
 
-  // Clean up old storage objects when their paths have changed
-  const oldHeroPath = (existing["hero"] as Record<string, unknown> | undefined)?.["backgroundStoragePath"] as string | null | undefined;
-  const newHeroPath = (incoming["hero"] as Record<string, unknown> | undefined)?.["backgroundStoragePath"] as string | null | undefined;
-  const oldCollPath = (existing["collectionBanner"] as Record<string, unknown> | undefined)?.["backgroundStoragePath"] as string | null | undefined;
-  const newCollPath = (incoming["collectionBanner"] as Record<string, unknown> | undefined)?.["backgroundStoragePath"] as string | null | undefined;
-
-  if (oldHeroPath && oldHeroPath !== newHeroPath) {
-    try {
-      const file = await objectStorageService.getObjectEntityFile(oldHeroPath);
-      await file.delete();
-    } catch (err) {
-      req.log.warn({ err }, "Failed to delete old hero background image from storage");
+  // Helper: delete a storage path if it changed
+  async function maybeDeletePath(oldPath: string | null | undefined, newPath: string | null | undefined, label: string) {
+    if (oldPath && oldPath !== newPath) {
+      try {
+        const file = await objectStorageService.getObjectEntityFile(oldPath);
+        await file.delete();
+      } catch (err) {
+        req.log.warn({ err }, `Failed to delete old ${label} from storage`);
+      }
     }
   }
-  if (oldCollPath && oldCollPath !== newCollPath) {
-    try {
-      const file = await objectStorageService.getObjectEntityFile(oldCollPath);
-      await file.delete();
-    } catch (err) {
-      req.log.warn({ err }, "Failed to delete old collection banner background image from storage");
+
+  // Clean up hero background
+  const oldHeroPath = (existing["hero"] as Record<string, unknown> | undefined)?.["backgroundStoragePath"] as string | null | undefined;
+  const newHeroPath = (incoming["hero"] as Record<string, unknown> | undefined)?.["backgroundStoragePath"] as string | null | undefined;
+  await maybeDeletePath(oldHeroPath, newHeroPath, "hero background image");
+
+  // Clean up legacy single collection banner
+  const oldCollPath = (existing["collectionBanner"] as Record<string, unknown> | undefined)?.["backgroundStoragePath"] as string | null | undefined;
+  const newCollPath = (incoming["collectionBanner"] as Record<string, unknown> | undefined)?.["backgroundStoragePath"] as string | null | undefined;
+  await maybeDeletePath(oldCollPath, newCollPath, "collection banner background image");
+
+  // Clean up collectionBanners array: delete paths that no longer appear in incoming
+  const oldBanners = (existing["collectionBanners"] as Array<Record<string, unknown>> | undefined) ?? [];
+  const newBannerPaths = new Set(
+    ((incoming["collectionBanners"] as Array<Record<string, unknown>> | undefined) ?? [])
+      .map((b) => b["backgroundStoragePath"] as string | null | undefined)
+      .filter(Boolean)
+  );
+  for (const ob of oldBanners) {
+    const oldPath = ob["backgroundStoragePath"] as string | null | undefined;
+    if (oldPath && !newBannerPaths.has(oldPath)) {
+      await maybeDeletePath(oldPath, undefined, `collection banner (${ob["id"] ?? "unknown"}) background image`);
     }
   }
 

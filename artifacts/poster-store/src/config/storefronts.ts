@@ -4,11 +4,31 @@ export interface HeroVisualConfig {
   backgroundOverlayOpacity?: number;
   primaryButtonText?: string | null;
   primaryButtonVariant?: "filled" | "outline";
+  primaryButtonLink?: string | null;
   secondaryButtonText?: string | null;
   secondaryButtonVariant?: "filled" | "outline";
+  secondaryButtonLink?: string | null;
+}
+
+export interface SectionFontOverrides {
+  headingFont?: string | null;
+  bodyFont?: string | null;
+}
+
+export interface SectionColorOverrides {
+  eyebrowColor?: string | null;
+  headingColor?: string | null;
+  textColor?: string | null;
+  linkColor?: string | null;
+  buttonTextColor?: string | null;
+  backgroundColor?: string | null;
+  overlayColor?: string | null;
+  overlayOpacity?: number | null;
 }
 
 export interface CollectionBannerVisualConfig {
+  id?: string;
+  visible?: boolean;
   backgroundImageUrl?: string | null;
   backgroundStoragePath?: string | null;
   backgroundOverlayOpacity?: number;
@@ -17,12 +37,51 @@ export interface CollectionBannerVisualConfig {
   text?: string | null;
   ctaText?: string | null;
   ctaLink?: string | null;
+  imageFit?: "cover" | "contain";
+  focalPointX?: "left" | "center" | "right";
+  focalPointY?: "top" | "center" | "bottom";
+  showPosterCards?: boolean;
+  fontOverrides?: SectionFontOverrides | null;
+  colorOverrides?: SectionColorOverrides | null;
+}
+
+export type HomepageSectionType =
+  | "hero"
+  | "featuredPosters"
+  | "collectionBanner"
+  | "exploreLinks"
+  | "newArrivals"
+  | "brandStory"
+  | "valueProps";
+
+export interface HomepageSectionConfig {
+  id: string;
+  type: HomepageSectionType;
+  visible: boolean;
+  sortOrder: number;
+  titleOverride?: string | null;
+  bannerId?: string | null;
+  fontOverrides?: SectionFontOverrides | null;
+  colorOverrides?: SectionColorOverrides | null;
 }
 
 export interface HomepageVisualConfig {
   hero?: HeroVisualConfig;
+  sections?: HomepageSectionConfig[];
+  collectionBanners?: CollectionBannerVisualConfig[];
+  /** @deprecated Legacy single-banner field — kept as backwards-compatible fallback. */
   collectionBanner?: CollectionBannerVisualConfig;
 }
+
+export const DEFAULT_HOMEPAGE_SECTIONS: HomepageSectionConfig[] = [
+  { id: "hero", type: "hero", visible: true, sortOrder: 10 },
+  { id: "featured-posters", type: "featuredPosters", visible: true, sortOrder: 20 },
+  { id: "collection-banner-default", type: "collectionBanner", visible: true, sortOrder: 30, bannerId: "default" },
+  { id: "explore-links", type: "exploreLinks", visible: true, sortOrder: 40 },
+  { id: "new-arrivals", type: "newArrivals", visible: true, sortOrder: 50 },
+  { id: "brand-story", type: "brandStory", visible: true, sortOrder: 60 },
+  { id: "value-props", type: "valueProps", visible: true, sortOrder: 70 },
+];
 
 export type HeroTextMode = "dark" | "light" | "custom";
 export type HeroOverlayMode = "none" | "light" | "dark" | "custom";
@@ -73,9 +132,7 @@ export interface StorefrontConfig {
     brandStory?: string;
   };
   shop?: {
-    /** Short single-line tagline shown under the poster count in /shop (always visible). */
     shopTagline?: string;
-    /** Longer intro fields — reserved for homepage/landing pages, not used on /shop grid. */
     introTitle?: string;
     introSubtitle?: string;
     introTrustNotes?: string[];
@@ -88,7 +145,6 @@ export interface StorefrontConfig {
       title: string;
       text: string;
       ctaText?: string;
-      /** Full relative path + query for the CTA, e.g. /shop?category=Coastal+Posters */
       ctaLink?: string;
     };
   };
