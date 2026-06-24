@@ -1,0 +1,525 @@
+#16 — Section-level visual overrides + Restore default order fix
+
+## Goal
+
+Add targeted homepage-only visual overrides for the most visual homepage sections, and fix the current `Restore default order` behavior.
+
+This phase should not affect poster pages, shop grid, product detail pages, cart, checkout, admin poster forms, or global store styling outside the homepage.
+
+## Workflow constraints
+
+* Do not create branches.
+* Do not commit or push.
+* Keep changes targeted.
+* Do not rebuild the whole homepage editor.
+* Preserve existing homepage configs.
+* Preserve backwards compatibility with old configs.
+* Do not mutate or delete collection banner content when restoring order.
+* Run typecheck before reporting.
+
+## Scope for this phase
+
+Apply visual overrides only to:
+
+1. Hero
+2. Collection banners
+3. Brand story
+4. Featured posters homepage section text
+5. New arrivals homepage section text
+
+Do not apply overrides to:
+
+* poster product pages
+* shop grid
+* individual poster detail page layout
+* badges
+* poster card backgrounds
+* poster card frames
+* Explore links chips/pills
+* Value props cards
+
+## Part A — Fix Restore default order
+
+### Current bug
+
+`Restore default order` only reverts the latest change. It should always deterministically restore the built-in default section order.
+
+### Expected behavior
+
+When the user clicks `Restore default order` and confirms:
+
+1. Rebuild `config.sections` from `DEFAULT_HOMEPAGE_SECTIONS`.
+2. Preserve existing visibility flags where possible.
+3. Preserve existing section visual overrides where possible.
+4. Preserve all custom collection banner sections.
+5. Append custom collection banner sections after the default sections.
+6. Never delete or mutate `config.collectionBanners`.
+7. Never delete banner content, images, CTA text, image fit, focal point, poster-card toggle, or visual overrides.
+8. Normalize `sortOrder` to stable increments: 10, 20, 30...
+
+### Implementation guidance
+
+Use a deterministic helper based on the default constant, not previous UI state history.
+
+Example shape:
+
+```ts id="fyauyo"
+function restoreDefaultSectionOrder(prev: HomepageVisualConfig): HomepageVisualConfig {
+  const currentSections = normalizeSectionOrder(getSections(prev));
+  const currentById = new Map(currentSections.map((s) => [s.id, s]));
+
+  const defaultSections = DEFAULT_HOMEPAGE_SECTIONS.map((defaultSection) => {
+    const existing = currentById.get(defaultSection.id);
+    return {
+      ...defaultSection,
+      visible: existing?.visible ?? defaultSection.visible,
+      fontOverrides: existing?.fontOverrides ?? defaultSection.fontOverrides ?? null,
+      colorOverrides: existing?.colorOverrides ?? defaultSection.colorOverrides ?? null,
+    };
+  });
+
+  const defaultIds = new Set(DEFAULT_HOMEPAGE_SECTIONS.map((s) => s.id));
+
+  const customSections = currentSections.filter((section) => {
+    if (defaultIds.has(section.id)) return false;
+    return true;
+  });
+
+  return {
+    ...prev,
+    sections: normalizeSectionOrder([...defaultSections, ...customSections]),
+  };
+}
+```
+
+Adapt to the real helper names in `AdminHomepageEditor.tsx`.
+
+Important:
+
+* The reset must not simply undo the last move.
+* The reset must not clear `collectionBanners`.
+* The reset must not remove extra collection banner section rows.
+* Cancel should close confirmation without changing state.
+
+## Part B — Type updates
+
+Update and align types in:
+
+* `artifacts/poster-store/src/config/storefronts.ts`
+* `artifacts/poster-store/src/lib/adminApi.ts`
+* `artifacts/api-server/src/routes/stores.ts`
+
+Use or extend existing planned override fields.
+
+### Section-level overrides
+
+Use section overrides for non-banner homepage sections:
+
+```ts id="i94j08"
+export interface SectionFontOverrides {
+  headingFont?: string | null;
+  bodyFont?: string | null;
+}
+
+export interface SectionColorOverrides {
+  headingColor?: string | null;
+  textColor?: string | null;
+  linkColor?: string | null;
+  backgroundColor?: string | null;
+
+  // Homepage poster-card text only, used only for Featured/New arrivals homepage cards.
+  posterTitleColor?: string | null;
+  posterPriceColor?: string | null;
+
+  // Hero/collection overlay support.
+  overlayColor?: string | null;
+  overlayOpacity?: number | null;
+}
+```
+
+### Hero button-level styling
+
+Add individual visual settings for each Hero button.
+
+Do not remove existing fields:
+
+* `primaryButtonText`
+* `primaryButtonVariant`
+* `primaryButtonLink`
+* `secondaryButtonText`
+* `secondaryButtonVariant`
+* `secondaryButtonLink`
+* `extraButtons`
+
+Add:
+
+```ts id="fl2io9"
+export interface HeroButtonStyleConfig {
+  textColor?: string | null;
+  backgroundColor?: string | null;
+  borderColor?: string | null;
+}
+
+export interface HeroButtonConfig {
+  id: string;
+  label: string;
+  link: string;
+  variant?: "filled" | "outline";
+  visible?: boolean;
+  style?: HeroButtonStyleConfig | null;
+}
+```
+
+Extend `HeroVisualConfig`:
+
+```ts id="ibvgm0"
+primaryButtonStyle?: HeroButtonStyleConfig | null;
+secondaryButtonStyle?: HeroButtonStyleConfig | null;
+```
+
+Primary and secondary buttons keep their old fields, but get optional style objects.
+
+Extra buttons use `button.style`.
+
+### Collection banner overrides
+
+Collection banner visual overrides should live on the banner object itself, because the banner is the actual content/design. The section row is only the placement.
+
+Extend or reuse:
+
+```ts id="n8ucpy"
+export interface CollectionBannerVisualConfig {
+  id?: string;
+  visible?: boolean;
+  backgroundImageUrl?: string | null;
+  backgroundStoragePath?: string | null;
+  backgroundOverlayOpacity?: number;
+  eyebrow?: string | null;
+  title?: string | null;
+  text?: string | null;
+  ctaText?: string | null;
+  ctaLink?: string | null;
+  imageFit?: "cover" | "contain";
+  focalPointX?: "left" | "center" | "right";
+  focalPointY?: "top" | "center" | "bottom";
+  showPosterCards?: boolean;
+  fontOverrides?: SectionFontOverrides | null;
+  colorOverrides?: SectionColorOverrides | null;
+}
+```
+
+Backend Zod:
+
+* Validate `#RRGGBB` hex colors.
+* Allow nullable/optional fields.
+* Validate `overlayOpacity` 0–1.
+* Keep schemas backwards-compatible.
+
+## Part C — Admin UI
+
+Update:
+
+* `artifacts/poster-store/src/pages/admin/AdminHomepageEditor.tsx`
+
+### General UX
+
+Add collapsed visual override panels. They should be closed by default.
+
+Each panel should say:
+
+> Leave blank to inherit global brand defaults.
+
+Each color setting should have:
+
+* color picker
+* hex input
+* clear/reset to inherit
+
+Each font setting should use the existing font list if available.
+
+Do not show irrelevant controls for each section.
+
+### Hero visual overrides
+
+In the Hero editor, add a collapsed panel:
+
+`Hero visual overrides`
+
+Fields:
+
+* Heading font
+* Body font
+* Heading color
+* Text/subtitle color
+* Bullet/text secondary color if already easy, otherwise use text color
+* Background color fallback
+* Overlay color
+* Overlay opacity
+
+Also add individual button style settings for:
+
+* Primary button
+* Secondary button
+* Each extra button
+
+Each button should be able to set:
+
+* Text color
+* Background color
+* Border color
+
+Leave blank = inherit current behavior.
+
+The individual button style UI should sit close to that button’s label/link/style fields so it is obvious which button is being styled.
+
+### Collection banner visual overrides
+
+Inside each `CollectionBannerEditor`, add a collapsed panel:
+
+`Banner visual overrides`
+
+Fields:
+
+* Heading font
+* Body font
+* Eyebrow color
+* Heading color
+* Text color
+* CTA/link color
+* Background color fallback
+* Overlay color
+* Overlay opacity
+
+These overrides are stored on the banner object, not only on the layout section row.
+
+### Brand story visual overrides
+
+Add a collapsed panel for the Brand story section:
+
+`Brand story visual overrides`
+
+Fields:
+
+* Font
+* Text/quote color
+* Background color
+
+### Featured posters visual overrides
+
+Add a collapsed panel for Featured posters:
+
+`Featured posters visual overrides`
+
+Fields:
+
+* Heading font
+* Heading color
+* View all link color
+* Poster title color
+* Poster price color
+
+These apply only to the homepage Featured posters section. Do not apply to shop cards or product pages.
+
+### New arrivals visual overrides
+
+Add a collapsed panel for New arrivals:
+
+`New arrivals visual overrides`
+
+Fields:
+
+* Heading font
+* Heading color
+* View all link color
+* Poster title color
+* Poster price color
+
+These apply only to the homepage New arrivals section. Do not apply to shop cards or product pages.
+
+### Do not add visual overrides yet for:
+
+* Explore links
+* Value props
+
+Keep these unchanged in this phase.
+
+## Part D — Public homepage rendering
+
+Update:
+
+* `artifacts/poster-store/src/pages/Home.tsx`
+
+Add helper functions to keep rendering clean:
+
+```ts id="xzoseh"
+function fontFamilyFromOverride(font?: string | null): string | undefined
+function cleanColor(color?: string | null): string | undefined
+function styleFromTextOverrides(args: ...): React.CSSProperties
+function mergeSectionBackgroundStyle(...): React.CSSProperties
+```
+
+Adapt to project style.
+
+### Hero rendering
+
+Apply Hero section overrides only on homepage Hero:
+
+* heading font/color
+* body font/text color for subtitle and bullet row
+* background color fallback
+* overlay color/opacity when image exists
+* individual primary/secondary/extra button style overrides
+
+Precedence:
+
+1. Explicit section override
+2. existing hero typography config / store theme logic
+3. current fallback behavior
+
+Do not break existing `heroTextMode`, global typography variables, or button variant behavior.
+
+### Collection banner rendering
+
+Apply banner-level overrides:
+
+* heading font
+* body font
+* eyebrow color
+* title color
+* text color
+* CTA/link color
+* background color fallback
+* overlay color/opacity
+
+Precedence:
+
+1. Banner override
+2. existing banner config
+3. global theme/current fallback
+
+Do not apply collection banner overrides to other sections.
+
+### Brand story rendering
+
+Apply:
+
+* font override
+* text color
+* section background color
+
+Only affect homepage brand story.
+
+### Featured posters rendering
+
+Apply only:
+
+* section heading font/color
+* View all link color
+* poster title color
+* poster price color
+
+Do not change:
+
+* card background
+* image behavior
+* badges
+* hover effects
+* product pages
+* shop cards
+
+This likely means passing optional style props into the homepage-specific `FeaturedPosterCard` component only.
+
+### New arrivals rendering
+
+Apply only:
+
+* section heading font/color
+* View all link color
+* poster title color
+* poster price color
+
+Do not change:
+
+* card background
+* image behavior
+* badges
+* hover effects
+* product pages
+* shop cards
+
+This likely means passing optional style props into the homepage-specific `NewArrivalCard` component only.
+
+## Data handling rules
+
+* Empty string should be converted to `null` or removed.
+* Avoid saving empty override objects if practical.
+* Existing configs with no overrides must render exactly as before.
+* Legacy collection banner configs must still render.
+
+## QA checklist
+
+Manual QA:
+
+### Restore default order
+
+* Move several sections.
+* Click Restore default order.
+* Confirm.
+* Verify the full default order is restored, not just the latest move.
+* Add two custom collection banners.
+* Restore default order.
+* Verify custom collection banners still exist and are appended safely.
+* Save and refresh.
+
+### Hero overrides
+
+* Set hero heading color.
+* Set hero subtitle/text color.
+* Set primary button background/text/border.
+* Add extra hero button and set its individual colors.
+* Save and verify public homepage.
+* Clear fields and verify inheritance returns.
+
+### Collection banner overrides
+
+* Set banner title color.
+* Set banner CTA color.
+* Set overlay color/opacity.
+* Set fallback background color.
+* Verify another collection banner can have different settings.
+
+### Brand story overrides
+
+* Set quote/text color.
+* Set background color.
+* Save and refresh.
+
+### Featured/New arrivals
+
+* Set section heading color.
+* Set View all link color.
+* Set poster title and price colors.
+* Verify shop/product pages are unchanged.
+
+## Typecheck
+
+Run:
+
+```bash id="zh9luz"
+pnpm --filter @workspace/poster-store run typecheck
+pnpm --filter @workspace/api-server run typecheck
+```
+
+Fix all new errors before reporting.
+
+## Report back
+
+Return:
+
+1. Files changed
+2. Restore default order fix summary
+3. Visual override fields implemented
+4. How inheritance works
+5. Confirmation that poster pages/shop grid are unchanged
+6. Typecheck results
+7. Any risks or deferred items
