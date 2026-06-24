@@ -1,0 +1,68 @@
+We need to improve poster card image rendering, collection banner layout controls, mobile collection banner behavior, hero button visibility, and editable hero trust badges.
+
+Please inspect the current implementation first and make the smallest clean changes needed. Do not create branches, do not open PRs, do not push to GitHub. Make changes only and report back with files changed, behavior, and any migrations needed.
+
+Issues to solve:
+
+1. Featured poster images can look blurry, especially illustrated posters such as “Test 2”.
+   - Inspect PosterCard / Featured posters image rendering and getOptimizedImageUrl usage.
+   - Increase card image quality/width where needed, preferably using responsive src/srcSet/sizes if the existing image helper supports it.
+   - Avoid over-compressing illustrated artwork.
+   - Keep the previous performance improvements reasonable; do not request huge images everywhere.
+
+2. Featured poster images can be cropped when the source image ratio differs from the card ratio.
+   - Normal poster artwork should preserve the full image by default.
+   - Prefer object-contain for poster artwork inside the fixed poster card frame, with an appropriate warm/off-white background.
+   - Keep lifestyle/mockup hover images using object-cover if needed.
+   - If the code already has a clean place for per-image/per-poster fit controls, add support for cover/contain and position. Otherwise use the minimal safe default: poster artwork object-contain, hover mockups object-cover.
+
+3. Collection banner text readability and position need admin control.
+   - Add configurable collection banner text layout options.
+   - The section should remain one banner section, but admins should be able to choose where the text is placed.
+   - Suggested options:
+     - text position: left / center / right
+     - vertical position: top / center / bottom
+     - max width: narrow / medium / wide
+     - readable overlay: none / soft panel / gradient
+   - Use defaults matching the current desktop layout so existing stores do not visually change unexpectedly.
+   - Apply these settings to the public homepage collection banner.
+
+4. Collection banners do not work well on mobile.
+   - Do not force the full desktop decorative banner layout on mobile.
+   - Add a mobile collection banner mode with sensible default.
+   - Recommended default: simplified-card on mobile.
+   - Suggested modes:
+     - full-banner
+     - simplified-card
+     - hidden
+   - simplified-card should show label, title, subtitle, CTA, and optionally a small image/thumbnail area, without text overlapping the decorative background.
+   - Desktop banner should remain visually rich and unchanged unless admin settings are changed.
+
+5. Hero buttons need mobile visibility control.
+   - Add support for hero buttons having showDesktop/showMobile or similar.
+   - Admin should be able to decide which hero buttons are visible on mobile.
+   - Public hero should render only mobile-enabled buttons on mobile and desktop-enabled buttons on desktop.
+   - Preserve current default behavior for existing buttons unless a migration/default config is needed.
+
+6. The hero trust-badge text under the buttons, currently “Fine art prints”, “Ships worldwide”, “Sustainably made”, must be editable in admin.
+   - Add editable store-level config for hero trust badges.
+   - Each badge should have text and mobile visibility.
+   - Keep current three texts as default values.
+   - Add admin UI in the existing store/hero configuration area.
+   - Public hero should render from config, falling back to the current default values if missing.
+
+Implementation constraints:
+- Keep changes targeted and low-risk.
+- Use existing store configuration patterns if available, especially typography_config or similar JSONB config.
+- If a DB migration is needed, make it idempotent and safe for existing data.
+- Do not remove existing store data.
+- Do not make broad unrelated refactors.
+- Do not change unrelated homepage sections.
+- Run typecheck and available relevant tests.
+- Report:
+  1. Files changed
+  2. DB/schema changes
+  3. Admin changes
+  4. Public homepage changes
+  5. How to configure the specific “Mediterranean Walls” banner so text appears further right
+  6. Test/typecheck result
