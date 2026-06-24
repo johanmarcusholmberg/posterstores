@@ -533,6 +533,60 @@ router.patch("/admin/stores/:storeKey/deactivate", requireAdmin, async (req, res
   return res.json(serializeStore(updated));
 });
 
+// ── In-memory homepage preview store ─────────────────────────────────────────
+
+interface PreviewEntry {
+  config: Record<string, unknown>;
+  expiresAt: number;
+}
+
+const previewStore = new Map<string, PreviewEntry>();
+const PREVIEW_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+function purgeExpiredPreviews() {
+  const now = Date.now();
+  for (const [token, entry] of previewStore) {
+    if (entry.expiresAt < now) previewStore.delete(token);
+  }
+}
+
+function generatePreviewToken(): string {
+  const arr = new Uint8Array(18);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// POST /api/stores/:storeKey/homepage-visual/preview — admin only; stores config in memory, returns token
+router.post("/stores/:storeKey/homepage-visual/preview", requireAdmin, async (req, res) => {
+  const storeKey = String(req.params.storeKey);
+
+  const [store] = await db.select().from(storesTable).where(eq(storesTable.storeKey, storeKey)).limit(1);
+  if (!store) return res.status(404).json({ error: "Store not found" });
+
+  const parsed = homepageVisualConfigSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  purgeExpiredPreviews();
+  const token = generatePreviewToken();
+  previewStore.set(token, {
+    config: { ...(parsed.data as Record<string, unknown>), _storeKey: storeKey },
+    expiresAt: Date.now() + PREVIEW_TTL_MS,
+  });
+
+  return res.json({ token });
+});
+
+// GET /api/stores/homepage-visual/preview/:token — public; fetch a stored preview config
+// Must be placed before /api/stores/:storeKey routes to avoid capturing "homepage-visual"
+router.get("/stores/homepage-visual/preview/:token", (req, res) => {
+  purgeExpiredPreviews();
+  const entry = previewStore.get(String(req.params.token));
+  if (!entry || entry.expiresAt < Date.now()) {
+    return res.status(404).json({ error: "Preview not found or expired" });
+  }
+  return res.json(entry.config);
+});
+
 // GET /api/stores — public endpoint: returns active store configs (for store selector + resolver)
 router.get("/stores", async (_req, res) => {
   const stores = await db

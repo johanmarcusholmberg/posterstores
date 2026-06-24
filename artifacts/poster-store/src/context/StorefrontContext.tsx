@@ -35,6 +35,16 @@ async function fetchDbStoreConfig(storeKey: string): Promise<StorefrontConfig | 
   }
 }
 
+async function fetchPreviewVisualConfig(token: string): Promise<Record<string, unknown> | null> {
+  try {
+    const res = await fetch(`/api/stores/homepage-visual/preview/${encodeURIComponent(token)}`);
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Resolves the active storeKey and any route prefix from the current URL.
  *
@@ -99,6 +109,9 @@ export const StorefrontProvider = ({ children }: { children: ReactNode }) => {
 
       const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
       const pathname = typeof window !== 'undefined' ? window.location.pathname : '/';
+      const searchParams = typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search)
+        : new URLSearchParams();
 
       const { storeKey, routePrefix } = resolveStore(stores, hostname, pathname);
 
@@ -111,13 +124,49 @@ export const StorefrontProvider = ({ children }: { children: ReactNode }) => {
 
       const dbConfig = await fetchDbStoreConfig(storeKey);
 
+      // If a preview token is present in the URL, overlay its visual config.
+      // The token payload includes _storeKey which was set by the admin when
+      // they POSTed the preview. If it doesn't match the URL-resolved store we
+      // re-fetch the correct store's config so the preview renders on the right
+      // base theme/catalog.
+      const previewToken = searchParams.get('preview');
+      let previewVisual: Record<string, unknown> | null = null;
+      let resolvedDbConfig = dbConfig;
+      let resolvedStaticFallback = staticFallback;
+
+      if (previewToken) {
+        previewVisual = await fetchPreviewVisualConfig(previewToken);
+
+        if (previewVisual) {
+          const previewStoreKey = typeof previewVisual._storeKey === 'string'
+            ? previewVisual._storeKey
+            : null;
+
+          if (previewStoreKey && previewStoreKey !== storeKey) {
+            // The preview belongs to a different store than what the URL resolved.
+            // Load that store's config so the correct base theme/fonts are used.
+            const { storefronts: allStorefronts } = await import('../config/storefronts');
+            resolvedStaticFallback = allStorefronts[previewStoreKey] ?? resolvedStaticFallback;
+            const overrideDbConfig = await fetchDbStoreConfig(previewStoreKey);
+            resolvedDbConfig = overrideDbConfig ?? resolvedDbConfig;
+          }
+        }
+      }
+
       if (!cancelled) {
-        if (dbConfig) {
-          // Merge: static config provides defaults for fields not stored in DB (e.g. shop),
-          // DB config takes precedence for everything it provides.
-          setStoreConfig({ ...staticFallback, ...dbConfig });
+        const base: StorefrontConfig = resolvedDbConfig
+          ? { ...resolvedStaticFallback, ...resolvedDbConfig }
+          : (resolvedStaticFallback ?? staticConfig);
+
+        if (previewVisual) {
+          // Strip the internal _storeKey metadata before applying as visual config
+          const { _storeKey: _ignored, ...visualConfig } = previewVisual;
+          setStoreConfig({
+            ...base,
+            homepageVisualConfig: visualConfig as StorefrontConfig['homepageVisualConfig'],
+          });
         } else {
-          if (staticFallback) setStoreConfig(staticFallback);
+          setStoreConfig(base);
         }
         setIsLoadingFromDb(false);
       }

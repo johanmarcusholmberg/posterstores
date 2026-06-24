@@ -548,6 +548,47 @@ export default function AdminHomepageEditor() {
   const setHero = (patch: Partial<HeroVisualConfig>) =>
     setConfig(c => ({ ...c, hero: { ...c.hero, ...patch } }));
 
+  // ── Preview ───────────────────────────────────────────────────────────────
+
+  const [previewing, setPreviewing] = useState(false);
+
+  async function handlePreview() {
+    setPreviewing(true);
+    try {
+      const toPreview: HomepageVisualConfig = {
+        ...config,
+        sections: workingSections,
+        collectionBanners: workingBanners,
+        collectionBanner: undefined,
+      };
+      const res = await fetch(`/api/stores/${encodeURIComponent(adminStoreKey)}/homepage-visual/preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(toPreview),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(typeof body.error === "string" ? body.error : "Preview failed");
+      }
+      const { token } = await res.json() as { token: string };
+      // Navigate to the store's public root so URL-based store resolution works.
+      // If the store has a route prefix (e.g. /sweden) use that; otherwise root /.
+      const previewBase = storeData?.routePrefix
+        ? `/${storeData.routePrefix}/`
+        : "/";
+      window.open(
+        `${previewBase}?preview=${encodeURIComponent(token)}`,
+        "_blank",
+        "noopener,noreferrer"
+      );
+    } catch (e: unknown) {
+      setError((e as Error)?.message ?? "Preview failed");
+    } finally {
+      setPreviewing(false);
+    }
+  }
+
   // ── Save ─────────────────────────────────────────────────────────────────
 
   async function handleSave() {
@@ -825,11 +866,21 @@ export default function AdminHomepageEditor() {
               </div>
             )}
 
-            {/* ── Save ─────────────────────────────────────────────────── */}
+            {/* ── Save / Preview ───────────────────────────────────────── */}
             <div className="flex gap-3 pt-1">
-              <Button onClick={handleSave} disabled={saving} className="gap-1.5">
+              <Button onClick={handleSave} disabled={saving || previewing} className="gap-1.5">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {saving ? "Saving…" : "Save changes"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handlePreview}
+                disabled={saving || previewing}
+                className="gap-1.5"
+              >
+                {previewing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
+                {previewing ? "Opening…" : "Preview"}
               </Button>
             </div>
           </>
