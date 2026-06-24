@@ -52,6 +52,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { STORE_FONT_OPTIONS, INHERIT_FONT_VALUE } from "@/lib/storeFonts";
 
 // ─── Upload helpers ────────────────────────────────────────────────────────
 
@@ -222,6 +223,13 @@ function ColorField({
 
 // ─── Font field ────────────────────────────────────────────────────────────
 
+/**
+ * Font override dropdown. Uses the same canonical font list as Store Settings.
+ * Selecting "Inherit global default" saves null (no override).
+ * If an old/custom value not in the list is loaded, it maps to INHERIT_FONT_VALUE
+ * (treated as "no override") so the UI never crashes; the value is preserved in
+ * state until the user picks a new option.
+ */
 function FontField({
   label,
   value,
@@ -231,15 +239,30 @@ function FontField({
   value?: string | null;
   onChange: (v: string | null) => void;
 }) {
+  const isKnown = value != null && (STORE_FONT_OPTIONS as readonly string[]).includes(value);
+  const selectValue = value && isKnown ? value : INHERIT_FONT_VALUE;
+
   return (
     <div className="space-y-1">
       <Label className="text-xs">{label}</Label>
-      <Input
-        value={value ?? ""}
-        placeholder="inherit"
-        className="h-7 text-xs"
-        onChange={e => onChange(e.target.value.trim() || null)}
-      />
+      <Select
+        value={selectValue}
+        onValueChange={v => onChange(v === INHERIT_FONT_VALUE ? null : v)}
+      >
+        <SelectTrigger className="h-7 text-xs">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={INHERIT_FONT_VALUE} className="text-xs text-muted-foreground italic">
+            Inherit global default
+          </SelectItem>
+          {STORE_FONT_OPTIONS.map(f => (
+            <SelectItem key={f} value={f} className="text-xs">
+              {f}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }

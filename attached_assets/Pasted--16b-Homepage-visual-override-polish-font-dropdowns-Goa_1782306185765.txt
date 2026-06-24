@@ -1,0 +1,166 @@
+#16b — Homepage visual override polish: font dropdowns
+
+## Goal
+
+Polish the Section-level visual overrides UI by replacing free-text font inputs with safe dropdown/select controls using the same font options already used in Store Settings / Brand & Typography.
+
+This is a small UX hardening task only. Do not expand the scope.
+
+## Workflow constraints
+
+* Do not create branches.
+* Do not commit or push.
+* Keep changes targeted.
+* Do not rebuild the Homepage Editor.
+* Do not change public homepage behavior except where needed to support the same font values.
+* Preserve all existing homepage override data.
+* Run typecheck before reporting.
+
+## Problem
+
+In #16, `FontField` was implemented as a simple text input. That technically works, but it is risky for admin UX because typos or unsupported font names can be saved.
+
+The Homepage Editor should use the same controlled font choices as Store Settings / Brand & Typography.
+
+## Required changes
+
+### 1. Reuse the existing font list
+
+Find the existing font options used in Store Settings / Brand & Typography, currently something like:
+
+```ts
+const FONT_OPTIONS = [
+  "System default",
+  "Playfair Display",
+  "Cormorant Garamond",
+  "Lora",
+  "Libre Baskerville",
+  "Merriweather",
+  "Inter",
+  "DM Sans",
+  "Source Sans 3",
+  "Manrope",
+] as const;
+```
+
+If this list is duplicated, extract it to a shared frontend helper file, for example:
+
+```ts
+artifacts/poster-store/src/lib/storeFonts.ts
+```
+
+Suggested export:
+
+```ts
+export const STORE_FONT_OPTIONS = [
+  "System default",
+  "Playfair Display",
+  "Cormorant Garamond",
+  "Lora",
+  "Libre Baskerville",
+  "Merriweather",
+  "Inter",
+  "DM Sans",
+  "Source Sans 3",
+  "Manrope",
+] as const;
+
+export type StoreFontOption = typeof STORE_FONT_OPTIONS[number];
+```
+
+Use this shared list in:
+
+* `AdminStoreForm.tsx`
+* `AdminHomepageEditor.tsx`
+
+Avoid introducing a new inconsistent font list.
+
+### 2. Replace `FontField` text input with Select
+
+In `AdminHomepageEditor.tsx`, update the reusable `FontField` component so it uses the existing shadcn Select component instead of a plain text input.
+
+Expected behavior:
+
+* Placeholder/default option: `Inherit global default`
+* Options:
+
+  * `Inherit global default`
+  * `System default`
+  * all supported store font options
+* Selecting `Inherit global default` should clear the override value, saving it as `null` or removing it from the override object.
+* Selecting `System default` should save `"System default"` if that is how current global typography handles it.
+* Existing saved font values that match the list should load correctly.
+* If an old/custom value exists that is not in the list, do not crash. Show it as unsupported or fallback to inherit, and mention in report how it is handled.
+
+Suggested logic:
+
+* Use `"__inherit__"` as the select value for blank/null.
+* Convert `"__inherit__"` back to `null` or undefined in the state update.
+* Preserve current data-cleaning behavior for empty override objects.
+
+### 3. Align backend validation if needed
+
+Check `artifacts/api-server/src/routes/stores.ts`.
+
+If `SectionFontOverrides` currently accepts arbitrary strings, tighten it to allow:
+
+* the same allowed fonts
+* nullable/optional values
+
+But do this carefully:
+
+* Do not break existing store configs.
+* If tightening could reject existing unknown values, keep schema permissive for now and only enforce the UI dropdown in this polish task.
+* Report which choice was made.
+
+Preferred if safe:
+
+```ts
+const fontOverrideSchema = z.enum(ALLOWED_FONTS).nullable().optional();
+```
+
+Use the existing `ALLOWED_FONTS` constant if available.
+
+### 4. Confirm public rendering still works
+
+No major `Home.tsx` changes should be needed, but confirm:
+
+* homepage visual overrides still apply fonts correctly
+* blank/inherited font overrides still inherit global store defaults
+* `"System default"` behaves as before
+
+### 5. Typecheck
+
+Run:
+
+```bash
+pnpm --filter @workspace/poster-store run typecheck
+pnpm --filter @workspace/api-server run typecheck
+```
+
+Fix all new errors before reporting.
+
+## QA checklist
+
+Manual reasoning / quick test:
+
+* Open Homepage Editor.
+* Hero visual override font fields are dropdowns, not text inputs.
+* Collection banner visual override font fields are dropdowns.
+* Brand story font field is dropdown.
+* Featured posters/New arrivals heading font fields are dropdowns.
+* Selecting a font saves and reloads.
+* Selecting inherit clears the override and global default applies.
+* Existing stores with no font override behave exactly as before.
+* Store Settings still uses the same font list and still works.
+
+## Report back
+
+Return:
+
+1. Files changed
+2. Whether the font list was extracted/shared or reused directly
+3. What changed in the Homepage Editor font fields
+4. Backend validation decision
+5. Typecheck results
+6. Any remaining risks

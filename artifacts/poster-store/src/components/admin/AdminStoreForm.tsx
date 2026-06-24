@@ -45,18 +45,8 @@ const DEFAULT_THEME: AdminStoreThemeConfig = {
   border: "#E4DDD3",
 };
 
-const FONT_OPTIONS = [
-  "System default",
-  "Playfair Display",
-  "Cormorant Garamond",
-  "Lora",
-  "Libre Baskerville",
-  "Merriweather",
-  "Inter",
-  "DM Sans",
-  "Source Sans 3",
-  "Manrope",
-] as const;
+import { STORE_FONT_OPTIONS } from "@/lib/storeFonts";
+const FONT_OPTIONS = STORE_FONT_OPTIONS;
 
 const TYPOGRAPHY_COLOR_FIELDS: { key: keyof AdminStoreTypographyConfig; label: string }[] = [
   { key: "headingColor", label: "Heading color" },
