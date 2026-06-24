@@ -165,6 +165,8 @@ export interface StoreTypographyConfig {
   heroOverlayOpacity?: number;
 }
 
+export type PosterCardPresentation = "current" | "full-image" | "stage";
+
 export interface StorefrontConfig {
   storeKey: string;
   storeName: string;
@@ -175,6 +177,14 @@ export interface StorefrontConfig {
   domainAliases?: string[] | null;
   routePrefix?: string | null;
   typographyConfig?: StoreTypographyConfig | null;
+  /**
+   * Controls how poster artwork is presented in card grids (Featured, New arrivals, Shop).
+   * "current"    — object-contain on warm neutral background (default, original behaviour)
+   * "full-image" — object-cover, fills the card stage
+   * "stage"      — centred artwork with breathing room and drop-shadow on warm bg
+   * Default: "current" (backwards-compatible).
+   */
+  posterCardPresentation?: PosterCardPresentation | null;
   theme?: {
     background: string;
     surface: string;

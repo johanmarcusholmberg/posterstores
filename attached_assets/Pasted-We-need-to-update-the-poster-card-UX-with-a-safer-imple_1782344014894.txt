@@ -1,0 +1,174 @@
+We need to update the poster-card UX with a safer implementation approach and fix the hover fade behavior.
+
+Important workflow constraints:
+
+* Do not create branches.
+* Do not create PRs.
+* Do not push to GitHub.
+* Do not commit unless I explicitly approve after reviewing the result.
+* Make changes only and report back.
+* Keep the current working setup available as a fallback until I give OK on the new change.
+
+Goal:
+Improve poster/product image presentation across homepage, New arrivals, shop grid, and product page while keeping mockup hover fade working smoothly.
+
+Current situation:
+
+* The current setup prevents cropping by using object-contain / neutral background.
+* This works technically, but the visual result can feel inconsistent because different poster ratios create different empty spaces.
+* I want to test a new poster presentation setup, but the current setup must remain available as fallback.
+
+New requirement:
+Add a controlled poster card presentation mode instead of hard-replacing the current behavior.
+
+Suggested presentation modes:
+
+1. current / fallback
+
+   * Keep the current setup exactly as it works today.
+   * This must remain available until I approve the new setup.
+
+2. full-image
+
+   * The artwork fills the image area of the card.
+   * Product title and price stay below the image area.
+   * This should feel like a clean ecommerce card:
+
+     * image on top
+     * text below
+     * consistent card width
+   * Choose the best fit behavior to keep this visually balanced across photo-like posters, portrait posters, square posters, and landscape posters.
+   * Avoid obviously bad cropping.
+
+3. stage
+
+   * A fixed neutral/warm background stage.
+   * The poster artwork is centered inside the stage, keeps its real aspect ratio, and gets a subtle shadow.
+   * Similar in principle to modern poster stores where the product tile is consistent but the poster shape remains visible.
+   * The poster should be large enough to compensate for the reduced usable area:
+
+     * suggested max-height around 86–90%
+     * suggested max-width around 82–88%
+   * Avoid making the poster look tiny or like accidental object-contain.
+
+Hover fade requirement:
+
+* Fix the mockup hover fade so it works both when moving the mouse onto the artwork and when moving the mouse away.
+* Right now the fade only feels smooth on hover-out.
+* The hover-in should also blend smoothly into the mockup.
+* Preferred implementation:
+
+  * If a hover mockup exists, always render both the base artwork layer and the hover mockup layer.
+  * Do not mount/render the hover mockup only after hover starts.
+  * Base artwork layer:
+
+    * opacity-100 normally
+    * opacity-0 on group-hover
+  * Hover mockup layer:
+
+    * opacity-0 normally
+    * opacity-100 on group-hover
+  * Both layers should use the same transition:
+
+    * transition-opacity
+    * duration-600
+    * ease-out
+* The hover mockup should be an absolute overlay over the whole image stage.
+* The hover mockup should use object-cover and fill the stage.
+* This must work in all poster presentation modes:
+
+  * current/fallback
+  * full-image
+  * stage
+* There should be no flicker, no layout shift, and no instant snap on hover-in.
+
+Implementation direction:
+
+* Create a small reusable abstraction for poster artwork display, for example:
+
+  * PosterArtworkStage
+  * ProductImageStage
+  * or a similar component/helper
+* The abstraction should support at least:
+
+  * current / fallback
+  * full-image
+  * stage
+* Keep the hover mockup layer separate from the base poster presentation.
+* Do not duplicate lots of image-rendering logic across Home, PosterCard, Shop, and MockupGallery if avoidable.
+
+Admin/config requirement:
+
+* Add a store-level setting if practical:
+
+  * posterCardPresentation: "current" | "full-image" | "stage"
+* The setting should control the base poster artwork presentation for:
+
+  * Featured posters
+  * New arrivals
+  * Shop grid
+  * Related posters if present
+* Product page can use the same setting or a larger version of it, but make sure raw poster artwork is not cropped unexpectedly.
+* If adding admin UI is too large for this pass, add a clearly isolated config constant/feature flag first and report where it is changed.
+* Default must be the current/fallback behavior, not the new mode, until I approve.
+
+Fallback requirement:
+
+* Do not delete or overwrite the current working behavior.
+* Keep it selectable through config or easy to revert.
+* Do not make irreversible layout changes.
+* If the new implementation causes visual problems, I need to be able to switch back to the current setup quickly.
+
+Featured posters / New arrivals consistency:
+
+* Featured posters and New arrivals should feel like the same product-card system.
+* Sync their image-card size, spacing, background, hover behavior, and text area as much as possible.
+* The sections can still differ in number of items/layout, but the card anatomy should feel consistent.
+* If using stage mode, compensate visually so the product does not feel too small.
+* Test whether Featured should remain 6 cards per row or whether the new presentation needs slightly larger cards. Do not permanently change the number unless clearly needed; report recommendation.
+
+Product page requirement:
+
+* The product detail page should also use an intentional poster presentation.
+* Raw poster artwork should not be awkwardly cropped.
+* Mockup/lifestyle images can still use object-cover.
+* Lightbox should preserve full image visibility for raw artwork.
+* Thumbnails should remain clean.
+
+Acceptance criteria:
+
+1. Current/fallback presentation remains available.
+2. New poster presentation mode is implemented safely behind config or a clear feature flag.
+3. Hover mockup fades smoothly on hover-in and hover-out.
+4. There is no flicker, snap, or layout shift during hover.
+5. Hover mockup behavior works in current, full-image, and stage modes.
+6. Featured posters and New arrivals use consistent card/image sizing.
+7. Raw poster artwork is not unintentionally cropped.
+8. Different poster sizes/ratios look intentional.
+9. Mockup/lifestyle images still fill the card nicely on hover.
+10. Product page raw artwork presentation is improved and not cropped.
+11. Homepage desktop/mobile still looks clean.
+12. Shop page desktop/mobile still looks clean.
+13. Typecheck passes with zero errors.
+
+Please test visually with:
+
+* “Test 2”
+* Spanish Lavender Fields
+* Alicante Harbour at Dusk
+* at least one portrait poster
+* at least one square or landscape poster
+* a poster with hover mockup
+
+Run typecheck for affected workspaces.
+
+Report back with:
+
+1. Files changed
+2. How the fallback/current mode is preserved
+3. How to switch between current, full-image, and stage
+4. What changed for hover fade
+5. What changed for Featured/New arrivals consistency
+6. What changed on the product page
+7. Visual recommendation after testing: current vs full-image vs stage
+8. Typecheck result

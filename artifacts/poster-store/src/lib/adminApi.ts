@@ -406,6 +406,8 @@ export interface AdminStoreSeoConfig {
   defaultDescription?: string;
 }
 
+export type AdminPosterCardPresentation = "current" | "full-image" | "stage";
+
 export interface AdminStore {
   id: number;
   storeKey: string;
@@ -425,6 +427,8 @@ export interface AdminStore {
   logoUrl: string | null;
   logoStoragePath: string | null;
   logoAltText: string | null;
+  /** Poster card presentation mode for grids. Null = "current" (default). */
+  posterCardPresentation: AdminPosterCardPresentation | null;
   posterCount: number;
   orderCount: number;
   createdAt: string;
@@ -445,6 +449,7 @@ export type CreateStorePayload = {
   primaryDomain?: string | null;
   domainAliases?: string[] | null;
   routePrefix?: string | null;
+  posterCardPresentation?: AdminPosterCardPresentation | null;
 };
 
 export type UpdateStorePayload = Partial<Omit<CreateStorePayload, "storeKey">> & {

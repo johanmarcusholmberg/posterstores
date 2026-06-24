@@ -136,6 +136,7 @@ const createStoreSchema = z.object({
   homepageConfig: homepageConfigSchema,
   seoConfig: seoConfigSchema,
   navigationConfig: z.any().nullable().optional(),
+  posterCardPresentation: z.enum(["current", "full-image", "stage"]).nullable().optional(),
   ...domainRoutingSchema.shape,
 });
 
@@ -285,6 +286,7 @@ router.post("/admin/stores", requireAdmin, async (req, res) => {
       primaryDomain: parsed.data.primaryDomain ?? null,
       domainAliases: (parsed.data.domainAliases as string[] | null | undefined) ?? null,
       routePrefix: parsed.data.routePrefix ?? null,
+      posterCardPresentation: (parsed.data.posterCardPresentation as "current" | "full-image" | "stage" | null | undefined) ?? null,
       createdAt: now,
       updatedAt: now,
     })
@@ -370,6 +372,7 @@ router.put("/admin/stores/:storeKey", requireAdmin, async (req, res) => {
   if ("domainAliases" in parsed.data) updates.domainAliases = (parsed.data.domainAliases as string[] | null | undefined) ?? null;
   if ("routePrefix" in parsed.data) updates.routePrefix = parsed.data.routePrefix ?? null;
   if ("logoAltText" in parsed.data) updates.logoAltText = parsed.data.logoAltText ?? null;
+  if ("posterCardPresentation" in parsed.data) updates.posterCardPresentation = (parsed.data.posterCardPresentation as "current" | "full-image" | "stage" | null | undefined) ?? null;
 
   const [updated] = await db
     .update(storesTable)

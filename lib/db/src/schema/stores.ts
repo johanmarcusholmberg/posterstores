@@ -22,6 +22,8 @@ export const storesTable = pgTable("stores", {
   logoUrl: text("logo_url"),
   logoStoragePath: text("logo_storage_path"),
   logoAltText: text("logo_alt_text"),
+  /** Poster card presentation mode for product-card grids. Null = "current" (default). */
+  posterCardPresentation: text("poster_card_presentation").$type<"current" | "full-image" | "stage">(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

@@ -7,7 +7,7 @@ import { addFavorite, removeFavorite } from "@/lib/favoritesApi";
 import { Heart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { LoginPromptModal } from "./LoginPromptModal";
-import { getOptimizedImageUrl } from "@/lib/imageUrl";
+import { PosterArtworkStage, type PosterCardPresentation } from "./PosterArtworkStage";
 
 interface PosterCardProps {
   poster: Poster;
@@ -109,6 +109,9 @@ export const PosterCard = ({ poster, favoritedIds, priority = false }: PosterCar
   const slug = (poster as any).slug as string | undefined;
   const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
 
+  // Presentation mode: read from store config, default to "current" (original behaviour).
+  const presentation: PosterCardPresentation = (store.posterCardPresentation as PosterCardPresentation | null | undefined) ?? "current";
+
   return (
     <>
       <Link
@@ -128,69 +131,22 @@ export const PosterCard = ({ poster, favoritedIds, priority = false }: PosterCar
           ].join(" ")}
         >
           {/*
-            Base poster image (always the raw artwork).
-
-            When a hover image exists:
-              Fades fully to opacity-0 on hover. No scale so there is nothing
-              competing with the incoming mockup image.
-
-            When no hover image:
-              Scales up to 108% — clearly noticeable inside overflow-hidden —
-              making hover feel interactive even without a second image.
-
-            motion-reduce: transitions removed. Scale stays at 100% so the
-            card looks correct with no animation.
+            PosterArtworkStage renders:
+              — The base artwork layer (mode-aware: contain / cover / centred-stage)
+              — The hover mockup overlay (always in DOM when hoverImage exists, so it
+                pre-loads; fades in/out symmetrically at 600 ms on hover-in AND hover-out)
           */}
-          <img
-            src={getOptimizedImageUrl(baseImage, { width: 600, quality: 85 })}
+          <PosterArtworkStage
+            src={baseImage}
+            hoverSrc={hoverImage}
             alt={poster.title}
-            loading={priority ? "eager" : "lazy"}
-            fetchPriority={priority ? "high" : undefined}
-            decoding="async"
-            className={[
-              "absolute inset-0 object-contain w-full h-full",
-              "motion-reduce:transition-none",
-              hoverImage
-                ? "transition-opacity duration-[600ms] ease-out opacity-100 group-hover:opacity-0 group-focus-within:opacity-0"
-                : "transition-transform duration-[300ms] ease-out scale-100 group-hover:scale-[1.08] group-focus-within:scale-[1.08]",
-            ].join(" ")}
+            priority={priority}
+            presentation={presentation}
             data-testid={`img-poster-${poster.id}`}
             onError={(e) => {
               (e.target as HTMLImageElement).src = poster.imageUrl;
             }}
           />
-
-          {/*
-            Hover/mockup image — only rendered when a second image is available.
-
-            Fades from opacity-0 to opacity-100 on hover/focus. Starts at
-            scale-100 and holds at scale-[1.03] in the hovered state to add a
-            subtle sense of depth after the reveal, without fighting the
-            opacity transition itself.
-
-            aria-hidden: always — screen readers use the base image alt text.
-            motion-reduce: transition removed, opacity stays 0 (never shown).
-          */}
-          {hoverImage && (
-            <img
-              src={getOptimizedImageUrl(hoverImage, { width: 600, quality: 80 })}
-              alt=""
-              aria-hidden="true"
-              loading="lazy"
-              decoding="async"
-              className={[
-                "absolute inset-0 object-cover w-full h-full",
-                "transition-[opacity,transform] duration-[600ms] ease-out",
-                "motion-reduce:transition-none",
-                "opacity-0 scale-100",
-                "group-hover:opacity-100 group-hover:scale-[1.03]",
-                "group-focus-within:opacity-100 group-focus-within:scale-[1.03]",
-              ].join(" ")}
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
-            />
-          )}
 
           {/* Subtle inset edge — print edge depth cue */}
           <div
