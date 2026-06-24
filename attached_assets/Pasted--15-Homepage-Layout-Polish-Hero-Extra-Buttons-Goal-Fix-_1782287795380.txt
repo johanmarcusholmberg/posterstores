@@ -1,0 +1,237 @@
+#15 — Homepage Layout Polish + Hero Extra Buttons
+
+## Goal
+
+Fix the new Homepage Layout editor issues and improve usability:
+
+1. Up/down arrows must actually reorder sections.
+2. Multiple collection banners must be clearly identifiable in the layout list.
+3. Hero section must support adding extra buttons in a user-friendly way.
+4. “Reset to default order” must not delete or remove custom collection sections.
+
+## Workflow constraints
+
+* Do not create branches.
+* Do not commit or push.
+* Keep changes targeted.
+* Do not rebuild the whole homepage editor.
+* Preserve all existing saved homepage configs.
+* Keep backwards compatibility with the existing `primaryButtonText`, `secondaryButtonText`, `primaryButtonLink`, and `secondaryButtonLink` fields.
+* Report changed files and typecheck result at the end.
+
+## Issues to fix
+
+### 1. Up/down arrows do not reorder sections
+
+In `AdminHomepageEditor.tsx`, investigate the section move handlers.
+
+Expected behavior:
+
+* Clicking up/down immediately changes the visible row order.
+* The updated order is saved into `config.sections`.
+* Reordering should be based on the current displayed sorted order, not stale array order.
+* After each move, normalize `sortOrder` values to stable increments, e.g. 10, 20, 30.
+* Disable up arrow for the first visible row and down arrow for the last visible row.
+* Do not disable working arrows incorrectly.
+
+Implementation suggestion:
+
+* Create a helper like:
+
+```ts id="9s4lm3"
+function normalizeSectionOrder(sections: HomepageSectionConfig[]): HomepageSectionConfig[] {
+  return [...sections]
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((section, index) => ({
+      ...section,
+      sortOrder: (index + 1) * 10,
+    }));
+}
+
+function moveSection(sectionId: string, direction: "up" | "down") {
+  setConfig(prev => {
+    const sections = normalizeSectionOrder(getSections(prev));
+    const index = sections.findIndex(s => s.id === sectionId);
+    if (index < 0) return prev;
+
+    const target = direction === "up" ? index - 1 : index + 1;
+    if (target < 0 || target >= sections.length) return prev;
+
+    const next = [...sections];
+    [next[index], next[target]] = [next[target], next[index]];
+
+    return {
+      ...prev,
+      sections: normalizeSectionOrder(next),
+    };
+  });
+}
+```
+
+Adapt to the actual helper names in the file.
+
+Also update the helper text. The UI currently says “Drag sections up/down,” but the UI uses arrows. Change it to something like:
+
+> Use the arrows to reorder sections. Toggle the eye icon to show or hide a section.
+
+Do not add drag-and-drop in this phase.
+
+### 2. Make collection banners identifiable in Homepage layout
+
+Currently multiple rows show only “Collection banner,” which makes it impossible to know which one is being moved.
+
+Expected behavior:
+
+* The layout row should display a useful label:
+
+  * `Collection banner 1 · Mediterranean Walls`
+  * `Collection banner 2 · Coastal Sale`
+  * `Collection banner 3 · Untitled`
+* The number should be based on the order of collection banners or their section order.
+* If a banner has a title, show it.
+* If no title exists, show `Untitled`.
+
+Implementation:
+
+* When rendering layout rows, resolve the section’s `bannerId` to the matching collection banner from `config.collectionBanners`.
+* Build a label from collection banner index + title.
+* Use the same label in the collection banner editor card header, so the admin can connect the editor card to the layout row.
+
+Also make sure duplicate collection banners receive a unique title fallback, for example:
+
+* `Collection banner 2`
+* or copy title + “copy”
+
+### 3. Hero section: add optional extra buttons
+
+The Hero section currently has primary and secondary buttons. Keep those fields for backwards compatibility, but add a user-friendly way to add more buttons.
+
+Add to `HeroVisualConfig`:
+
+```ts id="i81ndh"
+export interface HeroButtonConfig {
+  id: string;
+  label: string;
+  link: string;
+  variant?: "filled" | "outline";
+  visible?: boolean;
+}
+
+export interface HeroVisualConfig {
+  backgroundImageUrl?: string | null;
+  backgroundStoragePath?: string | null;
+  backgroundOverlayOpacity?: number;
+  primaryButtonText?: string | null;
+  primaryButtonVariant?: "filled" | "outline";
+  primaryButtonLink?: string | null;
+  secondaryButtonText?: string | null;
+  secondaryButtonVariant?: "filled" | "outline";
+  secondaryButtonLink?: string | null;
+
+  /**
+   * Optional extra hero buttons shown after the primary/secondary buttons.
+   * Existing primary/secondary fields remain the main backwards-compatible buttons.
+   */
+  extraButtons?: HeroButtonConfig[];
+}
+```
+
+Mirror this type in:
+
+* `artifacts/poster-store/src/config/storefronts.ts`
+* `artifacts/poster-store/src/lib/adminApi.ts`
+* backend Zod schema in `artifacts/api-server/src/routes/stores.ts`
+
+Admin UI:
+
+* In the Hero editor, add an “Extra buttons” area below the existing primary/secondary controls.
+* Add button: `+ Add hero button`
+* Each extra button row/card should have:
+
+  * Button label
+  * Destination link
+  * Style: Filled / Outline
+  * Show/hide toggle
+  * Remove button
+  * Optional up/down if easy, otherwise keep order as added
+* Link placeholder examples:
+
+  * `/shop`
+  * `/shop?category=Coastal+Posters`
+  * `/about`
+  * `https://example.com`
+
+Public homepage rendering:
+
+* Continue rendering primary and secondary buttons exactly as before.
+* Then render visible `hero.extraButtons` after them.
+* Use the same `resolveHomepageLink` and `SmartLink` behavior already built for primary/secondary buttons.
+* External links must not be route-prefixed.
+* Internal links must respect route prefix.
+* Empty extra button label should not render.
+* Empty extra button link should default to `/shop`.
+
+### 4. Make reset safe
+
+The current “Reset to default order” behavior is dangerous if it removes added collection banner sections.
+
+Change behavior and label.
+
+Preferred behavior:
+
+* Rename button to: `Restore default order`
+* Clicking it should:
+
+  * restore the built-in section order: Hero, Featured posters, Collection banner/default, Explore links, New arrivals, Brand story, Value props
+  * preserve all custom collection banners and their configs
+  * preserve custom collection banner sections by appending them after the default sections, unless they already map to the default collection banner
+  * preserve visibility flags where possible
+  * never delete `collectionBanners`
+  * never delete collection banner sections
+* Show a confirmation dialog before applying:
+
+  * Title: `Restore default section order?`
+  * Body: `This will reorder sections but will not delete your collection banners or their content.`
+  * Confirm: `Restore order`
+  * Cancel: `Cancel`
+
+Do not include a destructive “full reset” in this phase.
+
+Implementation detail:
+
+* The reset should only operate on `sections`.
+* It must not mutate or clear `collectionBanners`.
+* If custom collection banner sections exist, append them after default sections with normalized sort orders.
+* If a custom section is missing from defaults, preserve it at the bottom.
+
+### 5. QA / typecheck
+
+Run:
+
+```bash id="c3we8g"
+pnpm --filter @workspace/poster-store run typecheck
+pnpm --filter @workspace/api-server run typecheck
+```
+
+Manual QA checklist:
+
+* Up/down arrows reorder rows immediately.
+* Save, refresh, and order persists.
+* Two collection banners show distinguishable names in the layout.
+* Moving “Collection banner 2” moves the intended banner.
+* Extra Hero button renders on homepage.
+* Extra Hero internal link respects route prefix.
+* Extra Hero external link is not prefixed.
+* Restore default order preserves additional collection banners and appends them safely.
+* Existing stores without `extraButtons` still render correctly.
+
+## Report back
+
+Return:
+
+1. Files changed
+2. What was fixed
+3. How safe reset now behaves
+4. Hero extra button behavior
+5. Typecheck results
+6. Any remaining risks
