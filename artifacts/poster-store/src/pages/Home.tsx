@@ -17,6 +17,7 @@ import {
   DEFAULT_HOMEPAGE_SECTIONS,
   type CollectionBannerVisualConfig,
   type HomepageSectionConfig,
+  type HeroButtonStyleConfig,
 } from "@/config/storefronts";
 
 const VALUE_PROPS = [
@@ -84,6 +85,25 @@ function focalToObjectPosition(
   y: string | null | undefined
 ): string {
   return `${FOCAL_X[x ?? "center"] ?? "50%"} ${FOCAL_Y[y ?? "center"] ?? "50%"}`;
+}
+
+// ─── Visual override helpers ──────────────────────────────────────────────────
+
+function fontFamilyFromOverride(font?: string | null): string | undefined {
+  return font && font.trim() ? font.trim() : undefined;
+}
+
+function cleanColor(color?: string | null): string | undefined {
+  return color && color.trim() ? color.trim() : undefined;
+}
+
+function buttonStyleFromOverride(style?: HeroButtonStyleConfig | null): React.CSSProperties | undefined {
+  if (!style) return undefined;
+  const result: React.CSSProperties = {};
+  if (style.textColor) result.color = style.textColor;
+  if (style.backgroundColor) result.backgroundColor = style.backgroundColor;
+  if (style.borderColor) result.borderColor = style.borderColor;
+  return Object.keys(result).length > 0 ? result : undefined;
 }
 
 /** Shared badge class constants for card overlays */
@@ -154,7 +174,15 @@ function HomePosterCard({ poster }: { poster: Poster }) {
   );
 }
 
-function NewArrivalCard({ poster }: { poster: Poster }) {
+function NewArrivalCard({
+  poster,
+  titleColor,
+  priceColor,
+}: {
+  poster: Poster;
+  titleColor?: string;
+  priceColor?: string;
+}) {
   const slug = (poster as any).slug as string | undefined;
   const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
   const activeSizes = poster.posterSizes?.filter((s) => s.active) ?? [];
@@ -199,18 +227,36 @@ function NewArrivalCard({ poster }: { poster: Poster }) {
         {poster.isNew && <div className={NEW_BADGE_CLS}>NEW</div>}
       </div>
       <div className="mt-1.5 min-w-0">
-        <h3 className="font-serif font-semibold text-sm text-foreground truncate leading-snug">
+        <h3
+          className="font-serif font-semibold text-sm text-foreground truncate leading-snug"
+          style={titleColor ? { color: titleColor } : undefined}
+        >
           {(poster as any).displayTitle || poster.title}
         </h3>
         {hasPrice && (
-          <p className="text-xs font-medium text-foreground/70 mt-0.5 sm:hidden">{priceLabel}</p>
+          <p
+            className="text-xs font-medium text-foreground/70 mt-0.5 sm:hidden"
+            style={priceColor ? { color: priceColor } : undefined}
+          >
+            {priceLabel}
+          </p>
         )}
       </div>
     </Link>
   );
 }
 
-function FeaturedPosterCard({ poster, priority = false }: { poster: Poster; priority?: boolean }) {
+function FeaturedPosterCard({
+  poster,
+  priority = false,
+  titleColor,
+  priceColor,
+}: {
+  poster: Poster;
+  priority?: boolean;
+  titleColor?: string;
+  priceColor?: string;
+}) {
   const slug = (poster as any).slug as string | undefined;
   const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
   const activeSizes = poster.posterSizes?.filter((s) => s.active) ?? [];
@@ -251,10 +297,18 @@ function FeaturedPosterCard({ poster, priority = false }: { poster: Poster; prio
           {poster.isNew && <div className={NEW_BADGE_CLS}>NEW</div>}
         </div>
         <div className="px-0.5 pt-2.5 pb-3 min-h-[52px] flex flex-col justify-start min-w-0">
-          <h3 className="font-serif font-semibold text-[13px] sm:text-xs text-foreground/85 truncate leading-snug">
+          <h3
+            className="font-serif font-semibold text-[13px] sm:text-xs text-foreground/85 truncate leading-snug"
+            style={titleColor ? { color: titleColor } : undefined}
+          >
             {cardTitle}
           </h3>
-          <p className="text-[11px] text-foreground/50 mt-1">{priceLabel}</p>
+          <p
+            className="text-[11px] text-foreground/50 mt-1"
+            style={priceColor ? { color: priceColor } : undefined}
+          >
+            {priceLabel}
+          </p>
         </div>
       </div>
     </Link>
@@ -288,9 +342,10 @@ function PosterCardSkeleton() {
 interface HeroSectionProps {
   store: ReturnType<typeof useStorefront>;
   resolvedRoutePrefix: string | null;
+  sectionConfig?: HomepageSectionConfig | null;
 }
 
-function HeroSection({ store, resolvedRoutePrefix }: HeroSectionProps) {
+function HeroSection({ store, resolvedRoutePrefix, sectionConfig }: HeroSectionProps) {
   const heroVisual = store.homepageVisualConfig?.hero;
   const hasHeroBg = !!heroVisual?.backgroundImageUrl;
   const heroTextMode = store.typographyConfig?.heroTextMode;
@@ -301,45 +356,91 @@ function HeroSection({ store, resolvedRoutePrefix }: HeroSectionProps) {
   const primaryHref = resolveHomepageLink(resolvedRoutePrefix, heroVisual?.primaryButtonLink);
   const secondaryHref = resolveHomepageLink(resolvedRoutePrefix, heroVisual?.secondaryButtonLink);
 
+  // Section-level overrides
+  const co = sectionConfig?.colorOverrides;
+  const fo = sectionConfig?.fontOverrides;
+  const headingColorOverride = cleanColor(co?.headingColor);
+  const textColorOverride = cleanColor(co?.textColor);
+  const bgColorOverride = cleanColor(co?.backgroundColor);
+  const overlayColorOverride = cleanColor(co?.overlayColor);
+  const overlayOpacityOverride = co?.overlayOpacity ?? null;
+  const headingFontOverride = fontFamilyFromOverride(fo?.headingFont);
+  const bodyFontOverride = fontFamilyFromOverride(fo?.bodyFont);
+
+  // Compute heading style
+  const headingStyle: React.CSSProperties = {};
+  if (headingColorOverride) {
+    headingStyle.color = headingColorOverride;
+  } else if (useStoreHeroVars) {
+    headingStyle.color = "var(--store-hero-heading-color)";
+  }
+  if (headingFontOverride) headingStyle.fontFamily = headingFontOverride;
+
+  // Compute subtitle/bullet style
+  const subtitleStyle: React.CSSProperties = {};
+  if (textColorOverride) {
+    subtitleStyle.color = textColorOverride;
+  } else if (useStoreHeroVars) {
+    subtitleStyle.color = "var(--store-hero-subtitle-color)";
+  }
+  if (bodyFontOverride) subtitleStyle.fontFamily = bodyFontOverride;
+
+  const bulletStyle: React.CSSProperties = {};
+  if (textColorOverride) {
+    bulletStyle.color = textColorOverride;
+  } else if (useStoreHeroVars) {
+    bulletStyle.color = "var(--store-hero-bullet-color)";
+  }
+
+  // Overlay style (for when bg image is present)
+  const overlayDivStyle: React.CSSProperties = (() => {
+    if (!hasHeroBg) return {};
+    if (overlayColorOverride || overlayOpacityOverride != null) {
+      const style: React.CSSProperties = {
+        backgroundColor: overlayColorOverride ?? `rgba(0,0,0,${overlayOpacityOverride ?? 0.3})`,
+      };
+      if (overlayColorOverride && overlayOpacityOverride != null) style.opacity = overlayOpacityOverride;
+      return style;
+    }
+    if (useStoreOverlay) return { backgroundColor: "var(--store-hero-overlay-color)" };
+    return { backgroundColor: `rgba(0,0,0,${heroVisual?.backgroundOverlayOpacity ?? 0.3})` };
+  })();
+
+  // Section background style
+  const sectionStyle: React.CSSProperties = hasHeroBg
+    ? {
+        backgroundImage: `url(${heroVisual!.backgroundImageUrl})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }
+    : bgColorOverride
+    ? { backgroundColor: bgColorOverride }
+    : {};
+
   return (
     <section
-      className={cn("relative overflow-hidden", !hasHeroBg && "bg-sand")}
-      style={
-        hasHeroBg
-          ? {
-              backgroundImage: `url(${heroVisual!.backgroundImageUrl})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-            }
-          : undefined
-      }
+      className={cn("relative overflow-hidden", !hasHeroBg && !bgColorOverride && "bg-sand")}
+      style={sectionStyle}
     >
       {hasHeroBg && (
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundColor: useStoreOverlay
-              ? "var(--store-hero-overlay-color)"
-              : `rgba(0,0,0,${heroVisual?.backgroundOverlayOpacity ?? 0.3})`,
-          }}
-        />
+        <div className="absolute inset-0" style={overlayDivStyle} />
       )}
       <div className="relative z-10 container mx-auto max-w-screen-2xl px-6 lg:px-10 pt-3 pb-5 lg:pt-4 lg:pb-6 text-center">
         <h1
           className={cn(
             "font-serif text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 leading-tight",
-            !useStoreHeroVars && (hasHeroBg ? "text-white" : "text-primary")
+            !headingColorOverride && !useStoreHeroVars && (hasHeroBg ? "text-white" : "text-primary")
           )}
-          style={useStoreHeroVars ? { color: "var(--store-hero-heading-color)" } : undefined}
+          style={Object.keys(headingStyle).length > 0 ? headingStyle : undefined}
         >
           {store.homepage?.heroTitle || "Posters inspired by Spain"}
         </h1>
         <p
           className={cn(
             "text-sm mb-5 max-w-xl mx-auto leading-relaxed",
-            !useStoreHeroVars && (hasHeroBg ? "text-white/80" : "text-foreground/65")
+            !textColorOverride && !useStoreHeroVars && (hasHeroBg ? "text-white/80" : "text-foreground/65")
           )}
-          style={useStoreHeroVars ? { color: "var(--store-hero-subtitle-color)" } : undefined}
+          style={Object.keys(subtitleStyle).length > 0 ? subtitleStyle : undefined}
         >
           {store.homepage?.heroSubtitle || "Mediterranean places, colors and moments — printed for your home."}
         </p>
@@ -357,8 +458,9 @@ function HeroSection({ store, resolvedRoutePrefix }: HeroSectionProps) {
               }
               className={cn(
                 "w-full sm:w-auto h-11 px-6 text-sm",
-                hasHeroBg && !useStoreHeroVars && "bg-white text-primary hover:bg-white/90 border-0"
+                !heroVisual?.primaryButtonStyle && hasHeroBg && !useStoreHeroVars && "bg-white text-primary hover:bg-white/90 border-0"
               )}
+              style={buttonStyleFromOverride(heroVisual?.primaryButtonStyle)}
             >
               {heroVisual?.primaryButtonText || store.homepage?.primaryCta || "Browse posters"}
             </Button>
@@ -369,10 +471,11 @@ function HeroSection({ store, resolvedRoutePrefix }: HeroSectionProps) {
               variant="outline"
               className={cn(
                 "w-full sm:w-auto h-11 px-6 text-sm",
-                !useStoreHeroVars && (hasHeroBg
+                !heroVisual?.secondaryButtonStyle && !useStoreHeroVars && (hasHeroBg
                   ? "border-white/60 text-white hover:bg-white/10 bg-transparent"
                   : "border-primary/30 text-primary hover:bg-primary/5")
               )}
+              style={buttonStyleFromOverride(heroVisual?.secondaryButtonStyle)}
             >
               {heroVisual?.secondaryButtonText || store.homepage?.secondaryCta || "View all regions"}
             </Button>
@@ -389,11 +492,12 @@ function HeroSection({ store, resolvedRoutePrefix }: HeroSectionProps) {
                     variant={isFilled ? "default" : "outline"}
                     className={cn(
                       "w-full sm:w-auto h-11 px-6 text-sm",
-                      isFilled && hasHeroBg && !useStoreHeroVars && "bg-white text-primary hover:bg-white/90 border-0",
-                      !isFilled && !useStoreHeroVars && (hasHeroBg
+                      !btn.style && isFilled && hasHeroBg && !useStoreHeroVars && "bg-white text-primary hover:bg-white/90 border-0",
+                      !btn.style && !isFilled && !useStoreHeroVars && (hasHeroBg
                         ? "border-white/60 text-white hover:bg-white/10 bg-transparent"
                         : "border-primary/30 text-primary hover:bg-primary/5")
                     )}
+                    style={buttonStyleFromOverride(btn.style)}
                   >
                     {btn.label}
                   </Button>
@@ -405,9 +509,9 @@ function HeroSection({ store, resolvedRoutePrefix }: HeroSectionProps) {
         <div
           className={cn(
             "mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 justify-center text-xs",
-            !useStoreHeroVars && (hasHeroBg ? "text-white/50" : "text-foreground/40")
+            !textColorOverride && !useStoreHeroVars && (hasHeroBg ? "text-white/50" : "text-foreground/40")
           )}
-          style={useStoreHeroVars ? { color: "var(--store-hero-bullet-color)" } : undefined}
+          style={Object.keys(bulletStyle).length > 0 ? bulletStyle : undefined}
         >
           <span>✦ Fine art prints</span>
           <span>✦ Ships worldwide</span>
@@ -421,18 +525,36 @@ function HeroSection({ store, resolvedRoutePrefix }: HeroSectionProps) {
 interface FeaturedPostersSectionProps {
   featured: Poster[] | undefined;
   resolvedRoutePrefix: string | null;
+  sectionConfig?: HomepageSectionConfig | null;
 }
 
-function FeaturedPostersSection({ featured, resolvedRoutePrefix }: FeaturedPostersSectionProps) {
+function FeaturedPostersSection({ featured, resolvedRoutePrefix, sectionConfig }: FeaturedPostersSectionProps) {
   const FEATURED_LIMIT = 6;
+  const co = sectionConfig?.colorOverrides;
+  const fo = sectionConfig?.fontOverrides;
+  const headingColor = cleanColor(co?.headingColor);
+  const headingFont = fontFamilyFromOverride(fo?.headingFont);
+  const linkColor = cleanColor(co?.linkColor);
+  const posterTitleColor = cleanColor(co?.posterTitleColor);
+  const posterPriceColor = cleanColor(co?.posterPriceColor);
+
   return (
     <section className="pt-4 pb-5 lg:pt-4 lg:pb-6">
       <div className="container mx-auto max-w-screen-2xl px-6 lg:px-10">
         <div className="flex items-center justify-between mb-5 lg:mb-6">
-          <h2 className="font-serif text-xl font-bold text-foreground">Featured posters</h2>
+          <h2
+            className="font-serif text-xl font-bold text-foreground"
+            style={{
+              ...(headingColor ? { color: headingColor } : {}),
+              ...(headingFont ? { fontFamily: headingFont } : {}),
+            }}
+          >
+            Featured posters
+          </h2>
           <Link
             href={makeShopUrl(resolvedRoutePrefix)}
             className="text-sm text-primary font-medium hover:underline shrink-0 ml-4"
+            style={linkColor ? { color: linkColor } : undefined}
           >
             View all &rarr;
           </Link>
@@ -441,7 +563,12 @@ function FeaturedPostersSection({ featured, resolvedRoutePrefix }: FeaturedPoste
           {featured && featured.length > 0
             ? featured.slice(0, FEATURED_LIMIT).map((poster, i) => (
                 <div key={poster.id} className={["h-full", i >= 4 ? "hidden sm:block" : ""].filter(Boolean).join(" ")}>
-                  <FeaturedPosterCard poster={poster} priority={i < 2} />
+                  <FeaturedPosterCard
+                    poster={poster}
+                    priority={i < 2}
+                    titleColor={posterTitleColor}
+                    priceColor={posterPriceColor}
+                  />
                 </div>
               ))
             : Array.from({ length: FEATURED_LIMIT }).map((_, i) => (
@@ -483,12 +610,47 @@ function CollectionBannerSection({
     ? resolveHomepageLink(resolvedRoutePrefix, cbCtaLink)
     : makeShopUrl(resolvedRoutePrefix);
 
+  // Visual overrides
+  const co = banner.colorOverrides;
+  const fo = banner.fontOverrides;
+  const bannerEyebrowColor = cleanColor(co?.eyebrowColor);
+  const bannerHeadingColor = cleanColor(co?.headingColor);
+  const bannerHeadingFont = fontFamilyFromOverride(fo?.headingFont);
+  const bannerTextColor = cleanColor(co?.textColor);
+  const bannerBodyFont = fontFamilyFromOverride(fo?.bodyFont);
+  const bannerLinkColor = cleanColor(co?.linkColor);
+  const bannerBgColor = cleanColor(co?.backgroundColor);
+  const bannerOverlayColor = cleanColor(co?.overlayColor);
+  const bannerOverlayOpacity = co?.overlayOpacity ?? null;
+
+  const overlayStyle: React.CSSProperties = (() => {
+    if (bannerOverlayColor || bannerOverlayOpacity != null) {
+      const style: React.CSSProperties = {
+        backgroundColor: bannerOverlayColor ?? `rgba(0,0,0,${bannerOverlayOpacity ?? 0.35})`,
+      };
+      if (bannerOverlayColor && bannerOverlayOpacity != null) style.opacity = bannerOverlayOpacity;
+      return style;
+    }
+    return { backgroundColor: `rgba(0,0,0,${banner.backgroundOverlayOpacity ?? 0.35})` };
+  })();
+
+  const eyebrowStyle: React.CSSProperties = bannerEyebrowColor ? { color: bannerEyebrowColor } : {};
+  const headingStyle: React.CSSProperties = {
+    ...(bannerHeadingColor ? { color: bannerHeadingColor } : {}),
+    ...(bannerHeadingFont ? { fontFamily: bannerHeadingFont } : {}),
+  };
+  const textStyle: React.CSSProperties = {
+    ...(bannerTextColor ? { color: bannerTextColor } : {}),
+    ...(bannerBodyFont ? { fontFamily: bannerBodyFont } : {}),
+  };
+  const ctaStyle: React.CSSProperties = bannerLinkColor ? { color: bannerLinkColor } : {};
+
   return (
     <section className="py-2 lg:py-3">
       <div className="container mx-auto max-w-screen-2xl px-6 lg:px-10">
         <div
           className="relative overflow-hidden rounded-2xl shadow-[0_2px_20px_rgba(0,0,0,0.10)]"
-          style={!hasCollBg ? { backgroundColor: "#EBD9C4" } : undefined}
+          style={!hasCollBg ? { backgroundColor: bannerBgColor ?? "#EBD9C4" } : undefined}
         >
           {hasCollBg ? (
             <>
@@ -504,12 +666,7 @@ function CollectionBannerSection({
                 )}
                 style={imageFit === "cover" ? { objectPosition: objectPos } : undefined}
               />
-              <div
-                className="absolute inset-0"
-                style={{
-                  backgroundColor: `rgba(0,0,0,${banner.backgroundOverlayOpacity ?? 0.35})`,
-                }}
-              />
+              <div className="absolute inset-0" style={overlayStyle} />
             </>
           ) : null}
 
@@ -527,8 +684,9 @@ function CollectionBannerSection({
                   <p
                     className={cn(
                       "text-[10px] font-semibold uppercase tracking-[0.18em] mb-2.5",
-                      hasCollBg ? "text-white/60" : "text-foreground/45"
+                      !bannerEyebrowColor && (hasCollBg ? "text-white/60" : "text-foreground/45")
                     )}
+                    style={Object.keys(eyebrowStyle).length > 0 ? eyebrowStyle : undefined}
                   >
                     {cbEyebrow}
                   </p>
@@ -536,8 +694,9 @@ function CollectionBannerSection({
                 <h2
                   className={cn(
                     "font-serif text-2xl sm:text-3xl font-bold leading-tight mb-3",
-                    hasCollBg ? "text-white" : "text-primary"
+                    !bannerHeadingColor && (hasCollBg ? "text-white" : "text-primary")
                   )}
+                  style={Object.keys(headingStyle).length > 0 ? headingStyle : undefined}
                 >
                   {cbTitle}
                 </h2>
@@ -545,8 +704,9 @@ function CollectionBannerSection({
                   <p
                     className={cn(
                       "text-sm leading-relaxed mb-5 max-w-sm",
-                      hasCollBg ? "text-white/75" : "text-foreground/65"
+                      !bannerTextColor && (hasCollBg ? "text-white/75" : "text-foreground/65")
                     )}
+                    style={Object.keys(textStyle).length > 0 ? textStyle : undefined}
                   >
                     {cbText}
                   </p>
@@ -555,8 +715,9 @@ function CollectionBannerSection({
                   href={resolvedCtaHref}
                   className={cn(
                     "inline-flex items-center gap-1.5 text-sm font-semibold hover:underline",
-                    hasCollBg ? "text-white" : "text-primary"
+                    !bannerLinkColor && (hasCollBg ? "text-white" : "text-primary")
                   )}
+                  style={Object.keys(ctaStyle).length > 0 ? ctaStyle : undefined}
                 >
                   {cbCtaText} &rarr;
                 </Link>
@@ -647,6 +808,7 @@ interface NewArrivalsSectionProps {
   onScroll: () => void;
   onScrollLeft: () => void;
   onScrollRight: () => void;
+  sectionConfig?: HomepageSectionConfig | null;
 }
 
 function NewArrivalsSection({
@@ -658,16 +820,35 @@ function NewArrivalsSection({
   onScroll,
   onScrollLeft,
   onScrollRight,
+  sectionConfig,
 }: NewArrivalsSectionProps) {
   if (newArrivals.length === 0) return null;
+
+  const co = sectionConfig?.colorOverrides;
+  const fo = sectionConfig?.fontOverrides;
+  const headingColor = cleanColor(co?.headingColor);
+  const headingFont = fontFamilyFromOverride(fo?.headingFont);
+  const linkColor = cleanColor(co?.linkColor);
+  const posterTitleColor = cleanColor(co?.posterTitleColor);
+  const posterPriceColor = cleanColor(co?.posterPriceColor);
+
   return (
     <section className="pt-3 pb-4 lg:pt-4 lg:pb-5" data-testid="new-arrivals-section">
       <div className="container mx-auto max-w-screen-2xl px-6 lg:px-10 mb-4">
         <div className="flex items-center justify-between">
-          <h2 className="font-serif text-xl font-bold text-foreground">New arrivals</h2>
+          <h2
+            className="font-serif text-xl font-bold text-foreground"
+            style={{
+              ...(headingColor ? { color: headingColor } : {}),
+              ...(headingFont ? { fontFamily: headingFont } : {}),
+            }}
+          >
+            New arrivals
+          </h2>
           <Link
             href={makeShopUrl(resolvedRoutePrefix, "sort=newest")}
             className="text-sm text-primary font-medium hover:underline shrink-0 ml-4"
+            style={linkColor ? { color: linkColor } : undefined}
           >
             View all &rarr;
           </Link>
@@ -682,7 +863,11 @@ function NewArrivalsSection({
           >
             {newArrivals.map((poster) => (
               <div key={poster.id} className="flex-none snap-start w-[74vw] sm:w-[240px] lg:w-[260px]">
-                <NewArrivalCard poster={poster} />
+                <NewArrivalCard
+                  poster={poster}
+                  titleColor={posterTitleColor}
+                  priceColor={posterPriceColor}
+                />
               </div>
             ))}
             <div className="flex-none w-4 lg:w-6" aria-hidden="true" />
@@ -715,11 +900,33 @@ function NewArrivalsSection({
   );
 }
 
-function BrandStorySection({ brandStory }: { brandStory: string }) {
+function BrandStorySection({
+  brandStory,
+  sectionConfig,
+}: {
+  brandStory: string;
+  sectionConfig?: HomepageSectionConfig | null;
+}) {
+  const co = sectionConfig?.colorOverrides;
+  const fo = sectionConfig?.fontOverrides;
+  const textColor = cleanColor(co?.textColor);
+  const bgColor = cleanColor(co?.backgroundColor);
+  const fontFamily = fontFamilyFromOverride(fo?.bodyFont ?? fo?.headingFont);
+
   return (
-    <section className="py-8 lg:py-10" data-testid="brand-story-section">
+    <section
+      className="py-8 lg:py-10"
+      data-testid="brand-story-section"
+      style={bgColor ? { backgroundColor: bgColor } : undefined}
+    >
       <div className="max-w-2xl mx-auto px-6 text-center">
-        <p className="font-serif text-xl md:text-2xl text-foreground/75 leading-relaxed italic">
+        <p
+          className="font-serif text-xl md:text-2xl text-foreground/75 leading-relaxed italic"
+          style={{
+            ...(textColor ? { color: textColor } : {}),
+            ...(fontFamily ? { fontFamily } : {}),
+          }}
+        >
           &ldquo;{brandStory}&rdquo;
         </p>
       </div>
@@ -871,6 +1078,7 @@ export default function Home() {
                 key={section.id}
                 store={store}
                 resolvedRoutePrefix={resolvedRoutePrefix}
+                sectionConfig={section}
               />
             );
 
@@ -880,6 +1088,7 @@ export default function Home() {
                 key={section.id}
                 featured={featured}
                 resolvedRoutePrefix={resolvedRoutePrefix}
+                sectionConfig={section}
               />
             );
 
@@ -923,11 +1132,18 @@ export default function Home() {
                 onScroll={updateNaScrollState}
                 onScrollLeft={() => scrollNa("left")}
                 onScrollRight={() => scrollNa("right")}
+                sectionConfig={section}
               />
             );
 
           case "brandStory":
-            return <BrandStorySection key={section.id} brandStory={brandStory} />;
+            return (
+              <BrandStorySection
+                key={section.id}
+                brandStory={brandStory}
+                sectionConfig={section}
+              />
+            );
 
           case "valueProps":
             return <ValuePropsSection key={section.id} />;

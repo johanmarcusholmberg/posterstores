@@ -1,9 +1,16 @@
+export interface HeroButtonStyleConfig {
+  textColor?: string | null;
+  backgroundColor?: string | null;
+  borderColor?: string | null;
+}
+
 export interface HeroButtonConfig {
   id: string;
   label: string;
   link: string;
   variant?: "filled" | "outline";
   visible?: boolean;
+  style?: HeroButtonStyleConfig | null;
 }
 
 export interface HeroVisualConfig {
@@ -13,9 +20,11 @@ export interface HeroVisualConfig {
   primaryButtonText?: string | null;
   primaryButtonVariant?: "filled" | "outline";
   primaryButtonLink?: string | null;
+  primaryButtonStyle?: HeroButtonStyleConfig | null;
   secondaryButtonText?: string | null;
   secondaryButtonVariant?: "filled" | "outline";
   secondaryButtonLink?: string | null;
+  secondaryButtonStyle?: HeroButtonStyleConfig | null;
   /**
    * Optional extra hero buttons shown after the primary/secondary buttons.
    * Existing primary/secondary fields remain the main backwards-compatible buttons.
@@ -37,6 +46,9 @@ export interface SectionColorOverrides {
   backgroundColor?: string | null;
   overlayColor?: string | null;
   overlayOpacity?: number | null;
+  /** Homepage poster-card text only — used for Featured/New arrivals section cards. */
+  posterTitleColor?: string | null;
+  posterPriceColor?: string | null;
 }
 
 export interface CollectionBannerVisualConfig {

@@ -10,8 +10,11 @@ import {
   type HomepageVisualConfig,
   type HeroVisualConfig,
   type HeroButtonConfig,
+  type HeroButtonStyleConfig,
   type CollectionBannerVisualConfig,
   type HomepageSectionConfig,
+  type SectionFontOverrides,
+  type SectionColorOverrides,
   type AdminStore,
 } from "@/lib/adminApi";
 import {
@@ -168,6 +171,111 @@ function ImageUploader({ label, hint, recommendedSpec, currentUrl, onUpload, onR
   );
 }
 
+// ─── Color picker field ────────────────────────────────────────────────────
+
+function ColorField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value?: string | null;
+  onChange: (v: string | null) => void;
+}) {
+  const val = value ?? "";
+  const isValidHex = /^#[0-9A-Fa-f]{6}$/.test(val);
+
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs">{label}</Label>
+      <div className="flex items-center gap-1.5">
+        <input
+          type="color"
+          value={isValidHex ? val : "#888888"}
+          onChange={e => onChange(e.target.value)}
+          className="w-7 h-7 rounded border border-border cursor-pointer shrink-0 p-0.5 bg-background"
+          title="Pick color"
+        />
+        <Input
+          value={val}
+          placeholder="inherit"
+          className="h-7 text-xs font-mono min-w-0 flex-1"
+          onChange={e => {
+            const v = e.target.value;
+            onChange(v.trim() || null);
+          }}
+        />
+        {val && (
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            className="shrink-0 p-1 rounded hover:bg-muted text-muted-foreground transition-colors"
+            title="Clear — inherit global default"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Font field ────────────────────────────────────────────────────────────
+
+function FontField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value?: string | null;
+  onChange: (v: string | null) => void;
+}) {
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs">{label}</Label>
+      <Input
+        value={value ?? ""}
+        placeholder="inherit"
+        className="h-7 text-xs"
+        onChange={e => onChange(e.target.value.trim() || null)}
+      />
+    </div>
+  );
+}
+
+// ─── Collapsible override panel ────────────────────────────────────────────
+
+function CollapsibleOverridePanel({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-md border border-border/70 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-3 py-2 bg-muted/20 hover:bg-muted/40 transition-colors text-left"
+      >
+        <span className="text-sm font-medium text-foreground/80">{title}</span>
+        <ChevronRight className={cn("w-3.5 h-3.5 text-muted-foreground transition-transform shrink-0", open && "rotate-90")} />
+      </button>
+      {open && (
+        <div className="p-3 border-t border-border/50 space-y-3">
+          <p className="text-xs text-muted-foreground italic">
+            Leave blank to inherit global brand defaults.
+          </p>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Layout helpers ─────────────────────────────────────────────────────────
 
 function SectionCard({ title, description, children, className }: {
@@ -219,6 +327,14 @@ function CollectionBannerEditor({ banner, bannerLabel, totalBanners, onUpdate, o
   const [expanded, setExpanded] = useState(true);
   const overlayPct = Math.round((banner.backgroundOverlayOpacity ?? 0.35) * 100);
   const imageFit = banner.imageFit ?? "cover";
+
+  const co = banner.colorOverrides ?? {};
+  const fo = banner.fontOverrides ?? {};
+
+  const setColor = (key: keyof SectionColorOverrides, v: string | null) =>
+    onUpdate({ colorOverrides: { ...banner.colorOverrides, [key]: v } });
+  const setFont = (key: keyof SectionFontOverrides, v: string | null) =>
+    onUpdate({ fontOverrides: { ...banner.fontOverrides, [key]: v } });
 
   return (
     <div className="rounded-lg border border-border bg-background overflow-hidden">
@@ -364,10 +480,35 @@ function CollectionBannerEditor({ banner, bannerLabel, totalBanners, onUpdate, o
             />
           </div>
 
-          {/* Font/color override placeholder */}
-          <p className="text-xs text-muted-foreground rounded-md bg-muted/40 px-3 py-2">
-            Section-level font and color overrides are planned for next phase.
-          </p>
+          {/* Banner visual overrides */}
+          <CollapsibleOverridePanel title="Banner visual overrides">
+            <div className="grid grid-cols-2 gap-3">
+              <FontField label="Heading font" value={fo.headingFont} onChange={v => setFont("headingFont", v)} />
+              <FontField label="Body font" value={fo.bodyFont} onChange={v => setFont("bodyFont", v)} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <ColorField label="Eyebrow color" value={co.eyebrowColor} onChange={v => setColor("eyebrowColor", v)} />
+              <ColorField label="Heading color" value={co.headingColor} onChange={v => setColor("headingColor", v)} />
+              <ColorField label="Text color" value={co.textColor} onChange={v => setColor("textColor", v)} />
+              <ColorField label="CTA / link color" value={co.linkColor} onChange={v => setColor("linkColor", v)} />
+              <ColorField label="Background color fallback" value={co.backgroundColor} onChange={v => setColor("backgroundColor", v)} />
+              <ColorField label="Overlay color" value={co.overlayColor} onChange={v => setColor("overlayColor", v)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">
+                Overlay opacity — {Math.round((co.overlayOpacity ?? 0) * 100)}%
+                {co.overlayOpacity == null && (
+                  <span className="ml-1.5 text-muted-foreground font-normal">(using slider above)</span>
+                )}
+              </Label>
+              <Slider
+                min={0} max={100} step={5}
+                value={[Math.round((co.overlayOpacity ?? 0) * 100)]}
+                onValueChange={([v]) => setColor("overlayOpacity" as any, v === 0 ? null : v / 100 as any)}
+              />
+              <p className="text-xs text-muted-foreground">Set to override the overlay slider above. 0% = not set.</p>
+            </div>
+          </CollapsibleOverridePanel>
         </div>
       )}
     </div>
@@ -431,6 +572,24 @@ export default function AdminHomepageEditor() {
     return map;
   }, [workingBanners]);
 
+  // Per-section-type derived configs for override panels
+  const heroSection = useMemo(
+    () => workingSections.find(s => s.type === "hero") ?? null,
+    [workingSections]
+  );
+  const featuredSection = useMemo(
+    () => workingSections.find(s => s.type === "featuredPosters") ?? null,
+    [workingSections]
+  );
+  const newArrivalsSection = useMemo(
+    () => workingSections.find(s => s.type === "newArrivals") ?? null,
+    [workingSections]
+  );
+  const brandStorySection = useMemo(
+    () => workingSections.find(s => s.type === "brandStory") ?? null,
+    [workingSections]
+  );
+
   // ── Section operations ────────────────────────────────────────────────────
 
   const updateSections = useCallback((updater: (prev: HomepageSectionConfig[]) => HomepageSectionConfig[]) => {
@@ -440,6 +599,21 @@ export default function AdminHomepageEditor() {
     });
   }, []);
 
+  /** Update colorOverrides or fontOverrides for a specific section type. */
+  const updateSectionOverrides = useCallback((
+    type: HomepageSectionType,
+    field: "colorOverrides" | "fontOverrides",
+    patch: Partial<SectionColorOverrides> | Partial<SectionFontOverrides>
+  ) => {
+    updateSections(prev =>
+      prev.map(s =>
+        s.type === type
+          ? { ...s, [field]: { ...(s[field] ?? {}), ...patch } }
+          : s
+      )
+    );
+  }, [updateSections]);
+
   const moveSectionUp = (id: string) => {
     setConfig(c => {
       const sections = normalizeSortOrders(
@@ -447,7 +621,6 @@ export default function AdminHomepageEditor() {
       );
       const idx = sections.findIndex(s => s.id === id);
       if (idx <= 0) return c;
-      // Swap the sortOrder values so normalizeSortOrders re-sorts correctly
       const tmp = sections[idx].sortOrder;
       sections[idx] = { ...sections[idx], sortOrder: sections[idx - 1].sortOrder };
       sections[idx - 1] = { ...sections[idx - 1], sortOrder: tmp };
@@ -462,7 +635,6 @@ export default function AdminHomepageEditor() {
       );
       const idx = sections.findIndex(s => s.id === id);
       if (idx < 0 || idx >= sections.length - 1) return c;
-      // Swap the sortOrder values so normalizeSortOrders re-sorts correctly
       const tmp = sections[idx].sortOrder;
       sections[idx] = { ...sections[idx], sortOrder: sections[idx + 1].sortOrder };
       sections[idx + 1] = { ...sections[idx + 1], sortOrder: tmp };
@@ -482,16 +654,23 @@ export default function AdminHomepageEditor() {
         ? c.sections
         : [...DEFAULT_HOMEPAGE_SECTIONS];
       const defaultIds = new Set(DEFAULT_HOMEPAGE_SECTIONS.map(s => s.id));
-      // Rebuild default sections, preserving existing visibility flags
+      const currentById = new Map(existingSections.map(s => [s.id, s]));
+
+      // Rebuild default sections preserving visibility, font and color overrides
       const defaultSections: HomepageSectionConfig[] = DEFAULT_HOMEPAGE_SECTIONS.map(def => {
-        const existing = existingSections.find(s => s.id === def.id);
-        return { ...def, visible: existing !== undefined ? existing.visible : def.visible };
+        const existing = currentById.get(def.id);
+        return {
+          ...def,
+          visible: existing?.visible ?? def.visible,
+          fontOverrides: existing?.fontOverrides ?? def.fontOverrides ?? null,
+          colorOverrides: existing?.colorOverrides ?? def.colorOverrides ?? null,
+        };
       });
-      // Preserve any custom collection banner sections not in the defaults
-      const customBannerSections = existingSections.filter(
-        s => !defaultIds.has(s.id) && s.type === "collectionBanner"
-      );
-      return { ...c, sections: normalizeSortOrders([...defaultSections, ...customBannerSections]) };
+
+      // Preserve any custom sections (e.g. extra collection banners) appended after defaults
+      const customSections = existingSections.filter(s => !defaultIds.has(s.id));
+
+      return { ...c, sections: normalizeSortOrders([...defaultSections, ...customSections]) };
     });
     setShowResetConfirm(false);
   };
@@ -601,8 +780,6 @@ export default function AdminHomepageEditor() {
         throw new Error(typeof body.error === "string" ? body.error : "Preview failed");
       }
       const { token } = await res.json() as { token: string };
-      // Navigate to the store's public root so URL-based store resolution works.
-      // If the store has a route prefix (e.g. /sweden) use that; otherwise root /.
       const previewBase = storeData?.routePrefix
         ? `/${storeData.routePrefix}/`
         : "/";
@@ -632,7 +809,6 @@ export default function AdminHomepageEditor() {
         collectionBanner: undefined,
       };
       const saved = await adminUpdateHomepageVisual(adminStoreKey, toSave);
-      // Re-apply migration on the returned config
       let normalized: HomepageVisualConfig = { hero: {}, ...saved };
       if (saved.collectionBanner && !saved.collectionBanners?.length) {
         normalized = { ...normalized, collectionBanners: [{ ...saved.collectionBanner, id: "default" }] };
@@ -651,7 +827,6 @@ export default function AdminHomepageEditor() {
   const hero = config.hero ?? {};
   const heroOverlay = Math.round((hero.backgroundOverlayOpacity ?? 0.3) * 100);
 
-  // Banners that appear in the section list, in section order
   const orderedBannerSections = workingSections.filter(s => s.type === "collectionBanner");
 
   const theme = storeData?.themeConfig;
@@ -756,7 +931,6 @@ export default function AdminHomepageEditor() {
                         "flex items-center gap-2 px-3 py-2 rounded-md border",
                         section.visible ? "border-border bg-background" : "border-dashed border-border/60 bg-muted/20"
                       )}>
-                      {/* Visibility toggle */}
                       <button type="button"
                         onClick={() => toggleSectionVisible(section.id)}
                         className={cn(
@@ -767,12 +941,10 @@ export default function AdminHomepageEditor() {
                         {section.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                       </button>
 
-                      {/* Label */}
                       <span className={cn("flex-1 text-sm font-medium", !section.visible && "text-muted-foreground/60")}>
                         {label}
                       </span>
 
-                      {/* Up/down */}
                       <div className="flex gap-0.5 shrink-0">
                         <button type="button" onClick={() => moveSectionUp(section.id)} disabled={isFirst}
                           className="p-1 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
@@ -808,7 +980,7 @@ export default function AdminHomepageEditor() {
                   <div>
                     <p className="font-medium text-sm">Restore default section order?</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      This will reorder sections but will not delete your collection banners or their content.
+                      This will reorder sections to the built-in default order, preserving all banners, content, and visual overrides. Custom collection banner sections will be appended after the defaults.
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -839,55 +1011,105 @@ export default function AdminHomepageEditor() {
                   </p>
                 </div>
               )}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label>Primary button text</Label>
-                  <Input value={hero.primaryButtonText ?? ""} placeholder="Browse posters"
-                    onChange={e => setHero({ primaryButtonText: e.target.value || null })} />
+
+              {/* Primary button */}
+              <div className="space-y-2 pt-1 border-t border-border">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide pt-1">Primary button</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>Button text</Label>
+                    <Input value={hero.primaryButtonText ?? ""} placeholder="Browse posters"
+                      onChange={e => setHero({ primaryButtonText: e.target.value || null })} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Style</Label>
+                    <Select value={hero.primaryButtonVariant ?? "filled"}
+                      onValueChange={v => setHero({ primaryButtonVariant: v as "filled" | "outline" })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="filled">Filled</SelectItem>
+                        <SelectItem value="outline">Outline</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="sm:col-span-2 space-y-1.5">
+                    <Label>Link</Label>
+                    <Input value={hero.primaryButtonLink ?? ""} placeholder="/shop"
+                      onChange={e => setHero({ primaryButtonLink: e.target.value || null })} />
+                    <p className="text-xs text-muted-foreground">
+                      Leave blank to default to /shop. Examples: /shop?category=Coastal+Posters, /about, https://example.com
+                    </p>
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label>Primary button style</Label>
-                  <Select value={hero.primaryButtonVariant ?? "filled"}
-                    onValueChange={v => setHero({ primaryButtonVariant: v as "filled" | "outline" })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="filled">Filled</SelectItem>
-                      <SelectItem value="outline">Outline</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <CollapsibleOverridePanel title="Primary button colors">
+                  <div className="grid grid-cols-3 gap-3">
+                    <ColorField
+                      label="Text color"
+                      value={hero.primaryButtonStyle?.textColor}
+                      onChange={v => setHero({ primaryButtonStyle: { ...hero.primaryButtonStyle, textColor: v } })}
+                    />
+                    <ColorField
+                      label="Background"
+                      value={hero.primaryButtonStyle?.backgroundColor}
+                      onChange={v => setHero({ primaryButtonStyle: { ...hero.primaryButtonStyle, backgroundColor: v } })}
+                    />
+                    <ColorField
+                      label="Border"
+                      value={hero.primaryButtonStyle?.borderColor}
+                      onChange={v => setHero({ primaryButtonStyle: { ...hero.primaryButtonStyle, borderColor: v } })}
+                    />
+                  </div>
+                </CollapsibleOverridePanel>
+              </div>
+
+              {/* Secondary button */}
+              <div className="space-y-2 pt-1 border-t border-border">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide pt-1">Secondary button</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>Button text</Label>
+                    <Input value={hero.secondaryButtonText ?? ""} placeholder="View all regions"
+                      onChange={e => setHero({ secondaryButtonText: e.target.value || null })} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Style</Label>
+                    <Select value={hero.secondaryButtonVariant ?? "outline"}
+                      onValueChange={v => setHero({ secondaryButtonVariant: v as "filled" | "outline" })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="filled">Filled</SelectItem>
+                        <SelectItem value="outline">Outline</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="sm:col-span-2 space-y-1.5">
+                    <Label>Link</Label>
+                    <Input value={hero.secondaryButtonLink ?? ""} placeholder="/shop?region=Andalusia"
+                      onChange={e => setHero({ secondaryButtonLink: e.target.value || null })} />
+                    <p className="text-xs text-muted-foreground">
+                      Leave blank to default to /shop.
+                    </p>
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label>Primary button link</Label>
-                  <Input value={hero.primaryButtonLink ?? ""} placeholder="/shop"
-                    onChange={e => setHero({ primaryButtonLink: e.target.value || null })} />
-                  <p className="text-xs text-muted-foreground">
-                    Leave blank to default to /shop. Examples: /shop?category=Coastal+Posters, /about, https://example.com
-                  </p>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Secondary button text</Label>
-                  <Input value={hero.secondaryButtonText ?? ""} placeholder="View all regions"
-                    onChange={e => setHero({ secondaryButtonText: e.target.value || null })} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Secondary button style</Label>
-                  <Select value={hero.secondaryButtonVariant ?? "outline"}
-                    onValueChange={v => setHero({ secondaryButtonVariant: v as "filled" | "outline" })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="filled">Filled</SelectItem>
-                      <SelectItem value="outline">Outline</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Secondary button link</Label>
-                  <Input value={hero.secondaryButtonLink ?? ""} placeholder="/shop?region=Andalusia"
-                    onChange={e => setHero({ secondaryButtonLink: e.target.value || null })} />
-                  <p className="text-xs text-muted-foreground">
-                    Leave blank to default to /shop.
-                  </p>
-                </div>
+                <CollapsibleOverridePanel title="Secondary button colors">
+                  <div className="grid grid-cols-3 gap-3">
+                    <ColorField
+                      label="Text color"
+                      value={hero.secondaryButtonStyle?.textColor}
+                      onChange={v => setHero({ secondaryButtonStyle: { ...hero.secondaryButtonStyle, textColor: v } })}
+                    />
+                    <ColorField
+                      label="Background"
+                      value={hero.secondaryButtonStyle?.backgroundColor}
+                      onChange={v => setHero({ secondaryButtonStyle: { ...hero.secondaryButtonStyle, backgroundColor: v } })}
+                    />
+                    <ColorField
+                      label="Border"
+                      value={hero.secondaryButtonStyle?.borderColor}
+                      onChange={v => setHero({ secondaryButtonStyle: { ...hero.secondaryButtonStyle, borderColor: v } })}
+                    />
+                  </div>
+                </CollapsibleOverridePanel>
               </div>
 
               {/* Extra buttons */}
@@ -977,9 +1199,191 @@ export default function AdminHomepageEditor() {
                           }} />
                       </div>
                     </div>
+                    {/* Per-button color overrides */}
+                    <div className="grid grid-cols-3 gap-3 pt-1 border-t border-border/50">
+                      <ColorField
+                        label="Text color"
+                        value={btn.style?.textColor}
+                        onChange={v => {
+                          const btns = [...(hero.extraButtons ?? [])];
+                          btns[bIdx] = { ...btns[bIdx], style: { ...btns[bIdx].style, textColor: v } };
+                          setHero({ extraButtons: btns });
+                        }}
+                      />
+                      <ColorField
+                        label="Background"
+                        value={btn.style?.backgroundColor}
+                        onChange={v => {
+                          const btns = [...(hero.extraButtons ?? [])];
+                          btns[bIdx] = { ...btns[bIdx], style: { ...btns[bIdx].style, backgroundColor: v } };
+                          setHero({ extraButtons: btns });
+                        }}
+                      />
+                      <ColorField
+                        label="Border"
+                        value={btn.style?.borderColor}
+                        onChange={v => {
+                          const btns = [...(hero.extraButtons ?? [])];
+                          btns[bIdx] = { ...btns[bIdx], style: { ...btns[bIdx].style, borderColor: v } };
+                          setHero({ extraButtons: btns });
+                        }}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
+
+              {/* Hero visual overrides */}
+              <CollapsibleOverridePanel title="Hero visual overrides">
+                <div className="grid grid-cols-2 gap-3">
+                  <FontField
+                    label="Heading font"
+                    value={heroSection?.fontOverrides?.headingFont}
+                    onChange={v => updateSectionOverrides("hero", "fontOverrides", { headingFont: v })}
+                  />
+                  <FontField
+                    label="Body font"
+                    value={heroSection?.fontOverrides?.bodyFont}
+                    onChange={v => updateSectionOverrides("hero", "fontOverrides", { bodyFont: v })}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <ColorField
+                    label="Heading color"
+                    value={heroSection?.colorOverrides?.headingColor}
+                    onChange={v => updateSectionOverrides("hero", "colorOverrides", { headingColor: v })}
+                  />
+                  <ColorField
+                    label="Text / subtitle color"
+                    value={heroSection?.colorOverrides?.textColor}
+                    onChange={v => updateSectionOverrides("hero", "colorOverrides", { textColor: v })}
+                  />
+                  <ColorField
+                    label="Background color fallback"
+                    value={heroSection?.colorOverrides?.backgroundColor}
+                    onChange={v => updateSectionOverrides("hero", "colorOverrides", { backgroundColor: v })}
+                  />
+                  <ColorField
+                    label="Overlay color"
+                    value={heroSection?.colorOverrides?.overlayColor}
+                    onChange={v => updateSectionOverrides("hero", "colorOverrides", { overlayColor: v })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">
+                    Overlay opacity — {Math.round((heroSection?.colorOverrides?.overlayOpacity ?? 0) * 100)}%
+                    {heroSection?.colorOverrides?.overlayOpacity == null && (
+                      <span className="ml-1.5 text-muted-foreground font-normal">(using slider above)</span>
+                    )}
+                  </Label>
+                  <Slider
+                    min={0} max={100} step={5}
+                    value={[Math.round((heroSection?.colorOverrides?.overlayOpacity ?? 0) * 100)]}
+                    onValueChange={([v]) =>
+                      updateSectionOverrides("hero", "colorOverrides", { overlayOpacity: v === 0 ? null : v / 100 } as Partial<SectionColorOverrides>)
+                    }
+                  />
+                  <p className="text-xs text-muted-foreground">Set to override the overlay slider above. 0% = not set.</p>
+                </div>
+              </CollapsibleOverridePanel>
+            </SectionCard>
+
+            {/* ── Featured posters visual overrides ──────────────────── */}
+            <SectionCard
+              title="Featured posters"
+              description="Visual overrides for the Featured posters section heading and card text. Does not affect shop cards or product pages."
+            >
+              <CollapsibleOverridePanel title="Featured posters visual overrides">
+                <div className="grid grid-cols-2 gap-3">
+                  <FontField
+                    label="Heading font"
+                    value={featuredSection?.fontOverrides?.headingFont}
+                    onChange={v => updateSectionOverrides("featuredPosters", "fontOverrides", { headingFont: v })}
+                  />
+                  <ColorField
+                    label="Heading color"
+                    value={featuredSection?.colorOverrides?.headingColor}
+                    onChange={v => updateSectionOverrides("featuredPosters", "colorOverrides", { headingColor: v })}
+                  />
+                  <ColorField
+                    label="View all link color"
+                    value={featuredSection?.colorOverrides?.linkColor}
+                    onChange={v => updateSectionOverrides("featuredPosters", "colorOverrides", { linkColor: v })}
+                  />
+                  <ColorField
+                    label="Poster title color"
+                    value={featuredSection?.colorOverrides?.posterTitleColor}
+                    onChange={v => updateSectionOverrides("featuredPosters", "colorOverrides", { posterTitleColor: v })}
+                  />
+                  <ColorField
+                    label="Poster price color"
+                    value={featuredSection?.colorOverrides?.posterPriceColor}
+                    onChange={v => updateSectionOverrides("featuredPosters", "colorOverrides", { posterPriceColor: v })}
+                  />
+                </div>
+              </CollapsibleOverridePanel>
+            </SectionCard>
+
+            {/* ── New arrivals visual overrides ───────────────────────── */}
+            <SectionCard
+              title="New arrivals"
+              description="Visual overrides for the New arrivals section heading and card text. Does not affect shop cards or product pages."
+            >
+              <CollapsibleOverridePanel title="New arrivals visual overrides">
+                <div className="grid grid-cols-2 gap-3">
+                  <FontField
+                    label="Heading font"
+                    value={newArrivalsSection?.fontOverrides?.headingFont}
+                    onChange={v => updateSectionOverrides("newArrivals", "fontOverrides", { headingFont: v })}
+                  />
+                  <ColorField
+                    label="Heading color"
+                    value={newArrivalsSection?.colorOverrides?.headingColor}
+                    onChange={v => updateSectionOverrides("newArrivals", "colorOverrides", { headingColor: v })}
+                  />
+                  <ColorField
+                    label="View all link color"
+                    value={newArrivalsSection?.colorOverrides?.linkColor}
+                    onChange={v => updateSectionOverrides("newArrivals", "colorOverrides", { linkColor: v })}
+                  />
+                  <ColorField
+                    label="Poster title color"
+                    value={newArrivalsSection?.colorOverrides?.posterTitleColor}
+                    onChange={v => updateSectionOverrides("newArrivals", "colorOverrides", { posterTitleColor: v })}
+                  />
+                  <ColorField
+                    label="Poster price color"
+                    value={newArrivalsSection?.colorOverrides?.posterPriceColor}
+                    onChange={v => updateSectionOverrides("newArrivals", "colorOverrides", { posterPriceColor: v })}
+                  />
+                </div>
+              </CollapsibleOverridePanel>
+            </SectionCard>
+
+            {/* ── Brand story visual overrides ────────────────────────── */}
+            <SectionCard
+              title="Brand story"
+              description="Visual overrides for the Brand story quote section."
+            >
+              <CollapsibleOverridePanel title="Brand story visual overrides">
+                <div className="grid grid-cols-2 gap-3">
+                  <FontField
+                    label="Font"
+                    value={brandStorySection?.fontOverrides?.bodyFont ?? brandStorySection?.fontOverrides?.headingFont}
+                    onChange={v => updateSectionOverrides("brandStory", "fontOverrides", { bodyFont: v })}
+                  />
+                  <ColorField
+                    label="Text / quote color"
+                    value={brandStorySection?.colorOverrides?.textColor}
+                    onChange={v => updateSectionOverrides("brandStory", "colorOverrides", { textColor: v })}
+                  />
+                  <ColorField
+                    label="Background color"
+                    value={brandStorySection?.colorOverrides?.backgroundColor}
+                    onChange={v => updateSectionOverrides("brandStory", "colorOverrides", { backgroundColor: v })}
+                  />
+                </div>
+              </CollapsibleOverridePanel>
             </SectionCard>
 
             {/* ── Collection banners ────────────────────────────────────── */}
@@ -1012,15 +1416,9 @@ export default function AdminHomepageEditor() {
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {saving ? "Saving…" : "Save changes"}
               </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handlePreview}
-                disabled={saving || previewing}
-                className="gap-1.5"
-              >
-                {previewing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />}
-                {previewing ? "Opening…" : "Preview"}
+              <Button onClick={handlePreview} disabled={saving || previewing} variant="outline" className="gap-1.5">
+                {previewing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
+                {previewing ? "Opening preview…" : "Preview"}
               </Button>
             </div>
           </>

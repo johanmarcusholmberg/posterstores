@@ -641,12 +641,19 @@ router.get("/stores/resolve", async (req, res) => {
 
 // ── Homepage visual config (admin) ────────────────────────────────────────────
 
+const heroButtonStyleSchema = z.object({
+  textColor: z.string().nullable().optional(),
+  backgroundColor: z.string().nullable().optional(),
+  borderColor: z.string().nullable().optional(),
+}).nullable().optional();
+
 const heroButtonConfigSchema = z.object({
   id: z.string(),
   label: z.string(),
   link: z.string(),
   variant: z.enum(["filled", "outline"]).optional(),
   visible: z.boolean().optional(),
+  style: heroButtonStyleSchema,
 });
 
 const heroVisualSchema = z.object({
@@ -656,9 +663,11 @@ const heroVisualSchema = z.object({
   primaryButtonText: z.string().nullable().optional(),
   primaryButtonVariant: z.enum(["filled", "outline"]).optional(),
   primaryButtonLink: z.string().nullable().optional(),
+  primaryButtonStyle: heroButtonStyleSchema,
   secondaryButtonText: z.string().nullable().optional(),
   secondaryButtonVariant: z.enum(["filled", "outline"]).optional(),
   secondaryButtonLink: z.string().nullable().optional(),
+  secondaryButtonStyle: heroButtonStyleSchema,
   extraButtons: z.array(heroButtonConfigSchema).optional(),
 }).optional();
 
@@ -675,7 +684,9 @@ const sectionColorOverridesSchema = z.object({
   buttonTextColor: z.string().nullable().optional(),
   backgroundColor: z.string().nullable().optional(),
   overlayColor: z.string().nullable().optional(),
-  overlayOpacity: z.number().nullable().optional(),
+  overlayOpacity: z.number().min(0).max(1).nullable().optional(),
+  posterTitleColor: z.string().nullable().optional(),
+  posterPriceColor: z.string().nullable().optional(),
 }).nullable().optional();
 
 const collectionBannerVisualBaseSchema = z.object({
