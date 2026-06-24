@@ -1,0 +1,223 @@
+We need to expand the Homepage Editor and homepage rendering for the poster store project.
+
+Important workflow constraints:
+
+* Do not create branches.
+* Do not commit or push to GitHub.
+* Make the code changes only, then report changed files, tests/typecheck status, and any follow-up risks.
+* Keep the implementation targeted and avoid broad refactors unless necessary.
+* Preserve existing homepage behavior as fallback for existing store data.
+
+Goal:
+Create a flexible homepage editor where all homepage sections except the footer can be reordered, hidden/shown, and configured. Hero stays part of the homepage editor but footer is not included. Collection banners should support multiple instances.
+
+Current known state:
+
+* `stores.homepage_visual_config` already exists as JSONB.
+* Current `HomepageVisualConfig` only supports `hero` and one `collectionBanner`.
+* Current homepage renders fixed sections in this order: Hero, Featured posters, Collection banner, Explore region/category, New arrivals, Brand story, Value props.
+* Current collection banner background uses a cropped cover image; this causes uploaded/designed banners to be cropped when the image aspect does not match the storefront aspect.
+* Store Settings currently contains Theme colors and Brand & Typography, while Homepage Editor contains hero/collection visual settings. These should be harmonized so homepage design controls feel unified.
+
+Required functionality:
+
+1. Homepage sections model
+   Extend `HomepageVisualConfig` to support an ordered section list below/including Hero, excluding footer.
+
+Add a flexible structure like:
+
+```ts
+type HomepageSectionType =
+  | "hero"
+  | "featuredPosters"
+  | "collectionBanner"
+  | "exploreLinks"
+  | "newArrivals"
+  | "brandStory"
+  | "valueProps";
+
+interface HomepageSectionConfig {
+  id: string;
+  type: HomepageSectionType;
+  visible: boolean;
+  sortOrder: number;
+  titleOverride?: string | null;
+  fontOverrides?: SectionFontOverrides | null;
+  colorOverrides?: SectionColorOverrides | null;
+  bannerId?: string | null;
+}
+
+interface HomepageVisualConfig {
+  hero?: HeroVisualConfig;
+  sections?: HomepageSectionConfig[];
+  collectionBanners?: CollectionBannerVisualConfig[];
+  // Keep old collectionBanner field as backwards-compatible fallback.
+  collectionBanner?: CollectionBannerVisualConfig;
+}
+```
+
+Preserve backwards compatibility:
+
+* If `sections` is missing, render current default section order.
+* If `collectionBanners` is missing but old `collectionBanner` exists, render it as the first/default collection banner.
+* Existing stores must not break.
+
+2. Reorder all sections except footer
+   In `AdminHomepageEditor`, add a “Homepage layout” area where sections can be:
+
+* moved up/down
+* hidden/shown
+* reset/normalized to default order
+* collection banners can be added, duplicated, removed, and moved
+* all section rows/cards should show clear labels, e.g. “Hero”, “Featured posters”, “Collection banner: Mediterranean Walls”, “New arrivals”, etc.
+
+Hero can be reorderable too unless it causes large layout complications. If it is safer to keep Hero locked at top in this first implementation, make that explicit in the report and keep all sections below Hero reorderable. But preferred end goal is that all homepage sections apart from footer are configurable.
+
+3. Multiple collection banners
+   Replace the current single collection banner editor with repeatable collection banner cards.
+
+Each collection banner should support:
+
+* id
+* visible
+* eyebrow
+* title
+* text/description
+* CTA text
+* CTA link
+* background image URL/storage path
+* optional mobile background image URL/storage path if reasonable
+* background overlay opacity
+* image fit: `"cover"` or `"contain"`
+* focal point X/Y for cover mode, or at minimum select values like left/center/right and top/center/bottom
+* showPosterCards boolean
+* optional selected poster IDs or a simple fallback using currently selected `isCollectionBanner` posters if selected IDs are too large for this pass
+* optional font overrides
+* optional color overrides
+
+Collection banners should be insertable multiple times in the section order. Example:
+
+* Hero
+* Collection banner A
+* Featured posters
+* New arrivals
+* Collection banner B
+* Explore links
+* Brand story
+* Value props
+
+4. Optional section-level font and color overrides
+   Each homepage section should be able to inherit global theme/typography by default, but allow optional overrides.
+
+Start with practical fields:
+
+* headingFont
+* bodyFont
+* eyebrowColor
+* headingColor
+* textColor
+* linkColor
+* buttonTextColor
+* backgroundColor if no image
+* overlayColor/overlayOpacity where relevant
+
+Keep overrides optional. Empty fields should inherit global store theme/typography.
+
+Use existing font list and existing StoreThemeApplicator logic where possible. Do not duplicate unnecessary logic.
+
+5. Harmonize Theme colors and Brand & Typography with Homepage Editor
+   Do not remove Store Settings yet if that is risky, but improve the admin flow so the Homepage Editor shows or links the relevant global design settings clearly.
+
+Preferred:
+
+* Add a “Global brand defaults” card to Homepage Editor.
+* It should show/edit the same global typography/theme fields already used by Store Settings if this can be done cleanly.
+* If editing store theme/typography from Homepage Editor is too much for this pass, add a clear read-only summary and link/button to Store Settings, then report that full merge should be next phase.
+
+Avoid having two independent previews that contradict each other.
+
+6. Hero button destinations
+   Extend `HeroVisualConfig` so both hero buttons have configurable destination links.
+
+Add:
+
+```ts
+primaryButtonLink?: string | null;
+secondaryButtonLink?: string | null;
+```
+
+Admin UI:
+
+* Add inputs for Primary button link and Secondary button link.
+* Placeholder examples: `/shop`, `/shop?category=Coastal+Posters`, `/shop?region=Andalusia`, `/about`
+* If left blank, default to current behavior: `/shop`.
+* Respect route prefix behavior the same way collection CTA links currently do.
+
+Frontend:
+
+* Use configured hero button links when present.
+* Preserve current fallback behavior.
+
+7. Standard image specs and crop guidance
+   Add a shared image spec helper/config, used by both admin hints and public rendering.
+
+Recommended specs:
+
+* Hero desktop: 1920×600 or wider
+* Hero mobile: 1200×900 if mobile-specific image is supported
+* Collection banner desktop: 2600×400 or 1920×295, matching 13:2
+* Collection banner mobile: 1440×400, matching 18:5, if mobile-specific image is supported
+* Add safe-area guidance: keep important text/posters away from edges when using cover mode.
+
+In the admin uploader:
+
+* Show recommended size based on the section.
+* After upload, attempt to read natural image dimensions in the browser and show them.
+* Show a warning if the uploaded ratio is far from the storefront ratio, e.g. “This image is 1920×600 but the desktop banner is 13:2, so top/bottom cropping may occur in cover mode.”
+* Show preview frames for desktop and mobile aspect ratios.
+
+8. Public homepage rendering
+   Refactor Home.tsx carefully:
+
+* Keep existing card components if possible.
+* Extract section rendering into small render functions/components.
+* Render sections according to `homepageVisualConfig.sections` order.
+* Use fallbacks when config is missing.
+* Multiple collection banners must render correctly.
+* For collection banner image:
+
+  * `cover` should use object-cover and focal point.
+  * `contain` should use object-contain and a suitable background color.
+* Poster cards on collection banners:
+
+  * Only show if `showPosterCards` is true.
+  * This allows using a full designed background image with no extra overlay poster cards.
+  * If no explicit selected posters implementation is added yet, keep existing `isCollectionBanner` fallback and clearly mark in report.
+
+9. API/types validation
+   Update types in:
+
+* frontend config/storefront types
+* admin API types
+* backend store route validation for homepage visual config if applicable
+
+Ensure old and new shapes are accepted safely.
+
+10. Testing/QA
+    Run typecheck.
+    Run existing tests if available and not too expensive.
+    Do a quick manual reasoning pass for:
+
+* existing store with old `collectionBanner`
+* new store with no `homepage_visual_config`
+* store with multiple collection banners
+* hero buttons with blank links and custom links
+* collection banner cover vs contain
+
+Report:
+
+* Files changed
+* What was implemented
+* What was intentionally left for next phase
+* Any migration/backward-compatibility notes
+* Typecheck/test result
