@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { getOptimizedImageUrl } from "@/lib/imageUrl";
-import { parsePosterRatio, posterFillsCard } from "@/lib/posterRatio";
+import { parsePosterRatio } from "@/lib/posterRatio";
 import {
   DEFAULT_HOMEPAGE_SECTIONS,
   type CollectionBannerVisualConfig,
@@ -150,7 +150,6 @@ function HomePosterCard({ poster }: { poster: Poster }) {
     (primaryMockup && primaryMockup !== baseImage ? primaryMockup : null);
 
   const ratio = parsePosterRatio(poster)?.ratio ?? null;
-  const fillsFull = posterFillsCard(ratio);
 
   return (
     <Link
@@ -158,56 +157,35 @@ function HomePosterCard({ poster }: { poster: Poster }) {
       className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
       <div className="relative aspect-[3/4] overflow-hidden bg-[#f4f0eb] shadow-[0_1px_4px_rgba(0,0,0,0.06)] group-hover:shadow-[0_3px_14px_rgba(0,0,0,0.11)] transition-shadow duration-300">
-        {fillsFull ? (
+        {/* Artwork: outer flex centers the inner ratio-wrapper; border hugs artwork; object-contain never crops */}
+        <div
+          className={[
+            "absolute inset-0 flex items-center justify-center",
+            "motion-reduce:transition-none",
+            hoverImage
+              ? "transition-opacity duration-[280ms] ease-out opacity-100 group-hover:opacity-0 group-focus-within:opacity-0"
+              : "",
+          ].join(" ")}
+        >
           <div
             className={[
-              "absolute inset-0",
-              "ring-1 ring-inset ring-black/[0.14]",
-              "motion-reduce:transition-none",
-              hoverImage
-                ? "transition-opacity duration-[280ms] ease-out opacity-100 group-hover:opacity-0 group-focus-within:opacity-0"
-                : "transition-transform duration-[300ms] ease-out scale-100 group-hover:scale-[1.07] group-focus-within:scale-[1.07]",
+              "relative ring-1 ring-inset ring-black/[0.14]",
+              !hoverImage
+                ? "transition-transform duration-[300ms] ease-out scale-100 group-hover:scale-[1.07] group-focus-within:scale-[1.07] motion-reduce:transition-none"
+                : "",
             ].join(" ")}
+            style={{ aspectRatio: ratio ? String(ratio) : "3/4", maxWidth: "100%", maxHeight: "100%" }}
           >
             <img
               src={getOptimizedImageUrl(baseImage, { width: 600, quality: 85 })}
               alt={poster.title}
               loading="lazy"
               decoding="async"
-              className="absolute inset-0 w-full h-full object-cover"
+              className="absolute inset-0 w-full h-full object-contain"
               onError={(e) => { (e.target as HTMLImageElement).src = poster.imageUrl; }}
             />
           </div>
-        ) : (
-          <div
-            className={[
-              "absolute inset-0 flex items-center justify-center",
-              "motion-reduce:transition-none",
-              hoverImage
-                ? "transition-opacity duration-[280ms] ease-out opacity-100 group-hover:opacity-0 group-focus-within:opacity-0"
-                : "",
-            ].join(" ")}
-          >
-            <div
-              className={[
-                "relative ring-1 ring-inset ring-black/[0.14]",
-                !hoverImage
-                  ? "transition-transform duration-[300ms] ease-out scale-100 group-hover:scale-[1.07] group-focus-within:scale-[1.07] motion-reduce:transition-none"
-                  : "",
-              ].join(" ")}
-              style={{ aspectRatio: ratio ? String(ratio) : "3/4", maxWidth: "100%", maxHeight: "100%" }}
-            >
-              <img
-                src={getOptimizedImageUrl(baseImage, { width: 600, quality: 85 })}
-                alt={poster.title}
-                loading="lazy"
-                decoding="async"
-                className="absolute inset-0 w-full h-full object-cover"
-                onError={(e) => { (e.target as HTMLImageElement).src = poster.imageUrl; }}
-              />
-            </div>
-          </div>
-        )}
+        </div>
         {hoverImage && (
           <img
             src={getOptimizedImageUrl(hoverImage, { width: 600, quality: 80 })}
@@ -262,6 +240,7 @@ function NewArrivalCard({
     .map((s) => (s as any).size as string | undefined)
     .filter(Boolean) as string[];
   const baseImage = poster.imageUrl;
+  const newArrivalRatio = parsePosterRatio(poster)?.ratio ?? null;
 
   return (
     <Link
@@ -269,13 +248,21 @@ function NewArrivalCard({
       className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
       <div className="relative aspect-[3/4] overflow-hidden bg-[#f4f0eb] shadow-[0_1px_4px_rgba(0,0,0,0.06)] group-hover:shadow-[0_4px_18px_rgba(0,0,0,0.13)] transition-shadow duration-300">
-        <img
-          src={getOptimizedImageUrl(baseImage, { width: 400, quality: 75 })}
-          alt={poster.title}
-          loading="lazy"
-          decoding="async"
-          className="absolute inset-0 object-cover w-full h-full transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.05] motion-reduce:transition-none"
-        />
+        {/* Artwork: inner ratio-wrapper with object-contain — no cropping */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div
+            className="relative transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.05] motion-reduce:transition-none"
+            style={{ aspectRatio: newArrivalRatio ? String(newArrivalRatio) : "3/4", maxWidth: "100%", maxHeight: "100%" }}
+          >
+            <img
+              src={getOptimizedImageUrl(baseImage, { width: 400, quality: 75 })}
+              alt={poster.title}
+              loading="lazy"
+              decoding="async"
+              className="absolute inset-0 w-full h-full object-contain"
+            />
+          </div>
+        </div>
         <div
           className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-250 flex flex-col justify-end p-3 pointer-events-none"
           aria-hidden="true"
@@ -338,7 +325,6 @@ function FeaturedPosterCard({
   const cardTitle = (poster as any).displayTitle || poster.title;
 
   const ratio = parsePosterRatio(poster)?.ratio ?? null;
-  const fillsFull = posterFillsCard(ratio);
 
   return (
     <Link
@@ -355,36 +341,23 @@ function FeaturedPosterCard({
         "p-2 pb-0",
       ].join(" ")}>
         <div className="relative aspect-[3/4] overflow-hidden bg-[#ede8e0]">
-          {fillsFull ? (
-            <div className="absolute inset-0 ring-1 ring-inset ring-black/[0.14] transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.04] motion-reduce:transition-none">
+          {/* Artwork: inner ratio-wrapper with object-contain — border hugs artwork, no cropping */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div
+              className="relative ring-1 ring-inset ring-black/[0.14] transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.04] motion-reduce:transition-none"
+              style={{ aspectRatio: ratio ? String(ratio) : "3/4", maxWidth: "100%", maxHeight: "100%" }}
+            >
               <img
                 src={getOptimizedImageUrl(displayImage, { width: 600, quality: 85 })}
                 alt={poster.title}
                 loading={priority ? "eager" : "lazy"}
                 fetchPriority={priority ? "high" : undefined}
                 decoding="async"
-                className="absolute inset-0 w-full h-full object-cover"
+                className="absolute inset-0 w-full h-full object-contain"
                 onError={(e) => { (e.target as HTMLImageElement).src = poster.imageUrl; }}
               />
             </div>
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div
-                className="relative ring-1 ring-inset ring-black/[0.14] transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.04] motion-reduce:transition-none"
-                style={{ aspectRatio: ratio ? String(ratio) : "3/4", maxWidth: "100%", maxHeight: "100%" }}
-              >
-                <img
-                  src={getOptimizedImageUrl(displayImage, { width: 600, quality: 85 })}
-                  alt={poster.title}
-                  loading={priority ? "eager" : "lazy"}
-                  fetchPriority={priority ? "high" : undefined}
-                  decoding="async"
-                  className="absolute inset-0 w-full h-full object-cover"
-                  onError={(e) => { (e.target as HTMLImageElement).src = poster.imageUrl; }}
-                />
-              </div>
-            </div>
-          )}
+          </div>
         </div>
         <div className="px-0.5 pt-2.5 pb-3 min-h-[52px] flex flex-col justify-start min-w-0">
           <h3

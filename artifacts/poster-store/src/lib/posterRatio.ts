@@ -70,22 +70,3 @@ export function parsePosterRatio(poster: Poster): PosterRatioResult | null {
 
   return { ratio, orientation };
 }
-
-// ─── Card-fitting helpers ─────────────────────────────────────────────────────
-
-/**
- * The fixed card container uses aspect-[3/4] = 0.75 ratio.
- * When a portrait poster's ratio is within this threshold of 0.75,
- * object-cover fills the card cleanly without visible cropping.
- */
-const CARD_RATIO = 0.75;
-const COVER_THRESHOLD = 0.18;
-
-/**
- * Returns true when the poster should fill the full card area (object-cover).
- * Applies only to portrait posters whose ratio is close to the 3:4 card ratio.
- */
-export function posterFillsCard(ratio: number | null): boolean {
-  if (ratio === null) return false;
-  return ratio < 0.85 && Math.abs(ratio - CARD_RATIO) < COVER_THRESHOLD;
-}

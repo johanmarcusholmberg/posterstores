@@ -5,17 +5,19 @@
  * the actual artwork — not the card container. Used by PosterCard (shop grid).
  *
  * Fitting rules (derived from parsed size-label aspect ratio):
- *  - Portrait close to 3:4 card ratio (|ratio - 0.75| < 0.18):
- *      Inner wrapper fills the full card (inset-0). Image: object-cover.
- *      Border is on the wrapper → hugs the artwork edge-to-edge.
- *  - Everything else (landscape, square, extreme portrait, unknown ratio):
- *      Inner wrapper sized to the poster's natural aspect ratio, centered.
- *      Image: object-cover filling that wrapper (no cropping since wrapper
- *      matches the real ratio). Border on wrapper → hugs artwork precisely.
+ *   The outer card container is fixed (e.g. aspect-[3/4]).
+ *   The inner wrapper is sized to the poster's natural parsed ratio and centered.
+ *   The artwork image uses object-contain inside the inner wrapper.
+ *   Because the wrapper matches the poster ratio, artwork fills it naturally
+ *   without any cropping. If the source image differs slightly from the label
+ *   ratio, tiny gaps appear inside the wrapper rather than cutting the artwork.
+ *   The thin border lives on the inner wrapper, hugging the actual artwork.
+ *   When the ratio is unknown/null, a portrait-safe 3/4 inner wrapper is used.
  *
  * Hover crossfade:
- *  Both base and hover layers are always in the DOM (never conditionally
- *  mounted) so the hover image pre-loads. 600 ms symmetrical fade.
+ *   Both base and hover layers are always in the DOM so the hover image pre-loads.
+ *   600 ms symmetrical fade. The hover mockup fills the full card with object-cover
+ *   (lifestyle/mockup images where cover is appropriate).
  *
  * The legacy `presentation` prop is accepted but ignored — rendering no
  * longer depends on it. The PosterCardPresentation type is kept exported
@@ -25,7 +27,6 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import { getOptimizedImageUrl } from "@/lib/imageUrl";
-import { posterFillsCard } from "@/lib/posterRatio";
 
 /** @deprecated Rendering no longer uses presentation modes. Kept for type compat. */
 export type PosterCardPresentation = "current" | "full-image" | "stage";
@@ -37,8 +38,8 @@ interface PosterArtworkStageProps {
   priority?: boolean;
   /**
    * Poster aspect ratio (width / height) parsed from size labels.
-   * Drives portrait-fill vs natural-ratio-wrapper logic.
-   * Pass null when unknown — safe portrait-shaped fallback is used.
+   * Drives the inner wrapper size so artwork fits without cropping.
+   * Pass null when unknown — a portrait-safe 3/4 fallback wrapper is used.
    */
   aspectRatio?: number | null;
   /** @deprecated Ignored. Kept so existing callers don't break. */
@@ -57,41 +58,14 @@ export function PosterArtworkStage({
   onError,
 }: PosterArtworkStageProps) {
   const hasHover = hoverSrc !== null;
-  const fillsFull = posterFillsCard(aspectRatio);
 
   // ── Base artwork layer ────────────────────────────────────────────────────
+  // Outer flex centers the inner ratio-wrapper in the fixed card container.
+  // Inner wrapper is sized to the poster's natural ratio — border hugs artwork.
+  // Artwork image uses object-contain: nothing is ever cropped.
+  // Unknown ratio falls back to a 3/4 portrait-safe wrapper.
 
-  const baseArtwork = fillsFull ? (
-    /*
-     * Portrait close to 3:4 — inner wrapper fills the full card.
-     * Border on the wrapper hugs the artwork. Fade or scale on hover.
-     */
-    <div
-      className={cn(
-        "absolute inset-0",
-        "ring-1 ring-inset ring-black/[0.14]",
-        "motion-reduce:transition-none",
-        hasHover
-          ? "transition-opacity duration-[600ms] ease-out opacity-100 group-hover:opacity-0 group-focus-within:opacity-0"
-          : "transition-transform duration-[300ms] ease-out scale-100 group-hover:scale-[1.08] group-focus-within:scale-[1.08]"
-      )}
-    >
-      <img
-        src={getOptimizedImageUrl(src, { width: 600, quality: 85 })}
-        alt={alt}
-        loading={priority ? "eager" : "lazy"}
-        fetchPriority={priority ? "high" : undefined}
-        decoding="async"
-        className="absolute inset-0 w-full h-full object-cover"
-        data-testid={testId}
-        onError={onError}
-      />
-    </div>
-  ) : (
-    /*
-     * Landscape / square / extreme portrait / unknown —
-     * outer flex centers the inner ratio-wrapper; border on wrapper.
-     */
+  const baseArtwork = (
     <div
       className={cn(
         "absolute inset-0 flex items-center justify-center",
@@ -120,7 +94,7 @@ export function PosterArtworkStage({
           loading={priority ? "eager" : "lazy"}
           fetchPriority={priority ? "high" : undefined}
           decoding="async"
-          className="absolute inset-0 w-full h-full object-cover"
+          className="absolute inset-0 w-full h-full object-contain"
           data-testid={testId}
           onError={onError}
         />
@@ -129,7 +103,8 @@ export function PosterArtworkStage({
   );
 
   // ── Hover mockup overlay ──────────────────────────────────────────────────
-  // Always fills the full card stage with object-cover regardless of base fitting.
+  // Fills the full card stage with object-cover — lifestyle/mockup images are
+  // intended to fill the frame. This is the only place object-cover is used.
   const hoverOverlay = hasHover ? (
     <img
       src={getOptimizedImageUrl(hoverSrc!, { width: 600, quality: 80 })}
