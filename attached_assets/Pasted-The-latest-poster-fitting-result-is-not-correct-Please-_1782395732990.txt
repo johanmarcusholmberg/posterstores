@@ -1,0 +1,189 @@
+The latest poster fitting result is not correct. Please fix it without creating branches, PRs, commits, GitHub automation, or pushing. Make changes only and report back.
+
+Current problems visible in screenshots:
+
+1. Homepage landscape posters are filling the full poster area as if they are object-cover. They are not adapting to landscape format.
+2. “Test 2” is cropped on the homepage. This is not acceptable.
+3. The product page for “Test 2” appears to show a dummy/padded area on the sides of the poster image itself. Please investigate whether this is coming from the image file, the selected display image, or the product page rendering wrapper.
+4. The result looks like we reverted to the previous cover/fill behavior, not the intended ratio-aware fitting.
+
+Important correction:
+Actual poster artwork must never be cropped by default.
+
+Do not use object-cover on the actual poster artwork if it can crop the artwork.
+
+The poster should preserve its full artwork on homepage and shop. Portrait posters should fill the card as much as possible, but not by cutting off the image.
+
+Correct poster fitting behavior:
+
+* Use the parsed poster aspect ratio from posterSizes.
+* Render the poster artwork inside an inner ratio wrapper.
+* The inner wrapper should have the poster’s parsed natural aspect ratio.
+* The image inside the wrapper can be h-full w-full, but because the wrapper matches the poster ratio, the artwork should not crop.
+* The border/ring should be on the inner wrapper so it hugs the actual poster artwork.
+* The outer media/card area stays fixed.
+* The background around landscape/square posters should blend with the card/page background.
+
+Do not let landscape posters object-cover the full card area.
+
+Expected homepage behavior:
+
+1. Keep the current/reverted homepage card design.
+2. Do not reintroduce the large stage/mat layout.
+3. Portrait posters:
+
+   * should show the full artwork.
+   * should fill the media area as much as possible.
+   * if the fixed card area is not exactly the poster ratio, accept tiny background gaps rather than cropping.
+4. Landscape posters:
+
+   * should not crop.
+   * should not fill the full portrait card area.
+   * should sit centered in the card area, with height adapted to the landscape ratio.
+   * surrounding background should blend naturally.
+5. Square posters:
+
+   * should preserve full artwork and sit balanced.
+6. NEW badge should remain below the image on homepage poster cards.
+7. Heart can remain overlaid on homepage cards if that is still the current homepage style.
+
+Expected shop behavior:
+
+1. Shop should use the same ratio-aware artwork display logic.
+2. Portrait posters should show full artwork and fill the intended poster area as much as possible.
+3. Landscape posters should use the same fixed card/media area but adapt height naturally.
+4. Landscape posters must not crop and must not look like full-bleed cover photos.
+5. Thin border should hug the actual poster artwork.
+6. NEW badge and heart should remain below the image in the info area.
+
+Important: 50x70 versus 3:4 issue
+A 50x70 poster has aspect ratio 5:7 = 0.714.
+A 3:4 card area has aspect ratio 0.75.
+
+Therefore a 50x70 poster cannot fill a 3:4 area perfectly without either:
+
+* slight cropping,
+* slight distortion,
+* or tiny side/background gaps.
+
+Choose no cropping. Never distort the image. Tiny background gaps are acceptable if needed.
+
+If it is visually better and low-risk, test whether changing the poster media area from aspect-[3/4] to aspect-[5/7] makes 50x70 posters fill perfectly while keeping the current homepage card feel. But do not make a broad layout change unless it clearly improves the result. Report recommendation if unsure.
+
+Investigate why the current result failed:
+
+* Is parsePosterRatio returning null on homepage?
+* Are posterSizes available in the homepage poster data?
+* Are posterSizes available in the shop poster data?
+* Is PosterArtworkStage receiving the parsed aspectRatio?
+* Is Home.tsx bypassing PosterArtworkStage or using object-cover directly?
+* Is PosterCard.tsx still using object-cover directly?
+* Is the old presentation/current/full-image logic still affecting rendering?
+* Is productCardPresentation still influencing the frontend somehow?
+* Is fallback behavior accidentally using object-cover?
+
+Fix fallback behavior:
+
+* If aspectRatio is null/unknown, default to safe no-crop behavior.
+* Unknown ratio should not default to object-cover.
+* Unknown ratio should show the full image, preferably in a portrait-safe wrapper or object-contain.
+
+Product page “dummy side area” investigation:
+Please check the product detail page for “Test 2”.
+
+Determine whether the side/padded area is:
+
+1. part of the original uploaded image file,
+2. caused by using a generated display/preview image instead of the raw poster artwork,
+3. caused by product page MockupGallery layout/wrapper,
+4. caused by object-contain background/padding,
+5. caused by the new thin-border/ratio-wrapper code accidentally affecting product page.
+
+Do not change product page unless you find a clear rendering bug.
+
+If the dummy/padded area is part of the source image itself, report that clearly.
+If the product page is using the wrong image source, fix it so the raw poster artwork is used for the main artwork image.
+
+Hover behavior:
+
+* Keep desktop hover mockup fade.
+* Hover mockup may fill the full media area with object-cover.
+* Hover mockup must only appear on hover.
+* Default state must show actual poster artwork only.
+* Mobile should have no hover-specific behavior.
+
+Thin border:
+
+* Border should hug the actual poster artwork.
+* Use the inner wrapper approach.
+* Do not place the border on the full card/media container for landscape posters.
+
+Do not change:
+
+* checkout
+* cart
+* orders
+* product detail page unless clear bug
+* DB schema
+* backend routes
+* admin settings except hiding/removing posterCardPresentation selector if still visible
+
+Acceptance criteria:
+
+1. “Test 2” is no longer cropped on the homepage.
+2. Homepage portrait posters show full artwork.
+3. Homepage landscape posters do not use full-card cover behavior.
+4. Homepage landscape posters preserve full artwork and adapt height naturally.
+5. Shop portrait posters show full artwork.
+6. Shop landscape posters preserve full artwork and adapt height naturally.
+7. Actual poster artwork is never cropped by default.
+8. Unknown ratio fallback does not crop.
+9. Thin border hugs the actual artwork.
+10. NEW badge remains below image on homepage cards.
+11. NEW badge and heart remain below image in shop.
+12. Hover mockup still fades in smoothly on desktop.
+13. Hover mockup is not visible in default state.
+14. Mobile remains clean.
+15. Product page is not regressed.
+16. Typecheck passes with zero errors.
+
+Please test with:
+
+* Test 2
+* Jag testar
+* Spanish Lavender Fields
+* Cádiz Land's End
+* Málaga Rooftops, Summer
+* Paella Valenciana
+* one portrait poster
+* one landscape poster
+* one poster with hover mockup
+* one poster without hover mockup
+
+Save screenshots in:
+artifacts/qa-screenshots/poster-fit-crop-fix/
+
+Suggested screenshots:
+
+* home-test-2-not-cropped.png
+* home-landscape-adapted.png
+* home-desktop-overall.png
+* shop-portrait-not-cropped.png
+* shop-landscape-adapted.png
+* shop-desktop-overall.png
+* product-page-test-2-investigation.png
+* hover-default-state-no-mockup-overlay.png
+* hover-with-mockup.png
+* mobile-home.png
+* mobile-shop.png
+
+Report back with:
+
+1. Root cause of homepage cropping/fill behavior
+2. Whether posterSizes/aspectRatio reached Home.tsx and PosterArtworkStage
+3. Files changed
+4. Final fitting logic for portrait/landscape/square/unknown
+5. Whether 3:4 was kept or 5:7 was tested/recommended
+6. Product page dummy side area investigation result
+7. Screenshot file paths
+8. Typecheck result
