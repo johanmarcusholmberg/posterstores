@@ -1,0 +1,350 @@
+We need to implement the final universal poster-card presentation system.
+
+Do not create branches, PRs, commits, GitHub automation, or push. Make changes only and report back. Keep the implementation targeted and low-risk.
+
+Context:
+The current poster cards do not look good enough for a mixed poster catalogue. Landscape posters can look awkward, too small, or visually inconsistent compared with portrait posters. I want a cleaner Gallerix-like catalogue approach, but adapted to our store.
+
+Important final UX decision:
+Poster cards should be universal and fixed.
+
+Do not add an admin selector for different poster-card presentation modes.
+
+Do not create a “store cards” admin section.
+
+Do not let stores choose between current / full-image / stage modes.
+
+The poster-card layout, sizing, hover behavior, image behavior, and format handling should be fixed in code and consistent across all stores.
+
+The only store-level customization I may want is the color of the actual card background, not the image/stage presentation.
+
+Main goals:
+1. Create one universal poster-card system for homepage and shop.
+2. Show actual poster artwork by default.
+3. Preserve the real format of portrait, landscape, and square posters.
+4. Make landscape posters look like the same physical poster size rotated, not larger or more dominant than a regular 50x70 portrait poster.
+5. Keep all product cards the same outer size within the same grid/section.
+6. Keep all image/stage areas the same size within the same grid/section.
+7. Use desktop-only hover mockup fade when a mockup exists.
+8. Use highlight/shadow hover feedback on all cards.
+9. Move NEW badge and heart/like button below the image in the regular shop grid.
+10. Move the NEW badge below the image on the homepage as well, at least in sections where a poster-card style is used.
+11. Avoid changing the product detail page unless a direct bug is found.
+
+Universal card design:
+All product cards must have identical outer dimensions within the same section/grid.
+
+That means:
+- Same card width.
+- Same card image/stage area.
+- Same text/meta area behavior.
+- Same hover area.
+- Same layout rules.
+
+Only the artwork inside the stage should change size based on poster format.
+
+Card image/stage behavior:
+- Fixed image/stage area.
+- Neutral/off-white stage background.
+- Actual poster artwork centered inside the stage.
+- Poster keeps its real aspect ratio.
+- Poster has subtle border/shadow so it looks intentionally placed.
+- Default poster artwork must not be cropped.
+- Do not use object-cover for the default poster artwork.
+- Do not use full-image/cover as the default poster-card presentation.
+
+Important landscape rule:
+Landscape posters should not take more visual space than a regular 50x70 portrait poster.
+
+A landscape poster should:
+- Appear wider and shorter.
+- Feel like a 70x50 poster inside the same product tile.
+- Not fill most of the card width if that makes it feel visually bigger than portrait posters.
+- Not look like a hero image.
+- Not dominate the grid.
+
+Think of the Gallerix principle:
+- Same product-card system.
+- Different poster formats shown inside the same visual area.
+- A landscape poster is the same physical poster size rotated, not a bigger product.
+
+Suggested format-aware sizing inside the fixed stage:
+These values are starting points and can be tuned visually.
+
+Portrait poster:
+- max-height around 82–88% of the stage.
+- max-width around 62–72% of the stage.
+
+Landscape poster:
+- max-width around 62–72% of the stage.
+- max-height around 42–52% of the stage.
+- It must not look visually larger than a standard portrait poster.
+
+Square poster:
+- max-width around 62–72% of the stage.
+- max-height around 62–72% of the stage.
+
+Core principle:
+Different proportions, same perceived physical size.
+
+Homepage and shop consistency:
+Homepage Featured posters, homepage New arrivals, and the shop grid should use the same base poster tile style.
+
+They may differ in:
+- number of cards per row
+- section spacing
+- hover intensity
+
+They should not differ in:
+- artwork presentation logic
+- format handling
+- default image behavior
+- card anatomy
+- title/price pattern
+- basic visual language
+
+Homepage Featured / New arrivals:
+- Use the same base poster tile system as shop.
+- Stronger hover feedback on desktop:
+  - subtle lift, for example translateY(-2px).
+  - stronger card shadow.
+  - mockup fade if mockup exists.
+
+Shop/store grid:
+- Same base poster tile system.
+- Calmer hover feedback on desktop:
+  - shadow increase only.
+  - no lift, or extremely minimal lift.
+  - mockup fade if mockup exists.
+  - if no mockup exists, shadow only.
+
+Hover behavior:
+- Hover-specific behavior is desktop only.
+- Mobile should have no hover-specific image behavior.
+- On mobile, tapping a card opens the poster/product page as usual.
+
+Desktop hover with mockup:
+- If a poster has a hover mockup/lifestyle image, fade from the actual poster artwork to the full-size mockup.
+- The mockup should fill the full image/stage area.
+- The mockup should use object-cover.
+- The mockup should be an absolute overlay.
+- Fade should be smooth in and out, around 600ms.
+- Do not mount the hover image only on hover.
+- Keep the hover image rendered/preloaded enough to avoid a first-hover snap.
+
+Desktop hover without mockup:
+- Do not swap the image.
+- Do not zoom the image.
+- The artwork should stay as-is.
+- Apply only hover highlight:
+  - shop grid: subtle shadow increase.
+  - homepage cards: stronger shadow and subtle lift.
+
+Card background color:
+I do not want a full admin area for store cards.
+
+I only want the possibility to control the color of the actual card background if this fits cleanly into the existing store/admin appearance settings.
+
+Use or add a single store-level field only if needed, for example:
+- productCardBackgroundColor
+
+Meaning:
+- Controls the card surface/background.
+- Does not control poster sizing.
+- Does not control poster layout.
+- Does not control stage/full-image/current mode.
+- Does not control hover behavior.
+- Does not control shadow strength.
+- Does not introduce a store-card layout system.
+
+Place it in an existing store appearance/color area if possible. Do not create a new dedicated “store cards” admin section.
+
+If a suitable existing color field already exists, reuse it instead of adding a new DB field.
+
+If a new field is needed:
+- Add it safely.
+- Add/update DB schema.
+- Add an idempotent startup migration.
+- Add/update backend Zod/API schemas.
+- Add/update frontend types.
+- Do not overwrite existing store data.
+- Use a sensible fallback color.
+
+Previous posterCardPresentation experiment:
+There may already be code/DB/admin UI for a posterCardPresentation selector with values like current / full-image / stage.
+
+Update this according to the final decision:
+- Remove or hide the admin selector.
+- Do not rely on posterCardPresentation for the new universal behavior.
+- The universal poster-card system should be used regardless of posterCardPresentation value.
+- If the DB column already exists, it can remain harmless for now.
+- Do not add new presentation modes.
+- Report exactly what was done with the old selector/field.
+
+NEW badge and heart placement — shop grid:
+Move the “NEW” badge and heart/like button down from the image/stage area to the section below the image in the regular shop grid.
+
+Goal:
+- The poster image/stage should stay clean.
+- NEW and heart should not cover the artwork.
+- The lower information area should look visually balanced and intentional.
+- Heart must remain easy to click/tap.
+- Layout should not jump between posters with and without NEW badge.
+
+Recommended shop card lower layout:
+- Image/stage at top.
+- Below image:
+  - small meta/category row if currently used.
+  - title.
+  - price.
+  - NEW badge as a small pill in the info area, not over the artwork.
+  - heart aligned cleanly to the right side of the info area.
+
+Possible layout:
+- Category/meta row on left, heart on right.
+- Title below.
+- Price below.
+- NEW badge near the category/meta row or title area.
+- Keep the info area compact and premium.
+
+For the shop grid:
+- NEW badge must not overlay the poster image.
+- Heart icon must not overlay the poster image.
+- Heart should still be easy to click on desktop and mobile.
+- Cards with and without NEW badge should align cleanly.
+
+Homepage NEW badge behavior:
+Move the NEW badge below the image on the homepage as well, at least in sections where a poster-card style is used.
+
+This applies to:
+- Featured posters, if they use poster cards
+- New arrivals, if they use poster cards
+- any other homepage poster-card sections if applicable
+
+Goal:
+- Do not overlay the NEW badge on the poster artwork.
+- Keep the image/stage clean.
+- Make the lower content area look balanced and intentional.
+
+Recommended homepage lower layout:
+- Image/stage at top.
+- Below image:
+  - small meta/category row if currently used
+  - title
+  - price
+  - NEW badge as a pill in the lower info area, not on top of the image
+
+Important:
+- If the homepage uses the same shared card component as the shop, keep the logic consistent.
+- If the homepage has a slightly different card layout, still move the NEW badge below the image where poster cards are used.
+- Avoid covering important artwork on the homepage.
+
+Homepage heart behavior:
+- If homepage poster cards include a like/heart control and it looks good below the image, that is acceptable.
+- If the homepage currently does not use the heart there, do not add unnecessary clutter.
+- Main requirement: the NEW badge should be below the image on the homepage where poster cards are used.
+
+Product page:
+- Do not change product detail page unless a direct bug is found.
+- Product page raw poster artwork should continue showing the full artwork.
+- Mockup/lifestyle images can continue using object-cover where appropriate.
+- Lightbox should not regress.
+
+Implementation direction:
+- Prefer a reusable shared component/helper for poster tile artwork rendering.
+- Use it across:
+  - homepage Featured posters
+  - homepage New arrivals
+  - shop grid
+  - related posters if present
+- Avoid duplicating separate image-rendering rules in Home.tsx and PosterCard.tsx.
+- The component should support:
+  - fixed universal card/stage layout
+  - format-aware artwork sizing
+  - desktop mockup hover fade
+  - homepage vs shop hover intensity
+  - no-hover state with shadow highlight only
+
+Important:
+- Do not create a complicated admin system.
+- Do not implement manual cardPreviewImageUrl in this pass.
+- Do not implement generated preview images in this pass.
+- Do not make mockups the default image.
+- Actual poster artwork should remain the default image.
+- Hover mockup is only an optional desktop interaction.
+
+Acceptance criteria:
+1. There is no admin selector for poster-card presentation modes.
+2. Poster-card behavior is universal and fixed.
+3. Only card background color may be store-configurable, if implemented.
+4. All product cards have identical outer dimensions within the same section/grid.
+5. All image/stage areas have identical dimensions within the same section/grid.
+6. Portrait posters are shown in their real format.
+7. Landscape posters are shown in their real format.
+8. Square posters are shown in their real format.
+9. Landscape posters do not visually dominate or take more perceived space than standard portrait posters.
+10. Default poster artwork is not cropped.
+11. Actual poster artwork is shown by default.
+12. Desktop hover with mockup fades smoothly to a full-size mockup.
+13. Desktop hover without mockup only highlights the card.
+14. Mobile has no hover-specific image behavior.
+15. Homepage cards use slightly stronger hover than shop cards.
+16. Shop cards use calmer shadow-only hover highlight.
+17. Shop grid NEW badge and heart are moved below the image.
+18. Shop grid NEW badge and heart look balanced on desktop and mobile.
+19. Homepage NEW badge is moved below the image where poster cards are used.
+20. Homepage Featured and New arrivals feel like the same card system.
+21. Shop grid feels consistent with homepage cards.
+22. Product detail page is not regressed.
+23. Typecheck passes with zero errors.
+
+Please test visually with:
+- Test 2
+- Jag testar
+- Spanish Lavender Fields
+- Cádiz Land's End
+- Alicante Harbour at Dusk
+- one portrait poster
+- one landscape poster
+- one square poster if available
+- one poster with hover mockup
+- one poster without hover mockup
+- one NEW poster
+- one non-NEW poster
+
+Please save QA screenshots in:
+artifacts/qa-screenshots/universal-poster-card-final/
+
+Suggested screenshots:
+- home-desktop.png
+- home-mobile.png
+- home-featured-new-badge-below-image.png
+- home-new-arrivals-new-badge-below-image.png
+- home-featured-hover-with-mockup.png
+- home-featured-hover-without-mockup.png
+- shop-desktop.png
+- shop-mobile.png
+- shop-landscape-poster.png
+- shop-portrait-vs-landscape-scale.png
+- shop-new-heart-below-image.png
+- shop-hover-with-mockup-desktop.png
+- shop-hover-without-mockup-desktop.png
+- card-background-color-example.png, if card background color was implemented
+
+Run typecheck for affected workspaces.
+
+Report back with:
+1. Files changed
+2. What was done with the previous posterCardPresentation selector/field
+3. Whether a card background color setting was reused or added
+4. How the universal fixed card system works
+5. How same-size cards/stages are guaranteed
+6. How portrait/landscape/square sizing is handled
+7. How homepage vs shop hover intensity differs
+8. How desktop-only mockup hover works
+9. What changed for NEW badge and heart placement in the shop grid
+10. What changed for NEW badge placement on the homepage
+11. Whether homepage heart placement was changed or left as-is
+12. Whether product page was touched
+13. Screenshot file paths
+14. Typecheck result

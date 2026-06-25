@@ -22,7 +22,6 @@ import { migrateCollectionBanner } from "./lib/migrateCollectionBanner";
 import { migrateMockupSync } from "./lib/migrateMockupSync";
 import { migrateSmartPlacement } from "./lib/migrateSmartPlacement";
 import { migrateAiRenderMode } from "./lib/migrateAiRenderMode";
-import { migratePosterCardPresentation } from "./lib/migratePosterCardPresentation";
 import { seedPostsofSpain } from "./lib/seedPostsofSpain";
 
 const app: Express = express();
@@ -118,7 +117,6 @@ migrateSlugField()
   .then(() => migrateMockupSync())
   .then(() => migrateSmartPlacement())
   .then(() => migrateAiRenderMode())
-  .then(() => migratePosterCardPresentation())
   .then(() => seedMockupTemplates())
   .catch((err) =>
     logger.error(err, "Failed to run startup migrations")

@@ -875,7 +875,6 @@ router.get("/stores/:storeKey/config", async (req, res) => {
     logoAltText: store.logoAltText ?? null,
     homepageVisualConfig: (store.homepageVisualConfig as object) ?? null,
     typographyConfig: (store.typographyConfig as object) ?? null,
-    posterCardPresentation: store.posterCardPresentation ?? null,
   });
 });
 
