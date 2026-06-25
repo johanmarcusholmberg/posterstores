@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { getOptimizedImageUrl } from "@/lib/imageUrl";
 import {
   DEFAULT_HOMEPAGE_SECTIONS,
   type CollectionBannerVisualConfig,
@@ -19,7 +20,6 @@ import {
   type HeroButtonStyleConfig,
   type HeroTrustBadge,
 } from "@/config/storefronts";
-import { PosterArtworkStage } from "@/components/shared/PosterArtworkStage";
 
 const DEFAULT_TRUST_BADGES: HeroTrustBadge[] = [
   { id: "fine-art", text: "Fine art prints" },
@@ -124,30 +124,154 @@ function buttonStyleFromOverride(style?: HeroButtonStyleConfig | null): React.CS
   return Object.keys(result).length > 0 ? result : undefined;
 }
 
+/** Shared badge class constants for card overlays */
+const NEW_BADGE_CLS =
+  "absolute top-2 right-2 z-10 pointer-events-none rounded-full border border-[#c9a08a]/70 text-[#9e6b4e] bg-[#fefcfa]/80 backdrop-blur-[2px] text-[10px] font-medium tracking-[0.12em] uppercase px-2.5 py-[3px]";
+
 // ─── Card components ─────────────────────────────────────────────────────────
 
-/**
- * HomePosterTile — Universal poster card used across all homepage sections.
- *
- * Uses the same PosterArtworkStage as the shop grid so artwork presentation,
- * format handling, and mockup hover fade are consistent site-wide.
- *
- * hoverVariant controls hover intensity only:
- *   "featured" — lift (-translate-y-0.5) + stronger shadow (homepage sections)
- *   "calm"     — shadow increase only (carousel / secondary sections)
- */
-function HomePosterTile({
+function HomePosterCard({ poster }: { poster: Poster }) {
+  const slug = (poster as any).slug as string | undefined;
+  const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
+  const activeSizes = poster.posterSizes?.filter((s) => s.active) ?? [];
+  const lowestPrice = poster.lowestActivePrice;
+  const displayPrice = lowestPrice != null ? lowestPrice : poster.price;
+  const displayCurrency = activeSizes[0]?.currency ?? poster.currency;
+  const priceLabel =
+    activeSizes.length > 1
+      ? `From ${formatPrice(displayPrice, displayCurrency)}`
+      : formatPrice(displayPrice, displayCurrency);
+  const baseImage = poster.imageUrl;
+  const primaryMockup = poster.primaryDisplayImageUrl ?? null;
+  const dedicatedHover = poster.hoverDisplayImageUrl ?? null;
+  const hoverImage: string | null =
+    dedicatedHover ??
+    (primaryMockup && primaryMockup !== baseImage ? primaryMockup : null);
+
+  return (
+    <Link
+      href={href}
+      className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+    >
+      <div className="relative aspect-[3/4] overflow-hidden bg-[#f4f0eb] shadow-[0_1px_4px_rgba(0,0,0,0.06)] group-hover:shadow-[0_3px_14px_rgba(0,0,0,0.11)] transition-shadow duration-300">
+        <img
+          src={getOptimizedImageUrl(baseImage, { width: 600, quality: 85 })}
+          alt={poster.title}
+          loading="lazy"
+          decoding="async"
+          className={[
+            "absolute inset-0 object-contain w-full h-full",
+            "motion-reduce:transition-none",
+            hoverImage
+              ? "transition-opacity duration-[280ms] ease-out opacity-100 group-hover:opacity-0"
+              : "transition-transform duration-[300ms] ease-out scale-100 group-hover:scale-[1.07]",
+          ].join(" ")}
+          onError={(e) => { (e.target as HTMLImageElement).src = poster.imageUrl; }}
+        />
+        {hoverImage && (
+          <img
+            src={getOptimizedImageUrl(hoverImage, { width: 600, quality: 80 })}
+            alt=""
+            aria-hidden="true"
+            loading="lazy"
+            decoding="async"
+            className="absolute inset-0 object-cover w-full h-full transition-opacity duration-[280ms] ease-out opacity-0 group-hover:opacity-100 motion-reduce:transition-none motion-reduce:opacity-0"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+          />
+        )}
+        <div className="absolute inset-0 ring-1 ring-inset ring-black/[0.06] pointer-events-none" aria-hidden="true" />
+        {poster.isNew && <div className={NEW_BADGE_CLS}>NEW</div>}
+      </div>
+      <div className="mt-1.5 min-w-0">
+        <h3 className="font-serif font-semibold text-sm text-foreground truncate leading-snug">
+          {(poster as any).displayTitle || poster.title}
+        </h3>
+        <p className="text-xs font-medium text-foreground/70 mt-0.5">{priceLabel}</p>
+      </div>
+    </Link>
+  );
+}
+
+function NewArrivalCard({
+  poster,
+  titleColor,
+  priceColor,
+}: {
+  poster: Poster;
+  titleColor?: string;
+  priceColor?: string;
+}) {
+  const slug = (poster as any).slug as string | undefined;
+  const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
+  const activeSizes = poster.posterSizes?.filter((s) => s.active) ?? [];
+  const lowestPrice = poster.lowestActivePrice;
+  const displayPrice = lowestPrice != null ? lowestPrice : poster.price;
+  const displayCurrency = activeSizes[0]?.currency ?? poster.currency;
+  const hasPrice = displayPrice != null;
+  const priceLabel =
+    activeSizes.length > 1
+      ? `From ${formatPrice(displayPrice, displayCurrency)}`
+      : formatPrice(displayPrice, displayCurrency);
+  const sizeLabels = activeSizes
+    .slice(0, 4)
+    .map((s) => (s as any).size as string | undefined)
+    .filter(Boolean) as string[];
+  const baseImage = poster.imageUrl;
+
+  return (
+    <Link
+      href={href}
+      className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+    >
+      <div className="relative aspect-[3/4] overflow-hidden bg-[#f4f0eb] shadow-[0_1px_4px_rgba(0,0,0,0.06)] group-hover:shadow-[0_4px_18px_rgba(0,0,0,0.13)] transition-shadow duration-300">
+        <img
+          src={getOptimizedImageUrl(baseImage, { width: 400, quality: 75 })}
+          alt={poster.title}
+          loading="lazy"
+          decoding="async"
+          className="absolute inset-0 object-cover w-full h-full transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.05] motion-reduce:transition-none"
+        />
+        <div
+          className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-250 flex flex-col justify-end p-3 pointer-events-none"
+          aria-hidden="true"
+        >
+          {hasPrice && <p className="text-white text-[11px] font-semibold mb-0.5">{priceLabel}</p>}
+          {sizeLabels.length > 0 && (
+            <p className="text-white/65 text-[10px] mb-1.5 leading-tight">{sizeLabels.join(" · ")}</p>
+          )}
+          <span className="text-white/90 text-[11px] font-medium">View poster →</span>
+        </div>
+        <div className="absolute inset-0 ring-1 ring-inset ring-black/[0.06] pointer-events-none" aria-hidden="true" />
+        {poster.isNew && <div className={NEW_BADGE_CLS}>NEW</div>}
+      </div>
+      <div className="mt-1.5 min-w-0">
+        <h3
+          className="font-serif font-semibold text-sm text-foreground truncate leading-snug"
+          style={titleColor ? { color: titleColor } : undefined}
+        >
+          {(poster as any).displayTitle || poster.title}
+        </h3>
+        {hasPrice && (
+          <p
+            className="text-xs font-medium text-foreground/70 mt-0.5 sm:hidden"
+            style={priceColor ? { color: priceColor } : undefined}
+          >
+            {priceLabel}
+          </p>
+        )}
+      </div>
+    </Link>
+  );
+}
+
+function FeaturedPosterCard({
   poster,
   priority = false,
-  hoverVariant = "featured",
-  cardBg = "#f4f0eb",
   titleColor,
   priceColor,
 }: {
   poster: Poster;
   priority?: boolean;
-  hoverVariant?: "featured" | "calm";
-  cardBg?: string;
   titleColor?: string;
   priceColor?: string;
 }) {
@@ -161,63 +285,48 @@ function HomePosterTile({
     activeSizes.length > 1
       ? `From ${formatPrice(displayPrice, displayCurrency)}`
       : formatPrice(displayPrice, displayCurrency);
-
-  const baseImage = poster.imageUrl;
-  const primaryMockup = poster.primaryDisplayImageUrl ?? null;
-  const dedicatedHover = poster.hoverDisplayImageUrl ?? null;
-  const hoverImage: string | null =
-    dedicatedHover ??
-    (primaryMockup && primaryMockup !== baseImage ? primaryMockup : null);
+  const displayImage = poster.primaryDisplayImageUrl ?? poster.imageUrl;
+  const cardTitle = (poster as any).displayTitle || poster.title;
 
   return (
     <Link
       href={href}
-      className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className="group flex flex-col h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
-      <div
-        className={[
-          "relative aspect-[3/4] overflow-hidden",
-          "shadow-[0_1px_4px_rgba(0,0,0,0.06)]",
-          "transition-all duration-300 ease-out",
-          hoverVariant === "featured"
-            ? "group-hover:shadow-[0_6px_22px_rgba(0,0,0,0.14)] group-hover:-translate-y-0.5"
-            : "group-hover:shadow-[0_3px_14px_rgba(0,0,0,0.10)]",
-        ].join(" ")}
-        style={{ backgroundColor: cardBg }}
-      >
-        <PosterArtworkStage
-          src={baseImage}
-          hoverSrc={hoverImage}
-          alt={poster.title}
-          priority={priority}
-        />
-        <div className="absolute inset-0 ring-1 ring-inset ring-black/[0.06] pointer-events-none" aria-hidden="true" />
-      </div>
-
-      <div className="mt-1.5 min-w-0">
-        {poster.category && (
-          <p className="text-[10px] uppercase tracking-widest text-muted-foreground/40 mb-0.5 truncate">
-            {poster.category}
-          </p>
-        )}
-        <h3
-          className="font-serif font-semibold text-sm text-foreground truncate leading-snug"
-          style={titleColor ? { color: titleColor } : undefined}
-        >
-          {(poster as any).displayTitle || poster.title}
-        </h3>
-        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+      <div className={[
+        "flex flex-col flex-1",
+        "bg-[#faf8f3] rounded-[2px]",
+        "shadow-[0_2px_8px_rgba(0,0,0,0.09),0_1px_3px_rgba(0,0,0,0.06)]",
+        "group-hover:shadow-[0_6px_20px_rgba(0,0,0,0.14),0_2px_6px_rgba(0,0,0,0.09)]",
+        "group-hover:-translate-y-0.5",
+        "transition-all duration-300 ease-out",
+        "p-2 pb-0",
+      ].join(" ")}>
+        <div className="relative aspect-[3/4] overflow-hidden bg-[#ede8e0]">
+          <img
+            src={getOptimizedImageUrl(displayImage, { width: 600, quality: 85 })}
+            alt={poster.title}
+            loading={priority ? "eager" : "lazy"}
+            fetchPriority={priority ? "high" : undefined}
+            decoding="async"
+            className="absolute inset-0 w-full h-full object-contain transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.04] motion-reduce:transition-none"
+            onError={(e) => { (e.target as HTMLImageElement).src = poster.imageUrl; }}
+          />
+          {poster.isNew && <div className={NEW_BADGE_CLS}>NEW</div>}
+        </div>
+        <div className="px-0.5 pt-2.5 pb-3 min-h-[52px] flex flex-col justify-start min-w-0">
+          <h3
+            className="font-serif font-semibold text-[13px] sm:text-xs text-foreground/85 truncate leading-snug"
+            style={titleColor ? { color: titleColor } : undefined}
+          >
+            {cardTitle}
+          </h3>
           <p
-            className="text-xs font-medium text-foreground/70"
+            className="text-[11px] text-foreground/50 mt-1"
             style={priceColor ? { color: priceColor } : undefined}
           >
             {priceLabel}
           </p>
-          {poster.isNew && (
-            <span className="rounded-full border border-[#c9a08a]/70 text-[#9e6b4e] bg-[#fefcfa] text-[10px] font-medium tracking-[0.12em] uppercase px-2 py-[2px] shrink-0">
-              NEW
-            </span>
-          )}
         </div>
       </div>
     </Link>
@@ -226,12 +335,22 @@ function HomePosterTile({
 
 function FeaturedPosterCardSkeleton() {
   return (
-    <div>
+    <div className="bg-[#faf8f3] rounded-[2px] shadow-[0_2px_8px_rgba(0,0,0,0.07)] p-2 pb-0">
       <div className="aspect-[3/4] bg-muted animate-pulse" />
-      <div className="mt-1.5">
+      <div className="px-0.5 py-2.5 pb-3">
         <div className="h-3 bg-muted animate-pulse w-3/4" />
-        <div className="mt-1 h-2.5 bg-muted animate-pulse w-1/2" />
+        <div className="mt-1.5 h-2.5 bg-muted animate-pulse w-1/2" />
       </div>
+    </div>
+  );
+}
+
+function PosterCardSkeleton() {
+  return (
+    <div className="flex-none w-[155px] sm:w-[170px] lg:w-[185px] snap-start">
+      <div className="aspect-[3/4] bg-muted animate-pulse" />
+      <div className="mt-1.5 h-3.5 bg-muted animate-pulse w-3/4" />
+      <div className="mt-1 h-3 bg-muted animate-pulse w-1/2" />
     </div>
   );
 }
@@ -436,7 +555,6 @@ interface FeaturedPostersSectionProps {
 
 function FeaturedPostersSection({ featured, resolvedRoutePrefix, sectionConfig }: FeaturedPostersSectionProps) {
   const FEATURED_LIMIT = 6;
-  const store = useStorefront();
   const co = sectionConfig?.colorOverrides;
   const fo = sectionConfig?.fontOverrides;
   const headingColor = cleanColor(co?.headingColor);
@@ -444,7 +562,6 @@ function FeaturedPostersSection({ featured, resolvedRoutePrefix, sectionConfig }
   const linkColor = cleanColor(co?.linkColor);
   const posterTitleColor = cleanColor(co?.posterTitleColor);
   const posterPriceColor = cleanColor(co?.posterPriceColor);
-  const cardBg = (store as any).productCardBgColor || "#f4f0eb";
 
   return (
     <section className="pt-4 pb-5 lg:pt-4 lg:pb-6">
@@ -467,22 +584,20 @@ function FeaturedPostersSection({ featured, resolvedRoutePrefix, sectionConfig }
             View all &rarr;
           </Link>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-5 lg:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-5 lg:gap-4 items-stretch">
           {featured && featured.length > 0
             ? featured.slice(0, FEATURED_LIMIT).map((poster, i) => (
-                <div key={poster.id} className={i >= 4 ? "hidden sm:block" : undefined}>
-                  <HomePosterTile
+                <div key={poster.id} className={["h-full", i >= 4 ? "hidden sm:block" : ""].filter(Boolean).join(" ")}>
+                  <FeaturedPosterCard
                     poster={poster}
                     priority={i < 2}
-                    hoverVariant="featured"
-                    cardBg={cardBg}
                     titleColor={posterTitleColor}
                     priceColor={posterPriceColor}
                   />
                 </div>
               ))
             : Array.from({ length: FEATURED_LIMIT }).map((_, i) => (
-                <div key={i} className={i >= 4 ? "hidden sm:block" : undefined}>
+                <div key={i} className={["h-full", i >= 4 ? "hidden sm:block" : ""].filter(Boolean).join(" ")}>
                   <FeaturedPosterCardSkeleton />
                 </div>
               ))}
@@ -853,7 +968,6 @@ function NewArrivalsSection({
 }: NewArrivalsSectionProps) {
   if (newArrivals.length === 0) return null;
 
-  const store = useStorefront();
   const co = sectionConfig?.colorOverrides;
   const fo = sectionConfig?.fontOverrides;
   const headingColor = cleanColor(co?.headingColor);
@@ -861,7 +975,6 @@ function NewArrivalsSection({
   const linkColor = cleanColor(co?.linkColor);
   const posterTitleColor = cleanColor(co?.posterTitleColor);
   const posterPriceColor = cleanColor(co?.posterPriceColor);
-  const cardBg = (store as any).productCardBgColor || "#f4f0eb";
 
   return (
     <section className="pt-3 pb-4 lg:pt-4 lg:pb-5" data-testid="new-arrivals-section">
@@ -894,10 +1007,8 @@ function NewArrivalsSection({
           >
             {newArrivals.map((poster) => (
               <div key={poster.id} className="flex-none snap-start w-[74vw] sm:w-[240px] lg:w-[260px]">
-                <HomePosterTile
+                <NewArrivalCard
                   poster={poster}
-                  hoverVariant="calm"
-                  cardBg={cardBg}
                   titleColor={posterTitleColor}
                   priceColor={posterPriceColor}
                 />

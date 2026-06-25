@@ -179,14 +179,12 @@ export interface StorefrontConfig {
   typographyConfig?: StoreTypographyConfig | null;
   /**
    * Controls how poster artwork is presented in card grids (Featured, New arrivals, Shop).
-   * @deprecated The universal stage is always used; this field is ignored at runtime.
+   * "current"    — object-contain on warm neutral background (default, original behaviour)
+   * "full-image" — object-cover, fills the card stage
+   * "stage"      — centred artwork with breathing room and drop-shadow on warm bg
+   * Default: "current" (backwards-compatible).
    */
   posterCardPresentation?: PosterCardPresentation | null;
-  /**
-   * Product card stage background color (hex). Controls the neutral mat/background
-   * visible around artwork in poster cards. Defaults to #f4f0eb (warm neutral).
-   */
-  productCardBgColor?: string | null;
   theme?: {
     background: string;
     surface: string;

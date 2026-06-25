@@ -135,8 +135,10 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
   const [seoTitle, setSeoTitle] = useState(seo.defaultTitle ?? "");
   const [seoDescription, setSeoDescription] = useState(seo.defaultDescription ?? "");
 
-  // Product card background color (optional hex; empty = use default #f4f0eb)
-  const [productCardBgColor, setProductCardBgColor] = useState(existing?.productCardBgColor ?? "");
+  // Poster card presentation
+  const [posterCardPresentation, setPosterCardPresentation] = useState<"current" | "full-image" | "stage">(
+    (existing?.posterCardPresentation as "current" | "full-image" | "stage" | null | undefined) ?? "current"
+  );
 
   // Logo / branding
   const [logoUrl, setLogoUrl] = useState(existing?.logoUrl ?? null);
@@ -169,9 +171,6 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
       if (val && !HEX_COLOR_RE.test(val)) {
         errs.push(`Typography color "${key}" must be a valid 6-digit hex (e.g. #2F80A8)`);
       }
-    }
-    if (productCardBgColor && !HEX_COLOR_RE.test(productCardBgColor)) {
-      errs.push("Card background color must be a valid 6-digit hex (e.g. #f4f0eb)");
     }
     if (typography.heroOverlayOpacity !== undefined) {
       const op = typography.heroOverlayOpacity;
@@ -248,7 +247,7 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
           domainAliases: aliases.length > 0 ? aliases : null,
           routePrefix: routePrefix || null,
           logoAltText: logoAltText || null,
-          productCardBgColor: productCardBgColor || null,
+          posterCardPresentation: posterCardPresentation === "current" ? null : posterCardPresentation,
         };
         await adminUpdateStore(existing.storeKey, payload);
         toast({ title: "Store updated", description: `${name} has been saved.` });
@@ -268,7 +267,7 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
           primaryDomain: primaryDomain || null,
           domainAliases: aliases.length > 0 ? aliases : null,
           routePrefix: routePrefix || null,
-          productCardBgColor: productCardBgColor || null,
+          posterCardPresentation: posterCardPresentation === "current" ? null : posterCardPresentation,
         };
         await adminCreateStore(payload);
         toast({ title: "Store created", description: `${name} (${storeKey}) is ready.` });
@@ -722,69 +721,73 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
         </CardContent>
       </Card>
 
+      {/* Poster card presentation */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Poster card presentation</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-1.5 max-w-xs">
+            <Label htmlFor="poster-card-presentation">Artwork display mode</Label>
+            <Select
+              value={posterCardPresentation}
+              onValueChange={(v) => setPosterCardPresentation(v as "current" | "full-image" | "stage")}
+            >
+              <SelectTrigger id="poster-card-presentation">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="current">Current (contain — original behaviour)</SelectItem>
+                <SelectItem value="full-image">Full image (cover — fills the card)</SelectItem>
+                <SelectItem value="stage">Stage (centred with shadow on warm bg)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Controls how poster artwork is displayed in product-card grids (Featured, New arrivals, Shop).
+            <br />
+            <strong>Current</strong>: object-contain — no cropping, original behaviour (default).
+            <br />
+            <strong>Full image</strong>: object-cover — fills the card stage; may crop extreme ratios.
+            <br />
+            <strong>Stage</strong>: artwork centred with breathing room and a drop-shadow; best for mixed-ratio collections.
+            <br />
+            Default is <em>Current</em>. Change only after reviewing on the storefront.
+          </p>
+        </CardContent>
+      </Card>
+
       {/* Theme */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Theme colors</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {THEME_FIELDS.map(({ key, label }) => (
-              <div key={key} className="space-y-1.5">
-                <Label htmlFor={`theme-${key}`}>{label}</Label>
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="color"
-                    value={theme[key]}
-                    onChange={(e) => updateThemeColor(key, e.target.value)}
-                    className="w-8 h-8 rounded border cursor-pointer"
-                    aria-label={`${label} color picker`}
-                  />
-                  <Input
-                    id={`theme-${key}`}
-                    value={theme[key]}
-                    onChange={(e) => updateThemeColor(key, e.target.value)}
-                    placeholder="#000000"
-                    className="font-mono text-sm"
-                    maxLength={7}
-                  />
-                </div>
-                {theme[key] && !HEX_COLOR_RE.test(theme[key]) && (
-                  <p className="text-xs text-destructive">Invalid hex color</p>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Card background color — controls the mat/stage visible around artwork in all poster cards */}
-          <div className="border-t border-border/50 pt-4">
-            <div className="space-y-1.5 max-w-xs">
-              <Label htmlFor="product-card-bg-color">Card background color</Label>
+        <CardContent className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {THEME_FIELDS.map(({ key, label }) => (
+            <div key={key} className="space-y-1.5">
+              <Label htmlFor={`theme-${key}`}>{label}</Label>
               <div className="flex gap-2 items-center">
                 <input
                   type="color"
-                  value={productCardBgColor || "#f4f0eb"}
-                  onChange={(e) => setProductCardBgColor(e.target.value)}
+                  value={theme[key]}
+                  onChange={(e) => updateThemeColor(key, e.target.value)}
                   className="w-8 h-8 rounded border cursor-pointer"
-                  aria-label="Card background color picker"
+                  aria-label={`${label} color picker`}
                 />
                 <Input
-                  id="product-card-bg-color"
-                  value={productCardBgColor}
-                  onChange={(e) => setProductCardBgColor(e.target.value)}
-                  placeholder="#f4f0eb (default)"
+                  id={`theme-${key}`}
+                  value={theme[key]}
+                  onChange={(e) => updateThemeColor(key, e.target.value)}
+                  placeholder="#000000"
                   className="font-mono text-sm"
                   maxLength={7}
                 />
               </div>
-              {productCardBgColor && !HEX_COLOR_RE.test(productCardBgColor) && (
+              {theme[key] && !HEX_COLOR_RE.test(theme[key]) && (
                 <p className="text-xs text-destructive">Invalid hex color</p>
               )}
-              <p className="text-xs text-muted-foreground">
-                The neutral background visible behind artwork in all poster cards (shop grid, featured, new arrivals). Leave blank to use the default warm neutral <span className="font-mono">#f4f0eb</span>.
-              </p>
             </div>
-          </div>
+          ))}
         </CardContent>
       </Card>
 

@@ -137,7 +137,6 @@ const createStoreSchema = z.object({
   seoConfig: seoConfigSchema,
   navigationConfig: z.any().nullable().optional(),
   posterCardPresentation: z.enum(["current", "full-image", "stage"]).nullable().optional(),
-  productCardBgColor: z.string().regex(HEX_COLOR_RE, "Must be a valid hex color").nullable().optional(),
   ...domainRoutingSchema.shape,
 });
 
@@ -288,7 +287,6 @@ router.post("/admin/stores", requireAdmin, async (req, res) => {
       domainAliases: (parsed.data.domainAliases as string[] | null | undefined) ?? null,
       routePrefix: parsed.data.routePrefix ?? null,
       posterCardPresentation: (parsed.data.posterCardPresentation as "current" | "full-image" | "stage" | null | undefined) ?? null,
-      productCardBgColor: parsed.data.productCardBgColor ?? null,
       createdAt: now,
       updatedAt: now,
     })
@@ -375,7 +373,6 @@ router.put("/admin/stores/:storeKey", requireAdmin, async (req, res) => {
   if ("routePrefix" in parsed.data) updates.routePrefix = parsed.data.routePrefix ?? null;
   if ("logoAltText" in parsed.data) updates.logoAltText = parsed.data.logoAltText ?? null;
   if ("posterCardPresentation" in parsed.data) updates.posterCardPresentation = (parsed.data.posterCardPresentation as "current" | "full-image" | "stage" | null | undefined) ?? null;
-  if ("productCardBgColor" in parsed.data) updates.productCardBgColor = parsed.data.productCardBgColor ?? null;
 
   const [updated] = await db
     .update(storesTable)
