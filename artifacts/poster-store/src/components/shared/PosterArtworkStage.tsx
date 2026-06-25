@@ -84,7 +84,7 @@ export function PosterArtworkStage({
         )}
         style={{
           aspectRatio: aspectRatio ? String(aspectRatio) : "3/4",
-          maxWidth: "100%",
+          width: "100%",
           maxHeight: "100%",
         }}
       >

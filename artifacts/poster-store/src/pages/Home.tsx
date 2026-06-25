@@ -174,7 +174,7 @@ function HomePosterCard({ poster }: { poster: Poster }) {
                 ? "transition-transform duration-[300ms] ease-out scale-100 group-hover:scale-[1.07] group-focus-within:scale-[1.07] motion-reduce:transition-none"
                 : "",
             ].join(" ")}
-            style={{ aspectRatio: ratio ? String(ratio) : "3/4", maxWidth: "100%", maxHeight: "100%" }}
+            style={{ aspectRatio: ratio ? String(ratio) : "3/4", width: "100%", maxHeight: "100%" }}
           >
             <img
               src={getOptimizedImageUrl(baseImage, { width: 600, quality: 85 })}
@@ -252,7 +252,7 @@ function NewArrivalCard({
         <div className="absolute inset-0 flex items-center justify-center">
           <div
             className="relative transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.05] motion-reduce:transition-none"
-            style={{ aspectRatio: newArrivalRatio ? String(newArrivalRatio) : "3/4", maxWidth: "100%", maxHeight: "100%" }}
+            style={{ aspectRatio: newArrivalRatio ? String(newArrivalRatio) : "3/4", width: "100%", maxHeight: "100%" }}
           >
             <img
               src={getOptimizedImageUrl(baseImage, { width: 400, quality: 75 })}
@@ -345,7 +345,7 @@ function FeaturedPosterCard({
           <div className="absolute inset-0 flex items-center justify-center">
             <div
               className="relative ring-1 ring-inset ring-black/[0.14] transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.04] motion-reduce:transition-none"
-              style={{ aspectRatio: ratio ? String(ratio) : "3/4", maxWidth: "100%", maxHeight: "100%" }}
+              style={{ aspectRatio: ratio ? String(ratio) : "3/4", width: "100%", maxHeight: "100%" }}
             >
               <img
                 src={getOptimizedImageUrl(displayImage, { width: 600, quality: 85 })}
