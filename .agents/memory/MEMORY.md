@@ -1,4 +1,4 @@
 - [Drizzle timestamp coercion bug](drizzle-timestamp-coercion.md) — Drizzle timestamp columns require Date objects; passing ISO strings causes a runtime 500.
 - [Homepage section-level visual overrides](homepage-visual-overrides.md) — Section font/color overrides live on HomepageSectionConfig, not HeroVisualConfig; button styles are on HeroVisualConfig.
-- [Poster card presentation system](poster-card-presentation.md) — Three-mode artwork display (current/full-image/stage) via PosterArtworkStage component; store-level DB column; default is "current" (safe fallback).
+- [Universal poster card system](poster-card-universal.md) — Single PosterArtworkStage (centered, max-w-[74%] max-h-[87%], drop-shadow, 600ms hover crossfade) used by PosterCard, HomePosterTile; NEW+heart moved below image; productCardBgColor DB column; posterCardPresentation deprecated/ignored.
 - [DB schema push — interactive prompt workaround](db-push-workaround.md) — drizzle-kit push always prompts for favorites constraint; use raw psql for simple column additions to avoid blocking.

@@ -7,7 +7,7 @@ import { addFavorite, removeFavorite } from "@/lib/favoritesApi";
 import { Heart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { LoginPromptModal } from "./LoginPromptModal";
-import { PosterArtworkStage, type PosterCardPresentation } from "./PosterArtworkStage";
+import { PosterArtworkStage } from "./PosterArtworkStage";
 
 interface PosterCardProps {
   poster: Poster;
@@ -36,22 +36,16 @@ export const PosterCard = ({ poster, favoritedIds, priority = false }: PosterCar
         1. hoverDisplayImageUrl — a dedicated lifestyle/room mockup
         2. primaryDisplayImageUrl — the primary assigned mockup, if it's
            different from imageUrl (i.e. a mockup has been assigned at all)
-        3. null — no hover image; use the scale fallback instead
+        3. null — no hover image; card shadow handles hover feedback
 
     Public cards may only use rendered mockupImageUrl, never template background
-    images. This rule is enforced server-side in posterEnrichment.ts:
-    primaryDisplayImageUrl and hoverDisplayImageUrl are null unless a generated
-    mockupImageUrl exists, the template is active, status ≠ failed, and (for
-    AI-rendered mockups) approvedForPublic = true.
+    images. This rule is enforced server-side in posterEnrichment.ts.
   */
   const baseImage = poster.imageUrl;
 
   const primaryMockup = poster.primaryDisplayImageUrl ?? null;
   const dedicatedHover = poster.hoverDisplayImageUrl ?? null;
 
-  // Prefer the dedicated hover mockup; fall back to the primary mockup if it
-  // differs from the raw poster image (crossfade from art → room context).
-  // Both are guaranteed to be rendered mockupImageUrl values or null.
   const hoverImage: string | null =
     dedicatedHover ??
     (primaryMockup && primaryMockup !== baseImage ? primaryMockup : null);
@@ -109,8 +103,8 @@ export const PosterCard = ({ poster, favoritedIds, priority = false }: PosterCar
   const slug = (poster as any).slug as string | undefined;
   const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
 
-  // Presentation mode: read from store config, default to "current" (original behaviour).
-  const presentation: PosterCardPresentation = (store.posterCardPresentation as PosterCardPresentation | null | undefined) ?? "current";
+  // Card background — store-level override or warm neutral fallback
+  const cardBg = (store as any).productCardBgColor || "#f4f0eb";
 
   return (
     <>
@@ -119,29 +113,22 @@ export const PosterCard = ({ poster, favoritedIds, priority = false }: PosterCar
         className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         data-testid={`link-poster-${poster.id}`}
       >
-        {/* Image container */}
+        {/* Image/stage container — shadow increase only on hover, no lift or scale */}
         <div
           className={[
             "relative aspect-[3/4] overflow-hidden",
-            "bg-[#f4f0eb]",
             "mb-2 sm:mb-3",
             "shadow-[0_1px_4px_rgba(0,0,0,0.06)]",
             "transition-shadow duration-300 ease-out",
-            "group-hover:shadow-[0_3px_16px_rgba(0,0,0,0.12)]",
+            "group-hover:shadow-[0_3px_14px_rgba(0,0,0,0.10)]",
           ].join(" ")}
+          style={{ backgroundColor: cardBg }}
         >
-          {/*
-            PosterArtworkStage renders:
-              — The base artwork layer (mode-aware: contain / cover / centred-stage)
-              — The hover mockup overlay (always in DOM when hoverImage exists, so it
-                pre-loads; fades in/out symmetrically at 600 ms on hover-in AND hover-out)
-          */}
           <PosterArtworkStage
             src={baseImage}
             hoverSrc={hoverImage}
             alt={poster.title}
             priority={priority}
-            presentation={presentation}
             data-testid={`img-poster-${poster.id}`}
             onError={(e) => {
               (e.target as HTMLImageElement).src = poster.imageUrl;
@@ -153,56 +140,48 @@ export const PosterCard = ({ poster, favoritedIds, priority = false }: PosterCar
             className="absolute inset-0 ring-1 ring-inset ring-black/[0.06] pointer-events-none"
             aria-hidden="true"
           />
+        </div>
 
-          {/*
-            Overlay row — heart (left) + NEW badge (right).
-            items-center aligns both overlays by their visual centers
-            regardless of their respective heights, with no pixel hacks.
-            Wrapper is pointer-events-none; button re-enables events.
-          */}
-          <div className="absolute top-2 left-2 right-2 z-10 flex items-center justify-between pointer-events-none">
+        {/*
+          Info area — NEW badge and heart sit below the image so the artwork
+          stays clean. The layout never shifts between posters with/without NEW
+          because the badge is inline with the price row.
+        */}
+        <div className="mt-0.5">
+          <div className="flex items-start gap-2 min-w-0">
+            <div className="min-w-0 flex-1">
+              {poster.category && (
+                <p className="text-[10px] uppercase tracking-widest text-muted-foreground/40 mb-0.5 truncate">
+                  {poster.category}
+                </p>
+              )}
+              <h3 className="font-serif font-semibold text-base sm:text-lg text-foreground truncate leading-snug">
+                {(poster as any).displayTitle || poster.title}
+              </h3>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <p className="font-medium text-foreground text-sm">{priceLabel}</p>
+                {poster.isNew && (
+                  <span className="rounded-full border border-[#c9a08a]/70 text-[#9e6b4e] bg-[#fefcfa] text-[10px] font-medium tracking-[0.12em] uppercase px-2.5 py-[2px] shrink-0">
+                    NEW
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Heart/favorite button — right of info area, easy tap target */}
             <button
               type="button"
               onClick={toggleFavorite}
               disabled={isPending}
               aria-label={isFavorite ? "Remove from wishlist" : "Add to wishlist"}
               data-testid={`btn-favorite-${poster.id}`}
-              className="pointer-events-auto h-9 w-9 flex items-center justify-center rounded-full bg-[#fefcfa]/85 border border-[#c9a08a]/70 shadow-sm backdrop-blur-[2px] hover:bg-[#fefcfa] hover:border-[#c9a08a] active:scale-95 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a08a] disabled:opacity-50"
+              className="mt-0.5 h-8 w-8 flex-none flex items-center justify-center rounded-full bg-[#fefcfa] border border-[#c9a08a]/60 shadow-sm hover:bg-[#fef9f6] hover:border-[#c9a08a] active:scale-95 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a08a] disabled:opacity-50"
             >
               <Heart
-                className={`h-4 w-4 transition-colors duration-150 ${isFavorite ? "fill-[#8f5f45] text-[#8f5f45]" : "text-[#8f5f45]/75"}`}
+                className={`h-3.5 w-3.5 transition-colors duration-150 ${isFavorite ? "fill-[#8f5f45] text-[#8f5f45]" : "text-[#8f5f45]/75"}`}
               />
             </button>
-
-            {poster.isNew && (
-              <div className="rounded-full border border-[#c9a08a]/70 text-[#9e6b4e] bg-[#fefcfa]/80 backdrop-blur-[2px] text-[10px] font-medium tracking-[0.12em] uppercase px-2.5 py-[3px]">
-                NEW
-              </div>
-            )}
           </div>
-
-          {/* Hover label — desktop only */}
-          <div
-            className="absolute inset-x-0 bottom-0 hidden sm:flex items-end justify-center pb-4 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-200 pointer-events-none"
-            aria-hidden="true"
-          >
-            <span className="bg-background/85 backdrop-blur-sm text-foreground text-xs font-medium px-4 py-1.5 rounded-full shadow-sm border border-border/40 tracking-wide">
-              View poster
-            </span>
-          </div>
-        </div>
-
-        {/* Info area */}
-        <div className="mt-0.5">
-          {poster.category && (
-            <p className="text-[10px] uppercase tracking-widest text-muted-foreground/40 mb-0.5 truncate">
-              {poster.category}
-            </p>
-          )}
-          <h3 className="font-serif font-semibold text-base sm:text-lg text-foreground truncate leading-snug">
-            {(poster as any).displayTitle || poster.title}
-          </h3>
-          <p className="font-medium text-foreground text-sm mt-1">{priceLabel}</p>
         </div>
       </Link>
       <LoginPromptModal open={showPrompt} onClose={() => setShowPrompt(false)} />

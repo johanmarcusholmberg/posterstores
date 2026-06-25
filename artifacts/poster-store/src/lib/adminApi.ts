@@ -427,8 +427,10 @@ export interface AdminStore {
   logoUrl: string | null;
   logoStoragePath: string | null;
   logoAltText: string | null;
-  /** Poster card presentation mode for grids. Null = "current" (default). */
+  /** @deprecated Kept for backwards compat; ignored at runtime. */
   posterCardPresentation: AdminPosterCardPresentation | null;
+  /** Product card stage background color (hex). Defaults to #f4f0eb (warm neutral). */
+  productCardBgColor: string | null;
   posterCount: number;
   orderCount: number;
   createdAt: string;
@@ -450,6 +452,7 @@ export type CreateStorePayload = {
   domainAliases?: string[] | null;
   routePrefix?: string | null;
   posterCardPresentation?: AdminPosterCardPresentation | null;
+  productCardBgColor?: string | null;
 };
 
 export type UpdateStorePayload = Partial<Omit<CreateStorePayload, "storeKey">> & {

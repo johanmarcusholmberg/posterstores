@@ -24,6 +24,8 @@ export const storesTable = pgTable("stores", {
   logoAltText: text("logo_alt_text"),
   /** Poster card presentation mode for product-card grids. Null = "current" (default). */
   posterCardPresentation: text("poster_card_presentation").$type<"current" | "full-image" | "stage">(),
+  /** Optional product card stage background color (hex). Defaults to #f4f0eb (warm neutral). */
+  productCardBgColor: text("product_card_bg_color"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
