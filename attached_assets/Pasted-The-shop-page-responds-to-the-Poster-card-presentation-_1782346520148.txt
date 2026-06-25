@@ -1,0 +1,128 @@
+The shop page responds to the Poster card presentation setting, but the homepage does not. Also, Featured posters and New arrivals are still visually inconsistent on the homepage.
+
+Do not create branches, PRs, GitHub automation, commits, or pushes. Make changes only and report back.
+
+Current confirmed behavior:
+
+* Changing Poster card presentation affects the shop page.
+* Changing Poster card presentation does not visibly affect the homepage Featured posters.
+* Homepage Featured posters and New arrivals still use different card/image systems.
+* Featured posters still look like the old/current contained layout.
+* New arrivals still use larger full-bleed/cropped image cards.
+* They are not synced in size, presentation, hover behavior, or card anatomy.
+
+Main goals:
+
+1. Make homepage Featured posters use the selected posterCardPresentation.
+2. Make homepage New arrivals use the same poster card presentation system as Featured.
+3. Ensure Featured posters and New arrivals feel like the same storefront component family.
+4. Keep current/fallback mode available.
+5. Keep full-image and stage selectable.
+6. Keep hover mockup fade working.
+
+Investigate first:
+
+* Check how Home.tsx gets store config.
+* Check whether Home.tsx uses static storefront config instead of the runtime StorefrontContext/API config.
+* Check whether Featured posters pass store.posterCardPresentation into PosterCard.
+* Check whether New arrivals uses PosterCard or has its own custom card/image rendering.
+* Check whether StorefrontContext has loaded posterCardPresentation before Home renders.
+* Check whether /api/stores/:storeKey/config returns posterCardPresentation.
+* Check whether Featured/New arrivals receive the same resolved store object as the shop grid.
+
+Likely fix:
+
+* Use one resolved runtime store config for homepage sections.
+* The homepage should use the same posterCardPresentation value that the shop page uses.
+* Avoid using stale static config for posterCardPresentation after runtime config has loaded.
+* If needed, merge static storefront defaults with runtime API config, with runtime API config taking precedence.
+* If there is a brief async loading issue, either:
+
+  * render using the resolved context value once available, or
+  * ensure cards rerender correctly when the value arrives.
+* Do not leave homepage stuck on the initial static/default value.
+
+Featured/New arrivals consistency:
+
+* Refactor New arrivals to use PosterCard and PosterArtworkStage if it does not already.
+* Featured posters and New arrivals should use:
+
+  * same posterCardPresentation
+  * same image stage/presentation logic
+  * same hover fade logic
+  * same NEW badge styling
+  * same title/price text pattern
+  * same card background/shadow/border treatment
+* Layout can still differ if needed:
+
+  * Featured may remain 6 cards in a row on desktop.
+  * New arrivals may remain carousel/scrolling if that is intentional.
+* But the individual product cards must feel synced.
+
+Important visual direction:
+
+* In current mode, both Featured and New arrivals should look like the current/fallback card style.
+* In full-image mode, both Featured and New arrivals should show full-image style.
+* In stage mode, both Featured and New arrivals should show staged/centered artwork style.
+* The difference between modes must be visible on the homepage, not only the shop page.
+
+Hover fade:
+
+* Preserve the fixed hover behavior:
+
+  * base artwork and hover mockup are both rendered when hover mockup exists
+  * base fades opacity-100 to opacity-0
+  * hover mockup fades opacity-0 to opacity-100
+  * duration around 600ms
+  * eager/preloaded hover image if needed
+* Confirm hover works on homepage Featured and New arrivals.
+
+Fallback:
+
+* Do not make stage global default.
+* Keep null/current as fallback.
+* Do not remove full-image.
+* Do not remove the admin selector.
+* Do not alter product detail page unless a bug is found.
+
+QA requirements:
+Please test with PostsofSpain and take screenshots/files if possible.
+
+Test these modes:
+
+1. current
+2. full-image
+3. stage
+
+For each mode, verify:
+
+* Homepage Featured posters visibly change.
+* Homepage New arrivals visibly change.
+* Featured and New arrivals use the same card presentation system.
+* Shop page still changes correctly.
+* Mobile homepage looks clean.
+* Hover mockup fade works on homepage.
+* No visible layout jump after config loads.
+
+Acceptance criteria:
+
+1. Poster card presentation affects homepage Featured posters.
+2. Poster card presentation affects homepage New arrivals.
+3. Featured and New arrivals are visually synced.
+4. Shop page still works.
+5. Current/fallback mode still works.
+6. Full-image mode still works.
+7. Stage mode still works.
+8. Hover fade still works both in and out.
+9. Product detail page is not regressed.
+10. Typecheck passes with zero errors.
+
+Report back with:
+
+1. Root cause: why homepage ignored the setting
+2. Root cause: why New arrivals was not synced with Featured
+3. Files changed
+4. What changed in Home.tsx / card rendering
+5. How runtime store config is now applied on homepage
+6. Visual result for current/full-image/stage on homepage
+7. Typecheck result
