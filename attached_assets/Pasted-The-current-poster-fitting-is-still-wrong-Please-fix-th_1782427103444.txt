@@ -1,0 +1,181 @@
+The current poster fitting is still wrong. Please fix the root cause. Do not create branches, PRs, commits, GitHub automation, or push. Make changes only and report back.
+
+Current visible problems:
+
+1. The left portrait poster is not fitted correctly in the poster card.
+2. Landscape posters still behave as if they are inside a portrait poster rectangle.
+3. The landscape poster keeps the full tall card rectangle instead of adapting to landscape orientation.
+4. The current logic appears to use print size labels, but those do not reliably describe the artwork/image orientation.
+
+Important correction:
+Do not use `posterSizes` / print size labels as the primary source for artwork aspect ratio.
+
+Reason:
+`posterSizes` describe available print/product sizes, not necessarily the actual artwork image ratio. A landscape artwork can still have print sizes like A4, A3, 50x70, etc. That makes the code classify a landscape image as portrait, which is what we are seeing now.
+
+New rule:
+Use the actual poster artwork image dimensions/aspect ratio to determine fitting.
+
+Preferred data source:
+
+1. Use existing image metadata from the poster/display image if available, for example:
+
+   * width / height fields
+   * sourceImageWidth / sourceImageHeight
+   * image metadata already stored for display images/mockups
+   * any API field that represents the actual artwork file dimensions
+
+2. If no existing metadata is available:
+
+   * use the image naturalWidth/naturalHeight after load as a fallback.
+   * The outer card/media container must remain fixed so page layout does not shift.
+   * Only the inner artwork wrapper may update after the ratio is known.
+   * Use safe object-contain fallback before ratio is known.
+
+3. Do not rely on print size labels except as a last-resort fallback.
+
+Correct fitting behavior:
+
+* Outer card/media area remains fixed.
+* Actual artwork is shown inside an inner wrapper.
+* Inner wrapper uses the actual artwork ratio, not the print-size ratio.
+* Border/ring is applied to the inner wrapper so it hugs the artwork itself.
+* Artwork image inside the wrapper uses object-contain.
+* Default actual artwork must never be cropped.
+* No object-cover for actual poster artwork.
+* object-cover is allowed only for desktop hover mockup/lifestyle overlay.
+
+Correct sizing rules:
+Portrait artwork:
+
+* Inner wrapper should be portrait-shaped using actual image ratio.
+* It may fill the full media height if it fits.
+* It should show the full artwork without cropping.
+* Small side gaps are acceptable if required.
+
+Landscape artwork:
+
+* Inner wrapper should be landscape-shaped using actual image ratio.
+* It should use the available width and adapt height naturally.
+* It should be vertically centered in the fixed media area.
+* Background above/below should blend with the card/page background.
+* It must not keep a tall portrait border around it.
+* It must not crop.
+
+Square artwork:
+
+* Inner wrapper should be square/near-square.
+* Centered and balanced.
+* No cropping.
+
+Unknown ratio:
+
+* Use safe object-contain fallback.
+* Never use object-cover.
+* Once actual image dimensions are known, update the inner wrapper ratio.
+
+Important CSS/layout guidance:
+Do not size the inner wrapper using `h-full` for all orientations.
+
+Use orientation-aware constraints:
+
+* Portrait: height can be 100%, width auto, max-width 100%.
+* Landscape: width can be 100%, height auto, max-height 100%.
+* Square: constrained by both width and height.
+
+The inner wrapper must never overflow the outer media container.
+
+Possible implementation:
+
+* A shared helper like `getArtworkAspectRatio(poster)` should prefer actual image dimensions from the display image/artwork source.
+* If dimensions are not available, `PosterArtworkStage` can derive ratio from `img.naturalWidth / img.naturalHeight` on load and store it in component state.
+* Keep the outer aspect container stable to prevent grid/layout shift.
+
+Homepage requirements:
+
+* Keep the current/reverted homepage poster card style.
+* Do not reintroduce the large stage/mat layout.
+* Fix only the artwork fitting.
+* Portrait posters should show full artwork and fit naturally.
+* Landscape posters should adapt to landscape orientation and not keep the tall portrait rectangle.
+* NEW badge remains below image.
+* Heart can remain overlaid on homepage cards if that is current behavior.
+
+Shop requirements:
+
+* Use the same actual-artwork-ratio fitting.
+* Landscape posters should look similar to Gallerix principle:
+
+  * same fixed card/media area
+  * landscape artwork shown as landscape
+  * border hugs actual artwork
+  * background blends naturally
+* NEW badge and heart remain below the image in the info area.
+
+Product page investigation:
+The product page should also be checked for “Test 2”.
+Determine whether the side/dummy area is:
+
+1. part of the uploaded source image,
+2. caused by using the wrong display image,
+3. caused by a wrapper/background issue.
+
+If it is part of the source image, report that clearly.
+If the product page is using the wrong image source, fix it.
+Do not crop the product page image in code.
+
+Debug before coding:
+Check and report:
+
+1. What `posterSizes` says for the landscape posters.
+2. What the actual artwork image dimensions/ratio are.
+3. Whether the API already returns actual width/height for the poster artwork.
+4. Whether Home.tsx and PosterCard.tsx receive those dimensions.
+5. Whether the inner wrapper currently uses the print-size ratio instead of image ratio.
+6. Whether the inner wrapper overflows or is always using h-full.
+
+Acceptance criteria:
+
+1. Landscape posters no longer keep a tall portrait border/rectangle.
+2. Landscape posters display as landscape inside the fixed media area.
+3. Portrait posters are not cropped.
+4. “Test 2” is not cropped on the homepage.
+5. Actual poster artwork is never object-cover by default.
+6. Thin border hugs the actual artwork, not the full card.
+7. Background around landscape posters blends naturally.
+8. Homepage card style is otherwise preserved.
+9. Shop grid card style is otherwise preserved.
+10. NEW badge remains below image on homepage.
+11. NEW badge and heart remain below image in shop.
+12. Desktop hover mockup still fills the full media area with object-cover.
+13. Default state does not show mockup overlay.
+14. Mobile remains clean.
+15. Typecheck passes with zero errors.
+
+Please save screenshots in:
+artifacts/qa-screenshots/poster-artwork-ratio-fix/
+
+Required screenshots:
+
+* home-test-2-not-cropped.png
+* home-landscape-actual-ratio.png
+* home-desktop-overall.png
+* shop-landscape-actual-ratio.png
+* shop-portrait-not-cropped.png
+* shop-desktop-overall.png
+* product-page-test-2-investigation.png
+* hover-with-mockup.png
+* mobile-home.png
+* mobile-shop.png
+
+Report back with:
+
+1. Root cause
+2. Whether print-size labels were causing wrong orientation
+3. Whether actual artwork dimensions were available from API/data
+4. Final aspect-ratio source priority
+5. Files changed
+6. Final portrait/landscape/square/unknown fitting logic
+7. Product page Test 2 investigation result
+8. Screenshot file paths
+9. Typecheck result

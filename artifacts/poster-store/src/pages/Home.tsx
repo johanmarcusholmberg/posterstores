@@ -13,7 +13,6 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { getOptimizedImageUrl } from "@/lib/imageUrl";
-import { parsePosterRatio } from "@/lib/posterRatio";
 import {
   DEFAULT_HOMEPAGE_SECTIONS,
   type CollectionBannerVisualConfig,
@@ -131,6 +130,20 @@ const NEW_BADGE_CLS =
 
 // ─── Card components ─────────────────────────────────────────────────────────
 
+/**
+ * Returns orientation-aware inline style for the inner artwork wrapper.
+ * Ratio is read from img.naturalWidth/naturalHeight on load — NOT from print-size labels.
+ * Before load (null): absolute fill so object-contain img is immediately visible.
+ * Portrait (< 1): fill card height, auto width — tiny side gaps acceptable.
+ * Landscape/square (≥ 1): fill card width, auto height — background above/below blends.
+ */
+function artworkInnerStyle(ratio: number | null): React.CSSProperties {
+  if (ratio === null) return { position: "absolute", inset: 0 };
+  if (ratio < 1)
+    return { position: "relative", aspectRatio: String(ratio), height: "100%", width: "auto", maxWidth: "100%" };
+  return { position: "relative", aspectRatio: String(ratio), width: "100%", height: "auto", maxHeight: "100%" };
+}
+
 function HomePosterCard({ poster }: { poster: Poster }) {
   const slug = (poster as any).slug as string | undefined;
   const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
@@ -149,7 +162,7 @@ function HomePosterCard({ poster }: { poster: Poster }) {
     dedicatedHover ??
     (primaryMockup && primaryMockup !== baseImage ? primaryMockup : null);
 
-  const ratio = parsePosterRatio(poster)?.ratio ?? null;
+  const [ratio, setRatio] = useState<number | null>(null);
 
   return (
     <Link
@@ -169,12 +182,12 @@ function HomePosterCard({ poster }: { poster: Poster }) {
         >
           <div
             className={[
-              "relative ring-1 ring-inset ring-black/[0.14]",
+              ratio !== null ? "ring-1 ring-inset ring-black/[0.14]" : "",
               !hoverImage
                 ? "transition-transform duration-[300ms] ease-out scale-100 group-hover:scale-[1.07] group-focus-within:scale-[1.07] motion-reduce:transition-none"
                 : "",
             ].join(" ")}
-            style={{ aspectRatio: ratio ? String(ratio) : "3/4", width: "100%", maxHeight: "100%" }}
+            style={artworkInnerStyle(ratio)}
           >
             <img
               src={getOptimizedImageUrl(baseImage, { width: 600, quality: 85 })}
@@ -182,6 +195,11 @@ function HomePosterCard({ poster }: { poster: Poster }) {
               loading="lazy"
               decoding="async"
               className="absolute inset-0 w-full h-full object-contain"
+              onLoad={(e) => {
+                const img = e.currentTarget;
+                if (img.naturalWidth > 0 && img.naturalHeight > 0)
+                  setRatio(img.naturalWidth / img.naturalHeight);
+              }}
               onError={(e) => { (e.target as HTMLImageElement).src = poster.imageUrl; }}
             />
           </div>
@@ -240,7 +258,7 @@ function NewArrivalCard({
     .map((s) => (s as any).size as string | undefined)
     .filter(Boolean) as string[];
   const baseImage = poster.imageUrl;
-  const newArrivalRatio = parsePosterRatio(poster)?.ratio ?? null;
+  const [ratio, setRatio] = useState<number | null>(null);
 
   return (
     <Link
@@ -251,8 +269,8 @@ function NewArrivalCard({
         {/* Artwork: inner ratio-wrapper with object-contain — no cropping */}
         <div className="absolute inset-0 flex items-center justify-center">
           <div
-            className="relative transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.05] motion-reduce:transition-none"
-            style={{ aspectRatio: newArrivalRatio ? String(newArrivalRatio) : "3/4", width: "100%", maxHeight: "100%" }}
+            className="transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.05] motion-reduce:transition-none"
+            style={artworkInnerStyle(ratio)}
           >
             <img
               src={getOptimizedImageUrl(baseImage, { width: 400, quality: 75 })}
@@ -260,6 +278,11 @@ function NewArrivalCard({
               loading="lazy"
               decoding="async"
               className="absolute inset-0 w-full h-full object-contain"
+              onLoad={(e) => {
+                const img = e.currentTarget;
+                if (img.naturalWidth > 0 && img.naturalHeight > 0)
+                  setRatio(img.naturalWidth / img.naturalHeight);
+              }}
             />
           </div>
         </div>
@@ -324,7 +347,7 @@ function FeaturedPosterCard({
   const displayImage = poster.primaryDisplayImageUrl ?? poster.imageUrl;
   const cardTitle = (poster as any).displayTitle || poster.title;
 
-  const ratio = parsePosterRatio(poster)?.ratio ?? null;
+  const [ratio, setRatio] = useState<number | null>(null);
 
   return (
     <Link
@@ -344,8 +367,11 @@ function FeaturedPosterCard({
           {/* Artwork: inner ratio-wrapper with object-contain — border hugs artwork, no cropping */}
           <div className="absolute inset-0 flex items-center justify-center">
             <div
-              className="relative ring-1 ring-inset ring-black/[0.14] transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.04] motion-reduce:transition-none"
-              style={{ aspectRatio: ratio ? String(ratio) : "3/4", width: "100%", maxHeight: "100%" }}
+              className={[
+                ratio !== null ? "ring-1 ring-inset ring-black/[0.14]" : "",
+                "transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.04] motion-reduce:transition-none",
+              ].join(" ")}
+              style={artworkInnerStyle(ratio)}
             >
               <img
                 src={getOptimizedImageUrl(displayImage, { width: 600, quality: 85 })}
@@ -354,6 +380,11 @@ function FeaturedPosterCard({
                 fetchPriority={priority ? "high" : undefined}
                 decoding="async"
                 className="absolute inset-0 w-full h-full object-contain"
+                onLoad={(e) => {
+                  const img = e.currentTarget;
+                  if (img.naturalWidth > 0 && img.naturalHeight > 0)
+                    setRatio(img.naturalWidth / img.naturalHeight);
+                }}
                 onError={(e) => { (e.target as HTMLImageElement).src = poster.imageUrl; }}
               />
             </div>

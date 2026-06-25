@@ -8,7 +8,6 @@ import { Heart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { LoginPromptModal } from "./LoginPromptModal";
 import { PosterArtworkStage } from "./PosterArtworkStage";
-import { parsePosterRatio } from "@/lib/posterRatio";
 
 interface PosterCardProps {
   poster: Poster;
@@ -107,9 +106,6 @@ export const PosterCard = ({ poster, favoritedIds, priority = false }: PosterCar
   const slug = (poster as any).slug as string | undefined;
   const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
 
-  // Aspect ratio from size labels — drives fitting in PosterArtworkStage.
-  const aspectRatio = parsePosterRatio(poster)?.ratio ?? null;
-
   return (
     <>
       <Link
@@ -139,7 +135,6 @@ export const PosterCard = ({ poster, favoritedIds, priority = false }: PosterCar
             hoverSrc={hoverImage}
             alt={poster.title}
             priority={priority}
-            aspectRatio={aspectRatio}
             data-testid={`img-poster-${poster.id}`}
             onError={(e) => {
               (e.target as HTMLImageElement).src = poster.imageUrl;
