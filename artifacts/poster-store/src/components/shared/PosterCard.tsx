@@ -7,7 +7,8 @@ import { addFavorite, removeFavorite } from "@/lib/favoritesApi";
 import { Heart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { LoginPromptModal } from "./LoginPromptModal";
-import { PosterArtworkStage, type PosterCardPresentation } from "./PosterArtworkStage";
+import { PosterArtworkStage } from "./PosterArtworkStage";
+import { parsePosterRatio } from "@/lib/posterRatio";
 
 interface PosterCardProps {
   poster: Poster;
@@ -49,9 +50,6 @@ export const PosterCard = ({ poster, favoritedIds, priority = false }: PosterCar
   const primaryMockup = poster.primaryDisplayImageUrl ?? null;
   const dedicatedHover = poster.hoverDisplayImageUrl ?? null;
 
-  // Prefer the dedicated hover mockup; fall back to the primary mockup if it
-  // differs from the raw poster image (crossfade from art → room context).
-  // Both are guaranteed to be rendered mockupImageUrl values or null.
   const hoverImage: string | null =
     dedicatedHover ??
     (primaryMockup && primaryMockup !== baseImage ? primaryMockup : null);
@@ -109,8 +107,8 @@ export const PosterCard = ({ poster, favoritedIds, priority = false }: PosterCar
   const slug = (poster as any).slug as string | undefined;
   const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
 
-  // Presentation mode: read from store config, default to "current" (original behaviour).
-  const presentation: PosterCardPresentation = (store.posterCardPresentation as PosterCardPresentation | null | undefined) ?? "current";
+  // Aspect ratio from size labels — drives fitting in PosterArtworkStage.
+  const aspectRatio = parsePosterRatio(poster)?.ratio ?? null;
 
   return (
     <>
@@ -132,54 +130,21 @@ export const PosterCard = ({ poster, favoritedIds, priority = false }: PosterCar
         >
           {/*
             PosterArtworkStage renders:
-              — The base artwork layer (mode-aware: contain / cover / centred-stage)
-              — The hover mockup overlay (always in DOM when hoverImage exists, so it
-                pre-loads; fades in/out symmetrically at 600 ms on hover-in AND hover-out)
+              — The base artwork layer (ratio-aware: fill or natural-wrapper)
+              — The hover mockup overlay (always in DOM when hoverImage exists,
+                so it pre-loads; fades in/out symmetrically at 600 ms)
           */}
           <PosterArtworkStage
             src={baseImage}
             hoverSrc={hoverImage}
             alt={poster.title}
             priority={priority}
-            presentation={presentation}
+            aspectRatio={aspectRatio}
             data-testid={`img-poster-${poster.id}`}
             onError={(e) => {
               (e.target as HTMLImageElement).src = poster.imageUrl;
             }}
           />
-
-          {/* Subtle inset edge — print edge depth cue */}
-          <div
-            className="absolute inset-0 ring-1 ring-inset ring-black/[0.06] pointer-events-none"
-            aria-hidden="true"
-          />
-
-          {/*
-            Overlay row — heart (left) + NEW badge (right).
-            items-center aligns both overlays by their visual centers
-            regardless of their respective heights, with no pixel hacks.
-            Wrapper is pointer-events-none; button re-enables events.
-          */}
-          <div className="absolute top-2 left-2 right-2 z-10 flex items-center justify-between pointer-events-none">
-            <button
-              type="button"
-              onClick={toggleFavorite}
-              disabled={isPending}
-              aria-label={isFavorite ? "Remove from wishlist" : "Add to wishlist"}
-              data-testid={`btn-favorite-${poster.id}`}
-              className="pointer-events-auto h-9 w-9 flex items-center justify-center rounded-full bg-[#fefcfa]/85 border border-[#c9a08a]/70 shadow-sm backdrop-blur-[2px] hover:bg-[#fefcfa] hover:border-[#c9a08a] active:scale-95 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a08a] disabled:opacity-50"
-            >
-              <Heart
-                className={`h-4 w-4 transition-colors duration-150 ${isFavorite ? "fill-[#8f5f45] text-[#8f5f45]" : "text-[#8f5f45]/75"}`}
-              />
-            </button>
-
-            {poster.isNew && (
-              <div className="rounded-full border border-[#c9a08a]/70 text-[#9e6b4e] bg-[#fefcfa]/80 backdrop-blur-[2px] text-[10px] font-medium tracking-[0.12em] uppercase px-2.5 py-[3px]">
-                NEW
-              </div>
-            )}
-          </div>
 
           {/* Hover label — desktop only */}
           <div
@@ -192,7 +157,7 @@ export const PosterCard = ({ poster, favoritedIds, priority = false }: PosterCar
           </div>
         </div>
 
-        {/* Info area */}
+        {/* Info area — category, title, price row with NEW + heart */}
         <div className="mt-0.5">
           {poster.category && (
             <p className="text-[10px] uppercase tracking-widest text-muted-foreground/40 mb-0.5 truncate">
@@ -202,7 +167,29 @@ export const PosterCard = ({ poster, favoritedIds, priority = false }: PosterCar
           <h3 className="font-serif font-semibold text-base sm:text-lg text-foreground truncate leading-snug">
             {(poster as any).displayTitle || poster.title}
           </h3>
-          <p className="font-medium text-foreground text-sm mt-1">{priceLabel}</p>
+          {/* Price + NEW badge + heart — all below the image */}
+          <div className="flex items-center justify-between mt-1 gap-1">
+            <p className="font-medium text-foreground text-sm">{priceLabel}</p>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {poster.isNew && (
+                <div className="rounded-full border border-[#c9a08a]/70 text-[#9e6b4e] bg-[#fefcfa] text-[10px] font-medium tracking-[0.12em] uppercase px-2 py-[2px] whitespace-nowrap">
+                  NEW
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={toggleFavorite}
+                disabled={isPending}
+                aria-label={isFavorite ? "Remove from wishlist" : "Add to wishlist"}
+                data-testid={`btn-favorite-${poster.id}`}
+                className="h-7 w-7 flex items-center justify-center rounded-full hover:bg-[#f4f0eb] active:scale-95 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a08a] disabled:opacity-50"
+              >
+                <Heart
+                  className={`h-3.5 w-3.5 transition-colors duration-150 ${isFavorite ? "fill-[#8f5f45] text-[#8f5f45]" : "text-[#8f5f45]/60"}`}
+                />
+              </button>
+            </div>
+          </div>
         </div>
       </Link>
       <LoginPromptModal open={showPrompt} onClose={() => setShowPrompt(false)} />

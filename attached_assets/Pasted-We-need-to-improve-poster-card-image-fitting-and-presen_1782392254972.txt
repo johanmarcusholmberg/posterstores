@@ -1,0 +1,261 @@
+We need to improve poster card image fitting and presentation across homepage and shop, without redesigning the homepage card style too much.
+
+Goal:
+Keep the current/reverted homepage poster-card look, but improve how portrait, landscape, and square posters fit inside the card. In the shop, reuse the same poster artwork presentation if possible, so homepage and store feel visually connected. The shop can still have a more functional info layout.
+
+Do not create branches, PRs, commits, GitHub automation, or push. Make changes only and report back.
+
+Main UX decision:
+Reuse the same poster artwork display logic across homepage and shop if possible.
+
+That means:
+
+Same poster fitting rules.
+Same thin border around actual artwork.
+Same handling of portrait / landscape / square formats.
+Same desktop hover mockup behavior.
+Same default behavior: actual poster artwork first.
+
+But the surrounding card/info layout may differ:
+
+Homepage can remain more editorial/premium.
+Shop can remain more catalogue/functional.
+Do not force homepage and shop to have identical markup if that makes the shop worse.
+
+Important:
+I do not want the previous large stage/mat layout where posters looked tiny inside huge empty boxes.
+
+Homepage requirements:
+
+Keep the current/reverted homepage poster-card visual style.
+Same general card feeling.
+Same section feeling.
+Same card dimensions as much as possible.
+Do not introduce the big stage/mat design again.
+Improve fitting only:
+Portrait posters, like 50x70, should fill the poster/image area fully or nearly fully.
+Landscape posters should be possible, but should adapt inside the same card without cropping.
+Square posters should preserve their format and look balanced.
+The card itself should not change size depending on poster format.
+Homepage NEW tag:
+Move NEW below the image where homepage uses poster cards.
+Do not overlay NEW on the poster artwork.
+Make the lower info area look balanced.
+
+Shop/store grid requirements:
+Try to reuse the same poster-card image UX in the shop if possible.
+
+Visual goal:
+
+Similar to Gallerix-style catalogue presentation.
+Fixed product/card area.
+Actual poster artwork visible by default.
+Portrait posters fill the intended poster display area.
+Landscape posters use the same width logic but adapt their height.
+Landscape posters should not look like tiny strips in huge empty boxes.
+Landscape posters should not crop by default.
+Background/empty area around landscape posters should blend naturally with the card/page background.
+Add a thin border around the actual poster artwork.
+
+Shop card info layout:
+
+NEW badge and heart/like should be below the image, not overlaying the artwork.
+Heart should remain easy to click/tap.
+Layout should not jump between posters with and without NEW.
+Keep the shop grid compact and catalogue-like.
+
+Suggested shop lower layout:
+
+Image/poster display at top.
+Below image:
+category/meta row if currently used.
+title.
+price.
+NEW badge as a small pill in the info area.
+heart aligned right in the info area.
+
+Poster artwork display component:
+Create or update a shared component if practical, for example:
+
+PosterArtworkDisplay
+PosterImageDisplay
+PosterArtworkFrame
+
+This component should handle:
+
+actual poster artwork default image.
+portrait / landscape / square fitting.
+thin border around artwork.
+background blending.
+optional desktop hover mockup fade.
+no hover-specific behavior on mobile.
+
+Use the shared component in:
+
+homepage Featured posters.
+homepage New arrivals, where poster cards are used.
+shop grid.
+related poster cards if present and easy.
+
+Do not force the entire card wrapper to be the same if that creates worse UX. Share the artwork display logic first.
+
+Poster fitting rules:
+Use actual image ratio if available.
+
+Classification:
+
+portrait: aspect ratio < 0.85
+landscape: aspect ratio > 1.15
+square/near-square: otherwise
+
+Homepage fitting:
+
+Portrait: fill the existing poster/image area as much as possible.
+Landscape: fit width-wise inside the same media area and adapt height, with background blending into the card.
+Square: balanced fit.
+No default artwork cropping.
+
+Shop fitting:
+
+Portrait: fills the intended poster display area well.
+Landscape: uses intended display width and adapts height.
+Square: balanced.
+No default artwork cropping.
+Do not create a huge visible mat/background around landscape posters.
+The background/empty area should feel invisible or naturally blended, not like a designed empty box.
+
+Thin artwork border:
+Add a subtle thin line around the actual poster artwork itself, similar to Gallerix.
+
+Requirements:
+
+Applies to homepage poster artwork and shop poster artwork.
+Border should be around the image/artwork, not necessarily the entire card.
+Use a subtle neutral border, for example rgba(0,0,0,0.14), or an existing border token.
+Should be visible enough to define the poster edge but not heavy.
+
+Hover behavior:
+Desktop only.
+
+With hover mockup:
+
+Default image is actual poster artwork.
+On desktop hover, fade to mockup/lifestyle image.
+Mockup may use the full media/card image area.
+Mockup should use object-cover.
+Fade should be smooth in and out, around 600ms.
+Hover mockup must not be visible in default state.
+Do not mount the hover image only on hover if that causes first-hover snap.
+
+Without hover mockup:
+
+Do not swap image.
+Do not zoom image.
+Only highlight the card.
+Shop: subtle shadow highlight.
+Homepage: slightly stronger shadow/lift only if that matches current homepage behavior.
+
+Mobile:
+
+No hover-specific image behavior.
+Tap opens the poster/product page.
+
+Do not add:
+
+admin selector for poster card presentation.
+current/full-image/stage modes.
+generated card preview images.
+manual cardPreviewImageUrl in this pass.
+a new “store cards” admin section.
+new complex card layout controls.
+
+Card background:
+If productCardBgColor already exists, keep it and use it for the actual card surface/background.
+Do not add more card layout settings.
+Do not make poster fitting configurable.
+
+Previous experimental code:
+If posterCardPresentation selector still exists:
+
+Remove or hide it from admin.
+Do not rely on it for rendering.
+Existing DB column can remain harmless if already present.
+Report what was done.
+
+Product page:
+Do not change product detail page unless a clear bug is found.
+Raw poster artwork should still show the full artwork.
+Mockup/lifestyle images can continue using object-cover where appropriate.
+Lightbox should not regress.
+
+Acceptance criteria:
+
+Homepage keeps the current/reverted poster-card style.
+Homepage does not use the large stage/mat layout.
+Homepage portrait posters fill the image area well.
+Homepage landscape posters are possible and look intentional.
+Shop reuses the same poster artwork display logic if practical.
+Shop feels closer to Gallerix catalogue presentation.
+Portrait shop posters fill the intended poster area well.
+Landscape shop posters adapt height and do not look like tiny strips in huge boxes.
+Landscape shop posters do not crop by default.
+Square posters preserve their format.
+All actual poster artwork has a subtle thin border.
+Desktop hover with mockup fades smoothly to a full-area mockup.
+Desktop hover without mockup only highlights the card.
+Mobile has no hover-specific behavior.
+NEW badge is below the image on homepage poster cards.
+NEW badge and heart are below the image in the shop grid.
+Product detail page is not regressed.
+Typecheck passes with zero errors.
+
+Test visually with:
+
+Test 2.
+Jag testar.
+Spanish Lavender Fields.
+Cádiz Land's End.
+Málaga Rooftops, Summer.
+Paella Valenciana.
+one clear portrait poster.
+one clear landscape poster.
+one square/near-square poster if available.
+one poster with hover mockup.
+one poster without hover mockup.
+one NEW poster.
+one non-NEW poster.
+
+Save screenshots in:
+artifacts/qa-screenshots/poster-fit-gallerix-reuse/
+
+Suggested screenshots:
+
+home-desktop-current-card-style.png
+home-landscape-poster-fit.png
+home-new-badge-below-image.png
+shop-desktop-gallerix-style.png
+shop-portrait-fit.png
+shop-landscape-fit.png
+shop-thin-poster-border.png
+shop-new-heart-below-image.png
+hover-with-mockup-desktop.png
+hover-without-mockup-desktop.png
+mobile-home.png
+mobile-shop.png
+
+Run typecheck for affected workspaces.
+
+Report back with:
+
+Files changed.
+Whether a shared poster artwork display component was reused/created.
+How homepage card style was preserved.
+How shop reuses the poster artwork UX.
+How portrait poster fitting works.
+How landscape poster fitting works.
+How the thin poster border was added.
+How hover mockup behavior works.
+What changed for NEW badge and heart placement.
+Whether product page was touched.
+Screenshot file paths.
+Typecheck result.

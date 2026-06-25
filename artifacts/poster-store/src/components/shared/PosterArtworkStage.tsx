@@ -1,43 +1,49 @@
 /**
  * PosterArtworkStage
  *
- * A reusable image stage that renders poster artwork in one of three presentation
- * modes and handles the hover-mockup crossfade. Used by PosterCard and any other
- * grid / carousel that shows product thumbnails.
+ * Renders poster artwork with ratio-aware fitting and a thin border that hugs
+ * the actual artwork — not the card container. Used by PosterCard (shop grid).
  *
- * Modes:
- *  "current"    — object-contain on a warm neutral background (original behaviour, default)
- *  "full-image" — object-cover filling the whole card stage
- *  "stage"      — centred artwork with breathing room + drop-shadow on a warm bg;
- *                 good for mixed-ratio collections
+ * Fitting rules (derived from parsed size-label aspect ratio):
+ *  - Portrait close to 3:4 card ratio (|ratio - 0.75| < 0.18):
+ *      Inner wrapper fills the full card (inset-0). Image: object-cover.
+ *      Border is on the wrapper → hugs the artwork edge-to-edge.
+ *  - Everything else (landscape, square, extreme portrait, unknown ratio):
+ *      Inner wrapper sized to the poster's natural aspect ratio, centered.
+ *      Image: object-cover filling that wrapper (no cropping since wrapper
+ *      matches the real ratio). Border on wrapper → hugs artwork precisely.
  *
  * Hover crossfade:
- *  Both the base artwork layer and the hover-mockup layer are always in the DOM
- *  when a hoverSrc is provided — never conditionally mounted on hover state.
- *  The hover image uses loading="eager" so it's pre-fetched before first hover.
- *  Both layers transition at the same 600 ms duration so the crossfade is
- *  symmetrical on hover-in AND hover-out.
+ *  Both base and hover layers are always in the DOM (never conditionally
+ *  mounted) so the hover image pre-loads. 600 ms symmetrical fade.
+ *
+ * The legacy `presentation` prop is accepted but ignored — rendering no
+ * longer depends on it. The PosterCardPresentation type is kept exported
+ * so callers that still reference it do not need immediate updates.
  */
 
 import React from "react";
 import { cn } from "@/lib/utils";
 import { getOptimizedImageUrl } from "@/lib/imageUrl";
+import { posterFillsCard } from "@/lib/posterRatio";
 
+/** @deprecated Rendering no longer uses presentation modes. Kept for type compat. */
 export type PosterCardPresentation = "current" | "full-image" | "stage";
 
 interface PosterArtworkStageProps {
-  /** Raw poster artwork URL (base layer, always shown before hover). */
   src: string;
-  /** Hover mockup URL. When provided both layers are rendered; null = scale-only fallback. */
   hoverSrc: string | null;
   alt: string;
-  /** Load the base image eagerly with high fetchPriority (LCP cards only). */
   priority?: boolean;
-  /** Visual presentation mode. Defaults to "current". */
+  /**
+   * Poster aspect ratio (width / height) parsed from size labels.
+   * Drives portrait-fill vs natural-ratio-wrapper logic.
+   * Pass null when unknown — safe portrait-shaped fallback is used.
+   */
+  aspectRatio?: number | null;
+  /** @deprecated Ignored. Kept so existing callers don't break. */
   presentation?: PosterCardPresentation;
-  /** data-testid forwarded to the base artwork element. */
   "data-testid"?: string;
-  /** onError forwarded to the base artwork element. */
   onError?: React.ImgHTMLAttributes<HTMLImageElement>["onError"];
 }
 
@@ -46,33 +52,67 @@ export function PosterArtworkStage({
   hoverSrc,
   alt,
   priority = false,
-  presentation = "current",
+  aspectRatio = null,
   "data-testid": testId,
   onError,
 }: PosterArtworkStageProps) {
   const hasHover = hoverSrc !== null;
+  const fillsFull = posterFillsCard(aspectRatio);
 
   // ── Base artwork layer ────────────────────────────────────────────────────
 
-  // "stage" mode wraps the artwork in a centred container so we can apply
-  // padding + drop-shadow while keeping the real aspect ratio visible.
-  const baseArtwork =
-    presentation === "stage" ? (
+  const baseArtwork = fillsFull ? (
+    /*
+     * Portrait close to 3:4 — inner wrapper fills the full card.
+     * Border on the wrapper hugs the artwork. Fade or scale on hover.
+     */
+    <div
+      className={cn(
+        "absolute inset-0",
+        "ring-1 ring-inset ring-black/[0.14]",
+        "motion-reduce:transition-none",
+        hasHover
+          ? "transition-opacity duration-[600ms] ease-out opacity-100 group-hover:opacity-0 group-focus-within:opacity-0"
+          : "transition-transform duration-[300ms] ease-out scale-100 group-hover:scale-[1.08] group-focus-within:scale-[1.08]"
+      )}
+    >
+      <img
+        src={getOptimizedImageUrl(src, { width: 600, quality: 85 })}
+        alt={alt}
+        loading={priority ? "eager" : "lazy"}
+        fetchPriority={priority ? "high" : undefined}
+        decoding="async"
+        className="absolute inset-0 w-full h-full object-cover"
+        data-testid={testId}
+        onError={onError}
+      />
+    </div>
+  ) : (
+    /*
+     * Landscape / square / extreme portrait / unknown —
+     * outer flex centers the inner ratio-wrapper; border on wrapper.
+     */
+    <div
+      className={cn(
+        "absolute inset-0 flex items-center justify-center",
+        "motion-reduce:transition-none",
+        hasHover
+          ? "transition-opacity duration-[600ms] ease-out opacity-100 group-hover:opacity-0 group-focus-within:opacity-0"
+          : ""
+      )}
+    >
       <div
         className={cn(
-          // Leave ~6% breathing room on all sides
-          "absolute inset-[6%] flex items-center justify-center",
+          "relative ring-1 ring-inset ring-black/[0.14]",
           "motion-reduce:transition-none",
-          hasHover
-            ? [
-                "transition-opacity duration-[600ms] ease-out",
-                "opacity-100 group-hover:opacity-0 group-focus-within:opacity-0",
-              ]
-            : [
-                "transition-transform duration-[300ms] ease-out",
-                "scale-100 group-hover:scale-[1.04] group-focus-within:scale-[1.04]",
-              ]
+          !hasHover &&
+            "transition-transform duration-[300ms] ease-out scale-100 group-hover:scale-[1.08] group-focus-within:scale-[1.08]"
         )}
+        style={{
+          aspectRatio: aspectRatio ? String(aspectRatio) : "3/4",
+          maxWidth: "100%",
+          maxHeight: "100%",
+        }}
       >
         <img
           src={getOptimizedImageUrl(src, { width: 600, quality: 85 })}
@@ -80,41 +120,16 @@ export function PosterArtworkStage({
           loading={priority ? "eager" : "lazy"}
           fetchPriority={priority ? "high" : undefined}
           decoding="async"
-          className="max-h-full max-w-full object-contain"
-          style={{ filter: "drop-shadow(0 3px 18px rgba(0,0,0,0.24))" }}
+          className="absolute inset-0 w-full h-full object-cover"
           data-testid={testId}
           onError={onError}
         />
       </div>
-    ) : (
-      // "current" or "full-image": fill the container directly
-      <img
-        src={getOptimizedImageUrl(src, { width: 600, quality: 85 })}
-        alt={alt}
-        loading={priority ? "eager" : "lazy"}
-        fetchPriority={priority ? "high" : undefined}
-        decoding="async"
-        className={cn(
-          "absolute inset-0 w-full h-full motion-reduce:transition-none",
-          presentation === "full-image" ? "object-cover" : "object-contain",
-          hasHover
-            ? [
-                "transition-opacity duration-[600ms] ease-out",
-                "opacity-100 group-hover:opacity-0 group-focus-within:opacity-0",
-              ]
-            : [
-                "transition-transform duration-[300ms] ease-out",
-                "scale-100 group-hover:scale-[1.08] group-focus-within:scale-[1.08]",
-              ]
-        )}
-        data-testid={testId}
-        onError={onError}
-      />
-    );
+    </div>
+  );
 
   // ── Hover mockup overlay ──────────────────────────────────────────────────
-  // Always object-cover and fills the full stage regardless of presentation mode.
-  // Always in the DOM (not mounted on hover) so the image is pre-loaded.
+  // Always fills the full card stage with object-cover regardless of base fitting.
   const hoverOverlay = hasHover ? (
     <img
       src={getOptimizedImageUrl(hoverSrc!, { width: 600, quality: 80 })}

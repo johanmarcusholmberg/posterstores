@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { getOptimizedImageUrl } from "@/lib/imageUrl";
+import { parsePosterRatio, posterFillsCard } from "@/lib/posterRatio";
 import {
   DEFAULT_HOMEPAGE_SECTIONS,
   type CollectionBannerVisualConfig,
@@ -148,26 +149,65 @@ function HomePosterCard({ poster }: { poster: Poster }) {
     dedicatedHover ??
     (primaryMockup && primaryMockup !== baseImage ? primaryMockup : null);
 
+  const ratio = parsePosterRatio(poster)?.ratio ?? null;
+  const fillsFull = posterFillsCard(ratio);
+
   return (
     <Link
       href={href}
       className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
       <div className="relative aspect-[3/4] overflow-hidden bg-[#f4f0eb] shadow-[0_1px_4px_rgba(0,0,0,0.06)] group-hover:shadow-[0_3px_14px_rgba(0,0,0,0.11)] transition-shadow duration-300">
-        <img
-          src={getOptimizedImageUrl(baseImage, { width: 600, quality: 85 })}
-          alt={poster.title}
-          loading="lazy"
-          decoding="async"
-          className={[
-            "absolute inset-0 object-contain w-full h-full",
-            "motion-reduce:transition-none",
-            hoverImage
-              ? "transition-opacity duration-[280ms] ease-out opacity-100 group-hover:opacity-0"
-              : "transition-transform duration-[300ms] ease-out scale-100 group-hover:scale-[1.07]",
-          ].join(" ")}
-          onError={(e) => { (e.target as HTMLImageElement).src = poster.imageUrl; }}
-        />
+        {fillsFull ? (
+          <div
+            className={[
+              "absolute inset-0",
+              "ring-1 ring-inset ring-black/[0.14]",
+              "motion-reduce:transition-none",
+              hoverImage
+                ? "transition-opacity duration-[280ms] ease-out opacity-100 group-hover:opacity-0 group-focus-within:opacity-0"
+                : "transition-transform duration-[300ms] ease-out scale-100 group-hover:scale-[1.07] group-focus-within:scale-[1.07]",
+            ].join(" ")}
+          >
+            <img
+              src={getOptimizedImageUrl(baseImage, { width: 600, quality: 85 })}
+              alt={poster.title}
+              loading="lazy"
+              decoding="async"
+              className="absolute inset-0 w-full h-full object-cover"
+              onError={(e) => { (e.target as HTMLImageElement).src = poster.imageUrl; }}
+            />
+          </div>
+        ) : (
+          <div
+            className={[
+              "absolute inset-0 flex items-center justify-center",
+              "motion-reduce:transition-none",
+              hoverImage
+                ? "transition-opacity duration-[280ms] ease-out opacity-100 group-hover:opacity-0 group-focus-within:opacity-0"
+                : "",
+            ].join(" ")}
+          >
+            <div
+              className={[
+                "relative ring-1 ring-inset ring-black/[0.14]",
+                !hoverImage
+                  ? "transition-transform duration-[300ms] ease-out scale-100 group-hover:scale-[1.07] group-focus-within:scale-[1.07] motion-reduce:transition-none"
+                  : "",
+              ].join(" ")}
+              style={{ aspectRatio: ratio ? String(ratio) : "3/4", maxWidth: "100%", maxHeight: "100%" }}
+            >
+              <img
+                src={getOptimizedImageUrl(baseImage, { width: 600, quality: 85 })}
+                alt={poster.title}
+                loading="lazy"
+                decoding="async"
+                className="absolute inset-0 w-full h-full object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).src = poster.imageUrl; }}
+              />
+            </div>
+          </div>
+        )}
         {hoverImage && (
           <img
             src={getOptimizedImageUrl(hoverImage, { width: 600, quality: 80 })}
@@ -175,18 +215,23 @@ function HomePosterCard({ poster }: { poster: Poster }) {
             aria-hidden="true"
             loading="lazy"
             decoding="async"
-            className="absolute inset-0 object-cover w-full h-full transition-opacity duration-[280ms] ease-out opacity-0 group-hover:opacity-100 motion-reduce:transition-none motion-reduce:opacity-0"
+            className="absolute inset-0 object-cover w-full h-full transition-opacity duration-[280ms] ease-out opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 motion-reduce:transition-none"
             onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
           />
         )}
-        <div className="absolute inset-0 ring-1 ring-inset ring-black/[0.06] pointer-events-none" aria-hidden="true" />
-        {poster.isNew && <div className={NEW_BADGE_CLS}>NEW</div>}
       </div>
       <div className="mt-1.5 min-w-0">
         <h3 className="font-serif font-semibold text-sm text-foreground truncate leading-snug">
           {(poster as any).displayTitle || poster.title}
         </h3>
-        <p className="text-xs font-medium text-foreground/70 mt-0.5">{priceLabel}</p>
+        <div className="flex items-center justify-between mt-0.5 gap-1">
+          <p className="text-xs font-medium text-foreground/70">{priceLabel}</p>
+          {poster.isNew && (
+            <div className="shrink-0 rounded-full border border-[#c9a08a]/70 text-[#9e6b4e] bg-[#fefcfa] text-[10px] font-medium tracking-[0.12em] uppercase px-2 py-[2px]">
+              NEW
+            </div>
+          )}
+        </div>
       </div>
     </Link>
   );
@@ -241,8 +286,7 @@ function NewArrivalCard({
           )}
           <span className="text-white/90 text-[11px] font-medium">View poster →</span>
         </div>
-        <div className="absolute inset-0 ring-1 ring-inset ring-black/[0.06] pointer-events-none" aria-hidden="true" />
-        {poster.isNew && <div className={NEW_BADGE_CLS}>NEW</div>}
+        <div className="absolute inset-0 ring-1 ring-inset ring-black/[0.14] pointer-events-none" aria-hidden="true" />
       </div>
       <div className="mt-1.5 min-w-0">
         <h3
@@ -258,6 +302,11 @@ function NewArrivalCard({
           >
             {priceLabel}
           </p>
+        )}
+        {poster.isNew && (
+          <div className="mt-0.5 inline-flex rounded-full border border-[#c9a08a]/70 text-[#9e6b4e] bg-[#fefcfa] text-[10px] font-medium tracking-[0.12em] uppercase px-2 py-[2px]">
+            NEW
+          </div>
         )}
       </div>
     </Link>
@@ -288,6 +337,9 @@ function FeaturedPosterCard({
   const displayImage = poster.primaryDisplayImageUrl ?? poster.imageUrl;
   const cardTitle = (poster as any).displayTitle || poster.title;
 
+  const ratio = parsePosterRatio(poster)?.ratio ?? null;
+  const fillsFull = posterFillsCard(ratio);
+
   return (
     <Link
       href={href}
@@ -303,16 +355,36 @@ function FeaturedPosterCard({
         "p-2 pb-0",
       ].join(" ")}>
         <div className="relative aspect-[3/4] overflow-hidden bg-[#ede8e0]">
-          <img
-            src={getOptimizedImageUrl(displayImage, { width: 600, quality: 85 })}
-            alt={poster.title}
-            loading={priority ? "eager" : "lazy"}
-            fetchPriority={priority ? "high" : undefined}
-            decoding="async"
-            className="absolute inset-0 w-full h-full object-contain transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.04] motion-reduce:transition-none"
-            onError={(e) => { (e.target as HTMLImageElement).src = poster.imageUrl; }}
-          />
-          {poster.isNew && <div className={NEW_BADGE_CLS}>NEW</div>}
+          {fillsFull ? (
+            <div className="absolute inset-0 ring-1 ring-inset ring-black/[0.14] transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.04] motion-reduce:transition-none">
+              <img
+                src={getOptimizedImageUrl(displayImage, { width: 600, quality: 85 })}
+                alt={poster.title}
+                loading={priority ? "eager" : "lazy"}
+                fetchPriority={priority ? "high" : undefined}
+                decoding="async"
+                className="absolute inset-0 w-full h-full object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).src = poster.imageUrl; }}
+              />
+            </div>
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div
+                className="relative ring-1 ring-inset ring-black/[0.14] transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.04] motion-reduce:transition-none"
+                style={{ aspectRatio: ratio ? String(ratio) : "3/4", maxWidth: "100%", maxHeight: "100%" }}
+              >
+                <img
+                  src={getOptimizedImageUrl(displayImage, { width: 600, quality: 85 })}
+                  alt={poster.title}
+                  loading={priority ? "eager" : "lazy"}
+                  fetchPriority={priority ? "high" : undefined}
+                  decoding="async"
+                  className="absolute inset-0 w-full h-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).src = poster.imageUrl; }}
+                />
+              </div>
+            </div>
+          )}
         </div>
         <div className="px-0.5 pt-2.5 pb-3 min-h-[52px] flex flex-col justify-start min-w-0">
           <h3
@@ -327,6 +399,11 @@ function FeaturedPosterCard({
           >
             {priceLabel}
           </p>
+          {poster.isNew && (
+            <div className="mt-1.5 self-start rounded-full border border-[#c9a08a]/70 text-[#9e6b4e] bg-transparent text-[10px] font-medium tracking-[0.12em] uppercase px-2 py-[2px]">
+              NEW
+            </div>
+          )}
         </div>
       </div>
     </Link>

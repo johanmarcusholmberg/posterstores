@@ -721,41 +721,7 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
         </CardContent>
       </Card>
 
-      {/* Poster card presentation */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Poster card presentation</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="space-y-1.5 max-w-xs">
-            <Label htmlFor="poster-card-presentation">Artwork display mode</Label>
-            <Select
-              value={posterCardPresentation}
-              onValueChange={(v) => setPosterCardPresentation(v as "current" | "full-image" | "stage")}
-            >
-              <SelectTrigger id="poster-card-presentation">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="current">Current (contain — original behaviour)</SelectItem>
-                <SelectItem value="full-image">Full image (cover — fills the card)</SelectItem>
-                <SelectItem value="stage">Stage (centred with shadow on warm bg)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Controls how poster artwork is displayed in product-card grids (Featured, New arrivals, Shop).
-            <br />
-            <strong>Current</strong>: object-contain — no cropping, original behaviour (default).
-            <br />
-            <strong>Full image</strong>: object-cover — fills the card stage; may crop extreme ratios.
-            <br />
-            <strong>Stage</strong>: artwork centred with breathing room and a drop-shadow; best for mixed-ratio collections.
-            <br />
-            Default is <em>Current</em>. Change only after reviewing on the storefront.
-          </p>
-        </CardContent>
-      </Card>
+      {/* Poster card presentation selector removed — fitting is now automatic based on poster size labels */}
 
       {/* Theme */}
       <Card>
