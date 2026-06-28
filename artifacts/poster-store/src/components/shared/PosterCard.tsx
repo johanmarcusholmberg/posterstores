@@ -101,8 +101,7 @@ export const PosterCard = ({ poster, favoritedIds, priority = false }: PosterCar
           "bg-[#faf8f3] rounded-[2px]",
           "shadow-[0_2px_8px_rgba(0,0,0,0.09),0_1px_3px_rgba(0,0,0,0.06)]",
           "group-hover:shadow-[0_6px_20px_rgba(0,0,0,0.14),0_2px_6px_rgba(0,0,0,0.09)]",
-          "group-hover:-translate-y-0.5",
-          "transition-all duration-300 ease-out",
+          "transition-shadow duration-300 ease-out",
           "p-2 pb-0",
         ].join(" ")}>
           {/* Image area */}
