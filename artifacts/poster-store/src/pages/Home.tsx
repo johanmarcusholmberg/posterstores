@@ -363,7 +363,7 @@ function FeaturedPosterCard({
         "transition-all duration-300 ease-out",
         "p-2 pb-0",
       ].join(" ")}>
-        <div className="relative aspect-[3/4] overflow-hidden bg-[#ede8e0]">
+        <div className="relative aspect-[5/7] overflow-hidden bg-[#ede8e0]">
           {/* Artwork: inner ratio-wrapper with object-contain — border hugs artwork, no cropping */}
           <div className="absolute inset-0 flex items-center justify-center">
             <div
@@ -417,7 +417,7 @@ function FeaturedPosterCard({
 function FeaturedPosterCardSkeleton() {
   return (
     <div className="bg-[#faf8f3] rounded-[2px] shadow-[0_2px_8px_rgba(0,0,0,0.07)] p-2 pb-0">
-      <div className="aspect-[3/4] bg-muted animate-pulse" />
+      <div className="aspect-[5/7] bg-muted animate-pulse" />
       <div className="px-0.5 py-2.5 pb-3">
         <div className="h-3 bg-muted animate-pulse w-3/4" />
         <div className="mt-1.5 h-2.5 bg-muted animate-pulse w-1/2" />
