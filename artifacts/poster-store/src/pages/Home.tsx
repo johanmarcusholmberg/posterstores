@@ -668,7 +668,7 @@ function FeaturedPostersSection({ featured, resolvedRoutePrefix, sectionConfig }
             View all &rarr;
           </Link>
         </div>
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(148px,1fr))] gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-5 lg:gap-4 items-stretch">
           {featured && featured.length > 0
             ? featured.slice(0, FEATURED_LIMIT).map((poster, i) => (
                 <div key={poster.id} className={["h-full", i >= 4 ? "hidden sm:block" : ""].filter(Boolean).join(" ")}>

@@ -371,7 +371,7 @@ export default function Shop() {
     setLocation(`/shop?${params.toString()}`);
   };
 
-  const gridClasses = "grid grid-cols-[repeat(auto-fill,minmax(148px,1fr))] gap-4";
+  const gridClasses = "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6";
 
   return (
     <div className="container mx-auto px-4 py-12">
