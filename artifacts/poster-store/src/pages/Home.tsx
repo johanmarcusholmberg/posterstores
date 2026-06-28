@@ -363,7 +363,10 @@ function FeaturedPosterCard({
         "transition-all duration-300 ease-out",
         "p-2 pb-0",
       ].join(" ")}>
-        <div className="relative aspect-[5/7] overflow-hidden bg-[#ede8e0]">
+        <div
+          className="relative aspect-[5/7] overflow-hidden"
+          style={{ backgroundColor: ratio !== null && ratio > 5 / 7 ? '#faf8f3' : '#ede8e0' }}
+        >
           {/* Artwork: inner ratio-wrapper with object-contain — border hugs artwork, no cropping */}
           <div className="absolute inset-0 flex items-center justify-center">
             <div
