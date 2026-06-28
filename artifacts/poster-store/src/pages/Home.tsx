@@ -369,7 +369,7 @@ function FeaturedPosterCard({
             <div
               className={[
                 ratio !== null ? "ring-1 ring-inset ring-black/[0.14]" : "",
-                "transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.04] motion-reduce:transition-none",
+                "motion-reduce:transition-none",
               ].join(" ")}
               style={artworkInnerStyle(ratio)}
             >
