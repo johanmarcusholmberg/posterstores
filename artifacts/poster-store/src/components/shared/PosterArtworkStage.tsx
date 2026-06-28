@@ -44,6 +44,8 @@ interface PosterArtworkStageProps {
   presentation?: PosterCardPresentation;
   "data-testid"?: string;
   onError?: React.ImgHTMLAttributes<HTMLImageElement>["onError"];
+  /** Called once when the base image loads, with its natural width/height ratio. */
+  onRatioLoad?: (ratio: number) => void;
 }
 
 /**
@@ -82,6 +84,7 @@ export function PosterArtworkStage({
   priority = false,
   "data-testid": testId,
   onError,
+  onRatioLoad,
 }: PosterArtworkStageProps) {
   const hasHover = hoverSrc !== null;
   const [naturalRatio, setNaturalRatio] = useState<number | null>(null);
@@ -89,7 +92,9 @@ export function PosterArtworkStage({
   function handleLoad(e: React.SyntheticEvent<HTMLImageElement>) {
     const img = e.currentTarget;
     if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-      setNaturalRatio(img.naturalWidth / img.naturalHeight);
+      const r = img.naturalWidth / img.naturalHeight;
+      setNaturalRatio(r);
+      onRatioLoad?.(r);
     }
   }
 
