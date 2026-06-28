@@ -115,9 +115,7 @@ export function PosterArtworkStage({
       <div
         className={cn(
           hasRatio && "ring-1 ring-inset ring-black/[0.14]",
-          "motion-reduce:transition-none",
-          !hasHover &&
-            "transition-transform duration-[300ms] ease-out scale-100 group-hover:scale-[1.08] group-focus-within:scale-[1.08]"
+          "motion-reduce:transition-none"
         )}
         style={wrapperStyle}
       >
@@ -150,9 +148,9 @@ export function PosterArtworkStage({
         "absolute inset-0 object-cover w-full h-full",
         "transition-[opacity,transform] duration-[600ms] ease-out",
         "motion-reduce:transition-none",
-        "opacity-0 scale-100",
-        "group-hover:opacity-100 group-hover:scale-[1.03]",
-        "group-focus-within:opacity-100 group-focus-within:scale-[1.03]"
+        "opacity-0",
+        "group-hover:opacity-100",
+        "group-focus-within:opacity-100"
       )}
       onError={(e) => {
         (e.target as HTMLImageElement).style.display = "none";
