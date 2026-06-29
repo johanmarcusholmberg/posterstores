@@ -275,6 +275,12 @@ const ALLOWED_TEMPLATE_FIELDS = [
   "renderMode",
   "aiRenderPrompt",
   "aiRenderRequiresReview",
+  // Layered image fields
+  "lightingOverlayUrl",
+  "foregroundImageUrl",
+  "defaultLightingBlendMode",
+  "defaultLightingOpacity",
+  "defaultForegroundOpacity",
 ] as const;
 
 /**
@@ -548,6 +554,12 @@ router.post("/mockup-templates", requireAdmin, async (req, res) => {
       detectedAt: coerceDate(rest.detectedAt) ?? null,
       sourceImageWidth: rest.sourceImageWidth != null ? Math.round(Number(rest.sourceImageWidth)) : null,
       sourceImageHeight: rest.sourceImageHeight != null ? Math.round(Number(rest.sourceImageHeight)) : null,
+      // Layered image fields
+      lightingOverlayUrl: rest.lightingOverlayUrl ?? null,
+      foregroundImageUrl: rest.foregroundImageUrl ?? null,
+      defaultLightingBlendMode: rest.defaultLightingBlendMode ?? "multiply",
+      defaultLightingOpacity: coerceRanged(rest.defaultLightingOpacity, "defaultLightingOpacity", 0, 1) ?? 0.8,
+      defaultForegroundOpacity: coerceRanged(rest.defaultForegroundOpacity, "defaultForegroundOpacity", 0, 1) ?? 1.0,
     };
 
     const [template] = await db
@@ -807,6 +819,12 @@ router.get("/posters/:id/mockups", async (req, res) => {
       generatedAt: posterMockupsTable.generatedAt,
       errorMessage: posterMockupsTable.errorMessage,
       createdAt: posterMockupsTable.createdAt,
+      // Per-assignment layer toggles
+      useBase: posterMockupsTable.useBase,
+      useLightingOverlay: posterMockupsTable.useLightingOverlay,
+      useForeground: posterMockupsTable.useForeground,
+      lightingOpacityOverride: posterMockupsTable.lightingOpacityOverride,
+      foregroundOpacityOverride: posterMockupsTable.foregroundOpacityOverride,
       template: {
         id: mockupTemplatesTable.id,
         name: mockupTemplatesTable.name,
@@ -839,6 +857,12 @@ router.get("/posters/:id/mockups", async (req, res) => {
         contrast: mockupTemplatesTable.contrast,
         saturation: mockupTemplatesTable.saturation,
         compositeBlur: mockupTemplatesTable.compositeBlur,
+        // Layered image fields
+        lightingOverlayUrl: mockupTemplatesTable.lightingOverlayUrl,
+        foregroundImageUrl: mockupTemplatesTable.foregroundImageUrl,
+        defaultLightingBlendMode: mockupTemplatesTable.defaultLightingBlendMode,
+        defaultLightingOpacity: mockupTemplatesTable.defaultLightingOpacity,
+        defaultForegroundOpacity: mockupTemplatesTable.defaultForegroundOpacity,
       },
     })
     .from(posterMockupsTable)
@@ -889,6 +913,11 @@ router.post("/posters/:id/mockups", requireAdmin, async (req, res) => {
       sortOrder: sortOrder ?? 0,
       isPrimary: isPrimary ?? false,
       isHoverMockup: isHoverMockup ?? false,
+      useBase: req.body.useBase ?? true,
+      useLightingOverlay: req.body.useLightingOverlay ?? true,
+      useForeground: req.body.useForeground ?? true,
+      lightingOpacityOverride: req.body.lightingOpacityOverride ?? null,
+      foregroundOpacityOverride: req.body.foregroundOpacityOverride ?? null,
     })
     .returning();
 
@@ -923,6 +952,11 @@ router.put("/posters/:id/mockups/batch", requireAdmin, async (req, res) => {
       sortOrder: m.sortOrder ?? idx,
       isPrimary: m.isPrimary ?? false,
       isHoverMockup: m.isHoverMockup ?? false,
+      useBase: m.useBase ?? true,
+      useLightingOverlay: m.useLightingOverlay ?? true,
+      useForeground: m.useForeground ?? true,
+      lightingOpacityOverride: m.lightingOpacityOverride ?? null,
+      foregroundOpacityOverride: m.foregroundOpacityOverride ?? null,
     }));
 
     await db.insert(posterMockupsTable).values(toInsert);
@@ -965,6 +999,41 @@ router.put("/posters/:id/mockups/batch", requireAdmin, async (req, res) => {
     .orderBy(asc(posterMockupsTable.sortOrder), asc(posterMockupsTable.id));
 
   return res.json(result);
+});
+
+router.patch("/posters/:id/mockups/:mockupId/layers", requireAdmin, async (req, res) => {
+  const posterId = Number(req.params.id);
+  const mockupId = Number(req.params.mockupId);
+  if (isNaN(posterId) || isNaN(mockupId)) return res.status(400).json({ error: "Invalid id" });
+
+  const storeKey =
+    typeof req.query.storeKey === "string" ? req.query.storeKey : undefined;
+  if (!storeKey) return res.status(400).json({ error: "storeKey is required" });
+
+  const [poster] = await db
+    .select()
+    .from(postersTable)
+    .where(and(eq(postersTable.id, posterId), eq(postersTable.storeKey, storeKey)));
+
+  if (!poster) return res.status(404).json({ error: "Poster not found" });
+
+  const { useBase, useLightingOverlay, useForeground, lightingOpacityOverride, foregroundOpacityOverride } = req.body;
+
+  const updates: Record<string, unknown> = { updatedAt: new Date() };
+  if (useBase !== undefined) updates.useBase = Boolean(useBase);
+  if (useLightingOverlay !== undefined) updates.useLightingOverlay = Boolean(useLightingOverlay);
+  if (useForeground !== undefined) updates.useForeground = Boolean(useForeground);
+  if (lightingOpacityOverride !== undefined) updates.lightingOpacityOverride = lightingOpacityOverride === null ? null : Number(lightingOpacityOverride);
+  if (foregroundOpacityOverride !== undefined) updates.foregroundOpacityOverride = foregroundOpacityOverride === null ? null : Number(foregroundOpacityOverride);
+
+  const [updated] = await db
+    .update(posterMockupsTable)
+    .set(updates as any)
+    .where(and(eq(posterMockupsTable.id, mockupId), eq(posterMockupsTable.posterId, posterId)))
+    .returning();
+
+  if (!updated) return res.status(404).json({ error: "Mockup assignment not found" });
+  return res.json(updated);
 });
 
 router.patch("/posters/:id/mockups/:mockupId/hover", requireAdmin, async (req, res) => {

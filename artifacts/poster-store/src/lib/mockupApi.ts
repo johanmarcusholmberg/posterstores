@@ -113,6 +113,12 @@ export interface MockupTemplate {
   renderMode: "deterministic" | "ai_rendered";
   aiRenderPrompt: string | null;
   aiRenderRequiresReview: boolean;
+  // Layered image fields
+  lightingOverlayUrl: string | null;
+  foregroundImageUrl: string | null;
+  defaultLightingBlendMode: string | null;
+  defaultLightingOpacity: number | null;
+  defaultForegroundOpacity: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -152,6 +158,12 @@ export interface PosterMockupTemplate {
   contrast: number | null;
   saturation: number | null;
   compositeBlur: number | null;
+  // Layered image fields
+  lightingOverlayUrl?: string | null;
+  foregroundImageUrl?: string | null;
+  defaultLightingBlendMode?: string | null;
+  defaultLightingOpacity?: number | null;
+  defaultForegroundOpacity?: number | null;
 }
 
 export interface PosterMockup {
@@ -173,6 +185,12 @@ export interface PosterMockup {
   sourcePosterImageUrl: string | null;
   sourceTemplateImageUrl: string | null;
   approvedForPublic: boolean;
+  // Layer toggles per-assignment
+  useBase: boolean;
+  useLightingOverlay: boolean;
+  useForeground: boolean;
+  lightingOpacityOverride: number | null;
+  foregroundOpacityOverride: number | null;
   createdAt: string;
   template: PosterMockupTemplate | null;
 }
@@ -184,6 +202,12 @@ export interface BatchMockupItem {
   isPrimary?: boolean;
   isHoverMockup?: boolean;
   isGallery?: boolean;
+  // Layer toggles
+  useBase?: boolean;
+  useLightingOverlay?: boolean;
+  useForeground?: boolean;
+  lightingOpacityOverride?: number | null;
+  foregroundOpacityOverride?: number | null;
 }
 
 function jsonHeaders(): HeadersInit {
@@ -304,6 +328,31 @@ export async function adminUpdateMockupTemplate(
     credentials: "include",
     body: JSON.stringify(data),
   });
+  if (!res.ok) await handleError(res);
+  return res.json();
+}
+
+export async function adminUpdatePosterMockupLayers(
+  posterId: number,
+  mockupId: number,
+  storeKey: string,
+  data: {
+    useBase?: boolean;
+    useLightingOverlay?: boolean;
+    useForeground?: boolean;
+    lightingOpacityOverride?: number | null;
+    foregroundOpacityOverride?: number | null;
+  }
+): Promise<unknown> {
+  const res = await fetch(
+    `${BASE}/posters/${posterId}/mockups/${mockupId}/layers?storeKey=${encodeURIComponent(storeKey)}`,
+    {
+      method: "PATCH",
+      headers: jsonHeaders(),
+      credentials: "include",
+      body: JSON.stringify(data),
+    }
+  );
   if (!res.ok) await handleError(res);
   return res.json();
 }

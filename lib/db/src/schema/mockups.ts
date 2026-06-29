@@ -98,6 +98,12 @@ export const mockupTemplatesTable = pgTable("mockup_templates", {
   renderMode: text("render_mode").default("deterministic").notNull(),
   aiRenderPrompt: text("ai_render_prompt"),
   aiRenderRequiresReview: boolean("ai_render_requires_review").default(true).notNull(),
+  // Layered image fields
+  lightingOverlayUrl: text("lighting_overlay_url"),
+  foregroundImageUrl: text("foreground_image_url"),
+  defaultLightingBlendMode: text("default_lighting_blend_mode").default("multiply").notNull(),
+  defaultLightingOpacity: real("default_lighting_opacity").default(0.8).notNull(),
+  defaultForegroundOpacity: real("default_foreground_opacity").default(1.0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -127,6 +133,12 @@ export const posterMockupsTable = pgTable("poster_mockups", {
   sourcePosterImageUrl: text("source_poster_image_url"),
   sourceTemplateImageUrl: text("source_template_image_url"),
   approvedForPublic: boolean("approved_for_public").default(false).notNull(),
+  // Per-assignment layer toggles
+  useBase: boolean("use_base").default(true).notNull(),
+  useLightingOverlay: boolean("use_lighting_overlay").default(true).notNull(),
+  useForeground: boolean("use_foreground").default(true).notNull(),
+  lightingOpacityOverride: real("lighting_opacity_override"),
+  foregroundOpacityOverride: real("foreground_opacity_override"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

@@ -246,6 +246,52 @@ async function perspectiveWarpPoster(
     .toBuffer();
 }
 
+// ─── Layered compositor helpers ────────────────────────────────────────────────
+
+const VALID_BLEND_MODES = ["multiply", "screen", "overlay", "soft-light", "over"] as const;
+type LayerBlendMode = typeof VALID_BLEND_MODES[number];
+
+function normalizeBlendMode(mode: string | null | undefined): LayerBlendMode {
+  if (mode && (VALID_BLEND_MODES as readonly string[]).includes(mode)) {
+    return mode as LayerBlendMode;
+  }
+  return "multiply";
+}
+
+/** Fetch, resize to target dimensions, and apply opacity to an overlay image. */
+async function fetchAndPrepareOverlay(
+  url: string,
+  targetW: number,
+  targetH: number,
+  opacity: number
+): Promise<Buffer> {
+  const raw = await fetchImageBuffer(url);
+
+  const { data, info } = await sharp(raw)
+    .resize(targetW, targetH, { fit: "fill" })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  if (opacity < 1) {
+    const buf = Buffer.from(data);
+    for (let i = 3; i < buf.length; i += 4) {
+      buf[i] = Math.round(buf[i] * opacity);
+    }
+    return sharp(buf, {
+      raw: { width: info.width, height: info.height, channels: 4 },
+    })
+      .png()
+      .toBuffer();
+  }
+
+  return sharp(data, {
+    raw: { width: info.width, height: info.height, channels: 4 },
+  })
+    .png()
+    .toBuffer();
+}
+
 // ─── Exported compositors ─────────────────────────────────────────────────────
 
 /**
@@ -423,4 +469,93 @@ export async function compositePosterWithCorners(
 
   const buffer = await compositeSharp.jpeg({ quality: 88, mozjpeg: true }).toBuffer();
   return { buffer, surfaceWarning };
+}
+
+// ─── Layered compositor ────────────────────────────────────────────────────────
+
+export interface LayeredCompositorConfig extends CompositorConfig {
+  lightingOverlayUrl?: string | null;
+  foregroundImageUrl?: string | null;
+  lightingBlendMode?: string | null;
+  lightingOpacity?: number | null;
+  foregroundOpacity?: number | null;
+  useBase?: boolean;
+  useLightingOverlay?: boolean;
+  useForeground?: boolean;
+}
+
+/**
+ * Composite a poster into a template with optional layered overlays.
+ *
+ * Render order:
+ *  1. Base image with poster artwork composited into the placement area.
+ *  2. Lighting / shadow / reflection overlay (optional, blend mode + opacity configurable).
+ *  3. Foreground image (optional, composited with "over" blend).
+ *
+ * Layers with missing assets or use*=false are silently skipped.
+ * Falls back to the standard compositor when no layered assets are configured.
+ */
+export async function compositeLayeredMockup(
+  templateImageUrl: string,
+  posterImageUrl: string,
+  config: LayeredCompositorConfig
+): Promise<Buffer> {
+  let currentBuffer = await compositePosterIntoTemplate(
+    templateImageUrl,
+    posterImageUrl,
+    config
+  );
+
+  const hasLighting =
+    config.useLightingOverlay !== false && !!config.lightingOverlayUrl;
+  const hasForeground =
+    config.useForeground !== false && !!config.foregroundImageUrl;
+
+  if (!hasLighting && !hasForeground) return currentBuffer;
+
+  const templateBuf = await fetchImageBuffer(templateImageUrl);
+  const { width: templateW = 1000, height: templateH = 1000 } =
+    await sharp(templateBuf).metadata();
+
+  if (hasLighting) {
+    try {
+      const blendMode = normalizeBlendMode(config.lightingBlendMode);
+      const opacity = Math.max(0, Math.min(1, config.lightingOpacity ?? 0.8));
+      const overlayBuf = await fetchAndPrepareOverlay(
+        config.lightingOverlayUrl!,
+        templateW,
+        templateH,
+        opacity
+      );
+      currentBuffer = await sharp(currentBuffer)
+        .composite([{ input: overlayBuf, blend: blendMode }])
+        .jpeg({ quality: 88, mozjpeg: true })
+        .toBuffer();
+    } catch {
+      // skip layer on error
+    }
+  }
+
+  if (hasForeground) {
+    try {
+      const opacity = Math.max(
+        0,
+        Math.min(1, config.foregroundOpacity ?? 1.0)
+      );
+      const fgBuf = await fetchAndPrepareOverlay(
+        config.foregroundImageUrl!,
+        templateW,
+        templateH,
+        opacity
+      );
+      currentBuffer = await sharp(currentBuffer)
+        .composite([{ input: fgBuf, blend: "over" }])
+        .jpeg({ quality: 88, mozjpeg: true })
+        .toBuffer();
+    } catch {
+      // skip layer on error
+    }
+  }
+
+  return currentBuffer;
 }
