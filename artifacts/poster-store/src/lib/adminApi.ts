@@ -807,6 +807,14 @@ export interface CollectionBannerVisualConfig {
   /** Fine-tune vertical position of the text column in pixels. Default: 0. */
   textOffsetY?: number;
   displayStyle?: "visual" | "simple";
+  /** Whether to inject this banner into the shop grid. */
+  showInShop?: boolean;
+  /** Insert the banner after this many posters in the shop grid (e.g. 8 = after the first two rows on a 4-col desktop). */
+  shopInsertAfter?: number;
+  /** How the banner is presented in the shop grid — independent from the homepage displayStyle. Default: "visual". */
+  shopDisplayStyle?: "visual" | "simple";
+  /** How the banner renders on the mobile 2-column shop grid. Default: "simplified-card". */
+  shopMobileMode?: "full-banner" | "simplified-card" | "hidden";
 }
 
 export type HomepageSectionType =

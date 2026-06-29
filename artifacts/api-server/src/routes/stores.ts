@@ -735,6 +735,10 @@ const collectionBannerVisualBaseSchema = z.object({
   textOffsetX: z.number().min(-300).max(300).optional(),
   textOffsetY: z.number().min(-300).max(300).optional(),
   displayStyle: z.enum(["visual", "simple"]).optional(),
+  showInShop: z.boolean().optional(),
+  shopInsertAfter: z.number().int().min(0).optional(),
+  shopDisplayStyle: z.enum(["visual", "simple"]).optional(),
+  shopMobileMode: z.enum(["full-banner", "simplified-card", "hidden"]).optional(),
 });
 
 const collectionBannerVisualSchema = collectionBannerVisualBaseSchema.optional();

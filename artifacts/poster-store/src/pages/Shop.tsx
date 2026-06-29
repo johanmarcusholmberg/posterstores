@@ -2,10 +2,13 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useStorefront } from "@/context/StorefrontContext";
 import { useListPosters, getListPostersQueryKey, Poster } from "@workspace/api-client-react";
 import { PosterCard } from "@/components/shared/PosterCard";
+import { CollectionBannerSection } from "@/components/shared/CollectionBannerSection";
+import { type CollectionBannerVisualConfig } from "@/config/storefronts";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { useLocation, useSearch } from "wouter";
 import { SlidersHorizontal, X, Check, Loader2 } from "lucide-react";
 
@@ -113,37 +116,6 @@ function FilterSidebar({
 }
 
 
-function CollectionBanner({
-  title,
-  text,
-  ctaText,
-  onCtaClick,
-}: {
-  title: string;
-  text: string;
-  ctaText?: string;
-  onCtaClick?: () => void;
-}) {
-  return (
-    <div className="col-span-full my-2">
-      <div className="rounded-lg bg-secondary/10 border border-secondary/20 px-6 py-5 flex flex-col sm:flex-row sm:items-center gap-4">
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-widest text-secondary/80 mb-1">Collection</p>
-          <h3 className="font-serif text-lg sm:text-xl font-bold text-foreground leading-snug">{title}</h3>
-          <p className="text-sm text-muted-foreground mt-1 leading-relaxed max-w-lg">{text}</p>
-        </div>
-        {ctaText && (
-          <button
-            onClick={onCtaClick}
-            className="shrink-0 text-sm font-medium text-secondary hover:text-secondary/80 transition-colors underline-offset-2 hover:underline whitespace-nowrap"
-          >
-            {ctaText} →
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
 
 function HiddenFiltersPopover({
   hiddenFilters,
@@ -358,18 +330,31 @@ export default function Shop() {
   const hiddenCount = activeFilters.length - CHIP_LIMIT;
 
   const shopCfg = store.shop;
-  const collectionBanner = shopCfg?.collectionBanner;
-  const BANNER_AFTER = 4;
-  const showBanner = !hasAnyFilter && !!collectionBanner && accumulated.length >= BANNER_AFTER;
-  const firstBatch = showBanner ? accumulated.slice(0, BANNER_AFTER) : accumulated;
-  const restBatch = showBanner ? accumulated.slice(BANNER_AFTER) : [];
+  const { resolvedRoutePrefix } = store;
 
-  const handleBannerCta = () => {
-    if (!collectionBanner) return;
-    const params = new URLSearchParams();
-    params.set("category", "Coastal Posters");
-    setLocation(`/shop?${params.toString()}`);
-  };
+  const shopBanners = useMemo((): CollectionBannerVisualConfig[] => {
+    const banners = (store.homepageVisualConfig as any)?.collectionBanners ?? [];
+    return (banners as CollectionBannerVisualConfig[])
+      .filter(b => b.showInShop === true && b.visible !== false)
+      .sort((a, b) => (a.shopInsertAfter ?? 0) - (b.shopInsertAfter ?? 0));
+  }, [store.homepageVisualConfig]);
+
+  type GridSegment = { posters: Poster[]; banner: CollectionBannerVisualConfig | null };
+  const gridSegments = useMemo((): GridSegment[] => {
+    if (hasAnyFilter || shopBanners.length === 0) {
+      return [{ posters: accumulated, banner: null }];
+    }
+    const segments: GridSegment[] = [];
+    let start = 0;
+    for (const banner of shopBanners) {
+      const insertAfter = banner.shopInsertAfter ?? 0;
+      if (insertAfter <= start) continue;
+      segments.push({ posters: accumulated.slice(start, insertAfter), banner });
+      start = insertAfter;
+    }
+    segments.push({ posters: accumulated.slice(start), banner: null });
+    return segments;
+  }, [accumulated, shopBanners, hasAnyFilter]);
 
   const gridClasses = "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6";
 
@@ -524,35 +509,35 @@ export default function Shop() {
                 Clear filters
               </Button>
             </div>
-          ) : showBanner ? (
-            <>
-              <div className={gridClasses}>
-                {firstBatch.map((poster, i) => (
-                  <PosterCard key={poster.id} poster={poster} priority={i < 2} />
-                ))}
-              </div>
-              <div className="my-6">
-                <CollectionBanner
-                  title={collectionBanner!.title}
-                  text={collectionBanner!.text}
-                  ctaText={collectionBanner!.ctaText}
-                  onCtaClick={handleBannerCta}
-                />
-              </div>
-              {restBatch.length > 0 && (
-                <div className={gridClasses}>
-                  {restBatch.map((poster) => (
-                    <PosterCard key={poster.id} poster={poster} />
-                  ))}
-                </div>
-              )}
-            </>
           ) : (
-            <div className={gridClasses}>
-              {accumulated.map((poster, i) => (
-                <PosterCard key={poster.id} poster={poster} priority={i < 2} />
+            <>
+              {gridSegments.map((segment, segIdx) => (
+                <React.Fragment key={segIdx}>
+                  {segment.posters.length > 0 && (
+                    <div className={cn(gridClasses, segIdx > 0 && "mt-3")}>
+                      {segment.posters.map((poster, i) => (
+                        <PosterCard
+                          key={poster.id}
+                          poster={poster}
+                          priority={segIdx === 0 && i < 2}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  {segment.banner && (
+                    <div className="my-4">
+                      <CollectionBannerSection
+                        banner={segment.banner}
+                        collectionPreviewPosters={[]}
+                        resolvedRoutePrefix={resolvedRoutePrefix}
+                        displayStyleOverride={segment.banner.shopDisplayStyle}
+                        mobileModeOverride={segment.banner.shopMobileMode}
+                      />
+                    </div>
+                  )}
+                </React.Fragment>
               ))}
-            </div>
+            </>
           )}
 
           {hasMore && (

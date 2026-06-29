@@ -642,6 +642,74 @@ function CollectionBannerEditor({ banner, bannerLabel, totalBanners, onUpdate, o
             <p className="text-xs text-muted-foreground">Fine-tune text position on top of the selected anchor. Range: −300 to +300 px. Default: 0.</p>
           </div>
 
+          {/* Shop grid */}
+          <div className="space-y-3 pt-1 border-t border-border">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide pt-1">Shop grid</p>
+            <div className="flex items-center justify-between rounded-md border border-border px-3 py-2.5">
+              <div>
+                <p className="text-sm font-medium">Show in shop grid</p>
+                <p className="text-xs text-muted-foreground">Inject this banner between poster rows on the shop page</p>
+              </div>
+              <Switch
+                checked={banner.showInShop ?? false}
+                onCheckedChange={(v) => onUpdate({ showInShop: v })}
+              />
+            </div>
+            {banner.showInShop && (
+              <>
+                <div className="space-y-1.5">
+                  <Label>Insert after N posters</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={banner.shopInsertAfter ?? ""}
+                    onChange={e => {
+                      const v = parseInt(e.target.value, 10);
+                      onUpdate({ shopInsertAfter: isNaN(v) ? undefined : v });
+                    }}
+                    placeholder="e.g. 8 (after first two rows on a 4-col desktop)"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    The banner appears after this many posters. On a 4-column desktop grid: 4 = after row 1, 8 = after row 2, etc.
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Shop display style</Label>
+                  <div className="flex gap-2">
+                    {(["visual", "simple"] as const).map((style) => (
+                      <button key={style} type="button"
+                        onClick={() => onUpdate({ shopDisplayStyle: style })}
+                        className={cn(
+                          "flex-1 py-1.5 rounded-md border text-sm font-medium transition-colors",
+                          (banner.shopDisplayStyle ?? "visual") === style
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "border-border bg-background hover:bg-muted"
+                        )}>
+                        {style === "visual" ? "Visual (image)" : "Simple (text strip)"}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Independent from the homepage display style.</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Mobile treatment</Label>
+                  <Select
+                    value={banner.shopMobileMode ?? "simplified-card"}
+                    onValueChange={v => onUpdate({ shopMobileMode: v as "full-banner" | "simplified-card" | "hidden" })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="full-banner">Full banner</SelectItem>
+                      <SelectItem value="simplified-card">Simplified card (recommended)</SelectItem>
+                      <SelectItem value="hidden">Hidden on mobile</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">How the banner renders on the 2-column mobile shop grid.</p>
+                </div>
+              </>
+            )}
+          </div>
+
           {/* Banner visual overrides */}
           <CollapsibleOverridePanel title="Banner visual overrides">
             <div className="grid grid-cols-2 gap-3">
