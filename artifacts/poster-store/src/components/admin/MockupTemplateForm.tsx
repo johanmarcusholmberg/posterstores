@@ -262,6 +262,24 @@ export function MockupTemplateForm({
     template?.aiRenderRequiresReview ?? true
   );
 
+  // Layered image state
+  const [lightingOverlayUrl, setLightingOverlayUrl] = useState(template?.lightingOverlayUrl ?? "");
+  const [foregroundImageUrl, setForegroundImageUrl] = useState(template?.foregroundImageUrl ?? "");
+  const [defaultLightingBlendMode, setDefaultLightingBlendMode] = useState(
+    template?.defaultLightingBlendMode ?? "multiply"
+  );
+  const [defaultLightingOpacity, setDefaultLightingOpacity] = useState(
+    (template?.defaultLightingOpacity ?? 0.8).toString()
+  );
+  const [defaultForegroundOpacity, setDefaultForegroundOpacity] = useState(
+    (template?.defaultForegroundOpacity ?? 1.0).toString()
+  );
+  const [showLayeredImages, setShowLayeredImages] = useState(false);
+  const [lightingUploadProgress, setLightingUploadProgress] = useState<"idle" | "uploading" | "done">("idle");
+  const [foregroundUploadProgress, setForegroundUploadProgress] = useState<"idle" | "uploading" | "done">("idle");
+  const lightingFileInputRef = useRef<HTMLInputElement>(null);
+  const foregroundFileInputRef = useRef<HTMLInputElement>(null);
+
   // Smart placement state (DB-persisted)
   const [placementMode, setPlacementMode] = useState<PlacementMode>(
     (template?.placementMode as PlacementMode | null | undefined) ?? "manual"
@@ -612,6 +630,39 @@ export function MockupTemplateForm({
     }
   };
 
+  const handleLayerFileUpload = async (
+    file: File,
+    setUrl: (u: string) => void,
+    setProgress: (s: "idle" | "uploading" | "done") => void
+  ) => {
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      toast({ variant: "destructive", title: "Invalid file type", description: "Only JPG, PNG, and WebP are allowed." });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ variant: "destructive", title: "File too large", description: "Max file size is 10MB." });
+      return;
+    }
+    setProgress("uploading");
+    try {
+      const { uploadURL, objectPath } = await requestMockupImageUploadUrl({
+        name: file.name,
+        size: file.size,
+        contentType: file.type,
+      });
+      await uploadMockupImageFile(uploadURL, file);
+      const servingUrl = getStorageUrl(objectPath);
+      setUrl(servingUrl);
+      setProgress("done");
+      toast({ title: "Layer image uploaded" });
+    } catch (e: unknown) {
+      setProgress("idle");
+      const msg = e instanceof Error ? e.message : "Upload failed";
+      toast({ variant: "destructive", title: "Upload failed", description: msg });
+    }
+  };
+
   const handleUrlChange = (url: string) => {
     setBackgroundImageUrl(url);
     if (!url) {
@@ -795,6 +846,12 @@ export function MockupTemplateForm({
         renderMode,
         aiRenderPrompt: aiRenderPrompt.trim() || undefined,
         aiRenderRequiresReview,
+        // Layered images
+        lightingOverlayUrl: lightingOverlayUrl || undefined,
+        foregroundImageUrl: foregroundImageUrl || undefined,
+        defaultLightingBlendMode,
+        defaultLightingOpacity: defaultLightingOpacity !== "" ? parseFloat(defaultLightingOpacity) : undefined,
+        defaultForegroundOpacity: defaultForegroundOpacity !== "" ? parseFloat(defaultForegroundOpacity) : undefined,
       };
 
       let saved: MockupTemplate;
@@ -1939,6 +1996,146 @@ export function MockupTemplateForm({
             </div>}
           </div>
         </div>
+      </div>
+
+      {/* Layered images section — lighting overlay + foreground */}
+      <div className="rounded-md border overflow-hidden">
+        <button
+          type="button"
+          className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors"
+          onClick={() => setShowLayeredImages((v) => !v)}
+        >
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium">Layered images</p>
+            {(lightingOverlayUrl || foregroundImageUrl) ? (
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-800 border border-violet-300 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-700">
+                {[lightingOverlayUrl && "Lighting", foregroundImageUrl && "Foreground"].filter(Boolean).join(" + ")} configured
+              </span>
+            ) : (
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">None configured</span>
+            )}
+          </div>
+          {showLayeredImages ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
+        </button>
+        {showLayeredImages && (
+          <div className="space-y-5 px-4 pb-4 pt-1 border-t">
+            <p className="text-xs text-muted-foreground mt-2">
+              Layered images are composited on top of the poster after it is inserted into the background.
+              They enable lighting effects, glass reflections, shadows, and physical foreground elements.
+            </p>
+            <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1">
+              <Info className="w-3 h-3 shrink-0" />
+              Applied during Sync mockups. Run Sync after changing these images.
+            </p>
+
+            {/* Lighting / shadow / reflection overlay */}
+            <div className="space-y-3">
+              <div>
+                <Label className="text-sm font-medium">Lighting / shadow overlay</Label>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Full-size image composited over the poster. Use PNG with transparency for realistic lighting, glare, or shadow effects.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  value={lightingOverlayUrl}
+                  onChange={(e) => setLightingOverlayUrl(e.target.value)}
+                  placeholder="https://… or upload below"
+                  className="text-xs h-8 flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 text-xs shrink-0"
+                  onClick={() => lightingFileInputRef.current?.click()}
+                  disabled={lightingUploadProgress === "uploading"}
+                >
+                  {lightingUploadProgress === "uploading" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                  Upload
+                </Button>
+                {lightingOverlayUrl && (
+                  <Button type="button" variant="ghost" size="sm" className="h-8 text-xs text-destructive hover:text-destructive" onClick={() => { setLightingOverlayUrl(""); }}>
+                    Clear
+                  </Button>
+                )}
+              </div>
+              <input ref={lightingFileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLayerFileUpload(f, setLightingOverlayUrl, setLightingUploadProgress); e.target.value = ""; }} />
+              {lightingOverlayUrl && (
+                <div className="w-24 h-24 rounded border overflow-hidden bg-checkerboard">
+                  <img src={lightingOverlayUrl} alt="Lighting overlay preview" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">Blend mode</Label>
+                  <Select value={defaultLightingBlendMode} onValueChange={setDefaultLightingBlendMode}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="multiply">Multiply (shadows, darkening)</SelectItem>
+                      <SelectItem value="screen">Screen (highlights, brightening)</SelectItem>
+                      <SelectItem value="overlay">Overlay (contrast boost)</SelectItem>
+                      <SelectItem value="soft-light">Soft light (gentle)</SelectItem>
+                      <SelectItem value="over">Over (opaque composite)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Default opacity (0–1)</Label>
+                  <Input type="number" value={defaultLightingOpacity} onChange={(e) => setDefaultLightingOpacity(e.target.value)} className="h-8 text-xs" min={0} max={1} step={0.05} />
+                </div>
+              </div>
+            </div>
+
+            {/* Foreground image */}
+            <div className="space-y-3 pt-3 border-t">
+              <div>
+                <Label className="text-sm font-medium">Foreground image</Label>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Composited on top of everything using normal "over" blend. Use PNG with transparency for physical elements in front of the poster (e.g. a table edge, a vase).
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  value={foregroundImageUrl}
+                  onChange={(e) => setForegroundImageUrl(e.target.value)}
+                  placeholder="https://… or upload below"
+                  className="text-xs h-8 flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 text-xs shrink-0"
+                  onClick={() => foregroundFileInputRef.current?.click()}
+                  disabled={foregroundUploadProgress === "uploading"}
+                >
+                  {foregroundUploadProgress === "uploading" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                  Upload
+                </Button>
+                {foregroundImageUrl && (
+                  <Button type="button" variant="ghost" size="sm" className="h-8 text-xs text-destructive hover:text-destructive" onClick={() => { setForegroundImageUrl(""); }}>
+                    Clear
+                  </Button>
+                )}
+              </div>
+              <input ref={foregroundFileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLayerFileUpload(f, setForegroundImageUrl, setForegroundUploadProgress); e.target.value = ""; }} />
+              {foregroundImageUrl && (
+                <div className="w-24 h-24 rounded border overflow-hidden bg-checkerboard">
+                  <img src={foregroundImageUrl} alt="Foreground preview" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                </div>
+              )}
+              <div className="space-y-1 max-w-xs">
+                <Label className="text-xs">Default opacity (0–1)</Label>
+                <Input type="number" value={defaultForegroundOpacity} onChange={(e) => setDefaultForegroundOpacity(e.target.value)} className="h-8 text-xs" min={0} max={1} step={0.05} />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex items-center justify-end gap-3 pt-2 border-t">

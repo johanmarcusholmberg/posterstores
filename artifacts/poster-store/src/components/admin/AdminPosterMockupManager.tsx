@@ -48,6 +48,15 @@ interface DraftMockup {
   templateName?: string;
   templateFrameType?: string;
   previewUrl?: string | null;
+  // Layer toggles
+  useBase: boolean;
+  useLightingOverlay: boolean;
+  useForeground: boolean;
+  lightingOpacityOverride: number | null;
+  foregroundOpacityOverride: number | null;
+  // Tracks whether the template has layered assets
+  hasLightingOverlay?: boolean;
+  hasForeground?: boolean;
 }
 
 let keyCounter = 0;
@@ -86,6 +95,13 @@ export const AdminPosterMockupManager = ({
         templateName: m.template?.name ?? undefined,
         templateFrameType: m.template?.frameType ?? undefined,
         previewUrl: m.mockupImageUrl ?? m.template?.previewThumbnailUrl ?? null,
+        useBase: m.useBase ?? true,
+        useLightingOverlay: m.useLightingOverlay ?? true,
+        useForeground: m.useForeground ?? true,
+        lightingOpacityOverride: m.lightingOpacityOverride ?? null,
+        foregroundOpacityOverride: m.foregroundOpacityOverride ?? null,
+        hasLightingOverlay: !!(m.template?.lightingOverlayUrl),
+        hasForeground: !!(m.template?.foregroundImageUrl),
       }));
       setDrafts(loaded);
     } catch (e: any) {
@@ -118,6 +134,13 @@ export const AdminPosterMockupManager = ({
       templateName: template.name,
       templateFrameType: template.frameType,
       previewUrl: template.previewThumbnailUrl,
+      useBase: true,
+      useLightingOverlay: true,
+      useForeground: true,
+      lightingOpacityOverride: null,
+      foregroundOpacityOverride: null,
+      hasLightingOverlay: !!(template as any).lightingOverlayUrl,
+      hasForeground: !!(template as any).foregroundImageUrl,
     };
     setDrafts((prev) => [...prev, newDraft]);
   };
@@ -160,6 +183,11 @@ export const AdminPosterMockupManager = ({
       sortOrder: drafts.length,
       templateName: "Custom image",
       previewUrl: url,
+      useBase: true,
+      useLightingOverlay: true,
+      useForeground: true,
+      lightingOpacityOverride: null,
+      foregroundOpacityOverride: null,
     };
     setDrafts((prev) => [...prev, newDraft]);
     setCustomUrl("");
@@ -188,6 +216,11 @@ export const AdminPosterMockupManager = ({
         sortOrder: d.sortOrder,
         isPrimary: d.isPrimary,
         isHoverMockup: d.isHoverMockup,
+        useBase: d.useBase,
+        useLightingOverlay: d.useLightingOverlay,
+        useForeground: d.useForeground,
+        lightingOpacityOverride: d.lightingOpacityOverride,
+        foregroundOpacityOverride: d.foregroundOpacityOverride,
       }));
       await adminSavePosterMockupsBatch(poster.id, storeKey, items);
       toast({ title: "Mockups saved" });
@@ -489,6 +522,49 @@ export const AdminPosterMockupManager = ({
                           <ImageIcon className="w-2.5 h-2.5" />
                           Sync required — not shown publicly
                         </span>
+                      )}
+                      {/* Layer toggles — only shown when template has layered assets */}
+                      {(draft.hasLightingOverlay || draft.hasForeground) && (
+                        <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                          {draft.hasLightingOverlay && (
+                            <label className="flex items-center gap-1 text-[10px] cursor-pointer select-none text-muted-foreground hover:text-foreground transition-colors">
+                              <input
+                                type="checkbox"
+                                checked={draft.useLightingOverlay}
+                                onChange={(e) =>
+                                  setDrafts((prev) =>
+                                    prev.map((d) =>
+                                      d.key === draft.key
+                                        ? { ...d, useLightingOverlay: e.target.checked }
+                                        : d
+                                    )
+                                  )
+                                }
+                                className="w-3 h-3 accent-primary"
+                              />
+                              Lighting
+                            </label>
+                          )}
+                          {draft.hasForeground && (
+                            <label className="flex items-center gap-1 text-[10px] cursor-pointer select-none text-muted-foreground hover:text-foreground transition-colors">
+                              <input
+                                type="checkbox"
+                                checked={draft.useForeground}
+                                onChange={(e) =>
+                                  setDrafts((prev) =>
+                                    prev.map((d) =>
+                                      d.key === draft.key
+                                        ? { ...d, useForeground: e.target.checked }
+                                        : d
+                                    )
+                                  )
+                                }
+                                className="w-3 h-3 accent-primary"
+                              />
+                              Foreground
+                            </label>
+                          )}
+                        </div>
                       )}
                     </div>
 

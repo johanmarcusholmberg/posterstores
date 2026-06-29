@@ -11,6 +11,7 @@ import { adminLimiter } from "../middleware/rateLimiter";
 import {
   compositePosterIntoTemplate,
   compositePosterWithCorners,
+  compositeLayeredMockup,
 } from "../lib/mockupCompositor";
 import { ObjectStorageService } from "../lib/objectStorage";
 import {
@@ -384,22 +385,49 @@ router.post(
             });
             continue;
           }
-          imageBuffer = await compositePosterIntoTemplate(
-            template.backgroundImageUrl!,
-            poster.imageUrl,
-            {
-              posterX,
-              posterY,
-              posterWidth,
-              posterHeight,
-              rotation,
-              fitMode: template.fitMode,
-              borderRadius: template.borderRadius,
-              brightness: template.brightness,
-              contrast: template.contrast,
-              saturation: template.saturation,
-            }
-          );
+          const hasLayeredAssets = !!(template.lightingOverlayUrl || template.foregroundImageUrl);
+          if (hasLayeredAssets) {
+            imageBuffer = await compositeLayeredMockup(
+              template.backgroundImageUrl!,
+              poster.imageUrl,
+              {
+                posterX,
+                posterY,
+                posterWidth,
+                posterHeight,
+                rotation,
+                fitMode: template.fitMode,
+                borderRadius: template.borderRadius,
+                brightness: template.brightness,
+                contrast: template.contrast,
+                saturation: template.saturation,
+                lightingOverlayUrl: template.lightingOverlayUrl,
+                foregroundImageUrl: template.foregroundImageUrl,
+                lightingBlendMode: template.defaultLightingBlendMode,
+                lightingOpacity: mockup.lightingOpacityOverride ?? template.defaultLightingOpacity,
+                foregroundOpacity: mockup.foregroundOpacityOverride ?? template.defaultForegroundOpacity,
+                useLightingOverlay: mockup.useLightingOverlay,
+                useForeground: mockup.useForeground,
+              }
+            );
+          } else {
+            imageBuffer = await compositePosterIntoTemplate(
+              template.backgroundImageUrl!,
+              poster.imageUrl,
+              {
+                posterX,
+                posterY,
+                posterWidth,
+                posterHeight,
+                rotation,
+                fitMode: template.fitMode,
+                borderRadius: template.borderRadius,
+                brightness: template.brightness,
+                contrast: template.contrast,
+                saturation: template.saturation,
+              }
+            );
+          }
         }
 
         // ── Upload result ──────────────────────────────────────────────
