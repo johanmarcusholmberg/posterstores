@@ -349,9 +349,12 @@ export default function Shop() {
     for (const banner of shopBanners) {
       const insertAfter = banner.shopInsertAfter ?? 0;
       if (insertAfter <= start) continue;
+      // Only inject if enough posters have loaded to reach this position
+      if (insertAfter > accumulated.length) break;
       segments.push({ posters: accumulated.slice(start, insertAfter), banner });
       start = insertAfter;
     }
+    // Remaining posters with no banner (or not enough loaded yet to reach the next banner)
     segments.push({ posters: accumulated.slice(start), banner: null });
     return segments;
   }, [accumulated, shopBanners, hasAnyFilter]);
