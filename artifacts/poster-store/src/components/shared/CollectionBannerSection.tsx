@@ -20,6 +20,12 @@ export interface CollectionBannerSectionProps {
   displayStyleOverride?: "visual" | "simple";
   /** Override the banner's own mobileMode (used by shop grid to apply shopMobileMode). */
   mobileModeOverride?: "full-banner" | "simplified-card" | "hidden";
+  /**
+   * When true, render only the banner card without the outer <section> + container
+   * wrapper. Use this when the banner is embedded inside a layout that already
+   * provides the correct horizontal width (e.g. the shop grid's flex main area).
+   */
+  embedded?: boolean;
 }
 
 export function CollectionBannerSection({
@@ -29,6 +35,7 @@ export function CollectionBannerSection({
   resolvedRoutePrefix,
   displayStyleOverride,
   mobileModeOverride,
+  embedded = false,
 }: CollectionBannerSectionProps) {
   const hasCollBg = !!banner.backgroundImageUrl;
   const imageFit = banner.imageFit ?? "cover";
@@ -291,13 +298,11 @@ export function CollectionBannerSection({
   const effectiveDisplayStyle = displayStyleOverride ?? banner.displayStyle;
 
   if (effectiveDisplayStyle === "simple") {
-    return (
-      <section className="py-2 lg:py-3">
-        <div className="container mx-auto max-w-screen-2xl px-6 lg:px-10">
-          <div
-            className="rounded-2xl px-6 lg:px-10 py-7 lg:py-8 flex flex-col sm:flex-row sm:items-center justify-between gap-5"
-            style={{ backgroundColor: bannerBgColor ?? "#ede8e0" }}
-          >
+    const simpleCard = (
+      <div
+        className="rounded-2xl px-6 lg:px-10 py-7 lg:py-8 flex flex-col sm:flex-row sm:items-center justify-between gap-5"
+        style={{ backgroundColor: bannerBgColor ?? "#ede8e0" }}
+      >
             <div className="min-w-0">
               {cbEyebrow && (
                 <p
@@ -333,9 +338,25 @@ export function CollectionBannerSection({
                 {cbCtaText} &rarr;
               </Link>
             </div>
-          </div>
+      </div>
+    );
+
+    if (embedded) return simpleCard;
+    return (
+      <section className="py-2 lg:py-3">
+        <div className="container mx-auto max-w-screen-2xl px-6 lg:px-10">
+          {simpleCard}
         </div>
       </section>
+    );
+  }
+
+  if (embedded) {
+    return (
+      <>
+        {mobileCard}
+        {desktopBanner}
+      </>
     );
   }
 

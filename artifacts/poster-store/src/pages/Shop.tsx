@@ -545,6 +545,7 @@ export default function Shop() {
                         resolvedRoutePrefix={resolvedRoutePrefix}
                         displayStyleOverride={segment.banner.shopDisplayStyle}
                         mobileModeOverride={segment.banner.shopMobileMode}
+                        embedded
                       />
                     </div>
                   )}
