@@ -1,0 +1,149 @@
+Implement the hybrid layered mockup system.
+
+Current state:
+
+* Existing mockup templates live in code in `src/lib/mockup-templates.ts`.
+* They are procedural background/frame templates.
+* There is currently no `mockup_templates` DB table, no mockup admin editor, and no per-poster assignment table.
+
+Goal:
+Keep the existing code-based mockups fully backward compatible, but add a new DB-backed layered mockup system for new uploaded mockups.
+
+Do not rebuild or migrate the existing procedural templates yet.
+
+Architecture:
+
+1. Existing code templates remain as legacy templates.
+2. Add a new DB-backed layered template system.
+3. New layered templates should support uploaded assets:
+
+   * base image
+   * lighting / shadow / reflection overlay image
+   * foreground image
+4. Layer usage should be controlled per poster assignment, not only globally on the template.
+
+Data model:
+Create a new table for layered mockup templates, for example `mockup_layered_templates`, with fields similar to:
+
+* id
+* store_id if stores are supported in the current schema
+* name
+* base_image_url
+* lighting_overlay_url
+* foreground_image_url
+* poster placement data / placement polygon or existing placement fields
+* default_lighting_blend_mode
+* default_lighting_opacity
+* default_foreground_opacity
+* sort_order
+* is_active
+* created_at
+* updated_at
+
+Create a poster-to-layered-mockup assignment table, for example `poster_mockup_assignments`, with fields similar to:
+
+* id
+* poster_id
+* layered_template_id
+* enabled
+* use_base default true
+* use_lighting_overlay default true
+* use_foreground default true
+* lighting_opacity_override nullable
+* foreground_opacity_override nullable
+* is_primary
+* is_hover_mockup
+* sort_order
+* created_at
+* updated_at
+
+If similar tables or concepts already exist, extend them instead of creating duplicate structures.
+
+Rendering requirements:
+Support two render paths:
+
+1. Legacy code templates from `src/lib/mockup-templates.ts` continue using the current renderer unchanged.
+2. DB layered templates use the new compositing renderer.
+
+Layered render order:
+
+1. Draw base image if `use_base` is true and the asset exists.
+2. Draw the poster artwork into the configured poster placement area.
+3. Draw the lighting/shadow/reflection overlay if `use_lighting_overlay` is true and the asset exists.
+4. Draw the foreground image if `use_foreground` is true and the asset exists.
+
+If a layer is missing or disabled, skip it gracefully.
+
+The lighting overlay should support blend mode and opacity. Default blend mode can be `multiply` for shadows, but allow configurable values such as `multiply`, `screen`, `overlay`, `soft-light`, and `source-over`.
+
+Admin requirements:
+Add admin UI for layered mockup templates:
+
+* create template
+* edit template
+* upload/replace/remove base image
+* upload/replace/remove lighting overlay
+* upload/replace/remove foreground image
+* configure poster placement
+* configure default lighting blend mode
+* configure default lighting opacity
+* configure foreground opacity
+* enable/disable template
+* sort/order templates if the current admin patterns support this
+
+Poster admin requirements:
+For each poster, allow assigning one or more layered mockup templates.
+For each poster/mockup assignment, allow toggling:
+
+* enabled
+* use base
+* use lighting overlay
+* use foreground
+* primary mockup
+* hover mockup
+* sort order
+
+The toggles must be per poster assignment. Example:
+
+* Poster A can use base + lighting + foreground.
+* Poster B can use base + foreground only.
+* Poster C can use base only.
+
+Preview/export:
+The admin preview and the final rendered/exported mockup must use the same compositing logic. Do not rely only on CSS for final output. Use the existing canvas/server-side rendering pattern if one exists, or add a reusable compositing function.
+
+Backward compatibility:
+
+* Existing mockups from `src/lib/mockup-templates.ts` must still work exactly as before.
+* Existing posters must not break.
+* Do not force existing posters into the new DB layered system.
+* Do not remove the legacy mockup template file.
+
+API requirements:
+Add or extend API endpoints for:
+
+* listing layered mockup templates
+* creating/updating/deleting layered mockup templates
+* uploading/removing layer assets
+* assigning layered mockups to posters
+* updating per-poster layer toggles
+
+Follow existing API/auth/admin patterns in the repo.
+
+Testing:
+Add tests for:
+
+* legacy templates still render/list as before
+* layered template with all layers enabled
+* layered template with lighting disabled
+* layered template with foreground disabled
+* missing layer assets are skipped without crashing
+* per-poster toggles affect only that poster assignment
+* primary/hover mockup flags work for layered templates if these concepts already exist
+
+Before finishing:
+
+* run typecheck
+* run existing tests
+* run build if available
+* report all files changed and any follow-up migration/admin steps needed
