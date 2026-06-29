@@ -103,52 +103,6 @@ export function CollectionBannerSection({
   };
   const ctaStyle: React.CSSProperties = bannerLinkColor ? { color: bannerLinkColor } : {};
 
-  const textContent = (
-    <>
-      {cbEyebrow && (
-        <p
-          className={cn(
-            "text-[10px] font-semibold uppercase tracking-[0.18em] mb-2.5",
-            !bannerEyebrowColor && "text-foreground/45"
-          )}
-          style={Object.keys(eyebrowStyle).length > 0 ? eyebrowStyle : undefined}
-        >
-          {cbEyebrow}
-        </p>
-      )}
-      <h2
-        className={cn(
-          "font-serif text-2xl sm:text-3xl font-bold leading-tight mb-3",
-          !bannerHeadingColor && "text-primary"
-        )}
-        style={Object.keys(headingStyle).length > 0 ? headingStyle : undefined}
-      >
-        {cbTitle}
-      </h2>
-      {cbText && (
-        <p
-          className={cn(
-            "text-sm leading-relaxed mb-5",
-            textMaxWidthClass,
-            !bannerTextColor && "text-foreground/65"
-          )}
-          style={Object.keys(textStyle).length > 0 ? textStyle : undefined}
-        >
-          {cbText}
-        </p>
-      )}
-      <Link
-        href={resolvedCtaHref}
-        className={cn(
-          "inline-flex items-center gap-1.5 text-sm font-semibold hover:underline",
-          !bannerLinkColor && "text-primary"
-        )}
-        style={Object.keys(ctaStyle).length > 0 ? ctaStyle : undefined}
-      >
-        {cbCtaText} &rarr;
-      </Link>
-    </>
-  );
 
   const posterCards = showPosters && collectionPreviewPosters.length > 0 ? (
     <div className="flex-none flex items-end gap-2.5 sm:gap-3">
@@ -285,12 +239,53 @@ export function CollectionBannerSection({
   );
 
   const mobileCard = mobileMode === "simplified-card" ? (
-    <div
-      className="sm:hidden rounded-2xl px-5 py-6"
+    <Link
+      href={resolvedCtaHref}
+      className="block sm:hidden rounded-2xl px-5 py-6 cursor-pointer"
       style={{ backgroundColor: bannerBgColor ?? "#EBD9C4" }}
     >
-      {textContent}
-    </div>
+      {cbEyebrow && (
+        <p
+          className={cn(
+            "text-[10px] font-semibold uppercase tracking-[0.18em] mb-2.5",
+            !bannerEyebrowColor && "text-foreground/45"
+          )}
+          style={Object.keys(eyebrowStyle).length > 0 ? eyebrowStyle : undefined}
+        >
+          {cbEyebrow}
+        </p>
+      )}
+      <h2
+        className={cn(
+          "font-serif text-2xl sm:text-3xl font-bold leading-tight mb-3",
+          !bannerHeadingColor && "text-primary"
+        )}
+        style={Object.keys(headingStyle).length > 0 ? headingStyle : undefined}
+      >
+        {cbTitle}
+      </h2>
+      {cbText && (
+        <p
+          className={cn(
+            "text-sm leading-relaxed mb-5",
+            textMaxWidthClass,
+            !bannerTextColor && "text-foreground/65"
+          )}
+          style={Object.keys(textStyle).length > 0 ? textStyle : undefined}
+        >
+          {cbText}
+        </p>
+      )}
+      <span
+        className={cn(
+          "inline-flex items-center gap-1.5 text-sm font-semibold underline underline-offset-2",
+          !bannerLinkColor && "text-primary"
+        )}
+        style={Object.keys(ctaStyle).length > 0 ? ctaStyle : undefined}
+      >
+        {cbCtaText} &rarr;
+      </span>
+    </Link>
   ) : null;
 
   const effectiveDisplayStyle = displayStyleOverride ?? banner.displayStyle;

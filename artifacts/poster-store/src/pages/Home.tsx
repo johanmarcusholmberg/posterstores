@@ -491,7 +491,7 @@ function HeroSection({ store, resolvedRoutePrefix, sectionConfig }: HeroSectionP
       style={sectionStyle}
     >
       {hasHeroBg && (
-        <div className="absolute inset-0" style={overlayDivStyle} />
+        <div className="absolute inset-0 pointer-events-none" style={overlayDivStyle} />
       )}
       <div className="relative z-10 container mx-auto max-w-screen-2xl px-6 lg:px-10 pt-3 pb-5 lg:pt-4 lg:pb-6 text-center">
         <h1
