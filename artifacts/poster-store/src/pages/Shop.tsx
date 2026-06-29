@@ -349,15 +349,24 @@ export default function Shop() {
     for (const banner of shopBanners) {
       const insertAfter = banner.shopInsertAfter ?? 0;
       if (insertAfter <= start) continue;
-      // Only inject if enough posters have loaded to reach this position
-      if (insertAfter > accumulated.length) break;
-      segments.push({ posters: accumulated.slice(start, insertAfter), banner });
-      start = insertAfter;
+      // Skip banners beyond the known total poster count (would never be reached)
+      if (grandTotal > 0 && insertAfter > grandTotal) break;
+      // Pin the banner at its configured slot, clamped to however many posters have
+      // loaded so far. When not enough posters are loaded yet, the banner appears at
+      // the end of the current list and gently moves toward its final position as more
+      // posters fill in — preventing the jarring jump that would occur if the banner
+      // were hidden entirely and then suddenly inserted mid-grid on the next page load.
+      const sliceEnd = Math.min(insertAfter, accumulated.length);
+      segments.push({ posters: accumulated.slice(start, sliceEnd), banner });
+      start = sliceEnd;
+      // If accumulated hasn't reached this banner's position yet, stop here —
+      // no posters to place after it yet.
+      if (accumulated.length <= insertAfter) break;
     }
-    // Remaining posters with no banner (or not enough loaded yet to reach the next banner)
+    // Remaining posters after all injected banners
     segments.push({ posters: accumulated.slice(start), banner: null });
     return segments;
-  }, [accumulated, shopBanners, hasAnyFilter]);
+  }, [accumulated, grandTotal, shopBanners, hasAnyFilter]);
 
   const gridClasses = "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6";
 
