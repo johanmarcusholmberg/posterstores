@@ -392,7 +392,33 @@ function CollectionBannerEditor({ banner, bannerLabel, totalBanners, onUpdate, o
       {/* Content */}
       {expanded && (
         <div className="p-4 space-y-4">
-          <ImageUploader
+
+          {/* Display style toggle */}
+          <div className="space-y-1.5">
+            <Label>Display style</Label>
+            <div className="flex gap-2">
+              {(["visual", "simple"] as const).map((style) => (
+                <button key={style} type="button"
+                  onClick={() => onUpdate({ displayStyle: style })}
+                  className={cn(
+                    "flex-1 py-1.5 rounded-md border text-sm font-medium transition-colors",
+                    (banner.displayStyle ?? "visual") === style
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-border bg-background hover:bg-muted"
+                  )}>
+                  {style === "visual" ? "Visual (image)" : "Simple (text strip)"}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {(banner.displayStyle ?? "visual") === "simple"
+                ? "Flat editorial strip — no image needed. Uses background color below."
+                : "Full-bleed background image with text overlay."}
+            </p>
+          </div>
+
+          {(banner.displayStyle ?? "visual") === "visual" && (
+          <><ImageUploader
             label="Background image"
             hint="Fills the banner background. Leave empty for the default warm sand tone."
             recommendedSpec={
@@ -464,6 +490,7 @@ function CollectionBannerEditor({ banner, bannerLabel, totalBanners, onUpdate, o
                 onValueChange={([v]) => onUpdate({ backgroundOverlayOpacity: v / 100 })} />
             </div>
           )}
+          </>)}
 
           {/* Text fields */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

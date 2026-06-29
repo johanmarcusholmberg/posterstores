@@ -806,6 +806,7 @@ export interface CollectionBannerVisualConfig {
   textOffsetX?: number;
   /** Fine-tune vertical position of the text column in pixels. Default: 0. */
   textOffsetY?: number;
+  displayStyle?: "visual" | "simple";
 }
 
 export type HomepageSectionType =

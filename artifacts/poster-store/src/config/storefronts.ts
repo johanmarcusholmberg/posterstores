@@ -106,6 +106,8 @@ export interface CollectionBannerVisualConfig {
   textOffsetX?: number;
   /** Fine-tune vertical position of the text column in pixels. Default: 0. */
   textOffsetY?: number;
+  /** How the banner is presented. "visual" = full-bleed image (default). "simple" = flat editorial text strip, no image. */
+  displayStyle?: "visual" | "simple";
 }
 
 export type HomepageSectionType =

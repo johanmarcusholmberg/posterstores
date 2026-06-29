@@ -734,6 +734,7 @@ const collectionBannerVisualBaseSchema = z.object({
   mobileMode: z.enum(["full-banner", "simplified-card", "hidden"]).optional(),
   textOffsetX: z.number().min(-300).max(300).optional(),
   textOffsetY: z.number().min(-300).max(300).optional(),
+  displayStyle: z.enum(["visual", "simple"]).optional(),
 });
 
 const collectionBannerVisualSchema = collectionBannerVisualBaseSchema.optional();

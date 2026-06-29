@@ -979,6 +979,58 @@ function CollectionBannerSection({
     </div>
   ) : null;
 
+  // ── Simple mode — flat editorial strip, no image ───────────────────────────
+  if (banner.displayStyle === "simple") {
+    return (
+      <section className="py-2 lg:py-3">
+        <div className="container mx-auto max-w-screen-2xl px-6 lg:px-10">
+          <div
+            className="rounded-2xl px-6 lg:px-10 py-7 lg:py-8 flex flex-col sm:flex-row sm:items-center justify-between gap-5"
+            style={{ backgroundColor: bannerBgColor ?? "#ede8e0" }}
+          >
+            {/* Left: text */}
+            <div className="min-w-0">
+              {cbEyebrow && (
+                <p
+                  className={cn("text-[10px] font-semibold uppercase tracking-[0.18em] mb-1.5", !bannerEyebrowColor && "text-foreground/45")}
+                  style={bannerEyebrowColor ? { color: bannerEyebrowColor } : undefined}
+                >
+                  {cbEyebrow}
+                </p>
+              )}
+              <h2
+                className={cn("font-serif text-xl sm:text-2xl font-bold leading-tight", !bannerHeadingColor && "text-primary")}
+                style={bannerHeadingColor ? { color: bannerHeadingColor } : undefined}
+              >
+                {cbTitle}
+              </h2>
+              {cbText && (
+                <p
+                  className={cn("text-sm mt-1.5 max-w-sm", !bannerTextColor && "text-foreground/65")}
+                  style={bannerTextColor ? { color: bannerTextColor } : undefined}
+                >
+                  {cbText}
+                </p>
+              )}
+            </div>
+
+            {/* Right: poster cards + CTA */}
+            <div className="flex items-center gap-5 shrink-0">
+              {posterCards}
+              <Link
+                href={resolvedCtaHref}
+                className={cn("inline-flex items-center gap-1.5 text-sm font-semibold hover:underline whitespace-nowrap", !bannerLinkColor && "text-primary")}
+                style={bannerLinkColor ? { color: bannerLinkColor } : undefined}
+              >
+                {cbCtaText} &rarr;
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="py-2 lg:py-3">
       <div className={cn("container mx-auto max-w-screen-2xl px-6 lg:px-10", mobileMode === "simplified-card" && "space-y-2 sm:space-y-0")}>
