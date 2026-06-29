@@ -526,6 +526,23 @@ export const AdminPosterMockupManager = ({
                       {/* Layer toggles — only shown when template has layered assets */}
                       {(draft.hasLightingOverlay || draft.hasForeground) && (
                         <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                          <label className="flex items-center gap-1 text-[10px] cursor-pointer select-none text-muted-foreground hover:text-foreground transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={draft.useBase}
+                              onChange={(e) =>
+                                setDrafts((prev) =>
+                                  prev.map((d) =>
+                                    d.key === draft.key
+                                      ? { ...d, useBase: e.target.checked }
+                                      : d
+                                  )
+                                )
+                              }
+                              className="w-3 h-3 accent-primary"
+                            />
+                            Base
+                          </label>
                           {draft.hasLightingOverlay && (
                             <label className="flex items-center gap-1 text-[10px] cursor-pointer select-none text-muted-foreground hover:text-foreground transition-colors">
                               <input

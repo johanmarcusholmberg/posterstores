@@ -295,36 +295,24 @@ async function fetchAndPrepareOverlay(
 // ─── Exported compositors ─────────────────────────────────────────────────────
 
 /**
- * Composite a poster image into a mockup template image using the given
- * bounding-box placement config. Returns a JPEG Buffer of the composited result.
+ * Internal helper: place a pre-loaded, pre-resized poster onto a pre-loaded
+ * base canvas buffer using the given bounding-box placement config.
  *
- * Placement values (posterX, posterY, posterWidth, posterHeight) are
- * percentages of the template image's dimensions (0–100).
+ * W / H are the pixel dimensions of baseBuf (the caller must supply them to
+ * avoid a redundant metadata() call when the caller already knows the size).
  */
-export async function compositePosterIntoTemplate(
-  templateImageUrl: string,
-  posterImageUrl: string,
+async function applyPosterToCanvas(
+  baseBuf: Buffer,
+  posterBuffer: Buffer,
+  W: number,
+  H: number,
   config: CompositorConfig
 ): Promise<Buffer> {
-  const [templateBuffer, posterBuffer] = await Promise.all([
-    fetchImageBuffer(templateImageUrl),
-    fetchImageBuffer(posterImageUrl),
-  ]);
-
-  const templateMeta = await sharp(templateBuffer).metadata();
-  const templateW = templateMeta.width ?? 1000;
-  const templateH = templateMeta.height ?? 1000;
-
   const fit = config.fitMode ?? "cover";
-  const pxPct = config.posterX / 100;
-  const pyPct = config.posterY / 100;
-  const pwPct = config.posterWidth / 100;
-  const phPct = config.posterHeight / 100;
-
-  const areaLeft = Math.round(pxPct * templateW);
-  const areaTop = Math.round(pyPct * templateH);
-  const areaW = Math.round(pwPct * templateW);
-  const areaH = Math.round(phPct * templateH);
+  const areaLeft = Math.round((config.posterX / 100) * W);
+  const areaTop = Math.round((config.posterY / 100) * H);
+  const areaW = Math.round((config.posterWidth / 100) * W);
+  const areaH = Math.round((config.posterHeight / 100) * H);
 
   if (areaW <= 0 || areaH <= 0) throw new Error(`Invalid placement area: ${areaW}x${areaH}`);
 
@@ -362,7 +350,7 @@ export async function compositePosterIntoTemplate(
   if (config.brightness != null && config.brightness !== 1) modulations.brightness = config.brightness;
   if (config.saturation != null && config.saturation !== 1) modulations.saturation = config.saturation;
 
-  let compositeSharp = sharp(templateBuffer).composite([
+  let compositeSharp = sharp(baseBuf).composite([
     { input: posterBuf, left: areaLeft, top: areaTop, blend: "over" },
   ]);
 
@@ -375,6 +363,27 @@ export async function compositePosterIntoTemplate(
   }
 
   return compositeSharp.jpeg({ quality: 88, mozjpeg: true }).toBuffer();
+}
+
+/**
+ * Composite a poster image into a mockup template image using the given
+ * bounding-box placement config. Returns a JPEG Buffer of the composited result.
+ *
+ * Placement values (posterX, posterY, posterWidth, posterHeight) are
+ * percentages of the template image's dimensions (0–100).
+ */
+export async function compositePosterIntoTemplate(
+  templateImageUrl: string,
+  posterImageUrl: string,
+  config: CompositorConfig
+): Promise<Buffer> {
+  const [templateBuffer, posterBuffer] = await Promise.all([
+    fetchImageBuffer(templateImageUrl),
+    fetchImageBuffer(posterImageUrl),
+  ]);
+
+  const { width: W = 1000, height: H = 1000 } = await sharp(templateBuffer).metadata();
+  return applyPosterToCanvas(templateBuffer, posterBuffer, W, H, config);
 }
 
 /**
@@ -488,45 +497,59 @@ export interface LayeredCompositorConfig extends CompositorConfig {
  * Composite a poster into a template with optional layered overlays.
  *
  * Render order:
- *  1. Base image with poster artwork composited into the placement area.
- *  2. Lighting / shadow / reflection overlay (optional, blend mode + opacity configurable).
- *  3. Foreground image (optional, composited with "over" blend).
+ *  1. Base image (or plain white canvas when useBase=false) with poster artwork
+ *     composited into the placement area via applyPosterToCanvas.
+ *  2. Lighting / shadow / reflection overlay (optional, blend mode + opacity).
+ *  3. Foreground image (optional, "over" blend).
  *
  * Layers with missing assets or use*=false are silently skipped.
- * Falls back to the standard compositor when no layered assets are configured.
+ * Non-layered templates should use compositePosterIntoTemplate directly.
+ *
+ * Template image is fetched once for both dimension lookup and rendering —
+ * no double-fetch regardless of useBase setting.
  */
 export async function compositeLayeredMockup(
   templateImageUrl: string,
   posterImageUrl: string,
   config: LayeredCompositorConfig
 ): Promise<Buffer> {
-  let currentBuffer = await compositePosterIntoTemplate(
-    templateImageUrl,
-    posterImageUrl,
-    config
-  );
+  // Fetch both images upfront — dimensions are always needed for overlay sizing
+  // and the poster must always be placed regardless of useBase.
+  const [templateBuf, posterBuffer] = await Promise.all([
+    fetchImageBuffer(templateImageUrl),
+    fetchImageBuffer(posterImageUrl),
+  ]);
 
-  const hasLighting =
-    config.useLightingOverlay !== false && !!config.lightingOverlayUrl;
-  const hasForeground =
-    config.useForeground !== false && !!config.foregroundImageUrl;
+  const { width: W = 1000, height: H = 1000 } = await sharp(templateBuf).metadata();
+
+  // ── Step 1+2: base canvas + poster placement ─────────────────────────────
+  let currentBuffer: Buffer;
+
+  if (config.useBase === false) {
+    // No background: composite poster onto a plain white canvas.
+    // Template is still fetched above (needed for W/H); its pixels are not used.
+    const whiteBuf = await sharp({
+      create: { width: W, height: H, channels: 3, background: { r: 255, g: 255, b: 255 } },
+    })
+      .jpeg({ quality: 95 })
+      .toBuffer();
+    currentBuffer = await applyPosterToCanvas(whiteBuf, posterBuffer, W, H, config);
+  } else {
+    // Standard path: composite poster onto the background image.
+    currentBuffer = await applyPosterToCanvas(templateBuf, posterBuffer, W, H, config);
+  }
+
+  // ── Step 3: lighting / shadow overlay ────────────────────────────────────
+  const hasLighting = config.useLightingOverlay !== false && !!config.lightingOverlayUrl;
+  const hasForeground = config.useForeground !== false && !!config.foregroundImageUrl;
 
   if (!hasLighting && !hasForeground) return currentBuffer;
-
-  const templateBuf = await fetchImageBuffer(templateImageUrl);
-  const { width: templateW = 1000, height: templateH = 1000 } =
-    await sharp(templateBuf).metadata();
 
   if (hasLighting) {
     try {
       const blendMode = normalizeBlendMode(config.lightingBlendMode);
       const opacity = Math.max(0, Math.min(1, config.lightingOpacity ?? 0.8));
-      const overlayBuf = await fetchAndPrepareOverlay(
-        config.lightingOverlayUrl!,
-        templateW,
-        templateH,
-        opacity
-      );
+      const overlayBuf = await fetchAndPrepareOverlay(config.lightingOverlayUrl!, W, H, opacity);
       currentBuffer = await sharp(currentBuffer)
         .composite([{ input: overlayBuf, blend: blendMode }])
         .jpeg({ quality: 88, mozjpeg: true })
@@ -536,18 +559,11 @@ export async function compositeLayeredMockup(
     }
   }
 
+  // ── Step 4: foreground overlay ────────────────────────────────────────────
   if (hasForeground) {
     try {
-      const opacity = Math.max(
-        0,
-        Math.min(1, config.foregroundOpacity ?? 1.0)
-      );
-      const fgBuf = await fetchAndPrepareOverlay(
-        config.foregroundImageUrl!,
-        templateW,
-        templateH,
-        opacity
-      );
+      const opacity = Math.max(0, Math.min(1, config.foregroundOpacity ?? 1.0));
+      const fgBuf = await fetchAndPrepareOverlay(config.foregroundImageUrl!, W, H, opacity);
       currentBuffer = await sharp(currentBuffer)
         .composite([{ input: fgBuf, blend: "over" }])
         .jpeg({ quality: 88, mozjpeg: true })

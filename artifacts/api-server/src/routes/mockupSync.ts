@@ -406,6 +406,7 @@ router.post(
                 lightingBlendMode: template.defaultLightingBlendMode,
                 lightingOpacity: mockup.lightingOpacityOverride ?? template.defaultLightingOpacity,
                 foregroundOpacity: mockup.foregroundOpacityOverride ?? template.defaultForegroundOpacity,
+                useBase: mockup.useBase,
                 useLightingOverlay: mockup.useLightingOverlay,
                 useForeground: mockup.useForeground,
               }
