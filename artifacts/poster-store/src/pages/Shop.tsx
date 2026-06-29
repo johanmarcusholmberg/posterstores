@@ -540,6 +540,7 @@ export default function Shop() {
                     <div className="my-4">
                       <CollectionBannerSection
                         banner={segment.banner}
+                        staticBanner={store.shop?.collectionBanner ?? null}
                         collectionPreviewPosters={[]}
                         resolvedRoutePrefix={resolvedRoutePrefix}
                         displayStyleOverride={segment.banner.shopDisplayStyle}
