@@ -216,7 +216,7 @@ export function CollectionBannerSection({
             )}
             style={imageFit === "cover" ? { objectPosition: objectPos } : undefined}
           />
-          <div className="absolute inset-0" style={overlayStyle} />
+          <div className="absolute inset-0 pointer-events-none" style={overlayStyle} />
           {gradientOverlay}
         </>
       ) : null}
