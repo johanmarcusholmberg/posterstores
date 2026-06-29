@@ -232,6 +232,10 @@ export interface StorefrontConfig {
   logoUrl?: string | null;
   logoAltText?: string | null;
   homepageVisualConfig?: HomepageVisualConfig | null;
+  shopConfig?: {
+    /** Controls the poster card visual style in the shop grid. Default: "simple". */
+    cardStyle?: "simple" | "visual" | null;
+  } | null;
 }
 
 export const storefronts: Record<string, StorefrontConfig> = {

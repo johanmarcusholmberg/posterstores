@@ -13,6 +13,7 @@ import {
   type AdminStoreTypographyConfig,
   type AdminStoreHomepageConfig,
   type AdminStoreSeoConfig,
+  type AdminShopConfig,
   type HeroTextMode,
   type HeroOverlayMode,
 } from "@/lib/adminApi";
@@ -140,6 +141,11 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
     (existing?.posterCardPresentation as "current" | "full-image" | "stage" | null | undefined) ?? "current"
   );
 
+  // Shop layout
+  const [shopCardStyle, setShopCardStyle] = useState<"simple" | "visual">(
+    (existing?.shopConfig?.cardStyle as "simple" | "visual" | null | undefined) ?? "simple"
+  );
+
   // Logo / branding
   const [logoUrl, setLogoUrl] = useState(existing?.logoUrl ?? null);
   const [logoAltText, setLogoAltText] = useState(existing?.logoAltText ?? "");
@@ -248,6 +254,7 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
           routePrefix: routePrefix || null,
           logoAltText: logoAltText || null,
           posterCardPresentation: posterCardPresentation === "current" ? null : posterCardPresentation,
+          shopConfig: { cardStyle: shopCardStyle } satisfies AdminShopConfig,
         };
         await adminUpdateStore(existing.storeKey, payload);
         toast({ title: "Store updated", description: `${name} has been saved.` });
@@ -268,6 +275,7 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
           domainAliases: aliases.length > 0 ? aliases : null,
           routePrefix: routePrefix || null,
           posterCardPresentation: posterCardPresentation === "current" ? null : posterCardPresentation,
+          shopConfig: { cardStyle: shopCardStyle } satisfies AdminShopConfig,
         };
         await adminCreateStore(payload);
         toast({ title: "Store created", description: `${name} (${storeKey}) is ready.` });
@@ -722,6 +730,40 @@ export const AdminStoreForm = ({ existing }: AdminStoreFormProps) => {
       </Card>
 
       {/* Poster card presentation selector removed — fitting is now automatic based on poster size labels */}
+
+      {/* Shop layout */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Shop layout</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label className="mb-2 block">Poster card style</Label>
+            <div className="grid grid-cols-2 gap-3">
+              {(["simple", "visual"] as const).map((style) => (
+                <button
+                  key={style}
+                  type="button"
+                  onClick={() => setShopCardStyle(style)}
+                  className={[
+                    "rounded-md border-2 p-3 text-left transition-colors",
+                    shopCardStyle === style
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-muted-foreground/40",
+                  ].join(" ")}
+                >
+                  <p className="font-medium text-sm capitalize">{style}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {style === "simple"
+                      ? "Card with shadow, artwork contained, text below"
+                      : "Full-bleed image with gradient text overlay"}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Theme */}
       <Card>

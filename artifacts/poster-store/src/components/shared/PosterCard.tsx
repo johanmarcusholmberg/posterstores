@@ -8,6 +8,7 @@ import { Heart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { LoginPromptModal } from "./LoginPromptModal";
 import { PosterArtworkStage } from "./PosterArtworkStage";
+import { getOptimizedImageUrl } from "@/lib/imageUrl";
 
 interface PosterCardProps {
   poster: Poster;
@@ -27,6 +28,8 @@ export const PosterCard = ({ poster, favoritedIds, priority = false }: PosterCar
   const store = useStorefront();
   const { user } = useAuth();
   const { toast } = useToast();
+
+  const cardStyle = store.shopConfig?.cardStyle ?? "simple";
 
   const baseImage = poster.imageUrl;
   const primaryMockup = poster.primaryDisplayImageUrl ?? null;
@@ -89,6 +92,71 @@ export const PosterCard = ({ poster, favoritedIds, priority = false }: PosterCar
   const slug = (poster as any).slug as string | undefined;
   const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
 
+  const heartBtn = (
+    <button
+      type="button"
+      onClick={toggleFavorite}
+      disabled={isPending}
+      aria-label={isFavorite ? "Remove from wishlist" : "Add to wishlist"}
+      data-testid={`btn-favorite-${poster.id}`}
+      className="h-7 w-7 flex items-center justify-center rounded-full active:scale-95 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a08a] disabled:opacity-50"
+    >
+      <Heart
+        className={`h-3.5 w-3.5 transition-colors duration-150 ${isFavorite ? "fill-[#8f5f45] text-[#8f5f45]" : "text-[#8f5f45]/60"}`}
+      />
+    </button>
+  );
+
+  if (cardStyle === "visual") {
+    return (
+      <>
+        <Link
+          href={href}
+          className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          data-testid={`link-poster-${poster.id}`}
+        >
+          {/* Full-bleed image — object-cover, 5:7 ratio */}
+          <div className="relative aspect-[5/7] overflow-hidden bg-[#ede8e0]">
+            <img
+              src={getOptimizedImageUrl(baseImage, { width: 600, quality: 85 })}
+              alt={poster.title}
+              loading={priority ? "eager" : "lazy"}
+              fetchPriority={priority ? "high" : undefined}
+              decoding="async"
+              className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
+              data-testid={`img-poster-${poster.id}`}
+              onError={(e) => { (e.target as HTMLImageElement).src = poster.imageUrl; }}
+            />
+
+            {/* Gradient overlay — always present, fades title/price in */}
+            <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
+
+            {/* Text overlay at bottom */}
+            <div className="absolute inset-x-0 bottom-0 p-3 flex items-end justify-between gap-2">
+              <div className="min-w-0">
+                <h3 className="font-serif font-semibold text-[13px] text-white truncate leading-snug drop-shadow">
+                  {(poster as any).displayTitle || poster.title}
+                </h3>
+                <p className="text-[11px] text-white/75 mt-0.5 drop-shadow">{priceLabel}</p>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                {poster.isNew && (
+                  <div className="rounded-full border border-white/50 text-white bg-white/20 text-[10px] font-medium tracking-[0.12em] uppercase px-2 py-[2px] whitespace-nowrap backdrop-blur-sm">
+                    NEW
+                  </div>
+                )}
+                <div className="hover:bg-white/20 rounded-full">
+                  {heartBtn}
+                </div>
+              </div>
+            </div>
+          </div>
+        </Link>
+        <LoginPromptModal open={showPrompt} onClose={() => setShowPrompt(false)} />
+      </>
+    );
+  }
+
   return (
     <>
       <Link
@@ -150,18 +218,9 @@ export const PosterCard = ({ poster, favoritedIds, priority = false }: PosterCar
                     NEW
                   </div>
                 )}
-                <button
-                  type="button"
-                  onClick={toggleFavorite}
-                  disabled={isPending}
-                  aria-label={isFavorite ? "Remove from wishlist" : "Add to wishlist"}
-                  data-testid={`btn-favorite-${poster.id}`}
-                  className="h-7 w-7 flex items-center justify-center rounded-full hover:bg-[#ede8e0] active:scale-95 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a08a] disabled:opacity-50"
-                >
-                  <Heart
-                    className={`h-3.5 w-3.5 transition-colors duration-150 ${isFavorite ? "fill-[#8f5f45] text-[#8f5f45]" : "text-[#8f5f45]/60"}`}
-                  />
-                </button>
+                <div className="hover:bg-[#ede8e0] rounded-full">
+                  {heartBtn}
+                </div>
               </div>
             </div>
           </div>
