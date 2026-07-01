@@ -411,12 +411,7 @@ export const MockupGallery = ({
                 onClick={() => setActiveIdx(idx)}
                 aria-label={img.label}
                 aria-pressed={idx === activeIdx}
-                className={cn(
-                  "relative shrink-0 overflow-hidden border-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-                  activeIdx === idx
-                    ? "border-primary opacity-100"
-                    : "border-transparent opacity-50 hover:opacity-80"
-                )}
+                className="relative shrink-0 overflow-hidden border-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary border-transparent hover:opacity-80 opacity-[1]"
                 style={{ width: 68, height: 68 }}
               >
                 <img
@@ -432,7 +427,6 @@ export const MockupGallery = ({
           </div>
         )}
       </div>
-
       {/* Lightbox */}
       {lightboxOpen && (
         <div
