@@ -452,8 +452,8 @@ export const MockupGallery = ({
               <X className="w-7 h-7" />
             </button>
 
-            {/* Image — let it define its own size within viewport limits */}
-            <div className="relative flex items-center justify-center w-full mt-10">
+            {/* Image zone — fixed height so thumbnails never shift when images change ratio */}
+            <div className="relative flex items-center justify-center w-full mt-10 h-[60vh] sm:h-[72vh]">
               {allImages.length > 1 && (
                 <button
                   onClick={prevLightbox}
@@ -539,7 +539,7 @@ function LightboxImage({
     <img
       src={item.url}
       alt={alt}
-      className="block max-h-[82vh] max-w-[88vw] w-auto h-auto object-contain"
+      className="block w-full h-full object-contain"
       onError={(e) => { (e.target as HTMLImageElement).src = fallbackImageUrl; }}
     />
   );
