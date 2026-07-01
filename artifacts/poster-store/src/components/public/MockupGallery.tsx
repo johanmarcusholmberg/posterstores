@@ -539,7 +539,7 @@ function LightboxImage({
     <img
       src={item.url}
       alt={alt}
-      className="block w-full h-full object-contain"
+      className="block max-w-full max-h-full w-auto h-auto object-contain"
       onError={(e) => { (e.target as HTMLImageElement).src = fallbackImageUrl; }}
     />
   );
