@@ -230,7 +230,7 @@ function NewArrivalCard({
         {/* Artwork: inner ratio-wrapper with object-contain — no cropping */}
         <div className="absolute inset-0 flex items-center justify-center">
           <div
-            className="transition-transform duration-300 ease-out scale-100 group-hover:scale-[1.05] motion-reduce:transition-none"
+            className="motion-reduce:transition-none"
             style={artworkInnerStyle(ratio)}
           >
             <img
