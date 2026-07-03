@@ -220,13 +220,20 @@ function NewArrivalCard({
     .filter(Boolean) as string[];
   const baseImage = poster.imageUrl;
   const [ratio, setRatio] = useState<number | null>(null);
+  // Landscape/square posters (ratio >= 1): shrink the field's height to hug the
+  // image instead of letterboxing top/bottom inside the default portrait box.
+  const fieldStyle: React.CSSProperties | undefined =
+    ratio !== null && ratio >= 1 ? { aspectRatio: String(ratio) } : undefined;
 
   return (
     <Link
       href={href}
       className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
-      <div className="relative aspect-[3/4] overflow-hidden bg-[#f4f0eb] shadow-[0_1px_4px_rgba(0,0,0,0.06)] group-hover:shadow-[0_4px_18px_rgba(0,0,0,0.13)] transition-shadow duration-300">
+      <div
+        className="relative aspect-[3/4] overflow-hidden bg-[#f4f0eb] shadow-[0_1px_4px_rgba(0,0,0,0.06)] group-hover:shadow-[0_4px_18px_rgba(0,0,0,0.13)] transition-shadow duration-300"
+        style={fieldStyle}
+      >
         {/* Artwork: inner ratio-wrapper with object-contain — no cropping */}
         <div className="absolute inset-0 flex items-center justify-center">
           <div
