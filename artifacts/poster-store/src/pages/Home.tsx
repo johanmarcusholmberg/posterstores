@@ -227,10 +227,10 @@ function NewArrivalCard({
       className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
       <div className="relative aspect-[3/4] overflow-hidden bg-[#f4f0eb] shadow-[0_1px_4px_rgba(0,0,0,0.06)] group-hover:shadow-[0_4px_18px_rgba(0,0,0,0.13)] transition-shadow duration-300">
-        {/* Artwork: inner ratio-wrapper with object-contain — no cropping */}
+        {/* Artwork: inner ratio-wrapper with object-contain — border & hover hug the image */}
         <div className="absolute inset-0 flex items-center justify-center">
           <div
-            className="motion-reduce:transition-none"
+            className="relative motion-reduce:transition-none"
             style={artworkInnerStyle(ratio)}
           >
             <img
@@ -245,19 +245,21 @@ function NewArrivalCard({
                   setRatio(img.naturalWidth / img.naturalHeight);
               }}
             />
+            {/* Hover overlay hugs the actual image, not the full stage */}
+            <div
+              className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-250 flex flex-col justify-end p-3 pointer-events-none"
+              aria-hidden="true"
+            >
+              {hasPrice && <p className="text-white text-[11px] font-semibold mb-0.5">{priceLabel}</p>}
+              {sizeLabels.length > 0 && (
+                <p className="text-white/65 text-[10px] mb-1.5 leading-tight">{sizeLabels.join(" · ")}</p>
+              )}
+              <span className="text-white/90 text-[11px] font-medium">View poster →</span>
+            </div>
+            {/* Border ring hugs the actual image */}
+            <div className="absolute inset-0 ring-1 ring-inset ring-black/[0.14] pointer-events-none" aria-hidden="true" />
           </div>
         </div>
-        <div
-          className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-250 flex flex-col justify-end p-3 pointer-events-none"
-          aria-hidden="true"
-        >
-          {hasPrice && <p className="text-white text-[11px] font-semibold mb-0.5">{priceLabel}</p>}
-          {sizeLabels.length > 0 && (
-            <p className="text-white/65 text-[10px] mb-1.5 leading-tight">{sizeLabels.join(" · ")}</p>
-          )}
-          <span className="text-white/90 text-[11px] font-medium">View poster →</span>
-        </div>
-        <div className="absolute inset-0 ring-1 ring-inset ring-black/[0.14] pointer-events-none" aria-hidden="true" />
       </div>
       <div className="mt-1.5 min-w-0">
         <h3
