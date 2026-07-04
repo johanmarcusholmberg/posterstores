@@ -278,9 +278,12 @@ function NewArrivalCard({
     >
       <div
         ref={stageRef}
-        className="relative aspect-[3/4] overflow-hidden bg-[#f4f0eb] shadow-[0_1px_4px_rgba(0,0,0,0.06)] group-hover:shadow-[0_4px_18px_rgba(0,0,0,0.13)] transition-shadow duration-300"
+        className="relative aspect-[3/4] overflow-hidden"
       >
-        <div className="absolute inset-0" style={wrapperStyle}>
+        <div
+          className="absolute inset-0 shadow-[0_1px_4px_rgba(0,0,0,0.06)] group-hover:shadow-[0_4px_18px_rgba(0,0,0,0.13)] transition-shadow duration-300"
+          style={wrapperStyle}
+        >
           <img
             src={getOptimizedImageUrl(baseImage, { width: 400, quality: 75 })}
             alt={poster.title}
