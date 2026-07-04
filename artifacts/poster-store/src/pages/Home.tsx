@@ -97,12 +97,33 @@ const NEW_BADGE_CLS =
  * Before load (null): absolute fill so object-contain img is immediately visible.
  * Portrait (< 1): fill card height, auto width — tiny side gaps acceptable.
  * Landscape/square (≥ 1): fill card width, auto height — background above/below blends.
+ *
+ * Uses absolute positioning + translate(-50%,-50%) for rock-solid centering inside
+ * any stage, avoiding flex/aspect-ratio cross-browser quirks.
  */
 function artworkInnerStyle(ratio: number | null): React.CSSProperties {
   if (ratio === null) return { position: "absolute", inset: 0 };
   if (ratio < 1)
-    return { position: "relative", aspectRatio: String(ratio), height: "100%", width: "auto", maxWidth: "100%" };
-  return { position: "relative", aspectRatio: String(ratio), width: "100%", height: "auto", maxHeight: "100%" };
+    return {
+      position: "absolute",
+      aspectRatio: String(ratio),
+      height: "100%",
+      width: "auto",
+      maxWidth: "100%",
+      top: "50%",
+      left: "50%",
+      transform: "translate(-50%, -50%)",
+    };
+  return {
+    position: "absolute",
+    aspectRatio: String(ratio),
+    width: "100%",
+    height: "auto",
+    maxHeight: "100%",
+    top: "50%",
+    left: "50%",
+    transform: "translate(-50%, -50%)",
+  };
 }
 
 function HomePosterCard({ poster }: { poster: Poster }) {
@@ -219,46 +240,68 @@ function NewArrivalCard({
     .map((s) => (s as any).size as string | undefined)
     .filter(Boolean) as string[];
   const baseImage = poster.imageUrl;
+  const stageRef = useRef<HTMLDivElement>(null);
   const [ratio, setRatio] = useState<number | null>(null);
+  const [stageSize, setStageSize] = useState<{ w: number; h: number } | null>(null);
+
+  const wrapperStyle: React.CSSProperties | undefined = (() => {
+    if (!stageSize || ratio === null) return { position: "absolute", inset: 0 };
+    const { w: cw, h: ch } = stageSize;
+    const cr = cw / ch;
+    if (ratio >= cr) {
+      // Wider than stage: fit to stage width, auto height
+      const width = cw;
+      const height = width / ratio;
+      return { position: "absolute", width, height, top: (ch - height) / 2, left: 0 };
+    }
+    // Taller than stage: fit to stage height, auto width
+    const height = ch;
+    const width = height * ratio;
+    return { position: "absolute", width, height, top: 0, left: (cw - width) / 2 };
+  })();
+
+  function handleImgLoad(e: React.SyntheticEvent<HTMLImageElement>) {
+    const img = e.currentTarget;
+    if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+      setRatio(img.naturalWidth / img.naturalHeight);
+    }
+    if (stageRef.current) {
+      const rect = stageRef.current.getBoundingClientRect();
+      setStageSize({ w: rect.width, h: rect.height });
+    }
+  }
 
   return (
     <Link
       href={href}
       className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
-      <div className="relative aspect-[3/4] overflow-hidden bg-[#f4f0eb] shadow-[0_1px_4px_rgba(0,0,0,0.06)] group-hover:shadow-[0_4px_18px_rgba(0,0,0,0.13)] transition-shadow duration-300">
-        {/* Artwork: inner ratio-wrapper with object-contain — border & hover hug the image */}
-        <div className="absolute inset-0 flex items-center justify-center">
+      <div
+        ref={stageRef}
+        className="relative aspect-[3/4] overflow-hidden bg-[#f4f0eb] shadow-[0_1px_4px_rgba(0,0,0,0.06)] group-hover:shadow-[0_4px_18px_rgba(0,0,0,0.13)] transition-shadow duration-300"
+      >
+        <div className="absolute inset-0" style={wrapperStyle}>
+          <img
+            src={getOptimizedImageUrl(baseImage, { width: 400, quality: 75 })}
+            alt={poster.title}
+            loading="lazy"
+            decoding="async"
+            className="absolute inset-0 w-full h-full object-contain"
+            onLoad={handleImgLoad}
+          />
+          {/* Hover overlay hugs the actual image */}
           <div
-            className="relative motion-reduce:transition-none"
-            style={artworkInnerStyle(ratio)}
+            className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-250 flex flex-col justify-end p-3 pointer-events-none"
+            aria-hidden="true"
           >
-            <img
-              src={getOptimizedImageUrl(baseImage, { width: 400, quality: 75 })}
-              alt={poster.title}
-              loading="lazy"
-              decoding="async"
-              className="absolute inset-0 w-full h-full object-contain"
-              onLoad={(e) => {
-                const img = e.currentTarget;
-                if (img.naturalWidth > 0 && img.naturalHeight > 0)
-                  setRatio(img.naturalWidth / img.naturalHeight);
-              }}
-            />
-            {/* Hover overlay hugs the actual image, not the full stage */}
-            <div
-              className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-250 flex flex-col justify-end p-3 pointer-events-none"
-              aria-hidden="true"
-            >
-              {hasPrice && <p className="text-white text-[11px] font-semibold mb-0.5">{priceLabel}</p>}
-              {sizeLabels.length > 0 && (
-                <p className="text-white/65 text-[10px] mb-1.5 leading-tight">{sizeLabels.join(" · ")}</p>
-              )}
-              <span className="text-white/90 text-[11px] font-medium">View poster →</span>
-            </div>
-            {/* Border ring hugs the actual image */}
-            <div className="absolute inset-0 ring-1 ring-inset ring-black/[0.14] pointer-events-none" aria-hidden="true" />
+            {hasPrice && <p className="text-white text-[11px] font-semibold mb-0.5">{priceLabel}</p>}
+            {sizeLabels.length > 0 && (
+              <p className="text-white/65 text-[10px] mb-1.5 leading-tight">{sizeLabels.join(" · ")}</p>
+            )}
+            <span className="text-white/90 text-[11px] font-medium">View poster →</span>
           </div>
+          {/* Border ring hugs the actual image */}
+          <div className="absolute inset-0 ring-1 ring-inset ring-black/[0.14] pointer-events-none" aria-hidden="true" />
         </div>
       </div>
       <div className="mt-1.5 min-w-0">
