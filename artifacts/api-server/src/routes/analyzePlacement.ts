@@ -5,7 +5,7 @@ import { z } from "zod";
 
 const router: IRouter = Router();
 
-const DETECTION_MODEL = "gpt-4o";
+const DETECTION_MODEL = "gpt-5";
 
 const PRIVATE_IP_PATTERNS = [
   /^localhost$/i,
@@ -87,7 +87,7 @@ router.post(
     try {
       const response = await openai.chat.completions.create({
         model: DETECTION_MODEL,
-        max_completion_tokens: 512,
+        max_completion_tokens: 8192,
         messages: [
           {
             role: "system",

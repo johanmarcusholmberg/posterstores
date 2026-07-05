@@ -497,7 +497,7 @@ export function resolveEffectiveMockupPlacement(template: Parameters<typeof reso
 
 // ─── AI detection ─────────────────────────────────────────────────────────────
 
-const DETECTION_MODEL = "gpt-4o";
+const DETECTION_MODEL = "gpt-5";
 
 const SYSTEM_PROMPT = `You are a computer vision expert specializing in identifying poster/artwork placement surfaces in interior mockup images for a print shop.
 
@@ -721,7 +721,7 @@ export async function analyzeMockupPlacement(imageUrl: string): Promise<Placemen
   try {
     const response = await openai.chat.completions.create({
       model: DETECTION_MODEL,
-      max_completion_tokens: 800,
+      max_completion_tokens: 8192,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         {
