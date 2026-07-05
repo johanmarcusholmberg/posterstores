@@ -1,0 +1,61 @@
+Update the product detail page gallery layout.
+
+Goal:
+On desktop, move the small gallery thumbnails from below the main product image to a separate vertical column on the LEFT side of the large image, exactly like the attached/visualized layout. On mobile, keep the thumbnails below the main image as they are today.
+
+Important layout requirements:
+1. Desktop only:
+   - Use a horizontal gallery layout:
+     [vertical thumbnails] [large main image]
+   - Thumbnail column should be its own column.
+   - Gap between thumbnail column and main image: around 12–16px.
+   - Thumbnail column should be top-aligned with the main image.
+   - Thumbnail size should be around 64–72px.
+   - Show up to 4–5 thumbnails naturally; allow vertical scroll if there are more.
+   - The active thumbnail should have a clear but subtle active border using the store accent color.
+
+2. Mobile:
+   - Do NOT move thumbnails to the left on mobile.
+   - Keep the current mobile layout with thumbnails below the main image.
+
+3. Main image area:
+   - The product page main image area should behave exactly like the image area used in the “New Arrivals” section / PosterCard.
+   - Reuse the same sizing logic, aspect ratio, border, background, overflow behavior, and image fitting approach from the New Arrivals poster image container.
+   - Do not create a new inconsistent image style.
+   - The goal is that the product image area feels visually consistent with the shop/product cards.
+   - Keep the image contained and professional-looking; do not stretch low-resolution images unnaturally.
+
+4. Visual polish:
+   - Keep the large image approximately the same visual size as today.
+   - The gallery block may become slightly wider because of the new thumbnail column.
+   - Keep product info on the right unchanged.
+   - Keep spacing clean and aligned with the product title/price area.
+   - Do not change cart logic, image loading logic, price logic, size selector logic, or product data fetching.
+   - Remove the left/right navigation arrows that appear when hovering over the main product image. The gallery should be navigated by thumbnails only on the product page.
+
+Implementation guidance:
+- Inspect the Product Detail page/gallery component first.
+- Inspect the New Arrivals / PosterCard image container classes and reuse them where appropriate.
+- Prefer shared Tailwind classes or extract a small reusable image-frame wrapper if needed.
+- Desktop breakpoint should likely be `md` or `lg`, but choose the breakpoint that matches the current product page layout.
+- Avoid regressions in the lightbox.
+- Avoid changing the generated image URLs or mockup/image selection logic.
+
+Expected result:
+Desktop:
+[thumbnail]
+[thumbnail]   [large image area]   [product info]
+[thumbnail]
+
+Mobile:
+[large image area]
+[thumbnail] [thumbnail] [thumbnail]
+[product info]
+
+After implementing:
+- Run typecheck.
+- Check desktop product page visually.
+- Check mobile product page visually.
+- Confirm that thumbnails still switch the main image.
+- Confirm that lightbox still opens correctly.
+- Confirm that New Arrivals is unchanged.
