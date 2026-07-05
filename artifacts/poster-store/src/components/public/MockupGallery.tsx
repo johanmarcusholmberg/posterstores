@@ -298,16 +298,16 @@ export const MockupGallery = ({
   // Skeleton state
   if (isLoading) {
     return (
-      <div className="space-y-2.5" aria-busy="true">
-        <div
-          className="bg-muted animate-pulse sm:max-h-[420px]"
-          style={{ aspectRatio: "3/4" }}
-        />
-        <div className="flex gap-2">
+      <div className="flex flex-col-reverse md:flex-row md:items-start gap-2.5 md:gap-3.5" aria-busy="true">
+        <div className="flex flex-row md:flex-col gap-2 md:w-[72px] md:shrink-0">
           {[0, 1, 2].map((i) => (
             <div key={i} className="w-[68px] h-[68px] bg-muted animate-pulse rounded-sm" />
           ))}
         </div>
+        <div
+          className="bg-muted animate-pulse sm:max-h-[420px] w-full"
+          style={{ aspectRatio: "5/7" }}
+        />
       </div>
     );
   }
@@ -347,12 +347,47 @@ export const MockupGallery = ({
 
   return (
     <>
-      <div className="space-y-2.5" data-testid="mockup-gallery">
-        {/* Main image — flat poster style, no rounded corners, minimal shadow */}
+      <div
+        className="flex flex-col-reverse md:flex-row md:items-start gap-2.5 md:gap-3.5"
+        data-testid="mockup-gallery"
+      >
+        {/* Thumbnail strip — below main image on mobile, left column on desktop */}
+        {allImages.length > 1 && (
+          <div className="flex flex-row md:flex-col gap-2 overflow-x-auto md:overflow-x-visible md:overflow-y-auto pb-0.5 md:pb-0 scrollbar-hide md:w-[72px] md:max-h-[420px] md:shrink-0">
+            {allImages.map((img, idx) => {
+              const isActive = idx === activeIdx;
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setActiveIdx(idx)}
+                  aria-label={img.label}
+                  aria-pressed={isActive}
+                  className={cn(
+                    "relative shrink-0 overflow-hidden border-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary bg-[#faf8f3]",
+                    isActive ? "border-primary" : "border-transparent hover:opacity-80"
+                  )}
+                  style={{ width: 68, height: 68 }}
+                >
+                  <img
+                    src={img.url}
+                    alt={img.label}
+                    loading="lazy"
+                    decoding="async"
+                    className={cn("w-full h-full", img.isPosterArtwork ? "object-contain" : "object-cover")}
+                    onError={(e) => { (e.target as HTMLImageElement).src = fallbackImageUrl; }}
+                  />
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Main image — same sizing/aspect/background approach as the New Arrivals poster card */}
         <div
           ref={mainImageRef}
-          className="relative bg-[#f4f0eb] overflow-hidden cursor-zoom-in group select-none shadow-[0_1px_4px_rgba(0,0,0,0.06)] sm:max-h-[420px]"
-          style={{ aspectRatio: "3/4" }}
+          className="relative bg-[#faf8f3] overflow-hidden cursor-zoom-in group select-none shadow-[0_1px_4px_rgba(0,0,0,0.06)] sm:max-h-[420px] w-full"
+          style={{ aspectRatio: "5/7" }}
           onClick={openLightbox}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
@@ -364,26 +399,6 @@ export const MockupGallery = ({
             className="absolute inset-0 ring-1 ring-inset ring-black/[0.06] pointer-events-none"
             aria-hidden="true"
           />
-
-          {/* Swipe arrows on desktop when multiple images */}
-          {allImages.length > 1 && (
-            <>
-              <button
-                onClick={(e) => { e.stopPropagation(); setActiveIdx((i) => (i - 1 + allImages.length) % allImages.length); }}
-                className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/70 backdrop-blur-sm hover:bg-white/90 text-stone-700 rounded-full p-1.5 transition-all opacity-0 group-hover:opacity-100 shadow-sm md:flex hidden"
-                aria-label="Previous"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); setActiveIdx((i) => (i + 1) % allImages.length); }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/70 backdrop-blur-sm hover:bg-white/90 text-stone-700 rounded-full p-1.5 transition-all opacity-0 group-hover:opacity-100 shadow-sm md:flex hidden"
-                aria-label="Next"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </>
-          )}
 
           {/* Dot indicator on mobile */}
           {allImages.length > 1 && (
@@ -400,32 +415,6 @@ export const MockupGallery = ({
             </div>
           )}
         </div>
-
-        {/* Thumbnail strip */}
-        {allImages.length > 1 && (
-          <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-hide">
-            {allImages.map((img, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => setActiveIdx(idx)}
-                aria-label={img.label}
-                aria-pressed={idx === activeIdx}
-                className="relative shrink-0 overflow-hidden border-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary border-transparent hover:opacity-80 opacity-[1]"
-                style={{ width: 68, height: 68 }}
-              >
-                <img
-                  src={img.url}
-                  alt={img.label}
-                  loading="lazy"
-                  decoding="async"
-                  className={cn("w-full h-full", img.isPosterArtwork ? "object-contain" : "object-cover")}
-                  onError={(e) => { (e.target as HTMLImageElement).src = fallbackImageUrl; }}
-                />
-              </button>
-            ))}
-          </div>
-        )}
       </div>
       {/* Lightbox */}
       {lightboxOpen && (
