@@ -223,7 +223,6 @@ export const MockupGallery = ({
   const [activeIdx, setActiveIdx] = useState(primaryIdx >= 0 ? primaryIdx : 0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIdx, setLightboxIdx] = useState(activeIdx);
-  const [activeArtworkRatio, setActiveArtworkRatio] = useState<number | null>(null);
 
   // Touch/swipe state for the main carousel
   const touchStartX = useRef<number | null>(null);
@@ -296,12 +295,6 @@ export const MockupGallery = ({
     return () => window.removeEventListener("keydown", handler);
   }, [lightboxOpen, closeLightbox, prevLightbox, nextLightbox]);
 
-  // Reset the measured ratio whenever the active image changes — the new image's
-  // ratio (if it's poster artwork) will be reported again once it loads.
-  useEffect(() => {
-    setActiveArtworkRatio(null);
-  }, [activeIdx]);
-
   // Skeleton state
   if (isLoading) {
     return (
@@ -348,7 +341,6 @@ export const MockupGallery = ({
         alt={alt}
         className={className}
         isPosterArtwork={item.isPosterArtwork}
-        onRatioLoad={item.isPosterArtwork ? setActiveArtworkRatio : undefined}
       />
     );
   }
@@ -395,23 +387,22 @@ export const MockupGallery = ({
         <div
           ref={mainImageRef}
           className="relative bg-[#faf8f3] overflow-hidden cursor-zoom-in group select-none shadow-[0_1px_4px_rgba(0,0,0,0.06)] sm:max-h-[420px] w-full"
-          style={{
-            aspectRatio:
-              activeItem?.isPosterArtwork && activeArtworkRatio
-                ? `${activeArtworkRatio}`
-                : "5/7",
-          }}
+          style={{ aspectRatio: "5/7" }}
           onClick={openLightbox}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
         >
           {renderMainImage(activeItem)}
 
-          {/* Subtle inset edge — gives the image a "print edge" depth cue */}
-          <div
-            className="absolute inset-0 ring-1 ring-inset ring-black/[0.06] pointer-events-none"
-            aria-hidden="true"
-          />
+          {/* Subtle inset edge — gives mockup images a "print edge" depth cue.
+              Poster artwork gets its own ring that hugs the actual image instead
+              (see MainImage), since the artwork doesn't fill this fixed stage. */}
+          {!activeItem.isPosterArtwork && (
+            <div
+              className="absolute inset-0 ring-1 ring-inset ring-black/[0.06] pointer-events-none"
+              aria-hidden="true"
+            />
+          )}
 
           {/* Dot indicator on mobile */}
           {allImages.length > 1 && (
@@ -541,59 +532,127 @@ function LightboxImage({
   );
 }
 
-/** Simple image with fade-in and fallback, showing a skeleton while loading. */
+/**
+ * Returns orientation-aware CSS for the inner poster-artwork wrapper, mirroring
+ * PosterArtworkStage (New Arrivals): the outer stage stays a fixed size, and this
+ * wrapper hugs the actual image ratio, centered within it.
+ *
+ * Before load (null): fills the stage so the object-contain img is visible.
+ * Portrait (< 1):  height 100%, auto width — fills stage vertically, centers horizontally.
+ * Landscape/sq (≥ 1): width 100%, auto height — fills stage horizontally, centers vertically.
+ */
+function artworkWrapperStyle(ratio: number | null): React.CSSProperties {
+  if (ratio === null) {
+    return { position: "absolute", inset: 0 };
+  }
+  if (ratio < 1) {
+    return {
+      position: "relative",
+      aspectRatio: String(ratio),
+      height: "100%",
+      width: "auto",
+      maxWidth: "100%",
+    };
+  }
+  return {
+    position: "relative",
+    aspectRatio: String(ratio),
+    width: "100%",
+    height: "auto",
+    maxHeight: "100%",
+  };
+}
+
+/**
+ * Main gallery image.
+ *
+ * Mockups: fill the fixed stage edge-to-edge with object-cover (unchanged behavior).
+ * Poster artwork: like PosterArtworkStage, the stage size never changes — an inner
+ * wrapper is sized to the image's real ratio and centered, with object-contain so
+ * nothing is ever cropped or stretched.
+ */
 function MainImage({
   src,
   fallback,
   alt,
   className,
   isPosterArtwork,
-  onRatioLoad,
 }: {
   src: string;
   fallback: string;
   alt: string;
   className?: string;
   isPosterArtwork?: boolean;
-  onRatioLoad?: (ratio: number | null) => void;
 }) {
   const [loaded, setLoaded] = useState(false);
   const [errored, setErrored] = useState(false);
+  const [naturalRatio, setNaturalRatio] = useState<number | null>(null);
   const finalSrc = errored ? fallback : src;
 
+  function handleLoad(e: React.SyntheticEvent<HTMLImageElement>) {
+    setLoaded(true);
+    if (isPosterArtwork) {
+      const img = e.currentTarget;
+      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+        setNaturalRatio(img.naturalWidth / img.naturalHeight);
+      }
+    }
+  }
+
+  function handleError() {
+    if (!errored) {
+      setErrored(true);
+      setLoaded(false);
+      setNaturalRatio(null);
+    } else {
+      setLoaded(true);
+    }
+  }
+
+  if (!isPosterArtwork) {
+    return (
+      <div className={cn("relative w-full h-full", className)}>
+        {!loaded && <div className="absolute inset-0 bg-muted animate-pulse" />}
+        <img
+          key={finalSrc}
+          src={finalSrc}
+          alt={alt}
+          fetchPriority="high"
+          decoding="async"
+          className={cn(
+            "w-full h-full object-cover transition-opacity duration-300",
+            loaded ? "opacity-100" : "opacity-0"
+          )}
+          data-testid="mockup-gallery-main-image"
+          onLoad={handleLoad}
+          onError={handleError}
+        />
+      </div>
+    );
+  }
+
+  const wrapperStyle = artworkWrapperStyle(naturalRatio);
+  const hasRatio = naturalRatio !== null;
+
   return (
-    <div className={cn("relative w-full h-full", className)}>
+    <div className={cn("relative w-full h-full flex items-center justify-center", className)}>
       {!loaded && <div className="absolute inset-0 bg-muted animate-pulse" />}
-      <img
-        key={finalSrc}
-        src={finalSrc}
-        alt={alt}
-        fetchPriority="high"
-        decoding="async"
-        className={cn(
-          "w-full h-full transition-opacity duration-300",
-          isPosterArtwork ? "object-contain" : "object-cover",
-          loaded ? "opacity-100" : "opacity-0"
-        )}
-        data-testid="mockup-gallery-main-image"
-        onLoad={(e) => {
-          setLoaded(true);
-          if (onRatioLoad && isPosterArtwork) {
-            const img = e.currentTarget;
-            if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-              onRatioLoad(img.naturalWidth / img.naturalHeight);
-            }
-          }
-        }}
-        onError={() => {
-          if (!errored) {
-            setErrored(true);
-            setLoaded(false);
-          } else {
-            setLoaded(true);
-          }
-        }}
-      />
+      <div className={cn(hasRatio && "ring-1 ring-inset ring-black/[0.14]")} style={wrapperStyle}>
+        <img
+          key={finalSrc}
+          src={finalSrc}
+          alt={alt}
+          fetchPriority="high"
+          decoding="async"
+          className={cn(
+            "absolute inset-0 w-full h-full object-contain transition-opacity duration-300",
+            loaded ? "opacity-100" : "opacity-0"
+          )}
+          data-testid="mockup-gallery-main-image"
+          onLoad={handleLoad}
+          onError={handleError}
+        />
+      </div>
     </div>
   );
 }
