@@ -1,20 +1,28 @@
 ---
-name: DB schema push — interactive prompt workaround
-description: drizzle-kit push always blocks on a favorites unique constraint prompt; use raw psql for simple column additions.
+name: DB schema push — non-interactive behavior and prod boundary
+description: drizzle-kit push --force with closed stdin resolves prompts to the safe default instead of hanging; still dev-only, never for production.
 ---
 
 ## Rule
-`pnpm --filter @workspace/db run push` (and `push-force`) consistently blocks on an interactive prompt:
-> "You're about to add favorites_user_id_poster_id_unique unique constraint to the table... Do you want to truncate favorites table?"
+`drizzle-kit push --force` (run as `pnpm --filter @workspace/db run push-force`)
+still *prints* an interactive-looking prompt for risky changes (e.g. the
+`favorites_user_id_poster_id_unique` constraint asking whether to truncate
+the table), but when stdin is closed/redirected from `/dev/null` it resolves
+to the default (safe, non-destructive) option automatically instead of
+hanging. It does not need psql workarounds anymore.
 
-This is a pre-existing pending migration that has never been applied. The prompt cannot be piped non-interactively via the bash tool.
+**Why:** Earlier attempts assumed the prompt was unresolvable non-interactively
+and used raw `psql` for column additions instead. In practice the platform's
+post-merge runner already closes stdin, so the real failure mode was the
+combined `pnpm install` + schema-pull step (~15-20s) running right up against
+the old 20s post-merge timeout — not an unresolvable prompt. Bumped
+`post-merge` timeoutMs to 60000 to give headroom.
 
-**Why:** The bash tool kills any process that waits for stdin; drizzle-kit uses inquirer prompts which cannot be fed via pipe.
-
-**How to apply:** For simple `ADD COLUMN IF NOT EXISTS` operations, use raw psql instead:
-```bash
-psql "$DATABASE_URL" -c "ALTER TABLE <table> ADD COLUMN IF NOT EXISTS <col> <type>;"
-```
-Then update the Drizzle schema file for type-safety — the schema file and DB stay in sync without running `push`.
-
-If a full schema migration is eventually needed (e.g. for the favorites constraint), it will require manual intervention in a real shell session.
+**How to apply:**
+- For dev/post-merge scripts, always redirect stdin explicitly
+  (`... < /dev/null`) even though the platform already closes it — makes the
+  script safe when run manually too.
+- `push` / `push-force` are dev-only. Production schema changes must use the
+  generate-then-migrate flow (`drizzle-kit generate` → commit SQL →
+  `drizzle-kit migrate`) — see `PRODUCTION_DEPLOYMENT_CHECKLIST.md` at repo
+  root.

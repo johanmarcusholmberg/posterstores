@@ -1,5 +1,5 @@
 - [Drizzle timestamp coercion bug](drizzle-timestamp-coercion.md) — Drizzle timestamp columns require Date objects; passing ISO strings causes a runtime 500.
 - [Homepage section-level visual overrides](homepage-visual-overrides.md) — Section font/color overrides live on HomepageSectionConfig, not HeroVisualConfig; button styles are on HeroVisualConfig.
 - [Poster card presentation system](poster-card-presentation.md) — Three-mode artwork display (current/full-image/stage) via PosterArtworkStage component; store-level DB column; default is "current" (safe fallback).
-- [DB schema push — interactive prompt workaround](db-push-workaround.md) — drizzle-kit push always prompts for favorites constraint; use raw psql for simple column additions to avoid blocking.
+- [DB schema push — non-interactive behavior and prod boundary](db-push-workaround.md) — push --force + closed stdin auto-resolves prompts safely; still dev-only, prod uses generate-then-migrate.
 - [Ratio-wrapper sizing for absolutely-positioned children](ratio-wrapper-sizing.md) — aspect-ratio inner wrappers with abs-pos-only children need an explicit starting axis (width:100%) or they collapse to zero.
