@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useParams, Link, useLocation } from "wouter";
+import { useParams, Link, useLocation, useSearch } from "wouter";
 import { useStorefront } from "@/context/StorefrontContext";
 import { useAuth } from "@/context/AuthContext";
 import { getSessionId } from "@/lib/session";
@@ -88,13 +88,15 @@ export default function PosterBySlug() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const search = useSearch();
+
+  const rawReturnTo = new URLSearchParams(search).get("returnTo");
+  const isSafeReturnTo = (url: string | null): url is string =>
+    !!url && url.startsWith("/") && !url.startsWith("//");
+  const returnTo = isSafeReturnTo(rawReturnTo) ? rawReturnTo : null;
 
   const goBack = () => {
-    if (window.history.length > 1) {
-      window.history.back();
-    } else {
-      setLocation("/shop");
-    }
+    setLocation(returnTo ?? "/shop");
   };
 
   const [poster, setPoster] = useState<PosterData | null | undefined>(undefined);
@@ -308,10 +310,19 @@ export default function PosterBySlug() {
 
   const noActiveSizes = activeSizes.length === 0;
 
+  let backLabel = "Explore all posters";
+  if (returnTo) {
+    backLabel = "Back to your selection";
+    const returnToRegion = new URLSearchParams(returnTo.split("?")[1] ?? "").get("region");
+    if (returnToRegion && poster.region) {
+      backLabel = `Back to ${poster.region} posters`;
+    }
+  }
+
   return (
     <div className="container mx-auto px-4 pt-6 md:py-12 pb-28 md:pb-12">
       <button onClick={goBack} className="inline-flex items-center text-muted-foreground hover:text-foreground mb-4 md:mb-8">
-        <ArrowLeft className="mr-2 h-4 w-4" /> Back to shop
+        <ArrowLeft className="mr-2 h-4 w-4" /> {backLabel}
       </button>
 
       <div className="grid grid-cols-1 md:grid-cols-[360px_1fr] gap-10 mb-8 md:mb-12 items-start">
@@ -325,45 +336,68 @@ export default function PosterBySlug() {
         </div>
 
         <div className="flex flex-col">
-          <div className="mb-2 text-muted-foreground text-sm font-medium tracking-wider uppercase">
-            {poster.region} {poster.city && `• ${poster.city}`}
-          </div>
           <h1 className="font-serif text-4xl md:text-5xl font-bold text-foreground mb-3">
             {poster.title}
           </h1>
-          <p className="text-2xl font-medium text-foreground mb-4 md:mb-8" data-testid="detail-price">
-            {pricePrefix}{formatPrice(displayedPrice, displayedCurrency)}
-          </p>
-
-          <div className="prose prose-stone mb-6 md:mb-10 text-muted-foreground">
-            <p>{poster.description}</p>
+          <div className="mb-2 text-muted-foreground text-sm font-medium tracking-wider uppercase">
+            {poster.region} {poster.city && `• ${poster.city}`}
           </div>
 
           {activeSizes.length > 0 && (
-            <div className="mb-6 md:mb-10">
+            <div className="mb-5 md:mb-8">
               <h3 className="font-medium text-foreground mb-3">Select Size</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3" data-testid="size-selector">
-                {activeSizes.map((size) => {
-                  const isSelected = selectedSizeId === size.id;
-                  return (
-                    <button
-                      key={size.id}
-                      type="button"
-                      onClick={() => setSelectedSizeId(size.id)}
-                      data-testid={`size-option-${size.id}`}
-                      className={`flex flex-col items-start rounded-md border-2 px-3 py-2.5 text-left transition-colors cursor-pointer ${
-                        isSelected
-                          ? "border-primary bg-primary/5"
-                          : "border-border bg-background hover:border-primary/50 hover:bg-accent/50"
-                      }`}
-                    >
-                      <span className="font-medium text-sm text-foreground">{size.sizeLabel}</span>
-                      <span className={`text-sm mt-1 font-semibold ${isSelected ? "text-primary" : "text-foreground"}`}>
-                        {formatPrice(size.price, size.currency)}
-                      </span>
-                    </button>
-                  );
-                })}
+
+              {/* 
+                Mobile: horizontal scroll row
+                Tablet/Desktop: compact grid
+              */}
+              <div className="-mx-4 px-4 overflow-x-auto pb-2 sm:mx-0 sm:px-0 sm:overflow-visible sm:pb-0">
+                <div
+                  className="
+                    flex gap-2 snap-x snap-mandatory
+                    sm:grid sm:grid-cols-3 sm:gap-3 sm:snap-none
+                    lg:grid-cols-5
+                  "
+                  data-testid="size-selector"
+                >
+                  {activeSizes.map((size) => {
+                    const isSelected = selectedSizeId === size.id;
+
+                    return (
+                      <button
+                        key={size.id}
+                        type="button"
+                        onClick={() => setSelectedSizeId(size.id)}
+                        data-testid={`size-option-${size.id}`}
+                        aria-pressed={isSelected}
+                        className={`
+                          shrink-0 w-[118px] sm:w-auto snap-start
+                          flex flex-col items-start justify-center
+                          rounded-md border-2 px-3 py-2 text-left
+                          min-h-[58px]
+                          transition-colors cursor-pointer
+                          ${
+                            isSelected
+                              ? "border-primary bg-primary/5"
+                              : "border-border bg-background hover:border-primary/50 hover:bg-accent/50"
+                          }
+                        `}
+                      >
+                        <span className="font-medium text-sm text-foreground leading-tight">
+                          {size.sizeLabel}
+                        </span>
+
+                        <span
+                          className={`text-sm mt-0.5 font-semibold leading-tight ${
+                            isSelected ? "text-primary" : "text-foreground"
+                          }`}
+                        >
+                          {formatPrice(size.price, size.currency)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}
@@ -434,7 +468,7 @@ export default function PosterBySlug() {
                   key={p.id}
                   className="flex-none snap-start w-[170px] sm:w-[200px] lg:w-[220px]"
                 >
-                  <PosterCard poster={p} />
+                  <PosterCard poster={p} returnTo={returnTo ?? undefined} />
                 </div>
               ))}
             </div>

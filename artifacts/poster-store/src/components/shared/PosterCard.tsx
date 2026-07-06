@@ -15,6 +15,8 @@ interface PosterCardProps {
   favoritedIds?: number[];
   /** When true, loads the image eagerly with fetchPriority="high" (use for LCP cards only). */
   priority?: boolean;
+  /** Internal URL (e.g. current shop URL with filters) to carry through as ?returnTo= on the poster link. */
+  returnTo?: string;
 }
 
 function formatPrice(price: number, currency: string): string {
@@ -24,7 +26,7 @@ function formatPrice(price: number, currency: string): string {
   return `${symbol}${price.toFixed(2)}`;
 }
 
-export const PosterCard = ({ poster, favoritedIds, priority = false }: PosterCardProps) => {
+export const PosterCard = ({ poster, favoritedIds, priority = false, returnTo }: PosterCardProps) => {
   const store = useStorefront();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -90,7 +92,8 @@ export const PosterCard = ({ poster, favoritedIds, priority = false }: PosterCar
       : formatPrice(displayPrice, displayCurrency);
 
   const slug = (poster as any).slug as string | undefined;
-  const href = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
+  const basePath = slug ? `/posters/${slug}` : `/poster/${poster.id}`;
+  const href = returnTo ? `${basePath}?returnTo=${encodeURIComponent(returnTo)}` : basePath;
 
   const heartBtn = (
     <button

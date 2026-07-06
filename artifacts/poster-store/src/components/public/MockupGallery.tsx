@@ -353,7 +353,7 @@ export const MockupGallery = ({
       >
         {/* Thumbnail strip — below main image on mobile, left column on desktop */}
         {allImages.length > 1 && (
-          <div className="flex flex-row md:flex-col gap-2 overflow-x-auto md:overflow-x-visible md:overflow-y-auto pb-0.5 md:pb-0 scrollbar-hide md:w-[72px] md:max-h-[420px] md:shrink-0">
+          <div className="flex flex-row md:flex-col gap-2 overflow-x-auto md:overflow-x-visible md:overflow-y-auto pb-0.5 md:pb-0 scrollbar-hide md:w-[72px] md:max-h-[420px]   md:shrink-0">
             {allImages.map((img, idx) => {
               const isActive = idx === activeIdx;
               return (

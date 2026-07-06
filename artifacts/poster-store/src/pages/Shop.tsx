@@ -532,6 +532,7 @@ export default function Shop() {
                           key={poster.id}
                           poster={poster}
                           priority={segIdx === 0 && i < 2}
+                          returnTo={`/shop${searchString ? `?${searchString}` : ""}`}
                         />
                       ))}
                     </div>
