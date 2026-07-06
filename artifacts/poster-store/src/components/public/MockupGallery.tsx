@@ -383,10 +383,16 @@ export const MockupGallery = ({
           </div>
         )}
 
-        {/* Main image — same sizing/aspect/background approach as the New Arrivals poster card */}
+        {/* Main image — same sizing/aspect/background approach as the New Arrivals poster card.
+            Poster artwork keeps the stage transparent (like NewArrivalCard) so unused
+            letterbox space shows the page background instead of a visible cream box.
+            Mockups keep the cream background since they always fill the stage. */}
         <div
           ref={mainImageRef}
-          className="relative bg-[#faf8f3] overflow-hidden cursor-zoom-in group select-none shadow-[0_1px_4px_rgba(0,0,0,0.06)] sm:max-h-[420px] w-full"
+          className={cn(
+            "relative overflow-hidden cursor-zoom-in group select-none shadow-[0_1px_4px_rgba(0,0,0,0.06)] sm:max-h-[420px] w-full",
+            !activeItem.isPosterArtwork && "bg-[#faf8f3]"
+          )}
           style={{ aspectRatio: "5/7" }}
           onClick={openLightbox}
           onTouchStart={handleTouchStart}
