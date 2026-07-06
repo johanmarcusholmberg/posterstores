@@ -386,12 +386,14 @@ export const MockupGallery = ({
         {/* Main image — same sizing/aspect/background approach as the New Arrivals poster card.
             Poster artwork keeps the stage transparent (like NewArrivalCard) so unused
             letterbox space shows the page background instead of a visible cream box.
-            Mockups keep the cream background since they always fill the stage. */}
+            Mockups keep the cream background since they always fill the stage.
+            The drop shadow also moves to the image wrapper for poster artwork (see MainImage)
+            so it hugs the actual image instead of outlining the whole fixed stage. */}
         <div
           ref={mainImageRef}
           className={cn(
-            "relative overflow-hidden cursor-zoom-in group select-none shadow-[0_1px_4px_rgba(0,0,0,0.06)] sm:max-h-[420px] w-full",
-            !activeItem.isPosterArtwork && "bg-[#faf8f3]"
+            "relative overflow-hidden cursor-zoom-in group select-none sm:max-h-[420px] w-full",
+            !activeItem.isPosterArtwork && "bg-[#faf8f3] shadow-[0_1px_4px_rgba(0,0,0,0.06)]"
           )}
           style={{ aspectRatio: "5/7" }}
           onClick={openLightbox}
@@ -643,7 +645,10 @@ function MainImage({
   return (
     <div className={cn("relative w-full h-full flex items-center justify-center", className)}>
       {!loaded && <div className="absolute inset-0 bg-muted animate-pulse" />}
-      <div className={cn(hasRatio && "ring-1 ring-inset ring-black/[0.14]")} style={wrapperStyle}>
+      <div
+        className={cn(hasRatio && "ring-1 ring-inset ring-black/[0.14] shadow-[0_1px_4px_rgba(0,0,0,0.06)]")}
+        style={wrapperStyle}
+      >
         <img
           key={finalSrc}
           src={finalSrc}
