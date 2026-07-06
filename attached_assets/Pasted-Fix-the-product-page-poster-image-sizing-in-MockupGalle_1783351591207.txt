@@ -1,0 +1,57 @@
+Fix the product page poster image sizing in MockupGallery.
+
+Context:
+The product page uses MockupGallery.tsx. The main image wrapper currently forces all images into a fixed portrait aspect ratio with style={{ aspectRatio: "5/7" }}. This works for mockups and portrait posters, but it looks wrong for landscape poster artwork: the landscape image is shown with object-contain inside a tall portrait cream background area.
+
+The New Arrivals card handles this better by measuring the image naturalWidth/naturalHeight and using that ratio so the visible artwork area can hug the actual image. Reuse that ratio logic concept, but do NOT copy the New Arrivals visual design.
+
+Goal:
+When the active image is real poster artwork, the main gallery area should match the actual image ratio.
+When the active image is a mockup, keep the existing 5/7 behavior.
+
+Requirements:
+- File to update: src/components/public/MockupGallery.tsx
+- Do not change PosterBySlug.tsx unless absolutely necessary.
+- Do not change the product page layout, cart logic, size selector, tags, related posters, or lightbox behavior.
+- Do not change the visual design to the New Arrivals card design.
+- Only fix the main gallery image sizing behavior.
+- Keep object-contain for poster artwork.
+- Keep object-cover for mockup images.
+- Do not crop or stretch poster artwork.
+- Do not add hooks conditionally or below any return paths.
+- Any new useState/useEffect/useCallback hooks must be placed together with the other hooks near the top of the MockupGallery component.
+- The page must not crash if the image ratio is not known yet.
+- Use 5/7 as fallback while the ratio is unknown.
+
+Implementation details:
+- Add state for the active poster artwork ratio near the existing hooks:
+  const [activeArtworkRatio, setActiveArtworkRatio] = useState<number | null>(null);
+
+- Detect the active image:
+  const activeItem = allImages[activeIdx] ?? { url: fallbackImageUrl, label: "Poster", isPosterArtwork: true };
+
+- For the main image wrapper, replace the hardcoded:
+  style={{ aspectRatio: "5/7" }}
+
+  with logic like:
+  style={{
+    aspectRatio:
+      activeItem?.isPosterArtwork && activeArtworkRatio
+        ? `${activeArtworkRatio}`
+        : "5/7",
+  }}
+
+- Update the MainImage component so that when the image loads, it can report its natural ratio using naturalWidth / naturalHeight.
+- Only update activeArtworkRatio when the loaded image is poster artwork.
+- Reset activeArtworkRatio to null when switching from poster artwork to mockup, or when the active image changes and the new ratio is not known yet.
+- Make sure the fallback poster image is treated as poster artwork.
+- Keep the thumbnail strip unchanged.
+- Keep the lightbox unchanged.
+
+Expected result:
+- Mockups still display in the current stable 5/7 gallery frame.
+- Portrait poster artwork still looks normal.
+- Landscape poster artwork no longer sits inside a tall portrait cream area.
+- The product image area should fit the landscape poster image ratio.
+- No React hook order errors.
+- No TypeScript errors.

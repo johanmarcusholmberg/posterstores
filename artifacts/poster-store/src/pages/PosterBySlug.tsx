@@ -340,7 +340,7 @@ export default function PosterBySlug() {
             {poster.title}
           </h1>
           <div className="mb-2 text-muted-foreground text-sm font-medium tracking-wider uppercase">
-            {poster.region} {poster.city && `• ${poster.city}`}
+            {poster.region}
           </div>
 
           {activeSizes.length > 0 && (

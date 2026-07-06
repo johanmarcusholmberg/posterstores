@@ -223,6 +223,7 @@ export const MockupGallery = ({
   const [activeIdx, setActiveIdx] = useState(primaryIdx >= 0 ? primaryIdx : 0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIdx, setLightboxIdx] = useState(activeIdx);
+  const [activeArtworkRatio, setActiveArtworkRatio] = useState<number | null>(null);
 
   // Touch/swipe state for the main carousel
   const touchStartX = useRef<number | null>(null);
@@ -295,6 +296,12 @@ export const MockupGallery = ({
     return () => window.removeEventListener("keydown", handler);
   }, [lightboxOpen, closeLightbox, prevLightbox, nextLightbox]);
 
+  // Reset the measured ratio whenever the active image changes — the new image's
+  // ratio (if it's poster artwork) will be reported again once it loads.
+  useEffect(() => {
+    setActiveArtworkRatio(null);
+  }, [activeIdx]);
+
   // Skeleton state
   if (isLoading) {
     return (
@@ -312,7 +319,7 @@ export const MockupGallery = ({
     );
   }
 
-  const activeItem = allImages[activeIdx] ?? { url: fallbackImageUrl, label: "Poster" };
+  const activeItem = allImages[activeIdx] ?? { url: fallbackImageUrl, label: "Poster", isPosterArtwork: true };
 
   function renderMainImage(item: DisplayImage, className?: string) {
     // isComposited is always false in the public gallery (isVisible() requires mockupImageUrl).
@@ -341,6 +348,7 @@ export const MockupGallery = ({
         alt={alt}
         className={className}
         isPosterArtwork={item.isPosterArtwork}
+        onRatioLoad={item.isPosterArtwork ? setActiveArtworkRatio : undefined}
       />
     );
   }
@@ -387,7 +395,12 @@ export const MockupGallery = ({
         <div
           ref={mainImageRef}
           className="relative bg-[#faf8f3] overflow-hidden cursor-zoom-in group select-none shadow-[0_1px_4px_rgba(0,0,0,0.06)] sm:max-h-[420px] w-full"
-          style={{ aspectRatio: "5/7" }}
+          style={{
+            aspectRatio:
+              activeItem?.isPosterArtwork && activeArtworkRatio
+                ? `${activeArtworkRatio}`
+                : "5/7",
+          }}
           onClick={openLightbox}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
@@ -535,12 +548,14 @@ function MainImage({
   alt,
   className,
   isPosterArtwork,
+  onRatioLoad,
 }: {
   src: string;
   fallback: string;
   alt: string;
   className?: string;
   isPosterArtwork?: boolean;
+  onRatioLoad?: (ratio: number | null) => void;
 }) {
   const [loaded, setLoaded] = useState(false);
   const [errored, setErrored] = useState(false);
@@ -561,7 +576,15 @@ function MainImage({
           loaded ? "opacity-100" : "opacity-0"
         )}
         data-testid="mockup-gallery-main-image"
-        onLoad={() => setLoaded(true)}
+        onLoad={(e) => {
+          setLoaded(true);
+          if (onRatioLoad && isPosterArtwork) {
+            const img = e.currentTarget;
+            if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+              onRatioLoad(img.naturalWidth / img.naturalHeight);
+            }
+          }
+        }}
         onError={() => {
           if (!errored) {
             setErrored(true);
