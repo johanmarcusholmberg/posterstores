@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { useStorefront } from "@/context/StorefrontContext";
 import { useAuth } from "@/context/AuthContext";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { MockupGallery } from "@/components/public/MockupGallery";
 import { PosterCard } from "@/components/shared/PosterCard";
 import { LoginPromptModal } from "@/components/shared/LoginPromptModal";
-import { ShoppingBag, ArrowLeft, Heart, ChevronDown, ChevronUp, Shield, Truck, Package, Sparkles } from "lucide-react";
+import { ShoppingBag, ArrowLeft, Heart, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Shield, Truck, Package, Sparkles } from "lucide-react";
 import { getPosterMockups, type PosterMockup } from "@/lib/mockupApi";
 import { useAddCartItem, getGetCartQueryKey, useListPosters, getListPostersQueryKey } from "@workspace/api-client-react";
 import { addFavorite, removeFavorite, getFavoriteIds } from "@/lib/favoritesApi";
@@ -177,14 +177,43 @@ export default function PosterBySlug() {
   }, [poster]);
 
   const { data: relatedPosters } = useListPosters(
-    { storeKey: store.storeKey, region: poster?.region ?? undefined, limit: 4 },
+    { storeKey: store.storeKey, region: poster?.region ?? undefined, limit: 12 },
     {
       query: {
         enabled: !!poster?.region,
-        queryKey: getListPostersQueryKey({ storeKey: store.storeKey, region: poster?.region ?? undefined, limit: 4 }),
+        queryKey: getListPostersQueryKey({ storeKey: store.storeKey, region: poster?.region ?? undefined, limit: 12 }),
       },
     }
   );
+
+  const relatedTrackRef = useRef<HTMLDivElement>(null);
+  const [relatedCanScrollLeft, setRelatedCanScrollLeft] = useState(false);
+  const [relatedCanScrollRight, setRelatedCanScrollRight] = useState(false);
+
+  const updateRelatedScrollState = useCallback(() => {
+    const el = relatedTrackRef.current;
+    if (!el) return;
+    setRelatedCanScrollLeft(el.scrollLeft > 4);
+    setRelatedCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  }, []);
+
+  const scrollRelated = useCallback((dir: "left" | "right") => {
+    const el = relatedTrackRef.current;
+    if (!el) return;
+    const amount = el.clientWidth * 0.8;
+    el.scrollBy({ left: dir === "right" ? amount : -amount, behavior: "smooth" });
+  }, []);
+
+  const relatedList = (relatedPosters?.posters ?? []).filter(p => p.id !== poster?.id);
+
+  useEffect(() => {
+    updateRelatedScrollState();
+  }, [relatedList.length, updateRelatedScrollState]);
+
+  useEffect(() => {
+    window.addEventListener("resize", updateRelatedScrollState);
+    return () => window.removeEventListener("resize", updateRelatedScrollState);
+  }, [updateRelatedScrollState]);
 
   const addCartItem = useAddCartItem();
   const selectedSize = activeSizes.find(s => s.id === selectedSizeId) ?? null;
@@ -383,16 +412,50 @@ export default function PosterBySlug() {
         </div>
       </div>
 
-      {relatedPosters && relatedPosters.posters.length > 1 && (
+      {relatedList.length > 0 && (
         <section className="border-t border-border pt-6">
-          <h2 className="font-serif text-3xl font-bold text-foreground mb-8">More from {poster.region}</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-            {relatedPosters.posters
-              .filter(p => p.id !== poster.id)
-              .slice(0, 4)
-              .map(p => (
-                <PosterCard key={p.id} poster={p} />
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="font-serif text-3xl font-bold text-foreground">More from {poster.region}</h2>
+            <Link
+              href={`/shop?region=${encodeURIComponent(poster.region ?? "")}`}
+              className="text-sm text-primary font-medium hover:underline shrink-0 ml-4"
+            >
+              View all &rarr;
+            </Link>
+          </div>
+          <div className="relative -mx-4 px-4">
+            <div
+              ref={relatedTrackRef}
+              className="flex gap-4 overflow-x-auto pb-3 scroll-smooth snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              onScroll={updateRelatedScrollState}
+            >
+              {relatedList.map(p => (
+                <div
+                  key={p.id}
+                  className="flex-none snap-start w-[170px] sm:w-[200px] lg:w-[220px]"
+                >
+                  <PosterCard poster={p} />
+                </div>
               ))}
+            </div>
+            {relatedCanScrollLeft && (
+              <button
+                onClick={() => scrollRelated("left")}
+                aria-label="Scroll related posters left"
+                className="hidden sm:flex absolute left-0 top-1/2 -translate-y-1/2 z-10 items-center justify-center w-8 h-8 rounded-full bg-background/95 border border-border shadow-md text-foreground/80 hover:text-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+            )}
+            {relatedCanScrollRight && (
+              <button
+                onClick={() => scrollRelated("right")}
+                aria-label="Scroll related posters right"
+                className="hidden sm:flex absolute right-0 top-1/2 -translate-y-1/2 z-10 items-center justify-center w-8 h-8 rounded-full bg-background/95 border border-border shadow-md text-foreground/80 hover:text-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </section>
       )}
