@@ -285,7 +285,7 @@ export default function PosterBySlug() {
         <ArrowLeft className="mr-2 h-4 w-4" /> Back to shop
       </button>
 
-      <div className="grid grid-cols-1 md:grid-cols-[360px_1fr] gap-10 mb-12 md:mb-24 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-[360px_1fr] gap-10 mb-8 md:mb-12 items-start">
         <div>
           <MockupGallery
             mockups={mockups ?? []}
@@ -384,7 +384,7 @@ export default function PosterBySlug() {
       </div>
 
       {relatedPosters && relatedPosters.posters.length > 1 && (
-        <section className="border-t border-border pt-16">
+        <section className="border-t border-border pt-6">
           <h2 className="font-serif text-3xl font-bold text-foreground mb-8">More from {poster.region}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {relatedPosters.posters
