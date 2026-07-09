@@ -275,6 +275,14 @@ export const MockupGallery = ({
   };
 
   const closeLightbox = useCallback(() => setLightboxOpen(false), []);
+
+  const handleLightboxBackdropClick = useCallback(() => {
+    // Only close by outside-click on desktop/tablet
+    if (window.matchMedia("(min-width: 768px)").matches) {
+      closeLightbox();
+    }
+  }, [closeLightbox]);
+  
   const prevLightbox = useCallback(
     () => setLightboxIdx((i) => (i - 1 + allImages.length) % allImages.length),
     [allImages.length]
@@ -371,10 +379,9 @@ export const MockupGallery = ({
                 >
                   <img
                     src={img.url}
-                    alt={img.label}
-                    loading="lazy"
-                    decoding="async"
-                    className={cn("w-full h-full", img.isPosterArtwork ? "object-contain" : "object-cover")}
+                    alt={alt}
+                    className="block max-w-full max-h-full w-auto h-auto object-contain"
+                    onClick={(e) => e.stopPropagation()}
                     onError={(e) => { (e.target as HTMLImageElement).src = fallbackImageUrl; }}
                   />
                 </button>
@@ -432,15 +439,16 @@ export const MockupGallery = ({
       {lightboxOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
-          onClick={closeLightbox}
-        >
+          onClick={handleLightboxBackdropClick}
+        >  
           <div
-            className="relative flex flex-col items-center w-full px-4"
-            onClick={(e) => e.stopPropagation()}
-          >
+            className="relative flex flex-col items-center w-full px-4">
             {/* Close button */}
             <button
-              onClick={closeLightbox}
+              onClick={(e) => {
+                e.stopPropagation();
+                closeLightbox();
+              }}
               className="absolute top-0 right-4 text-white/70 hover:text-white transition-colors z-10"
               aria-label="Close"
             >
@@ -451,7 +459,10 @@ export const MockupGallery = ({
             <div className="relative flex items-center justify-center w-full mt-10 h-[60vh] sm:h-[72vh]">
               {allImages.length > 1 && (
                 <button
-                  onClick={prevLightbox}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    prevLightbox();
+                  }}
                   className="absolute left-0 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/55 text-white rounded-full p-2 transition-colors z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                   aria-label="Previous"
                 >
@@ -467,7 +478,10 @@ export const MockupGallery = ({
 
               {allImages.length > 1 && (
                 <button
-                  onClick={nextLightbox}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    nextLightbox();
+                  }}
                   className="absolute right-0 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/55 text-white rounded-full p-2 transition-colors z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
                   aria-label="Next"
                 >
@@ -483,7 +497,10 @@ export const MockupGallery = ({
                   <button
                     key={idx}
                     type="button"
-                    onClick={() => setLightboxIdx(idx)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setLightboxIdx(idx);
+                    }}
                     aria-label={img.label}
                     className={cn(
                       "relative shrink-0 overflow-hidden border-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white",
@@ -535,6 +552,7 @@ function LightboxImage({
       src={item.url}
       alt={alt}
       className="block max-w-full max-h-full w-auto h-auto object-contain"
+      onClick={(e) => e.stopPropagation()}
       onError={(e) => { (e.target as HTMLImageElement).src = fallbackImageUrl; }}
     />
   );

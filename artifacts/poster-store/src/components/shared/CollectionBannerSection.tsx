@@ -110,7 +110,12 @@ export function CollectionBannerSection({
   };
   const ctaStyle: React.CSSProperties = bannerLinkColor ? { color: bannerLinkColor } : {};
 
-
+  const scrollToTop = () => {
+    window.setTimeout(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    }, 0);
+  };
+  
   const posterCards = showPosters && collectionPreviewPosters.length > 0 ? (
     <div className="flex-none flex items-end gap-2.5 sm:gap-3">
       {collectionPreviewPosters.map((poster, idx) => {
@@ -159,7 +164,7 @@ export function CollectionBannerSection({
       className={cn(
         "relative overflow-hidden rounded-2xl shadow-[0_2px_20px_rgba(0,0,0,0.10)]",
         mobileMode === "simplified-card" && "hidden sm:block",
-        mobileMode === "hidden" && "hidden sm:block",
+        mobileMode === "hidden" && "hidden lg:block",
       )}
       style={!hasCollBg ? { backgroundColor: bannerBgColor ?? "#EBD9C4" } : undefined}
     >
@@ -172,7 +177,7 @@ export function CollectionBannerSection({
             loading="lazy"
             decoding="async"
             className={cn(
-              "w-full aspect-[18/5] sm:aspect-[13/2] block",
+              "w-full aspect-[6/1] min-h-[200px] lg:min-h-[190px] xl:min-h-[180px] block",
               imageFit === "contain" ? "object-contain bg-sand" : "object-cover"
             )}
             style={imageFit === "cover" ? { objectPosition: objectPos } : undefined}
@@ -229,6 +234,7 @@ export function CollectionBannerSection({
             )}
             <Link
               href={resolvedCtaHref}
+              onClick={scrollToTop}
               className={cn(
                 "inline-flex items-center gap-1.5 text-sm font-semibold hover:underline",
                 !bannerLinkColor && (hasCollBg ? "text-white" : "text-primary")
@@ -248,6 +254,7 @@ export function CollectionBannerSection({
   const mobileCard = mobileMode === "simplified-card" ? (
     <Link
       href={resolvedCtaHref}
+      onClick={scrollToTop}
       className="block sm:hidden rounded-2xl px-5 py-6 cursor-pointer"
       style={{ backgroundColor: bannerBgColor ?? "#EBD9C4" }}
     >
@@ -332,6 +339,7 @@ export function CollectionBannerSection({
               {posterCards}
               <Link
                 href={resolvedCtaHref}
+                onClick={scrollToTop}
                 className={cn("inline-flex items-center gap-1.5 text-sm font-semibold hover:underline whitespace-nowrap", !bannerLinkColor && "text-primary")}
                 style={bannerLinkColor ? { color: bannerLinkColor } : undefined}
               >

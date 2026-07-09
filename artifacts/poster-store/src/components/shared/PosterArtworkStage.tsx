@@ -106,10 +106,8 @@ export function PosterArtworkStage({
     <div
       className={cn(
         "absolute inset-0 flex items-center justify-center",
-        "motion-reduce:transition-none",
-        hasHover
-          ? "transition-opacity duration-[600ms] ease-out opacity-100 group-hover:opacity-0 group-focus-within:opacity-0"
-          : ""
+        "opacity-100",
+        "motion-reduce:transition-none"
       )}
     >
       <div
@@ -146,7 +144,10 @@ export function PosterArtworkStage({
       decoding="async"
       className={cn(
         "absolute inset-0 object-cover w-full h-full",
-        "transition-[opacity,transform] duration-[600ms] ease-out",
+        "transition-opacity ease-in-out",
+        "duration-[400ms]",
+        "group-hover:duration-[800ms]",
+        "group-focus-within:duration-[800ms]",
         "motion-reduce:transition-none",
         "opacity-0",
         "group-hover:opacity-100",

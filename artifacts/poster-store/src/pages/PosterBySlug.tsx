@@ -311,11 +311,21 @@ export default function PosterBySlug() {
   const noActiveSizes = activeSizes.length === 0;
 
   let backLabel = "Explore all posters";
+
   if (returnTo) {
-    backLabel = "Back to your selection";
+    backLabel = "Back to your Selection";
+
     const returnToRegion = new URLSearchParams(returnTo.split("?")[1] ?? "").get("region");
-    if (returnToRegion && poster.region) {
-      backLabel = `Back to ${poster.region} posters`;
+
+    const selectedRegions = returnToRegion
+      ? returnToRegion
+          .split(",")
+          .map((region) => region.trim())
+          .filter(Boolean)
+      : [];
+
+    if (selectedRegions.length === 1) {
+      backLabel = `Back to ${selectedRegions[0]} posters`;
     }
   }
 

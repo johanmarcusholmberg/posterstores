@@ -278,7 +278,7 @@ function NewArrivalCard({
     >
       <div
         ref={stageRef}
-        className="relative aspect-[3/4] overflow-hidden"
+        className="relative aspect-[5/7] overflow-hidden"
       >
         <div
           className="absolute inset-0 shadow-[0_1px_4px_rgba(0,0,0,0.06)] group-hover:shadow-[0_4px_18px_rgba(0,0,0,0.13)] transition-shadow duration-300"
@@ -802,7 +802,7 @@ function NewArrivalsSection({
             onScroll={onScroll}
           >
             {newArrivals.map((poster) => (
-              <div key={poster.id} className="flex-none snap-start w-[74vw] sm:w-[240px] lg:w-[260px]">
+              <div key={poster.id} className="flex-none snap-start w-[48vw] sm:w-[180px] lg:w-[200px] xl:w[215px]">
                 <NewArrivalCard
                   poster={poster}
                   titleColor={posterTitleColor}
