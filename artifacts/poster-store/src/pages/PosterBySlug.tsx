@@ -51,6 +51,27 @@ function formatPrice(price: number, currency: string): string {
   return `${symbol}${price.toFixed(2)}`;
 }
 
+const DEFAULT_TRUST_MESSAGES = [
+  {
+    key: "paper",
+    icon: Package,
+    title: "Premium matte paper",
+    detail: "High-quality art print",
+  },
+  {
+    key: "delivery",
+    icon: Truck,
+    title: "Printed to order",
+    detail: "Dispatch in 2–4 working days",
+  },
+  {
+    key: "payment",
+    icon: Shield,
+    title: "Secure payment",
+    detail: "30-day returns",
+  },
+] as const;
+
 function CollapsibleSection({ title, children }: { title: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
@@ -62,10 +83,10 @@ function CollapsibleSection({ title, children }: { title: string; children: Reac
         aria-expanded={open}
       >
         {title}
-        {open ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+        {open ? <ChevronUp className="h-4 w-4 text-muted-foreground/50" /> : <ChevronDown className="h-4 w-4 text-muted-foreground/50" />}
       </button>
       {open && (
-        <div className="pb-4 text-sm text-muted-foreground space-y-1 leading-relaxed">
+        <div className="pb-4 text-sm text-foreground/65 space-y-1 leading-relaxed">
           {children}
         </div>
       )}
@@ -285,10 +306,10 @@ export default function PosterBySlug() {
 
   if (poster === undefined && !notFound) {
     return (
-      <div className="container mx-auto px-4 py-6 md:py-12 animate-pulse">
+      <div className="container mx-auto w-full max-w-[1280px] px-4 py-6 md:py-12 animate-pulse">
         <div className="h-5 bg-muted w-24 rounded mb-4 md:mb-8" />
-        <div className="grid grid-cols-1 md:grid-cols-[360px_1fr] gap-10">
-          <div className="aspect-[3/4] w-full bg-muted rounded-md" />
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,11fr)_minmax(0,10fr)] lg:gap-12 xl:gap-14">
+          <div className="aspect-[5/7] w-full max-w-[520px] rounded-sm bg-muted" />
           <div className="space-y-6">
             <div className="h-10 bg-muted w-3/4 rounded" />
             <div className="h-6 bg-muted w-1/4 rounded" />
@@ -330,12 +351,12 @@ export default function PosterBySlug() {
   }
 
   return (
-    <div className="container mx-auto px-4 pt-6 md:py-12 pb-28 md:pb-12">
+    <div className="container mx-auto w-full max-w-[1280px] px-4 pt-6 md:py-12 pb-28 md:pb-12">
       <button onClick={goBack} className="inline-flex items-center text-muted-foreground hover:text-foreground mb-4 md:mb-8">
         <ArrowLeft className="mr-2 h-4 w-4" /> {backLabel}
       </button>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[380px_minmax(0,680px)] xl:grid-cols-[420px_minmax(0,680px)] gap-8 lg:gap-12 mb-10 md:mb-14 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,11fr)_minmax(0,10fr)] gap-8 lg:gap-12 xl:gap-14 mb-10 md:mb-14 items-start">
         <div>
           <MockupGallery
             mockups={mockups ?? []}
@@ -345,17 +366,33 @@ export default function PosterBySlug() {
           />
         </div>
 
-        <div className="flex flex-col w-full max-w-[680px]">
-          <h1 className="font-serif text-4xl md:text-5xl font-bold text-foreground mb-3">
+        <div className="flex flex-col w-full max-w-[560px]">
+          {poster.region && (
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-primary/80">
+              {poster.region}
+            </p>
+          )}
+          <h1 className="font-serif text-4xl md:text-5xl font-bold leading-[1.05] text-foreground">
             {poster.title}
           </h1>
-          <div className="mb-2 text-muted-foreground text-sm font-medium tracking-wider uppercase">
-            {poster.region}
+          {poster.description && (
+            <p className="mt-2 max-w-xl text-[15px] leading-6 text-foreground/65">
+              {poster.description}
+            </p>
+          )}
+          <div className="mt-5">
+            <p className="text-2xl font-semibold tracking-tight text-foreground">
+              {pricePrefix}
+              {formatPrice(displayedPrice, displayedCurrency)}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Includes VAT · Frame not included
+            </p>
           </div>
 
           {activeSizes.length > 0 && (
-            <div className="mb-5 md:mb-8">
-              <h3 className="font-medium text-foreground mb-3">Select Size</h3>
+            <div className="mt-7 mb-5 md:mb-8">
+              <h3 className="font-medium text-foreground mb-3">Select size</h3>
 
               {/* 
                 Mobile: horizontal scroll row
@@ -388,22 +425,28 @@ export default function PosterBySlug() {
                           transition-all cursor-pointer
                           ${
                             isSelected
-                              ? "border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20"
-                              : "border-border bg-background hover:border-primary/50 hover:bg-accent/40"
+                              ? "border-primary bg-primary/[0.07] shadow-[0_2px_8px_rgba(0,0,0,0.06)] ring-1 ring-primary/30"
+                              : "border-border/80 bg-background hover:border-primary/40 hover:bg-accent/30"
                           }
                         `}
                       >
 
                         {isSelected && (
                           <span
-                            className="absolute right-2 top-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm"
+                            className="absolute right-2 top-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm ring-2 ring-background"
                             aria-hidden="true"
                           >
                             <Check className="h-3.5 w-3.5" />
                           </span>
                         )}
                         
-                        <span className="font-medium text-sm text-foreground leading-tight">
+                        <span
+                          className={`text-sm leading-tight ${
+                            isSelected
+                              ? "font-semibold text-foreground"
+                              : "font-medium text-foreground/80"
+                          }`}
+                        >
                           {size.sizeLabel}
                         </span>
 
@@ -428,30 +471,141 @@ export default function PosterBySlug() {
             </p>
           )}
 
-          <div ref={addToCartRef} className="flex gap-3 mt-auto max-w-[560px]">
+          <div
+            ref={addToCartRef}
+            className="flex max-w-[560px] gap-3 mt-auto"
+          >
             <Button
               size="lg"
-              className="flex-1 h-13 text-base font-semibold shadow-sm"
+              className="
+                h-[52px] flex-1 rounded-[5px]
+                bg-foreground text-background
+                text-[15px] font-semibold
+                shadow-none
+                transition-colors
+                hover:bg-foreground/90
+                focus-visible:ring-2
+                focus-visible:ring-foreground/30
+                focus-visible:ring-offset-2
+                disabled:bg-primary
+                disabled:text-primary-foreground
+                disabled:opacity-50
+              "
               onClick={handleAddToCart}
-              disabled={addCartItem.isPending || noActiveSizes || (activeSizes.length > 0 && !selectedSizeId)}
+              disabled={
+                addCartItem.isPending ||
+                noActiveSizes ||
+                (activeSizes.length > 0 && !selectedSizeId)
+              }
               data-testid="btn-add-to-cart"
             >
-              {addCartItem.isPending ? "Adding..." : (
-                <><ShoppingBag className="mr-2 h-5 w-5" /> Add to cart</>
+              {addCartItem.isPending ? (
+                "Adding…"
+              ) : (
+                <>
+                  <ShoppingBag className="mr-2 h-5 w-5" />
+                  Add to cart
+                </>
               )}
             </Button>
+
             <Button
               size="lg"
               variant="outline"
-              className="h-[52px] w-[52px] px-0 shadow-sm"
+              className={`
+                h-[52px] w-[52px] shrink-0 rounded-[5px] px-0
+                border shadow-none transition-colors
+                hover:border-foreground/30 hover:bg-muted/50
+                ${
+                  isFavorite
+                    ? "border-secondary/50 bg-secondary/5"
+                    : "border-border bg-background"
+                }
+              `}
               onClick={handleToggleFavorite}
               disabled={favoritesPending}
-              aria-label={isFavorite ? "Remove from wishlist" : "Add to wishlist"}
+              aria-label={
+                isFavorite
+                  ? "Remove from wishlist"
+                  : "Add to wishlist"
+              }
             >
-              <Heart className={`h-5 w-5 ${isFavorite ? "fill-secondary text-secondary" : ""}`} />
+              <Heart
+                className={`h-5 w-5 transition-colors ${
+                  isFavorite
+                    ? "fill-secondary text-secondary"
+                    : "text-foreground/70"
+                }`}
+              />
             </Button>
           </div>
 
+          <div
+            className="mt-5 max-w-[560px] py-4"
+            aria-label="Shopping benefits"
+          >
+            <div className="grid grid-cols-3">
+              {DEFAULT_TRUST_MESSAGES.map(
+                ({ key, icon: Icon, title, detail }) => (
+                  <div
+                    key={key}
+                    className="
+                      flex min-w-0 flex-col items-center
+                      px-2 text-center
+                      sm:items-start sm:px-4 sm:text-left
+                    "
+                  >
+                    <Icon
+                      className="mb-2 h-4 w-4 shrink-0 text-primary"
+                      strokeWidth={1.8}
+                      aria-hidden="true"
+                    />
+
+                    <p className="text-xs font-semibold leading-4 text-foreground">
+                      {title}
+                    </p>
+
+                    <p className="mt-0.5 text-[11px] leading-4 text-foreground/60">
+                      {detail}
+                    </p>
+                  </div>
+                )
+              )}
+            </div>
+          </div>
+
+          <div
+            className="mt-4 max-w-[560px] border-t border-border"
+            aria-label="Product information"
+          >
+            <CollapsibleSection title="Product details">
+              <p>
+                Museum-quality poster printed on premium matte paper.
+              </p>
+              <p>
+                Frame is not included.
+              </p>
+            </CollapsibleSection>
+
+            <CollapsibleSection title="Paper & printing">
+              <p>
+                Printed using high-quality inks for rich colours and sharp details.
+              </p>
+              <p>
+                Each poster is produced to order.
+              </p>
+            </CollapsibleSection>
+
+            <CollapsibleSection title="Shipping & returns">
+              <p>
+                Orders are normally dispatched within 2–4 working days.
+              </p>
+              <p>
+                Returns are accepted within 30 days.
+              </p>
+            </CollapsibleSection>
+          </div>
+          
           {poster.tags && poster.tags.length > 0 && (
             <div className="mt-8 flex flex-wrap gap-2">
               {poster.tags.map(tag => (
@@ -541,13 +695,31 @@ export default function PosterBySlug() {
           </div>
           <Button
             size="default"
-            className="shrink-0 h-11 px-5 text-sm"
+            className="
+              h-11 shrink-0 rounded-[5px] px-5
+              bg-foreground text-background
+              text-sm font-semibold
+              shadow-none transition-colors
+              hover:bg-foreground/90
+              disabled:bg-primary
+              disabled:text-primary-foreground
+              disabled:opacity-50
+            "
             onClick={handleAddToCart}
-            disabled={addCartItem.isPending || noActiveSizes || (activeSizes.length > 0 && !selectedSizeId)}
+            disabled={
+              addCartItem.isPending ||
+              noActiveSizes ||
+              (activeSizes.length > 0 && !selectedSizeId)
+            }
             aria-label="Add to cart"
           >
-            {addCartItem.isPending ? "Adding…" : (
-              <><ShoppingBag className="mr-1.5 h-4 w-4" /> Add to cart</>
+            {addCartItem.isPending ? (
+              "Adding…"
+            ) : (
+              <>
+                <ShoppingBag className="mr-1.5 h-4 w-4" />
+                Add to cart
+              </>
             )}
           </Button>
         </div>

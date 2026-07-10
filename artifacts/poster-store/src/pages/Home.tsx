@@ -11,7 +11,7 @@ import {
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, Landmark, Building2, Waves, Compass, Award, Globe2, Package, Leaf, } from "lucide-react";
 import { getOptimizedImageUrl } from "@/lib/imageUrl";
 import {
   DEFAULT_HOMEPAGE_SECTIONS,
@@ -41,10 +41,26 @@ function heroBtnWrapperCls(showMobile: boolean | undefined, showDesktop: boolean
 }
 
 const VALUE_PROPS = [
-  { title: "Museum quality", description: "Archival inks on premium fine art paper" },
-  { title: "Made to order", description: "Printed especially for you when you order" },
-  { title: "Worldwide shipping", description: "Carefully packed and shipped to your door" },
-  { title: "Better choice", description: "Sustainably made with responsible materials" },
+  {
+    icon: Award,
+    title: "Museum-quality prints",
+    description: "Fine art paper and archival ink for lasting beauty.",
+  },
+  {
+    icon: Package,
+    title: "Made to order",
+    description: "Each print is made especially for you with care.",
+  },
+  {
+    icon: Globe2,
+    title: "Worldwide shipping",
+    description: "Carefully packed and shipped wherever you are.",
+  },
+  {
+    icon: Leaf,
+    title: "Sustainably made",
+    description: "Responsible materials and low-impact production.",
+  },
 ];
 
 function formatPrice(price: number, currency: string): string {
@@ -441,7 +457,7 @@ function FeaturedPosterCardSkeleton() {
 function PosterCardSkeleton() {
   return (
     <div className="flex-none w-[155px] sm:w-[170px] lg:w-[185px] snap-start">
-      <div className="aspect-[3/4] bg-muted animate-pulse" />
+      <div className="aspect-[5/7] bg-muted animate-pulse" />
       <div className="mt-1.5 h-3.5 bg-muted animate-pulse w-3/4" />
       <div className="mt-1 h-3 bg-muted animate-pulse w-1/2" />
     </div>
@@ -535,13 +551,16 @@ function HeroSection({ store, resolvedRoutePrefix, sectionConfig }: HeroSectionP
 
   return (
     <section
-      className={cn("relative overflow-hidden", !hasHeroBg && !bgColorOverride && "bg-sand")}
+      className={cn(
+        "relative overflow-hidden min-h-[220px] lg:min-h-[300px] flex items-center",
+        !hasHeroBg && !bgColorOverride && "bg-sand"
+      )}
       style={sectionStyle}
     >
       {hasHeroBg && (
         <div className="absolute inset-0 pointer-events-none" style={overlayDivStyle} />
       )}
-      <div className="relative z-10 container mx-auto max-w-screen-2xl px-6 lg:px-10 pt-3 pb-5 lg:pt-4 lg:pb-6 text-center">
+      <div className="relative z-10 container mx-auto max-w-screen-2xl px-6 lg:px-10 pt-6 pb-10 lg:pt-8 lg:pb-10 text-center">
         <h1
           className={cn(
             "font-serif text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 leading-tight",
@@ -700,6 +719,13 @@ function FeaturedPostersSection({ featured, resolvedRoutePrefix, sectionConfig }
   );
 }
 
+const REGION_ICONS = [
+  MapPin,
+  Landmark,
+  Compass,
+  Building2,
+  Waves,
+];
 
 interface ExploreLinksProps {
   regionChips: string[];
@@ -715,24 +741,32 @@ function ExploreLinksSection({ regionChips, categoryChips, resolvedRoutePrefix, 
       <div className="container mx-auto max-w-screen-2xl px-6 lg:px-10">
         <h2 className="font-serif text-lg font-bold text-foreground mb-4">{regionFilterLabel}</h2>
         <div className="flex flex-wrap gap-2">
-          {regionChips.map((region) => (
-            <Link
-              key={region}
-              href={makeShopUrl(resolvedRoutePrefix, `region=${encodeURIComponent(region)}`)}
-              className="flex-1 min-w-fit inline-flex items-center justify-center px-3.5 py-1.5 rounded-full border border-border text-sm text-foreground/75 bg-surface hover:bg-sand/60 hover:border-primary/30 hover:text-primary transition-colors duration-150"
-            >
-              {region}
-            </Link>
-          ))}
-          {categoryChips.map((cat) => (
-            <Link
-              key={cat}
-              href={makeShopUrl(resolvedRoutePrefix, `category=${encodeURIComponent(cat)}`)}
-              className="flex-1 min-w-fit inline-flex items-center justify-center px-3.5 py-1.5 rounded-full border border-border text-sm text-foreground/75 bg-surface hover:bg-sand/60 hover:border-primary/30 hover:text-primary transition-colors duration-150"
-            >
-              {cat}
-            </Link>
-          ))}
+          {regionChips.map((region, index) => {
+            const Icon = REGION_ICONS[index] ?? MapPin;
+            return (
+              <Link
+                key={region}
+                href={makeShopUrl(
+                  resolvedRoutePrefix,
+                  `region=${encodeURIComponent(region)}`
+                )}
+                className="flex-1 min-w-fit inline-flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-full border border-border text-sm text-foreground/75 bg-surface hover:bg-sand/60 hover:border-primary/30 hover:text-primary transition-colors duration-150"
+              >
+                <Icon className="h-4 w-4 shrink-0 text-foreground/45" />
+                <span>{region}</span>
+              </Link>
+            );
+          })}
+          <Link
+            href={makeShopUrl(resolvedRoutePrefix)}
+            className="flex-1 min-w-fit inline-flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-full border border-border text-sm text-foreground/75 bg-surface hover:bg-sand/60 hover:border-primary/30 hover:text-primary transition-colors duration-150"
+          >
+            <MapPin className="h-4 w-4 shrink-0 text-foreground/45" />
+
+            <span>View all destinations</span>
+
+            <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+          </Link>
         </div>
       </div>
     </section>
@@ -876,19 +910,42 @@ function BrandStorySection({
 
 function ValuePropsSection() {
   return (
-    <section className="border-t border-border py-8 lg:py-10">
+    <section className="border-t border-border/60 py-8 lg:py-10">
       <div className="container mx-auto max-w-screen-2xl px-6 lg:px-10">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          {VALUE_PROPS.map((prop, i) => (
-            <div
-              key={i}
-              className="text-center px-4 py-5 bg-surface border border-border/50 rounded-xl"
-              data-testid={`value-card-${i}`}
-            >
-              <h3 className="font-serif font-bold text-sm mb-1.5">{prop.title}</h3>
-              <p className="text-xs text-muted-foreground leading-relaxed">{prop.description}</p>
-            </div>
-          ))}
+        <div className="rounded-xl bg-[#faf7f1] px-5 py-6 lg:px-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+            {VALUE_PROPS.map((prop, i) => {
+              const Icon = prop.icon;
+
+              return (
+                <div
+                  key={i}
+                  className={cn(
+                    "flex items-start gap-4 px-3 py-4 lg:px-6",
+                    i > 0 && "lg:border-l lg:border-border/60",
+                    i >= 2 && "sm:border-t lg:border-t-0 sm:border-border/60"
+                  )}
+                  data-testid={`value-card-${i}`}
+                >
+                  <Icon
+                    className="h-8 w-8 shrink-0 text-[#9b8267]"
+                    strokeWidth={1.4}
+                    aria-hidden="true"
+                  />
+
+                  <div className="min-w-0">
+                    <h3 className="font-serif font-semibold text-sm text-foreground mb-1">
+                      {prop.title}
+                    </h3>
+
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {prop.description}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </section>
@@ -1056,7 +1113,7 @@ export default function Home() {
                 regionChips={regionChips}
                 categoryChips={categoryChips}
                 resolvedRoutePrefix={resolvedRoutePrefix}
-                regionFilterLabel={store.shop?.regionFilterLabel ?? "Explore Spain"}
+                regionFilterLabel={store.shop?.regionFilterLabel ?? "Explore Spain by place"}
               />
             );
 

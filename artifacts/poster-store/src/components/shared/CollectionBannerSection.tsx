@@ -162,7 +162,7 @@ export function CollectionBannerSection({
   const desktopBanner = (
     <div
       className={cn(
-        "relative overflow-hidden rounded-2xl shadow-[0_2px_20px_rgba(0,0,0,0.10)]",
+        "relative overflow-hidden rounded-[8px] shadow-[0_2px_20px_rgba(0,0,0,0.10)]",
         mobileMode === "simplified-card" && "hidden sm:block",
         mobileMode === "hidden" && "hidden lg:block",
       )}
@@ -255,7 +255,7 @@ export function CollectionBannerSection({
     <Link
       href={resolvedCtaHref}
       onClick={scrollToTop}
-      className="block sm:hidden rounded-2xl px-5 py-6 cursor-pointer"
+      className="block sm:hidden rounded-[8px] px-5 py-6 cursor-pointer"
       style={{ backgroundColor: bannerBgColor ?? "#EBD9C4" }}
     >
       {cbEyebrow && (
@@ -307,7 +307,7 @@ export function CollectionBannerSection({
   if (effectiveDisplayStyle === "simple") {
     const simpleCard = (
       <div
-        className="rounded-2xl px-6 lg:px-10 py-7 lg:py-8 flex flex-col sm:flex-row sm:items-center justify-between gap-5"
+        className="rounded-[10px] px-6 lg:px-10 py-7 lg:py-8 flex flex-col sm:flex-row sm:items-center justify-between gap-5"
         style={{ backgroundColor: bannerBgColor ?? "#ede8e0" }}
       >
             <div className="min-w-0">

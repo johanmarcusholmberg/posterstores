@@ -276,12 +276,56 @@ export const MockupGallery = ({
 
   const closeLightbox = useCallback(() => setLightboxOpen(false), []);
 
-  const handleLightboxBackdropClick = useCallback(() => {
-    // Only close by outside-click on desktop/tablet
-    if (window.matchMedia("(min-width: 768px)").matches) {
-      closeLightbox();
-    }
-  }, [closeLightbox]);
+  const handleLightboxBackdropClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      // Outside-click closing is desktop/tablet only
+      if (!window.matchMedia("(min-width: 768px)").matches) return;
+
+      const mainImage =
+        e.currentTarget.querySelector<HTMLImageElement>(
+          '[data-lightbox-main-image="true"]'
+        );
+
+      if (
+        !mainImage ||
+        mainImage.naturalWidth === 0 ||
+        mainImage.naturalHeight === 0
+      ) {
+        closeLightbox();
+        return;
+      }
+
+      const box = mainImage.getBoundingClientRect();
+      const naturalRatio =
+        mainImage.naturalWidth / mainImage.naturalHeight;
+      const boxRatio = box.width / box.height;
+
+      let visibleLeft = box.left;
+      let visibleTop = box.top;
+      let visibleWidth = box.width;
+      let visibleHeight = box.height;
+
+      // Calculate the actual visible image area when object-contain is used
+      if (naturalRatio > boxRatio) {
+        visibleHeight = box.width / naturalRatio;
+        visibleTop = box.top + (box.height - visibleHeight) / 2;
+      } else {
+        visibleWidth = box.height * naturalRatio;
+        visibleLeft = box.left + (box.width - visibleWidth) / 2;
+      }
+
+      const clickedOnVisibleImage =
+        e.clientX >= visibleLeft &&
+        e.clientX <= visibleLeft + visibleWidth &&
+        e.clientY >= visibleTop &&
+        e.clientY <= visibleTop + visibleHeight;
+
+      if (!clickedOnVisibleImage) {
+        closeLightbox();
+      }
+    },
+    [closeLightbox]
+  );
   
   const prevLightbox = useCallback(
     () => setLightboxIdx((i) => (i - 1 + allImages.length) % allImages.length),
@@ -306,16 +350,21 @@ export const MockupGallery = ({
   // Skeleton state
   if (isLoading) {
     return (
-      <div className="flex flex-col-reverse md:flex-row md:items-start gap-2.5 md:gap-3.5" aria-busy="true">
-        <div className="flex flex-row md:flex-col gap-2 md:w-[72px] md:shrink-0">
+      <div className="flex w-full flex-col-reverse gap-2.5 md:max-w-[500px] md:flex-row md:items-start md:gap-3.5 lg:max-w-none xl:gap-4" aria-busy="true">
+        <div className="flex flex-row gap-2 md:w-[96px] md:shrink-0 md:flex-col xl:w-[112px]">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="w-[68px] h-[68px] bg-muted animate-pulse rounded-sm" />
+        <div
+          key={i}
+          className="
+            h-[68px] w-[68px] shrink-0 rounded-sm
+            bg-muted animate-pulse
+            md:h-auto md:w-[92px] md:aspect-[5/7]
+            xl:w-[108px]
+          "
+        />
           ))}
         </div>
-        <div
-          className="bg-muted animate-pulse sm:max-h-[420px] w-full"
-          style={{ aspectRatio: "5/7" }}
-        />
+        <div className="aspect-[5/7] w-full bg-muted animate-pulse md:min-w-0 md:flex-1" />
       </div>
     );
   }
@@ -356,12 +405,25 @@ export const MockupGallery = ({
   return (
     <>
       <div
-        className="flex flex-col-reverse md:flex-row md:items-start gap-2.5 md:gap-3.5"
+        className="flex w-full flex-col-reverse gap-2.5 md:max-w-[500px] md:flex-row md:items-start md:gap-3.5 lg:max-w-none xl:gap-4"
         data-testid="mockup-gallery"
       >
         {/* Thumbnail strip — below main image on mobile, left column on desktop */}
         {allImages.length > 1 && (
-          <div className="flex flex-row md:flex-col gap-2 overflow-x-auto md:overflow-x-visible md:overflow-y-auto pb-0.5 md:pb-0 scrollbar-hide md:w-[72px] md:max-h-[420px]   md:shrink-0">
+        <div
+          className="
+            flex flex-row gap-2
+            overflow-x-auto pb-0.5
+            scrollbar-hide
+
+            md:w-[96px] md:shrink-0 md:flex-col
+            md:overflow-x-visible md:overflow-y-auto md:pb-0
+            md:max-h-[680px]
+
+            lg:max-h-[720px]
+            xl:w-[112px]
+          "
+        >
             {allImages.map((img, idx) => {
               const isActive = idx === activeIdx;
               return (
@@ -374,17 +436,31 @@ export const MockupGallery = ({
                   }}
                   aria-label={img.label}
                   aria-pressed={isActive}
-                  className={cn(
-                    "relative shrink-0 overflow-hidden border-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary bg-[#faf8f3]",
-                    isActive ? "border-primary" : "border-transparent hover:opacity-80"
+                  className={cn(                    `
+                      relative h-[68px] w-[68px] shrink-0
+                      overflow-hidden border-2 bg-[#faf8f3]
+                      transition-all
+                      focus-visible:outline-none
+                      focus-visible:ring-2
+                      focus-visible:ring-primary
+
+                      md:h-auto md:w-[92px] md:aspect-[5/7]
+                      xl:w-[108px]`,
+                    isActive
+                      ? "border-primary"
+                      : "border-transparent hover:opacity-80"
                   )}
-                  style={{ width: 68, height: 68 }}
                 >
                   <img
                     src={img.url}
                     alt={alt}
-                    className="block max-w-full max-h-full w-auto h-auto object-contain"
-                    onError={(e) => { (e.target as HTMLImageElement).src = fallbackImageUrl; }}
+                    className={cn(
+                      "block h-full w-full",
+                      img.isPosterArtwork ? "object-contain" : "object-cover"
+                    )}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = fallbackImageUrl;
+                    }}
                   />
                 </button>
               );
@@ -401,10 +477,9 @@ export const MockupGallery = ({
         <div
           ref={mainImageRef}
           className={cn(
-            "relative overflow-hidden cursor-zoom-in group select-none sm:max-h-[420px] w-full",
+            "relative aspect-[5/7] w-full overflow-hidden cursor-zoom-in group select-none md:w-auto md:min-w-0 md:flex-1",
             !activeItem.isPosterArtwork && "bg-[#faf8f3] shadow-[0_1px_4px_rgba(0,0,0,0.06)]"
           )}
-          style={{ aspectRatio: "5/7" }}
           onClick={openLightbox}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
@@ -458,7 +533,19 @@ export const MockupGallery = ({
             </button>
 
             {/* Image zone — fixed height so thumbnails never shift when images change ratio */}
-            <div className="relative flex items-center justify-center w-full mt-10 h-[60vh] sm:h-[72vh]">
+            <div
+              className="
+                relative flex items-center justify-center
+                w-[calc(100vw-2rem)]
+                sm:w-[calc(100vw-6rem)]
+                max-w-[1600px]
+                mt-8
+                h-[66vh]
+                sm:h-[72vh]
+                lg:h-[76vh]
+                max-h-[820px]
+              "
+            >
               {allImages.length > 1 && (
                 <button
                   onClick={(e) => {
@@ -473,7 +560,11 @@ export const MockupGallery = ({
               )}
 
               <LightboxImage
-                item={allImages[lightboxIdx] ?? { url: fallbackImageUrl, label: "Poster" }}
+                key={lightboxIdx}
+                item={allImages[lightboxIdx] ?? {
+                  url: fallbackImageUrl,
+                  label: "Poster",
+                }}
                 fallbackImageUrl={fallbackImageUrl}
                 alt={alt}
               />
@@ -494,7 +585,7 @@ export const MockupGallery = ({
 
             {/* Thumbnail strip — no labels */}
             {allImages.length > 1 && (
-              <div className="flex gap-2 mt-4 overflow-x-auto pb-0.5">
+              <div className="flex max-w-[calc(100vw-2rem)] gap-3 mt-5 overflow-x-auto px-1 pb-1">
                 {allImages.map((img, idx) => (
                   <button
                     key={idx}
@@ -505,12 +596,20 @@ export const MockupGallery = ({
                     }}
                     aria-label={img.label}
                     className={cn(
-                      "relative shrink-0 overflow-hidden border-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white",
+                      `
+                        relative h-[72px] w-[72px] shrink-0
+                        overflow-hidden border-2
+                        transition-all
+                        focus-visible:outline-none
+                        focus-visible:ring-2
+                        focus-visible:ring-white
+
+                        sm:h-[88px] sm:w-[88px]
+                      `,
                       lightboxIdx === idx
                         ? "border-white opacity-100"
                         : "border-transparent opacity-40 hover:opacity-70"
                     )}
-                    style={{ width: 56, height: 56 }}
                   >
                     <img
                       src={img.url}
@@ -540,6 +639,7 @@ export const MockupGallery = ({
  * so all items render as a plain <img> with object-contain. The CompositedMockup path
  * is gone — live CSS compositing is admin-preview-only and never reaches the lightbox.
  */
+
 function LightboxImage({
   item,
   fallbackImageUrl,
@@ -549,13 +649,54 @@ function LightboxImage({
   fallbackImageUrl: string;
   alt: string;
 }) {
+  const [naturalRatio, setNaturalRatio] = useState<number | null>(null);
+  const [useFallback, setUseFallback] = useState(false);
+
+  const imageSrc = useFallback ? fallbackImageUrl : item.url;
+
+  const imageStyle: React.CSSProperties =
+    naturalRatio === null
+      ? {
+          width: "auto",
+          height: "auto",
+          maxWidth: "100%",
+          maxHeight: "100%",
+        }
+      : naturalRatio < 1
+        ? {
+            height: "100%",
+            width: "auto",
+            maxWidth: "100%",
+          }
+        : {
+            width: "100%",
+            height: "auto",
+            maxHeight: "100%",
+          };
+
   return (
     <img
-      src={item.url}
+      key={imageSrc}
+      src={imageSrc}
       alt={alt}
-      className="block max-w-full max-h-full w-auto h-auto object-contain"
-      onClick={(e) => e.stopPropagation()}
-      onError={(e) => { (e.target as HTMLImageElement).src = fallbackImageUrl; }}
+      data-lightbox-main-image="true"
+      className="block shrink-0 object-contain"
+      style={imageStyle}
+      onLoad={(e) => {
+        const image = e.currentTarget;
+
+        if (image.naturalWidth > 0 && image.naturalHeight > 0) {
+          setNaturalRatio(
+            image.naturalWidth / image.naturalHeight
+          );
+        }
+      }}
+      onError={() => {
+        if (!useFallback) {
+          setUseFallback(true);
+          setNaturalRatio(null);
+        }
+      }}
     />
   );
 }
