@@ -368,7 +368,10 @@ export const MockupGallery = ({
                 <button
                   key={idx}
                   type="button"
-                  onClick={() => setActiveIdx(idx)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveIdx(idx);
+                  }}
                   aria-label={img.label}
                   aria-pressed={isActive}
                   className={cn(
@@ -381,7 +384,6 @@ export const MockupGallery = ({
                     src={img.url}
                     alt={alt}
                     className="block max-w-full max-h-full w-auto h-auto object-contain"
-                    onClick={(e) => e.stopPropagation()}
                     onError={(e) => { (e.target as HTMLImageElement).src = fallbackImageUrl; }}
                   />
                 </button>

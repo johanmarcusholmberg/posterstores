@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { MockupGallery } from "@/components/public/MockupGallery";
 import { PosterCard } from "@/components/shared/PosterCard";
 import { LoginPromptModal } from "@/components/shared/LoginPromptModal";
-import { ShoppingBag, ArrowLeft, Heart, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Shield, Truck, Package, Sparkles } from "lucide-react";
+import { ShoppingBag, ArrowLeft, Heart, Check, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Shield, Truck, Package, Sparkles } from "lucide-react";
 import { getPosterMockups, type PosterMockup } from "@/lib/mockupApi";
 import { useAddCartItem, getGetCartQueryKey, useListPosters, getListPostersQueryKey } from "@workspace/api-client-react";
 import { addFavorite, removeFavorite, getFavoriteIds } from "@/lib/favoritesApi";
@@ -335,7 +335,7 @@ export default function PosterBySlug() {
         <ArrowLeft className="mr-2 h-4 w-4" /> {backLabel}
       </button>
 
-      <div className="grid grid-cols-1 md:grid-cols-[360px_1fr] gap-10 mb-8 md:mb-12 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[380px_minmax(0,680px)] xl:grid-cols-[420px_minmax(0,680px)] gap-8 lg:gap-12 mb-10 md:mb-14 items-start">
         <div>
           <MockupGallery
             mockups={mockups ?? []}
@@ -345,7 +345,7 @@ export default function PosterBySlug() {
           />
         </div>
 
-        <div className="flex flex-col">
+        <div className="flex flex-col w-full max-w-[680px]">
           <h1 className="font-serif text-4xl md:text-5xl font-bold text-foreground mb-3">
             {poster.title}
           </h1>
@@ -381,18 +381,28 @@ export default function PosterBySlug() {
                         data-testid={`size-option-${size.id}`}
                         aria-pressed={isSelected}
                         className={`
-                          shrink-0 w-[118px] sm:w-auto snap-start
+                          relative shrink-0 w-[118px] sm:w-auto snap-start
                           flex flex-col items-start justify-center
-                          rounded-md border-2 px-3 py-2 text-left
-                          min-h-[58px]
-                          transition-colors cursor-pointer
+                          rounded-lg border px-3 pr-8 py-2.5 text-left
+                          min-h-[60px]
+                          transition-all cursor-pointer
                           ${
                             isSelected
-                              ? "border-primary bg-primary/5"
-                              : "border-border bg-background hover:border-primary/50 hover:bg-accent/50"
+                              ? "border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20"
+                              : "border-border bg-background hover:border-primary/50 hover:bg-accent/40"
                           }
                         `}
                       >
+
+                        {isSelected && (
+                          <span
+                            className="absolute right-2 top-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm"
+                            aria-hidden="true"
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                          </span>
+                        )}
+                        
                         <span className="font-medium text-sm text-foreground leading-tight">
                           {size.sizeLabel}
                         </span>
@@ -418,10 +428,10 @@ export default function PosterBySlug() {
             </p>
           )}
 
-          <div ref={addToCartRef} className="flex gap-3 mt-auto">
+          <div ref={addToCartRef} className="flex gap-3 mt-auto max-w-[560px]">
             <Button
               size="lg"
-              className="flex-1 text-lg h-14"
+              className="flex-1 h-13 text-base font-semibold shadow-sm"
               onClick={handleAddToCart}
               disabled={addCartItem.isPending || noActiveSizes || (activeSizes.length > 0 && !selectedSizeId)}
               data-testid="btn-add-to-cart"
@@ -433,7 +443,7 @@ export default function PosterBySlug() {
             <Button
               size="lg"
               variant="outline"
-              className="h-14 px-4"
+              className="h-[52px] w-[52px] px-0 shadow-sm"
               onClick={handleToggleFavorite}
               disabled={favoritesPending}
               aria-label={isFavorite ? "Remove from wishlist" : "Add to wishlist"}
@@ -443,10 +453,10 @@ export default function PosterBySlug() {
           </div>
 
           {poster.tags && poster.tags.length > 0 && (
-            <div className="mt-12 flex flex-wrap gap-2">
+            <div className="mt-8 flex flex-wrap gap-2">
               {poster.tags.map(tag => (
                 <Link key={tag} href={`/shop?tag=${encodeURIComponent(tag)}`}>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer">
+                  <span className="inline-flex items-center rounded-full border border-border/70 bg-background px-3 py-1 text-xs font-medium text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors cursor-pointer">
                     {tag}
                   </span>
                 </Link>
