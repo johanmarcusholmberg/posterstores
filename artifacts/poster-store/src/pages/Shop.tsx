@@ -159,7 +159,7 @@ function HiddenFiltersPopover({
   return (
     <div
       ref={containerRef}
-      className="relative"
+      className="relative z-40 shrink-0"
       onMouseEnter={() => { cancelClose(); setOpen(true); }}
       onMouseLeave={scheduleClose}
       data-testid="filter-chips-overflow"
@@ -167,21 +167,41 @@ function HiddenFiltersPopover({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="text-xs text-muted-foreground bg-muted hover:bg-muted/80 rounded-full px-2.5 py-1 font-medium select-none cursor-pointer transition-colors min-h-[32px]"
+        className="
+          inline-flex h-6 shrink-0 items-center
+          whitespace-nowrap rounded-full
+          border border-border/70
+          bg-muted/50 px-2.5 py-0
+          text-[11px] font-medium leading-none
+          text-muted-foreground
+          transition-colors
+          hover:border-border
+          hover:bg-muted
+          hover:text-foreground
+        "
       >
         +{hiddenFilters.length} more
       </button>
 
       {open && (
         <div
-          className="absolute left-0 top-full mt-1.5 z-50 bg-background border border-border rounded-lg shadow-lg p-2 flex flex-col gap-1 min-w-[140px]"
+          className="
+            absolute left-0 top-full z-50 mt-1.5
+            min-w-[170px]
+            rounded-lg border border-border
+            bg-background p-2 shadow-lg
+            flex flex-col gap-1
+          "
           onMouseEnter={cancelClose}
           onMouseLeave={scheduleClose}
         >
           {hiddenFilters.map(f => (
             <button
               key={`${f.key}-${f.value}`}
-              onClick={() => { onRemove(f); setOpen(false); }}
+              onClick={(event) => {
+                event.stopPropagation();
+                onRemove(f);
+              }}
               className="flex items-center justify-between gap-3 text-xs text-foreground hover:bg-muted/60 rounded px-2.5 py-1.5 text-left w-full transition-colors group min-h-[36px]"
             >
               <span>{f.label}</span>
@@ -387,81 +407,117 @@ export default function Shop() {
 
         {/* Main Content */}
         <main className="flex-1">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-            <div>
-              <h1 className="font-serif text-3xl font-bold text-foreground">
-                {hasAnyFilter ? (
-                  <>
-                    Showing{" "}
-                    <span className="text-foreground">{total}</span>{" "}
-                    <span className="text-muted-foreground font-sans font-normal text-2xl">
-                      poster{total !== 1 ? "s" : ""}
-                    </span>
-                  </>
-                ) : (
-                  "All Posters"
-                )}
+          <div className="flex flex-col sm:flex-row justify-between items-start mb-4 gap-3">
+            <div className="min-w-0 flex-1">
+              <h1 className="flex flex-wrap items-baseline gap-x-2 font-serif text-3xl font-bold text-foreground">
+                <span>
+                  {hasAnyFilter ? "Showing" : "All Posters"}
+                </span>
+
+                <span className="font-sans text-2xl font-normal text-primary/70">
+                  {total} poster{total !== 1 ? "s" : ""}
+                </span>
               </h1>
-              {!hasAnyFilter && total > 0 && (
-                <p className="text-sm text-muted-foreground mt-1">{total} posters</p>
-              )}
 
-              {/* Compact always-visible tagline — keeps heading area stable height across states */}
-              {shopCfg?.shopTagline && (
-                <p className="text-xs text-muted-foreground/70 mt-1.5 tracking-wide">
-                  {shopCfg.shopTagline}
-                </p>
-              )}
-
-              {/* Compact active filter chips */}
-              {activeFilters.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2 mt-2">
-                  {visibleChips.map(f => (
-                    <Badge
-                      key={`${f.key}-${f.value}`}
-                      variant="secondary"
-                      className="flex items-center gap-1 cursor-pointer hover:bg-secondary/80 pr-1.5"
-                      onClick={() => {
-                        if (f.key === "region" || f.key === "category") {
-                          toggleFilter(f.key, f.value);
-                        } else {
-                          setFilter(f.key, undefined);
-                        }
-                      }}
-                      data-testid={`filter-chip-${f.key}-${f.value}`}
+              {/*
+                Fixed second row:
+                - without filters: show the shop tagline
+                - with filters: show the active filter controls
+              */}
+                <div className="relative mt-1.5 flex min-h-6 max-w-full items-center overflow-visible">
+                {hasAnyFilter ? (
+                    <div
+                      className="
+                        flex min-w-0 items-center gap-2
+                        overflow-visible
+                      "
                     >
-                      {f.label}
-                      <X className="h-3 w-3" />
-                    </Badge>
-                  ))}
-                  {hiddenCount > 0 && (
-                    <HiddenFiltersPopover
-                      hiddenFilters={activeFilters.slice(CHIP_LIMIT)}
-                      onRemove={(f) => {
-                        if (f.key === "region" || f.key === "category") {
-                          toggleFilter(f.key, f.value);
-                        } else {
-                          setFilter(f.key, undefined);
-                        }
-                      }}
-                    />
-                  )}
-                  <button
-                    onClick={clearAllFilters}
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors underline-offset-2 hover:underline"
-                    data-testid="btn-clear-all-filters"
-                  >
-                    Clear all
-                  </button>
-                </div>
-              )}
+                    {visibleChips.map((f) => (
+                      <Badge
+                        key={`${f.key}-${f.value}`}
+                        variant="secondary"
+                        className="
+                          inline-flex h-6 shrink-0 items-center gap-1
+                          whitespace-nowrap rounded-md
+                          px-2.5 py-0
+                          text-[11px] font-semibold leading-none
+                          cursor-pointer
+                          hover:bg-secondary/80
+                        "
+                        onClick={() => {
+                          if (
+                            f.key === "region" ||
+                            f.key === "category"
+                          ) {
+                            toggleFilter(f.key, f.value);
+                          } else {
+                            setFilter(f.key, undefined);
+                          }
+                        }}
+                        data-testid={`filter-chip-${f.key}-${f.value}`}
+                      >
+                        {f.label}
+                        <X className="h-3 w-3 shrink-0" />
+                      </Badge>
+                    ))}
+
+                    {hiddenCount > 0 && (
+                      <HiddenFiltersPopover
+                        hiddenFilters={activeFilters.slice(CHIP_LIMIT)}
+                        onRemove={(f) => {
+                          if (
+                            f.key === "region" ||
+                            f.key === "category"
+                          ) {
+                            toggleFilter(f.key, f.value);
+                          } else {
+                            setFilter(f.key, undefined);
+                          }
+                        }}
+                      />
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={clearAllFilters}
+                      className="
+                        inline-flex h-6 shrink-0 items-center
+                        whitespace-nowrap px-1 py-0
+                        text-[11px] font-medium leading-none
+                        text-muted-foreground
+                        transition-colors
+                        hover:text-foreground hover:underline
+                        underline-offset-2
+                      "
+                      data-testid="btn-clear-all-filters"
+                    >
+                      Clear all
+                    </button>
+                  </div>
+                ) : (
+                  <p className="truncate text-xs tracking-wide text-muted-foreground/70">
+                    {shopCfg?.shopTagline ?? ""}
+                  </p>
+                )}
+              </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center shrink-0 self-start">
               {/* Mobile filter button */}
               <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
                 <SheetTrigger asChild>
-                  <Button variant="outline" size="sm" className="md:hidden gap-2" data-testid="btn-mobile-filters">
+                    <Button
+                      variant="outline"
+                      className="
+                        md:hidden
+                        h-11 min-h-[44px]
+                        w-full sm:w-auto
+                        min-w-0
+                        justify-center gap-2
+                        rounded-md px-3
+                        text-sm"
+                      data-testid="btn-mobile-filters"
+                      >
                     <SlidersHorizontal className="h-4 w-4" />
                     Filters
                     {activeFilters.length > 0 && (
@@ -492,7 +548,15 @@ export default function Shop() {
               </Sheet>
 
               <Select value={sortFilter} onValueChange={(v) => setFilter("sort", v)}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger
+                  className="
+                    h-11 min-h-[44px]
+                    w-full min-w-0
+                    rounded-md px-3
+                    text-sm
+                    sm:w-[180px]
+                  "
+                >
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
                 <SelectContent>

@@ -15,6 +15,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+const NAV_LINKS = [
+  { label: "Posters", href: "/shop" },
+  { label: "Bestsellers", href: "/shop" },
+  { label: "New Arrivals", href: "/shop" },
+  { label: "Frames", href: "/shop" },
+  { label: "Inspiration", href: "/shop" },
+  { label: "Gift Cards", href: "/shop" },
+];
+
 export const Navbar = () => {
   const store = useStorefront();
   const { user, logout } = useAuth();
@@ -104,12 +113,22 @@ export const Navbar = () => {
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto max-w-screen-2xl px-6 lg:px-10 h-16 flex items-center gap-2">
+        <div
+          className="
+            container mx-auto max-w-screen-2xl
+            h-16 px-4 sm:px-6 lg:px-10
+            flex items-center gap-2
+            xl:grid xl:grid-cols-[1fr_auto_1fr] xl:gap-3
+          "
+        >
 
         {/* Logo — hidden on mobile when search is open to give input room */}
         <Link
           href="/"
-          className={`flex items-center gap-2 shrink-0 mr-2 ${searchOpen ? "hidden sm:flex" : "flex"}`}
+          className={`
+            items-center gap-2 shrink-0 justify-self-start
+            ${searchOpen ? "hidden xl:flex" : "flex"}
+          `}
           data-testid="link-home"
           onClick={closeMobile}
         >
@@ -127,27 +146,80 @@ export const Navbar = () => {
           )}
         </Link>
 
-        {/* Inline expanding search input */}
-        {searchOpen && (
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-            <Input
-              ref={searchInputRef}
-              type="text"
-              placeholder="Search posters…"
-              value={searchInputValue}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              className="pl-9 h-9 bg-background/90"
-              data-testid="input-search"
-              onKeyDown={(e) => {
-                if (e.key === "Escape") closeSearch();
-              }}
-            />
-          </div>
-        )}
+        {/* Primary navigation — large desktop */}
+        <div
+          className="
+            hidden xl:flex
+            justify-self-center
+            items-center justify-center
+            gap-5 2xl:gap-7
+          "
+          aria-label="Primary navigation"
+        >
+          {NAV_LINKS.map((item) => (
+            <Link
+              key={item.label}
+              href={item.href}
+              className="
+                relative shrink-0 whitespace-nowrap
+                text-sm font-medium
+                text-foreground/90
+                transition-colors duration-150
+                hover:text-primary
+                after:absolute after:-bottom-1.5
+                after:left-0 after:h-px after:w-0
+                after:bg-primary
+                after:transition-all after:duration-200
+                hover:after:w-full
+              "
+            >
+              {item.label}
+            </Link>
+          ))}
+        </div>      
+        
+          {/* Right-side utilities */}
+              <div
+                className={`
+                  flex min-w-0 items-center justify-end gap-1 sm:gap-2
+                  ${searchOpen ? "flex-1" : "ml-auto"}
+                  xl:ml-0 xl:w-full xl:justify-self-end
+                `}
+              >
 
-        {/* Right-side icons */}
-        <div className={`flex items-center gap-2 ${searchOpen ? "" : "ml-auto"}`}>
+          {/* Search input — bounded to the right utility area */}
+              {searchOpen && (
+                <div
+                  className="
+                    relative min-w-0 flex-1
+                    xl:flex-none
+                    xl:w-[clamp(160px,14vw,240px)]
+                  "
+                >
+                  <Search
+                    className="
+                      pointer-events-none
+                      absolute left-3 top-1/2
+                      h-4 w-4 -translate-y-1/2
+                      text-muted-foreground
+                    "
+                  />
+
+                  <Input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder="Search posters…"
+                    value={searchInputValue}
+                    onChange={(e) => handleSearchChange(e.target.value)}
+                    className="h-9 w-full min-w-0 bg-background/90 pl-9"
+                    data-testid="input-search"
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") closeSearch();
+                    }}
+                  />
+                </div>
+              )}
+              
           {/* Search toggle */}
           <Button
             variant="ghost"
@@ -242,7 +314,7 @@ export const Navbar = () => {
             <Button
               variant="ghost"
               size="icon"
-              className="md:hidden"
+              className="xl:hidden"
               onClick={() => setMobileOpen((o) => !o)}
               aria-label={mobileOpen ? "Close menu" : "Open menu"}
               data-testid="btn-mobile-menu"
@@ -255,12 +327,33 @@ export const Navbar = () => {
 
       {/* Mobile menu drawer */}
       {mobileOpen && (
-        <div className="md:hidden border-t border-border/40 bg-background/95 backdrop-blur px-4 py-4 space-y-1">
-          <Link href="/shop" onClick={closeMobile} data-testid="link-shop-mobile">
-            <div className={`flex items-center px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${location === "/shop" ? "bg-primary/10 text-primary" : "text-foreground hover:bg-muted"}`}>
-              Shop
-            </div>
-          </Link>
+        <div className="xl:hidden border-t border-border/40 bg-background/95 backdrop-blur px-4 py-4 space-y-1"> 
+
+          <div className="space-y-1 pb-3">
+            {NAV_LINKS.map((item) => (
+              <Link
+                key={item.label}
+                href={item.href}
+                onClick={closeMobile}
+              >
+                <div
+                  className="
+                    flex items-center
+                    rounded-md px-3 py-2.5
+                    text-sm font-medium
+                    text-foreground
+                    transition-colors
+                    hover:bg-muted hover:text-primary
+                  "
+                >
+                  {item.label}
+                </div>
+              </Link>
+            ))}
+          </div>
+
+          <div className="my-2 border-t border-border/50" />
+          
           <Link href="/favorites" onClick={closeMobile}>
             <div className={`flex items-center px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${location === "/favorites" ? "bg-primary/10 text-primary" : "text-foreground hover:bg-muted"}`}>
               Saved Posters

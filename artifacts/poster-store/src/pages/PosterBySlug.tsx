@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { MockupGallery } from "@/components/public/MockupGallery";
 import { PosterCard } from "@/components/shared/PosterCard";
 import { LoginPromptModal } from "@/components/shared/LoginPromptModal";
-import { ShoppingBag, ArrowLeft, Heart, Check, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Shield, Truck, Package, Sparkles } from "lucide-react";
+import { ShoppingBag, Heart, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Shield, Truck, Package, } from "lucide-react";
 import { getPosterMockups, type PosterMockup } from "@/lib/mockupApi";
 import { useAddCartItem, getGetCartQueryKey, useListPosters, getListPostersQueryKey } from "@workspace/api-client-react";
 import { addFavorite, removeFavorite, getFavoriteIds } from "@/lib/favoritesApi";
@@ -440,14 +440,6 @@ export default function PosterBySlug() {
       ? currentPath
       : `${currentPath}?${search}`;
 
-  const backLabel = selectionBreadcrumb
-    ? selectionBreadcrumb.multiple
-      ? "Back to your selection"
-      : `Back to ${selectionBreadcrumb.label} posters`
-    : poster.region
-      ? `Back to ${poster.region} posters`
-      : "Explore all posters";
-
   return (
     <div className="container mx-auto w-full max-w-[1280px] px-4 pt-6 md:py-12 pb-28 md:pb-12">
       <nav
@@ -519,15 +511,6 @@ export default function PosterBySlug() {
         </ol>
       </nav>
 
-      <button
-        type="button"
-        onClick={goBack}
-        className="mb-4 inline-flex items-center text-sm text-muted-foreground transition-colors hover:text-foreground md:hidden"
-      >
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        {backLabel}
-      </button>
-
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,11fr)_minmax(0,10fr)] gap-8 lg:gap-12 xl:gap-14 mb-10 md:mb-14 items-start">
         <div>
           <MockupGallery
@@ -591,19 +574,21 @@ export default function PosterBySlug() {
             <div className="mt-7 mb-5 md:mb-8">
               <h3 className="font-medium text-foreground mb-3">Select size</h3>
 
-              {/* 
-                Mobile: horizontal scroll row
-                Tablet/Desktop: compact grid
-              */}
-              <div className="-mx-4 px-4 overflow-x-auto pb-2 sm:mx-0 sm:px-0 sm:overflow-visible sm:pb-0">
-                <div
-                  className="
-                    flex gap-2 snap-x snap-mandatory
-                    sm:grid sm:grid-cols-3 sm:gap-3 sm:snap-none
-                    lg:grid-cols-5
-                  "
-                  data-testid="size-selector"
-                >
+                  {/*
+                    Mobile: two-column grid
+                    Tablet: three columns
+                    Desktop: five columns
+                  */}
+                  <div className="w-full">
+                    <div
+                      className="
+                        grid grid-cols-2 gap-2
+                        sm:grid-cols-3 sm:gap-3
+                        lg:grid-cols-5
+                      "
+                      data-testid="size-selector"
+                    >
+                  
                   {activeSizes.map((size) => {
                     const isSelected = selectedSizeId === size.id;
 
@@ -615,10 +600,9 @@ export default function PosterBySlug() {
                         data-testid={`size-option-${size.id}`}
                         aria-pressed={isSelected}
                         className={`
-                          relative shrink-0 w-[118px] sm:w-auto snap-start
+                          relative w-full h-[64px]
                           flex flex-col items-start justify-center
                           rounded-lg border px-3 py-2.5 text-left
-                          min-h-[60px]
                           transition-all cursor-pointer
                           ${
                             isSelected
