@@ -313,11 +313,9 @@ function NewArrivalCard({
             className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-250 flex flex-col justify-end p-3 pointer-events-none"
             aria-hidden="true"
           >
-            {hasPrice && <p className="text-white text-[11px] font-semibold mb-0.5">{priceLabel}</p>}
-            {sizeLabels.length > 0 && (
-              <p className="text-white/65 text-[10px] mb-1.5 leading-tight">{sizeLabels.join(" · ")}</p>
-            )}
-            <span className="text-white/90 text-[11px] font-medium">View poster →</span>
+            <span className="text-white/90 text-[11px] font-medium">
+              View poster →
+            </span>
           </div>
           {/* Border ring hugs the actual image */}
           <div className="absolute inset-0 ring-1 ring-inset ring-black/[0.14] pointer-events-none" aria-hidden="true" />
@@ -332,17 +330,12 @@ function NewArrivalCard({
         </h3>
         {hasPrice && (
           <p
-            className="text-xs font-medium text-foreground/70 mt-0.5 sm:hidden"
+            className="mt-0.5 text-xs font-medium text-foreground/60"
             style={priceColor ? { color: priceColor } : undefined}
           >
             {priceLabel}
           </p>
-        )}
-        {poster.isNew && (
-          <div className="mt-0.5 inline-flex rounded-full border border-[#c9a08a]/70 text-[#9e6b4e] bg-[#fefcfa] text-[10px] font-medium tracking-[0.12em] uppercase px-2 py-[2px]">
-            NEW
-          </div>
-        )}
+        )}        
       </div>
     </Link>
   );
@@ -419,23 +412,27 @@ function FeaturedPosterCard({
           </div>
         </div>
         <div className="px-0.5 pt-2.5 pb-3 min-h-[52px] flex flex-col justify-start min-w-0">
-          <h3
-            className="font-serif font-semibold text-[13px] sm:text-xs text-foreground/85 truncate leading-snug"
-            style={titleColor ? { color: titleColor } : undefined}
-          >
-            {cardTitle}
-          </h3>
+          <div className="flex items-baseline justify-between gap-2 min-w-0">
+            <h3
+              className="min-w-0 flex-1 font-serif font-semibold text-[13px] sm:text-xs text-foreground/85 truncate leading-snug"
+              style={titleColor ? { color: titleColor } : undefined}
+            >
+              {cardTitle}
+            </h3>
+
+            {poster.isNew && (
+              <span className="shrink-0 text-[10px] font-medium tracking-[0.12em] uppercase text-foreground/45">
+                New
+              </span>
+            )}
+          </div>
+
           <p
-            className="text-[11px] text-foreground/50 mt-1"
+            className="mt-1 text-[11px] text-foreground/50"
             style={priceColor ? { color: priceColor } : undefined}
           >
             {priceLabel}
           </p>
-          {poster.isNew && (
-            <div className="mt-1.5 self-start rounded-full border border-[#c9a08a]/70 text-[#9e6b4e] bg-transparent text-[10px] font-medium tracking-[0.12em] uppercase px-2 py-[2px]">
-              NEW
-            </div>
-          )}
         </div>
       </div>
     </Link>

@@ -144,9 +144,9 @@ export const PosterCard = ({ poster, favoritedIds, priority = false, returnTo }:
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 {poster.isNew && (
-                  <div className="rounded-full border border-white/50 text-white bg-white/20 text-[10px] font-medium tracking-[0.12em] uppercase px-2 py-[2px] whitespace-nowrap backdrop-blur-sm">
-                    NEW
-                  </div>
+                  <span className="text-[10px] font-medium tracking-[0.12em] uppercase text-white/90 drop-shadow">
+                    New
+                  </span>
                 )}
                 <div className="hover:bg-white/20 rounded-full">
                   {heartBtn}
@@ -205,25 +205,25 @@ export const PosterCard = ({ poster, favoritedIds, priority = false, returnTo }:
 
           {/* Info area */}
           <div className="px-0.5 pt-2.5 pb-3 min-h-[52px] flex flex-col justify-start min-w-0">
-            {poster.category && (
-              <p className="text-[10px] uppercase tracking-widest text-muted-foreground/40 mb-0.5 truncate">
-                {poster.category}
-              </p>
-            )}
-            <h3 className="font-serif font-semibold text-[13px] sm:text-xs text-foreground/85 truncate leading-snug">
-              {(poster as any).displayTitle || poster.title}
-            </h3>
+            <div className="flex items-baseline justify-between gap-2 min-w-0">
+              <h3 className="min-w-0 flex-1 font-serif font-semibold text-[13px] sm:text-xs text-foreground/85 truncate leading-snug">
+                {(poster as any).displayTitle || poster.title}
+              </h3>
+
+              {poster.isNew && (
+                <span className="shrink-0 text-[10px] font-medium tracking-[0.12em] uppercase text-[#9e6b4e]">
+                  New
+                </span>
+              )}
+            </div>
+
             <div className="flex items-center justify-between mt-1 gap-1">
-              <p className="text-[11px] text-foreground/50">{priceLabel}</p>
-              <div className="flex items-center gap-1 shrink-0">
-                {poster.isNew && (
-                  <div className="rounded-full border border-[#c9a08a]/70 text-[#9e6b4e] bg-transparent text-[10px] font-medium tracking-[0.12em] uppercase px-2 py-[2px] whitespace-nowrap">
-                    NEW
-                  </div>
-                )}
-                <div className="hover:bg-[#ede8e0] rounded-full">
-                  {heartBtn}
-                </div>
+              <p className="text-[11px] text-foreground/50">
+                {priceLabel}
+              </p>
+
+              <div className="shrink-0 hover:bg-[#ede8e0] rounded-full">
+                {heartBtn}
               </div>
             </div>
           </div>

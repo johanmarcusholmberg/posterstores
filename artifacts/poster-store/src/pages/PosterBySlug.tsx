@@ -51,6 +51,91 @@ function formatPrice(price: number, currency: string): string {
   return `${symbol}${price.toFixed(2)}`;
 }
 
+const IGNORED_SELECTION_PARAMS = new Set([
+  "sort",
+  "page",
+  "view",
+]);
+
+const NAMED_SELECTION_PARAMS = new Set([
+  "region",
+  "city",
+  "category",
+  "style",
+  "tag",
+  "collection",
+]);
+
+type SelectionBreadcrumb = {
+  label: string;
+  href: string;
+  multiple: boolean;
+};
+
+function getSelectionBreadcrumb(
+  returnTo: string | null
+): SelectionBreadcrumb | null {
+  if (!returnTo) return null;
+
+  try {
+    const url = new URL(
+      returnTo,
+      "https://poster-store.local"
+    );
+
+    const activeSelections: Array<{
+      key: string;
+      value: string;
+    }> = [];
+
+    for (const [key, rawValue] of url.searchParams.entries()) {
+      if (
+        IGNORED_SELECTION_PARAMS.has(key) ||
+        rawValue.trim() === ""
+      ) {
+        continue;
+      }
+
+      const values = rawValue
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+
+      for (const value of values) {
+        activeSelections.push({
+          key,
+          value,
+        });
+      }
+    }
+
+    if (activeSelections.length === 0) {
+      return null;
+    }
+
+    const onlySelection = activeSelections[0];
+
+    if (
+      activeSelections.length === 1 &&
+      NAMED_SELECTION_PARAMS.has(onlySelection.key)
+    ) {
+      return {
+        label: onlySelection.value,
+        href: returnTo,
+        multiple: false,
+      };
+    }
+
+    return {
+      label: "Your Selection",
+      href: returnTo,
+      multiple: true,
+    };
+  } catch {
+    return null;
+  }
+}
+
 const DEFAULT_TRUST_MESSAGES = [
   {
     key: "paper",
@@ -108,7 +193,7 @@ export default function PosterBySlug() {
   const sessionId = getSessionId();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
+  const [currentPath, setLocation] = useLocation();
   const search = useSearch();
 
   const rawReturnTo = new URLSearchParams(search).get("returnTo");
@@ -331,29 +416,116 @@ export default function PosterBySlug() {
 
   const noActiveSizes = activeSizes.length === 0;
 
-  let backLabel = "Explore all posters";
+  const selectionBreadcrumb =
+    getSelectionBreadcrumb(returnTo);
 
-  if (returnTo) {
-    backLabel = "Back to your Selection";
+  const homeHref = "/";
+  const postersHref = "/shop";
 
-    const returnToRegion = new URLSearchParams(returnTo.split("?")[1] ?? "").get("region");
+  const posterRegionHref = poster.region
+    ? `/shop?region=${encodeURIComponent(poster.region)}`
+    : postersHref;
 
-    const selectedRegions = returnToRegion
-      ? returnToRegion
-          .split(",")
-          .map((region) => region.trim())
-          .filter(Boolean)
-      : [];
+  const breadcrumbSelectionLabel =
+    selectionBreadcrumb?.label ??
+    poster.region ??
+    null;
 
-    if (selectedRegions.length === 1) {
-      backLabel = `Back to ${selectedRegions[0]} posters`;
-    }
-  }
+  const breadcrumbSelectionHref =
+    selectionBreadcrumb?.href ??
+    posterRegionHref;
+
+  const currentPosterHref =
+    currentPath.includes("?") || !search
+      ? currentPath
+      : `${currentPath}?${search}`;
+
+  const backLabel = selectionBreadcrumb
+    ? selectionBreadcrumb.multiple
+      ? "Back to your selection"
+      : `Back to ${selectionBreadcrumb.label} posters`
+    : poster.region
+      ? `Back to ${poster.region} posters`
+      : "Explore all posters";
 
   return (
     <div className="container mx-auto w-full max-w-[1280px] px-4 pt-6 md:py-12 pb-28 md:pb-12">
-      <button onClick={goBack} className="inline-flex items-center text-muted-foreground hover:text-foreground mb-4 md:mb-8">
-        <ArrowLeft className="mr-2 h-4 w-4" /> {backLabel}
+      <nav
+        aria-label="Breadcrumb"
+        className="mb-4 md:mb-8"
+      >
+        <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+          <li>
+            <Link
+              href={homeHref}
+              className="transition-colors hover:text-foreground"
+            >
+              Home
+            </Link>
+          </li>
+
+          <li
+            aria-hidden="true"
+            className="text-muted-foreground/50"
+          >
+            /
+          </li>
+
+          <li>
+            <Link
+              href={postersHref}
+              className="transition-colors hover:text-foreground"
+            >
+              Posters
+            </Link>
+          </li>
+
+          {breadcrumbSelectionLabel && (
+            <>
+              <li
+                aria-hidden="true"
+                className="text-muted-foreground/50"
+              >
+                /
+              </li>
+
+              <li>
+                <Link
+                  href={breadcrumbSelectionHref}
+                  className="transition-colors hover:text-foreground"
+                >
+                  {breadcrumbSelectionLabel}
+                </Link>
+              </li>
+            </>
+          )}
+
+          <li
+            aria-hidden="true"
+            className="text-muted-foreground/50"
+          >
+            /
+          </li>
+
+          <li>
+            <Link
+              href={currentPosterHref}
+              aria-current="page"
+              className="text-foreground transition-colors hover:text-primary"
+            >
+              {poster.title}
+            </Link>
+          </li>
+        </ol>
+      </nav>
+
+      <button
+        type="button"
+        onClick={goBack}
+        className="mb-4 inline-flex items-center text-sm text-muted-foreground transition-colors hover:text-foreground md:hidden"
+      >
+        <ArrowLeft className="mr-2 h-4 w-4" />
+        {backLabel}
       </button>
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,11fr)_minmax(0,10fr)] gap-8 lg:gap-12 xl:gap-14 mb-10 md:mb-14 items-start">
@@ -375,6 +547,31 @@ export default function PosterBySlug() {
           <h1 className="font-serif text-4xl md:text-5xl font-bold leading-[1.05] text-foreground">
             {poster.title}
           </h1>
+          
+          {poster.tags && poster.tags.length > 0 && (
+            <div className="mt-1.5 flex flex-wrap items-center text-sm text-muted-foreground">
+              {poster.tags.map((tag, index) => (
+                <React.Fragment key={tag}>
+                  <Link
+                    href={`/shop?tag=${encodeURIComponent(tag)}`}
+                    className="transition-colors hover:text-primary hover:underline"
+                  >
+                    {tag}
+                  </Link>
+
+                  {index < poster.tags.length - 1 && (
+                    <span
+                      className="mr-1.5 text-muted-foreground/50"
+                      aria-hidden="true"
+                    >
+                      ,&nbsp;
+                    </span>
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+          )}
+          
           {poster.description && (
             <p className="mt-2 max-w-xl text-[15px] leading-6 text-foreground/65">
               {poster.description}
@@ -604,19 +801,7 @@ export default function PosterBySlug() {
                 Returns are accepted within 30 days.
               </p>
             </CollapsibleSection>
-          </div>
-          
-          {poster.tags && poster.tags.length > 0 && (
-            <div className="mt-8 flex flex-wrap gap-2">
-              {poster.tags.map(tag => (
-                <Link key={tag} href={`/shop?tag=${encodeURIComponent(tag)}`}>
-                  <span className="inline-flex items-center rounded-full border border-border/70 bg-background px-3 py-1 text-xs font-medium text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors cursor-pointer">
-                    {tag}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          )}
+          </div>                    
         </div>
       </div>
 
