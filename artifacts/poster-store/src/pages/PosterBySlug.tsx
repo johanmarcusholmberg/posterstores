@@ -538,7 +538,7 @@ export default function PosterBySlug() {
           />
         </div>
 
-        <div className="flex flex-col w-full max-w-[560px]">
+        <div className="flex flex-col w-full max-w-[560px] lg:sticky lg:top-24">
           {poster.region && (
             <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-primary/80">
               {poster.region}
@@ -617,7 +617,7 @@ export default function PosterBySlug() {
                         className={`
                           relative shrink-0 w-[118px] sm:w-auto snap-start
                           flex flex-col items-start justify-center
-                          rounded-lg border px-3 pr-8 py-2.5 text-left
+                          rounded-lg border px-3 py-2.5 text-left
                           min-h-[60px]
                           transition-all cursor-pointer
                           ${
@@ -626,16 +626,7 @@ export default function PosterBySlug() {
                               : "border-border/80 bg-background hover:border-primary/40 hover:bg-accent/30"
                           }
                         `}
-                      >
-
-                        {isSelected && (
-                          <span
-                            className="absolute right-2 top-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm ring-2 ring-background"
-                            aria-hidden="true"
-                          >
-                            <Check className="h-3.5 w-3.5" />
-                          </span>
-                        )}
+                      >                      
                         
                         <span
                           className={`text-sm leading-tight ${
@@ -684,9 +675,9 @@ export default function PosterBySlug() {
                 focus-visible:ring-2
                 focus-visible:ring-foreground/30
                 focus-visible:ring-offset-2
-                disabled:bg-primary
-                disabled:text-primary-foreground
-                disabled:opacity-50
+                disabled:bg-foreground
+                disabled:text-background
+                disabled:opacity-100
               "
               onClick={handleAddToCart}
               disabled={
@@ -886,9 +877,9 @@ export default function PosterBySlug() {
               text-sm font-semibold
               shadow-none transition-colors
               hover:bg-foreground/90
-              disabled:bg-primary
-              disabled:text-primary-foreground
-              disabled:opacity-50
+              disabled:bg-foreground
+              disabled:text-background
+              disabled:opacity-100
             "
             onClick={handleAddToCart}
             disabled={
