@@ -10,9 +10,28 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useLocation, useSearch } from "wouter";
-import { SlidersHorizontal, X, Check, Loader2 } from "lucide-react";
+import { SlidersHorizontal, ArrowUpDown, X, Check, Loader2 } from "lucide-react";
 
 const PAGE_LIMIT = 24;
+
+const SORT_OPTIONS = [
+  {
+    value: "newest",
+    label: "Newest Arrivals",
+  },
+  {
+    value: "price_asc",
+    label: "Price: Low to High",
+  },
+  {
+    value: "price_desc",
+    label: "Price: High to Low",
+  },
+  {
+    value: "popular",
+    label: "Popular",
+  },
+] as const;
 
 function FilterSidebar({
   store,
@@ -220,6 +239,105 @@ export default function Shop() {
   const searchParams = new URLSearchParams(searchString);
   const [, setLocation] = useLocation();
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [showFloatingControls, setShowFloatingControls] =
+    useState(false);
+
+  const [floatingSortOpen, setFloatingSortOpen] =
+    useState(false);
+
+  const desktopFilterEndRef = useRef<HTMLDivElement>(null);
+  const mobileFilterEndRef = useRef<HTMLDivElement>(null);
+  const floatingControlsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let animationFrame = 0;
+
+    const updateFloatingControls = () => {
+      cancelAnimationFrame(animationFrame);
+
+      animationFrame = requestAnimationFrame(() => {
+        const isDesktop = window.matchMedia(
+          "(min-width: 768px)"
+        ).matches;
+
+        const target = isDesktop
+          ? desktopFilterEndRef.current
+          : mobileFilterEndRef.current;
+
+        if (!target) return;
+
+        const hasPassedFilters =
+          target.getBoundingClientRect().bottom < 0;
+
+        setShowFloatingControls(hasPassedFilters);
+      });
+    };
+
+    updateFloatingControls();
+
+    window.addEventListener(
+      "scroll",
+      updateFloatingControls,
+      { passive: true }
+    );
+
+    window.addEventListener(
+      "resize",
+      updateFloatingControls
+    );
+
+    return () => {
+      cancelAnimationFrame(animationFrame);
+
+      window.removeEventListener(
+        "scroll",
+        updateFloatingControls
+      );
+
+      window.removeEventListener(
+        "resize",
+        updateFloatingControls
+      );
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!floatingSortOpen) return;
+
+    const handlePointerDown = (
+      event: PointerEvent
+    ) => {
+      const container = floatingControlsRef.current;
+
+      if (
+        container &&
+        !container.contains(event.target as Node)
+      ) {
+        setFloatingSortOpen(false);
+      }
+    };
+
+    document.addEventListener(
+      "pointerdown",
+      handlePointerDown
+    );
+
+    return () => {
+      document.removeEventListener(
+        "pointerdown",
+        handlePointerDown
+      );
+    };
+  }, [floatingSortOpen]);
+
+  useEffect(() => {
+    if (
+      !showFloatingControls ||
+      mobileFiltersOpen
+    ) {
+      setFloatingSortOpen(false);
+    }
+  }, [showFloatingControls, mobileFiltersOpen]);
 
   const regionFilters = useMemo(
     () => searchParams.get("region")?.split(",").map(v => v.trim()).filter(Boolean) ?? [],
@@ -231,6 +349,7 @@ export default function Shop() {
   );
   const cityFilter = searchParams.get("city") || undefined;
   const tagFilter = searchParams.get("tag") || undefined;
+  const isNewFilter = searchParams.get("isNew") === "true";
   const searchQuery = searchParams.get("search") || undefined;
   const sortFilter = (searchParams.get("sort") as any) || "newest";
 
@@ -238,7 +357,7 @@ export default function Shop() {
   const [accumulated, setAccumulated] = useState<Poster[]>([]);
   const [grandTotal, setGrandTotal] = useState(0);
 
-  const filterSig = `${store.storeKey}|${regionFilters.join(",")}|${categoryFilters.join(",")}|${cityFilter ?? ""}|${tagFilter ?? ""}|${searchQuery ?? ""}|${sortFilter}`;
+  const filterSig = `${store.storeKey}|${regionFilters.join(",")}|${categoryFilters.join(",")}|${cityFilter ?? ""}|${tagFilter ?? ""}|${isNewFilter}|${searchQuery ?? ""}|${sortFilter}`;
   const prevFilterSig = useRef<string | null>(null);
 
   const offset = page * PAGE_LIMIT;
@@ -250,6 +369,7 @@ export default function Shop() {
       city: cityFilter,
       category: categoryFilters.length > 0 ? categoryFilters.join(",") : undefined,
       tag: tagFilter,
+      isNew: isNewFilter || undefined,
       search: searchQuery,
       sort: sortFilter,
       limit: PAGE_LIMIT,
@@ -263,6 +383,7 @@ export default function Shop() {
           city: cityFilter,
           category: categoryFilters.length > 0 ? categoryFilters.join(",") : undefined,
           tag: tagFilter,
+          isNew: isNewFilter || undefined,
           search: searchQuery,
           sort: sortFilter,
           limit: PAGE_LIMIT,
@@ -335,8 +456,29 @@ export default function Shop() {
   const activeFilters: { label: string; key: string; value: string }[] = [];
   regionFilters.forEach(r => activeFilters.push({ label: r, key: "region", value: r }));
   categoryFilters.forEach(c => activeFilters.push({ label: c, key: "category", value: c }));
-  if (tagFilter) activeFilters.push({ label: tagFilter, key: "tag", value: tagFilter });
-  if (searchQuery) activeFilters.push({ label: `"${searchQuery}"`, key: "search", value: searchQuery });
+  if (tagFilter) {
+    activeFilters.push({
+      label: tagFilter,
+      key: "tag",
+      value: tagFilter,
+    });
+  }
+
+  if (isNewFilter) {
+    activeFilters.push({
+      label: "New Arrivals",
+      key: "isNew",
+      value: "true",
+    });
+  }
+
+  if (searchQuery) {
+    activeFilters.push({
+      label: `"${searchQuery}"`,
+      key: "search",
+      value: searchQuery,
+    });
+  }
 
   const hasAnyFilter = activeFilters.length > 0;
   const total = grandTotal || pageData?.total || 0;
@@ -391,7 +533,7 @@ export default function Shop() {
   const gridClasses = "grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6";
 
   return (
-    <div className="container mx-auto px-4 py-12">
+    <div className="container mx-auto px-4 pt-12 pb-28">
       <div className="flex flex-col md:flex-row gap-8">
         {/* Desktop Sidebar Filters */}
         <aside className="hidden md:block w-64 shrink-0">
@@ -402,6 +544,12 @@ export default function Shop() {
             toggleFilter={toggleFilter}
             clearSection={clearSection}
             clearAllFilters={clearAllFilters}
+          />
+
+          <div
+            ref={desktopFilterEndRef}
+            className="h-px"
+            aria-hidden="true"
           />
         </aside>
 
@@ -560,15 +708,25 @@ export default function Shop() {
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="newest">Newest Arrivals</SelectItem>
-                  <SelectItem value="price_asc">Price: Low to High</SelectItem>
-                  <SelectItem value="price_desc">Price: High to Low</SelectItem>
-                  <SelectItem value="popular">Popular</SelectItem>
+                  {SORT_OPTIONS.map((option) => (
+                    <SelectItem
+                      key={option.value}
+                      value={option.value}
+                    >
+                      {option.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
 
+          <div
+            ref={mobileFilterEndRef}
+            className="h-px md:hidden"
+            aria-hidden="true"
+          />
+          
           {isLoadingFirstPage ? (
             <div className={gridClasses}>
               {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
@@ -641,6 +799,197 @@ export default function Shop() {
             </div>
           )}
         </main>
+      </div>
+
+      {/* Floating filter and sorting control */}
+      <div
+        ref={floatingControlsRef}
+        aria-hidden={
+          !showFloatingControls ||
+          mobileFiltersOpen
+        }
+        className={cn(
+          `
+            fixed left-1/2 z-50
+            -translate-x-1/2
+            transition-all
+            duration-200 ease-out
+          `,
+          showFloatingControls &&
+            !mobileFiltersOpen
+            ? "translate-y-0 opacity-100"
+            : `
+                pointer-events-none
+                translate-y-3 opacity-0
+              `
+        )}
+        style={{
+          bottom:
+            "calc(1rem + env(safe-area-inset-bottom, 0px))",
+        }}
+      >
+        {/* Floating sorting menu */}
+        {floatingSortOpen && (
+          <div
+            className="
+              absolute bottom-full right-0
+              mb-2 w-56
+              rounded-xl
+              border border-border/80
+              bg-background
+              p-1.5
+              shadow-[0_10px_35px_rgba(0,0,0,0.16)]
+            "
+          >
+            <p
+              className="
+                px-3 pb-1.5 pt-1
+                text-[11px] font-semibold
+                uppercase tracking-[0.12em]
+                text-muted-foreground
+              "
+            >
+              Sort posters
+            </p>
+
+            {SORT_OPTIONS.map((option) => {
+              const isSelected =
+                sortFilter === option.value;
+
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => {
+                    setFilter(
+                      "sort",
+                      option.value
+                    );
+
+                    setFloatingSortOpen(false);
+                  }}
+                  className={cn(
+                    `
+                      flex w-full items-center
+                      justify-between gap-3
+                      rounded-lg px-3 py-2.5
+                      text-left text-sm
+                      transition-colors
+                      hover:bg-muted/70
+                    `,
+                    isSelected &&
+                      "bg-muted font-medium"
+                  )}
+                >
+                  <span>{option.label}</span>
+
+                  {isSelected && (
+                    <Check
+                      className="
+                        h-4 w-4
+                        shrink-0 text-primary
+                      "
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Main floating capsule */}
+        <div
+          className="
+            flex h-12 items-center
+            overflow-hidden rounded-full
+            border border-border/80
+            bg-background/95
+            shadow-[0_7px_26px_rgba(0,0,0,0.17)]
+            backdrop-blur-md
+          "
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setFloatingSortOpen(false);
+              setMobileFiltersOpen(true);
+            }}
+            className="
+              flex h-full items-center
+              gap-2 px-4
+              text-sm font-medium
+              text-foreground
+              transition-colors
+              hover:bg-muted/60
+              focus-visible:outline-none
+              focus-visible:ring-2
+              focus-visible:ring-inset
+              focus-visible:ring-ring
+            "
+            tabIndex={
+              showFloatingControls &&
+              !mobileFiltersOpen
+                ? 0
+                : -1
+            }
+            data-testid="btn-floating-filters"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+
+            <span>Filters</span>
+
+            {activeFilters.length > 0 && (
+              <span
+                className="
+                  inline-flex h-5 min-w-5
+                  items-center justify-center
+                  rounded-full
+                  bg-primary px-1.5
+                  text-[11px] font-semibold
+                  text-primary-foreground
+                "
+              >
+                {activeFilters.length}
+              </span>
+            )}
+          </button>
+
+          <div
+            className="h-5 w-px bg-border"
+            aria-hidden="true"
+          />
+
+          <button
+            type="button"
+            onClick={() => {
+              setFloatingSortOpen(
+                (current) => !current
+              );
+            }}
+            className="
+              flex h-full w-12
+              items-center justify-center
+              text-foreground
+              transition-colors
+              hover:bg-muted/60
+              focus-visible:outline-none
+              focus-visible:ring-2
+              focus-visible:ring-inset
+              focus-visible:ring-ring
+            "
+            aria-label="Sort posters"
+            aria-expanded={floatingSortOpen}
+            tabIndex={
+              showFloatingControls &&
+              !mobileFiltersOpen
+                ? 0
+                : -1
+            }
+            data-testid="btn-floating-sort"
+          >
+            <ArrowUpDown className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </div>
   );

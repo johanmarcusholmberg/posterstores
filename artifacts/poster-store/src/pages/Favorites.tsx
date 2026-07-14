@@ -50,7 +50,7 @@ export default function Favorites() {
       <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="aspect-[3/4] bg-muted animate-pulse rounded-md" />
+            <div key={i} className="aspect-[5/7] bg-muted animate-pulse rounded-md" />
           ))}
         </div>
       </div>
@@ -96,7 +96,7 @@ export default function Favorites() {
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="aspect-[3/4] bg-muted animate-pulse rounded-md" />
+            <div key={i} className="aspect-[5/7] bg-muted animate-pulse rounded-md" />
           ))}
         </div>
       ) : !error && favorites.length === 0 ? (
@@ -115,13 +115,13 @@ export default function Favorites() {
           {favorites.map((poster) => {
             const href = poster.slug ? `/posters/${poster.slug}` : `/poster/${poster.id}`;
             return (
-              <div key={poster.id} className="group">
+              <div key={poster.id}>
                 <Link href={href} className="block">
-                  <div className="relative aspect-[3/4] overflow-hidden bg-muted rounded-md mb-4 shadow-sm group-hover:shadow-md transition-shadow">
+                  <div className="relative aspect-[5/7] overflow-hidden bg-muted rounded-md mb-4 shadow-sm">
                     <img
                       src={poster.imageUrl}
                       alt={poster.title}
-                      className="object-cover w-full h-full transition-transform duration-500 group-hover:scale-105"
+                      className="object-cover w-full h-full"
                     />
                     <button
                       onClick={(e) => { e.preventDefault(); handleRemove(poster.id); }}
