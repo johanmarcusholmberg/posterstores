@@ -520,24 +520,59 @@ function TemplateCard({
             <Badge variant="destructive" className="text-[10px]">Inactive</Badge>
           )}
         </div>
-        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div
+          className="
+            absolute top-2.5 right-2.5 z-10
+            flex items-center gap-1
+            rounded-lg border border-border/60
+            bg-background/90 p-1
+            shadow-md backdrop-blur-md
+
+            opacity-100 translate-y-0
+
+            sm:opacity-0 sm:-translate-y-1
+            sm:group-hover:opacity-100
+            sm:group-hover:translate-y-0
+
+            group-focus-within:opacity-100
+            group-focus-within:translate-y-0
+
+            transition-all duration-200
+          "
+        >
           <Button
+            type="button"
             size="icon"
-            variant="secondary"
-            className="h-7 w-7 bg-background/90"
+            variant="ghost"
+            className="
+              h-9 w-9 rounded-md
+              text-foreground/70
+              hover:bg-muted
+              hover:text-foreground
+            "
             onClick={() => onEdit(template)}
             title="Edit template"
+            aria-label={`Edit ${template.name}`}
           >
-            <Pencil className="w-3 h-3" />
+            <Pencil className="h-4 w-4" />
           </Button>
+
           <Button
+            type="button"
             size="icon"
-            variant="secondary"
-            className="h-7 w-7 bg-background/90 hover:bg-destructive hover:text-destructive-foreground"
+            variant="ghost"
+            className="
+              h-9 w-9 rounded-md
+              text-muted-foreground
+              hover:bg-destructive/10
+              hover:text-destructive
+              focus-visible:ring-destructive/40
+            "
             onClick={() => onDelete(template)}
             title="Remove template"
+            aria-label={`Remove ${template.name}`}
           >
-            <Trash2 className="w-3 h-3" />
+            <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       </div>

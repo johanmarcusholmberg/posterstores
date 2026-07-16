@@ -817,7 +817,7 @@ function NewArrivalsSection({
             New arrivals
           </h2>
           <Link
-            href={makeShopUrl(resolvedRoutePrefix, "sort=newest")}
+            href={makeShopUrl(resolvedRoutePrefix,"isNew=true&sort=newest")}
             className="text-sm text-primary font-medium hover:underline shrink-0 ml-4"
             style={linkColor ? { color: linkColor } : undefined}
           >

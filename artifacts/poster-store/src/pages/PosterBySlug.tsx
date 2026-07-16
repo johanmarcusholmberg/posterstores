@@ -542,7 +542,7 @@ export default function PosterBySlug() {
                     {tag}
                   </Link>
 
-                  {index < poster.tags.length - 1 && (
+                  {index < poster.tags!.length - 1 && (
                     <span
                       className="mr-1.5 text-muted-foreground/50"
                       aria-hidden="true"

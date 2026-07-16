@@ -621,8 +621,7 @@ export function MockupTemplateForm({
       setStoragePath(objectPath);
       setBackgroundImageUrl(servingUrl);
       setUploadProgress("done");
-      toast({ title: "Image uploaded — detecting placement…" });
-      await runPlacementAnalysis(servingUrl);
+      toast({ title: "Image uploaded" });
     } catch (e: unknown) {
       setUploadProgress("idle");
       const msg = e instanceof Error ? e.message : "Upload failed";
@@ -664,12 +663,12 @@ export function MockupTemplateForm({
   };
 
   const handleUrlChange = (url: string) => {
+    // A manually entered URL is not connected to an uploaded object.
+    setStoragePath("");
     setBackgroundImageUrl(url);
-    if (!url) {
-      setStoragePath("");
-      setAnalysisState("idle");
-      lastAnalyzedUrlRef.current = "";
-    }
+    setAnalysisState("idle");
+    setAnalysisDescription("");
+    lastAnalyzedUrlRef.current = "";
   };
 
   const handleManualDetect = () => {
@@ -860,6 +859,10 @@ export function MockupTemplateForm({
       } else {
         saved = await adminCreateMockupTemplate(payload);
       }
+
+      console.log("Saved mockup template:", saved);
+      console.log("Saved storagePath:", saved.storagePath);
+      
       toast({ title: isEdit ? "Template updated" : "Template created" });
       onSaved(saved);
     } catch (e: unknown) {

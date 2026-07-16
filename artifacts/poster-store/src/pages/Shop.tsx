@@ -559,7 +559,7 @@ export default function Shop() {
             <div className="min-w-0 flex-1">
               <h1 className="flex flex-wrap items-baseline gap-x-2 font-serif text-3xl font-bold text-foreground">
                 <span>
-                  {hasAnyFilter ? "Showing" : "All Posters"}
+                  {hasAnyFilter ? "Viewing" : "All Posters"}
                 </span>
 
                 <span className="font-sans text-2xl font-normal text-primary/70">
