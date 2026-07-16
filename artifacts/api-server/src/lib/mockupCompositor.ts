@@ -1,4 +1,7 @@
 import sharp from "sharp";
+import { ObjectStorageService } from "./objectStorage";
+
+const storage = new ObjectStorageService();
 
 // ─── Bounding-box compositor (original, backwards-compatible) ─────────────────
 
@@ -42,10 +45,70 @@ export interface PerspectiveCompositorResult {
 
 // ─── Shared utilities ─────────────────────────────────────────────────────────
 
-async function fetchImageBuffer(url: string): Promise<Buffer> {
-  const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
-  if (!res.ok) throw new Error(`Failed to fetch image (${res.status}): ${url}`);
-  return Buffer.from(await res.arrayBuffer());
+function getInternalObjectPath(source: string): string | null {
+  const trimmed = source.trim();
+
+  // Direct object-storage path:
+  // /objects/uploads/abc123
+  if (trimmed.startsWith("/objects/")) {
+    return trimmed;
+  }
+
+  // Browser-serving route:
+  // /api/storage/objects/uploads/abc123
+  //
+  // ObjectStorageService expects:
+  // /objects/uploads/abc123
+  const storageApiPrefix = "/api/storage";
+
+  if (trimmed.startsWith(`${storageApiPrefix}/objects/`)) {
+    return trimmed.slice(storageApiPrefix.length);
+  }
+
+  return null;
+}
+
+async function fetchImageBuffer(source: string): Promise<Buffer> {
+  const trimmed = source.trim();
+  const internalObjectPath = getInternalObjectPath(trimmed);
+
+  // Uploaded files should be read directly from object storage.
+  if (internalObjectPath) {
+    const file = await storage.getObjectEntityFile(internalObjectPath);
+    const [buffer] = await file.download();
+
+    return buffer;
+  }
+
+  // Externally hosted images still use normal HTTP fetching.
+  let parsedUrl: URL;
+
+  try {
+    parsedUrl = new URL(trimmed);
+  } catch {
+    throw new Error(`Unsupported image source: ${trimmed}`);
+  }
+
+  if (
+    parsedUrl.protocol !== "http:" &&
+    parsedUrl.protocol !== "https:"
+  ) {
+    throw new Error(
+      `Unsupported image protocol: ${parsedUrl.protocol}`
+    );
+  }
+
+  const response = await fetch(parsedUrl.toString(), {
+    signal: AbortSignal.timeout(30_000),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch image (${response.status}): ${parsedUrl.toString()}`
+    );
+  }
+
+  return Buffer.from(await response.arrayBuffer());
 }
 
 function buildRoundedMask(w: number, h: number, r: number): Buffer {
