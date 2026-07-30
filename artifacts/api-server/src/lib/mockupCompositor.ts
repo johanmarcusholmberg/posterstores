@@ -3,7 +3,10 @@ import { ObjectStorageService } from "./objectStorage";
 
 const storage = new ObjectStorageService();
 
-// ─── Bounding-box compositor (original, backwards-compatible) ─────────────────
+// ─── Backwards-compatible interface declarations ──────────────────────────────
+//
+// These interfaces are preserved so existing call sites compile without changes.
+// The rendering logic now routes through the unified `renderMockup` pipeline.
 
 export interface CompositorConfig {
   posterX: number;
@@ -17,8 +20,6 @@ export interface CompositorConfig {
   contrast?: number | null;
   saturation?: number | null;
 }
-
-// ─── Corner-based surface types (for perspective rendering) ───────────────────
 
 /** Normalized (0–1) four-corner surface definition. */
 export interface CornerPoints {
@@ -43,28 +44,86 @@ export interface PerspectiveCompositorResult {
   surfaceWarning?: string;
 }
 
-// ─── Shared utilities ─────────────────────────────────────────────────────────
+export interface LayeredCompositorConfig extends CompositorConfig {
+  lightingOverlayUrl?: string | null;
+  foregroundImageUrl?: string | null;
+  lightingBlendMode?: string | null;
+  lightingOpacity?: number | null;
+  foregroundOpacity?: number | null;
+  useBase?: boolean;
+  useLightingOverlay?: boolean;
+  useForeground?: boolean;
+}
+
+// ─── Unified render API ───────────────────────────────────────────────────────
+
+export interface BboxSurface {
+  mode: "bbox";
+  posterX: number;   // percentage 0–100
+  posterY: number;
+  posterWidth: number;
+  posterHeight: number;
+  rotation?: number | null;
+  borderRadius?: number | null;
+  fitMode?: string | null;
+}
+
+export interface CornersSurface {
+  mode: "corners";
+  corners: CornerPoints;
+  borderRadius?: number | null;
+  fitMode?: string | null;
+}
+
+export type RenderSurface = BboxSurface | CornersSurface;
+
+export interface PosterAdjustments {
+  brightness?: number | null;
+  contrast?: number | null;
+  saturation?: number | null;
+}
+
+/**
+ * Full options for the unified mockup renderer.
+ *
+ * Layer render order:
+ *   1. Base image (or white canvas when useBase = false)
+ *   2. Adjusted poster artwork (adjustments applied only to the poster)
+ *   3. Effects overlay (when useLightingOverlay !== false and effectsOverlayUrl is set)
+ *   4. Foreground layer (when useForeground !== false and foregroundImageUrl is set)
+ *   5. Single final JPEG encode via encodeResultAsJpeg
+ */
+export interface RenderMockupOptions {
+  templateImageUrl: string;
+  posterImageUrl: string;
+  surface: RenderSurface;
+  /** Brightness, contrast, saturation applied to the poster only — not the base. */
+  adjustments?: PosterAdjustments;
+  effectsOverlayUrl?: string | null;
+  foregroundImageUrl?: string | null;
+  effectsBlendMode?: string | null;
+  effectsOpacity?: number | null;
+  foregroundOpacity?: number | null;
+  useBase?: boolean;
+  useLightingOverlay?: boolean;
+  useForeground?: boolean;
+}
+
+export interface RenderMockupResult {
+  buffer: Buffer;
+  /** Set when perspective warp fell back to bounding-box rendering. */
+  surfaceWarning?: string;
+}
+
+// ─── Image loading ────────────────────────────────────────────────────────────
 
 function getInternalObjectPath(source: string): string | null {
   const trimmed = source.trim();
-
-  // Direct object-storage path:
-  // /objects/uploads/abc123
-  if (trimmed.startsWith("/objects/")) {
-    return trimmed;
-  }
-
-  // Browser-serving route:
-  // /api/storage/objects/uploads/abc123
-  //
-  // ObjectStorageService expects:
-  // /objects/uploads/abc123
+  if (trimmed.startsWith("/objects/")) return trimmed;
   const storageApiPrefix = "/api/storage";
-
   if (trimmed.startsWith(`${storageApiPrefix}/objects/`)) {
     return trimmed.slice(storageApiPrefix.length);
   }
-
   return null;
 }
 
@@ -72,30 +131,21 @@ async function fetchImageBuffer(source: string): Promise<Buffer> {
   const trimmed = source.trim();
   const internalObjectPath = getInternalObjectPath(trimmed);
 
-  // Uploaded files should be read directly from object storage.
   if (internalObjectPath) {
     const file = await storage.getObjectEntityFile(internalObjectPath);
     const [buffer] = await file.download();
-
     return buffer;
   }
 
-  // Externally hosted images still use normal HTTP fetching.
   let parsedUrl: URL;
-
   try {
     parsedUrl = new URL(trimmed);
   } catch {
     throw new Error(`Unsupported image source: ${trimmed}`);
   }
 
-  if (
-    parsedUrl.protocol !== "http:" &&
-    parsedUrl.protocol !== "https:"
-  ) {
-    throw new Error(
-      `Unsupported image protocol: ${parsedUrl.protocol}`
-    );
+  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+    throw new Error(`Unsupported image protocol: ${parsedUrl.protocol}`);
   }
 
   const response = await fetch(parsedUrl.toString(), {
@@ -103,13 +153,13 @@ async function fetchImageBuffer(source: string): Promise<Buffer> {
   });
 
   if (!response.ok) {
-    throw new Error(
-      `Failed to fetch image (${response.status}): ${parsedUrl.toString()}`
-    );
+    throw new Error(`Failed to fetch image (${response.status}): ${parsedUrl.toString()}`);
   }
 
   return Buffer.from(await response.arrayBuffer());
 }
+
+// ─── Utility helpers ──────────────────────────────────────────────────────────
 
 function buildRoundedMask(w: number, h: number, r: number): Buffer {
   const rx = Math.min(r, w / 2, h / 2);
@@ -144,13 +194,24 @@ export function isRectangularCorners(corners: CornerPoints, tolerance = 0.005): 
   );
 }
 
+function normalizeFitMode(fitStr: string | null | undefined): "cover" | "contain" | "stretch" {
+  if (fitStr === "contain") return "contain";
+  if (fitStr === "stretch") return "stretch";
+  return "cover";
+}
+
+const VALID_BLEND_MODES = ["multiply", "screen", "overlay", "soft-light", "over"] as const;
+type LayerBlendMode = typeof VALID_BLEND_MODES[number];
+
+function normalizeBlendMode(mode: string | null | undefined): LayerBlendMode {
+  if (mode && (VALID_BLEND_MODES as readonly string[]).includes(mode)) {
+    return mode as LayerBlendMode;
+  }
+  return "multiply";
+}
+
 // ─── Perspective warp math ────────────────────────────────────────────────────
 
-/**
- * Solve an 8×8 linear system A·h = b using Gaussian elimination with
- * partial pivoting. Returns the solution vector or null if the system
- * is singular or nearly singular.
- */
 function solveLinear8(A: number[][], b: number[]): number[] | null {
   const n = 8;
   const M: number[][] = A.map((row, i) => [...row, b[i]]);
@@ -173,11 +234,6 @@ function solveLinear8(A: number[][], b: number[]): number[] | null {
   return M.map((row, i) => row[n] / row[i]);
 }
 
-/**
- * Compute a 3×3 projective homography H such that dst[i] ≈ H · src[i]
- * (in homogeneous coordinates). Returns a 9-element row-major array [h00..h22]
- * with h22 = 1, or null if the system cannot be solved.
- */
 function computeHomography(
   src: [number, number][],
   dst: [number, number][]
@@ -196,7 +252,6 @@ function computeHomography(
   return h ? [...h, 1] : null;
 }
 
-/** Invert a 3×3 matrix (row-major, 9 elements). Returns null if singular. */
 function invertMatrix3x3(H: number[]): number[] | null {
   const [a, b, c, d, e, f, g, h, k] = H;
   const det = a * (e * k - f * h) - b * (d * k - f * g) + c * (d * h - e * g);
@@ -209,7 +264,6 @@ function invertMatrix3x3(H: number[]): number[] | null {
   ];
 }
 
-/** Apply a 3×3 homography to point (px, py). Returns [-1,-1] on degenerate w. */
 function applyH(H: number[], px: number, py: number): [number, number] {
   const w = H[6] * px + H[7] * py + H[8];
   if (Math.abs(w) < 1e-10) return [-1, -1];
@@ -222,16 +276,12 @@ function applyH(H: number[], px: number, py: number): [number, number] {
  * Warp posterBuf into the destination quadrilateral on a template-sized canvas
  * using inverse perspective mapping + bilinear sampling.
  *
- * Returns a transparent PNG (templateW × templateH) with only the warped poster
- * pixels filled in, ready to be composited over the template background.
- * Returns null if the homography cannot be computed.
- *
- * Performance note: O(bbW × bbH) iterations where bbW/bbH is the bounding box
- * of the destination quad. For a 2000 × 2000 template this is at most 4M pixels
- * (~100–300 ms in Node.js, well within sync timeout budgets).
+ * Accepts the already-adjusted (brightness/contrast/saturation applied) poster
+ * buffer. Returns a transparent PNG (templateW × templateH) with only the warped
+ * poster pixels filled in. Returns null if the homography cannot be computed.
  */
 async function perspectiveWarpPoster(
-  posterBuf: Buffer,
+  adjustedPosterBuf: Buffer,
   corners: CornerPoints,
   templateW: number,
   templateH: number,
@@ -255,7 +305,7 @@ async function perspectiveWarpPoster(
   const sharpFit: "cover" | "contain" | "fill" =
     fitMode === "stretch" ? "fill" : fitMode === "contain" ? "contain" : "cover";
 
-  const { data: posterRgba, info } = await sharp(posterBuf)
+  const { data: posterRgba, info } = await sharp(adjustedPosterBuf)
     .resize(bbW, bbH, { fit: sharpFit, withoutEnlargement: false })
     .ensureAlpha()
     .raw()
@@ -264,7 +314,6 @@ async function perspectiveWarpPoster(
   const sampW = info.width;
   const sampH = info.height;
 
-  // H maps poster-pixel space (0..sampW, 0..sampH) → template-pixel space
   const src: [number, number][] = [[0, 0], [sampW, 0], [sampW, sampH], [0, sampH]];
   const dst: [number, number][] = [TL, TR, BR, BL];
 
@@ -309,19 +358,94 @@ async function perspectiveWarpPoster(
     .toBuffer();
 }
 
-// ─── Layered compositor helpers ────────────────────────────────────────────────
+// ─── Poster-only adjustments ──────────────────────────────────────────────────
 
-const VALID_BLEND_MODES = ["multiply", "screen", "overlay", "soft-light", "over"] as const;
-type LayerBlendMode = typeof VALID_BLEND_MODES[number];
+/**
+ * Apply brightness, contrast, and saturation adjustments to the poster artwork
+ * ONLY. These must be applied before the poster is placed into the scene so that
+ * the base image, frame, and overlay layers are never affected.
+ *
+ * Neutral values (brightness=1, contrast=1, saturation=1) are treated as no-ops.
+ */
+export async function applyAdjustmentsToPoster(
+  posterBuf: Buffer,
+  adjustments: PosterAdjustments | undefined
+): Promise<Buffer> {
+  const { brightness, contrast, saturation } = adjustments ?? {};
+  const needsMod =
+    (brightness != null && brightness !== 1) ||
+    (saturation != null && saturation !== 1);
+  const needsLinear = contrast != null && contrast !== 1;
 
-function normalizeBlendMode(mode: string | null | undefined): LayerBlendMode {
-  if (mode && (VALID_BLEND_MODES as readonly string[]).includes(mode)) {
-    return mode as LayerBlendMode;
+  if (!needsMod && !needsLinear) return posterBuf;
+
+  let s = sharp(posterBuf);
+
+  if (needsMod) {
+    const mod: { brightness?: number; saturation?: number } = {};
+    if (brightness != null && brightness !== 1) mod.brightness = brightness;
+    if (saturation != null && saturation !== 1) mod.saturation = saturation;
+    s = s.modulate(mod);
   }
-  return "multiply";
+
+  if (needsLinear) {
+    const c = contrast!;
+    const offset = Math.round(128 * (1 - c));
+    s = s.linear(c, offset);
+  }
+
+  return s.png().toBuffer();
 }
 
-/** Fetch, resize to target dimensions, and apply opacity to an overlay image. */
+// ─── Poster preparation (resize + rotation + border radius) ──────────────────
+
+/**
+ * Resize, rotate, and apply border radius to the already-adjusted poster buffer,
+ * producing a PNG ready to be composited into the placement area.
+ */
+async function preparePosterForBbox(
+  adjustedPosterBuf: Buffer,
+  areaW: number,
+  areaH: number,
+  opts: { rotation?: number | null; borderRadius?: number | null; fitMode?: string | null }
+): Promise<Buffer> {
+  const fitMode = normalizeFitMode(opts.fitMode);
+  const sharpFit: "cover" | "contain" | "fill" =
+    fitMode === "stretch" ? "fill" : fitMode === "contain" ? "contain" : "cover";
+
+  let s = sharp(adjustedPosterBuf).resize(areaW, areaH, {
+    fit: sharpFit,
+    withoutEnlargement: false,
+  });
+
+  if (opts.rotation) {
+    s = s
+      .rotate(opts.rotation, { background: { r: 0, g: 0, b: 0, a: 0 } })
+      .resize(areaW, areaH, { fit: "cover" });
+  }
+
+  const borderRadiusPx =
+    opts.borderRadius != null && opts.borderRadius > 0
+      ? Math.round((opts.borderRadius / 100) * Math.min(areaW, areaH))
+      : 0;
+
+  let posterBuf = await s.png().toBuffer();
+
+  if (borderRadiusPx > 0) {
+    const { width: pw = areaW, height: ph = areaH } = await sharp(posterBuf).metadata();
+    const maskSvg = buildRoundedMask(pw, ph, borderRadiusPx);
+    posterBuf = await sharp(posterBuf)
+      .composite([{ input: maskSvg, blend: "dest-in" }])
+      .png()
+      .toBuffer();
+  }
+
+  return posterBuf;
+}
+
+// ─── Layer overlay helper ─────────────────────────────────────────────────────
+
+/** Fetch an overlay image, scale it to the canvas dimensions, and apply opacity. */
 async function fetchAndPrepareOverlay(
   url: string,
   targetW: number,
@@ -355,286 +479,296 @@ async function fetchAndPrepareOverlay(
     .toBuffer();
 }
 
-// ─── Exported compositors ─────────────────────────────────────────────────────
+// ─── Final JPEG encoder ───────────────────────────────────────────────────────
 
 /**
- * Internal helper: place a pre-loaded, pre-resized poster onto a pre-loaded
- * base canvas buffer using the given bounding-box placement config.
+ * The single point of JPEG encoding for all mockup renders.
  *
- * W / H are the pixel dimensions of baseBuf (the caller must supply them to
- * avoid a redundant metadata() call when the caller already knows the size).
+ * All intermediate compositing steps use PNG buffers to avoid lossy
+ * recompression. Only this function produces the final JPEG output.
+ * It is exported so tests can verify it is called exactly once per render.
  */
-async function applyPosterToCanvas(
-  baseBuf: Buffer,
-  posterBuffer: Buffer,
-  W: number,
-  H: number,
-  config: CompositorConfig
-): Promise<Buffer> {
-  const fit = config.fitMode ?? "cover";
-  const areaLeft = Math.round((config.posterX / 100) * W);
-  const areaTop = Math.round((config.posterY / 100) * H);
-  const areaW = Math.round((config.posterWidth / 100) * W);
-  const areaH = Math.round((config.posterHeight / 100) * H);
+export function encodeResultAsJpeg(buf: Buffer): Promise<Buffer> {
+  return sharp(buf).jpeg({ quality: 88, mozjpeg: true }).toBuffer();
+}
 
-  if (areaW <= 0 || areaH <= 0) throw new Error(`Invalid placement area: ${areaW}x${areaH}`);
+// ─── Unified render pipeline ──────────────────────────────────────────────────
 
-  const sharpFit: "cover" | "contain" | "fill" =
-    fit === "stretch" ? "fill" : fit === "contain" ? "contain" : "cover";
+/**
+ * Render a mockup by compositing a poster into a template using one consistent
+ * layer pipeline for both bounding-box and perspective placement modes.
+ *
+ * Render order:
+ *   1. Base image (or white canvas when useBase = false)
+ *   2. Adjusted poster artwork (adjustments applied ONLY to the poster)
+ *   3. Effects overlay (optional: useLightingOverlay !== false + effectsOverlayUrl set)
+ *   4. Foreground layer  (optional: useForeground    !== false + foregroundImageUrl set)
+ *   5. Single final JPEG encode via encodeResultAsJpeg
+ *
+ * Intermediate states are kept as PNG buffers — no JPEG re-encoding until step 5.
+ *
+ * Layer failures throw descriptive errors so the caller (mockupSync) can mark
+ * the mockup as failed with a clear reason. A missing URL for a disabled layer
+ * is not treated as an error.
+ */
+export async function renderMockup(opts: RenderMockupOptions): Promise<RenderMockupResult> {
+  // ── 1. Load images ──────────────────────────────────────────────────────────
+  const [rawTemplateBuf, rawPosterBuf] = await Promise.all([
+    fetchImageBuffer(opts.templateImageUrl),
+    fetchImageBuffer(opts.posterImageUrl),
+  ]);
 
-  let posterResized = sharp(posterBuffer).resize(areaW, areaH, {
-    fit: sharpFit,
-    withoutEnlargement: false,
-  });
+  // ── 2. Compute working dimensions ───────────────────────────────────────────
+  //
+  // Corners mode is capped at 2000 px on the longest edge to bound memory use
+  // during the O(W×H) perspective warp. Bounding-box mode uses the full size.
+  const rawMeta = await sharp(rawTemplateBuf).metadata();
+  const rawW = rawMeta.width ?? 1000;
+  const rawH = rawMeta.height ?? 1000;
 
-  if (config.rotation) {
-    posterResized = posterResized
-      .rotate(config.rotation, { background: { r: 0, g: 0, b: 0, a: 0 } })
-      .resize(areaW, areaH, { fit: "cover" });
+  const MAX_DIM = 2000;
+  const scale =
+    opts.surface.mode === "corners"
+      ? Math.min(1, MAX_DIM / Math.max(rawW, rawH))
+      : 1;
+  const W = Math.round(rawW * scale);
+  const H = Math.round(rawH * scale);
+
+  // ── 3. Resolve base canvas ──────────────────────────────────────────────────
+  let baseBuf: Buffer;
+  if (opts.useBase === false) {
+    // White canvas — template is still fetched above for dimension lookup.
+    baseBuf = await sharp({
+      create: { width: W, height: H, channels: 3, background: { r: 255, g: 255, b: 255 } },
+    })
+      .png()
+      .toBuffer();
+  } else if (scale < 1) {
+    baseBuf = await sharp(rawTemplateBuf).resize(W, H).png().toBuffer();
+  } else {
+    baseBuf = rawTemplateBuf;
   }
 
-  const borderRadiusPx =
-    config.borderRadius != null && config.borderRadius > 0
-      ? Math.round((config.borderRadius / 100) * Math.min(areaW, areaH))
-      : 0;
+  // ── 4. Apply adjustments to poster artwork only ─────────────────────────────
+  const adjustedPosterBuf = await applyAdjustmentsToPoster(rawPosterBuf, opts.adjustments);
 
-  let posterBuf = await posterResized.toBuffer();
+  // ── 5. Place poster onto base canvas ───────────────────────────────────────
+  let workingBuf: Buffer;
+  let surfaceWarning: string | undefined;
 
-  if (borderRadiusPx > 0) {
-    const { width: pw = areaW, height: ph = areaH } = await sharp(posterBuf).metadata();
-    const maskSvg = buildRoundedMask(pw, ph, borderRadiusPx);
-    posterBuf = await sharp(posterBuf)
-      .composite([{ input: maskSvg, blend: "dest-in" }])
+  if (opts.surface.mode === "corners") {
+    const { corners, fitMode: fitStr, borderRadius } = opts.surface;
+    const fitMode = normalizeFitMode(fitStr);
+
+    let warpedPng: Buffer | null = null;
+    try {
+      warpedPng = await perspectiveWarpPoster(adjustedPosterBuf, corners, W, H, fitMode);
+    } catch (err) {
+      surfaceWarning = `Perspective warp error (${
+        err instanceof Error ? err.message : "unknown"
+      }) — falling back to bounding-box render`;
+    }
+
+    if (!warpedPng) {
+      if (!surfaceWarning) {
+        surfaceWarning =
+          "Perspective surface configured, but renderer fell back to rectangle. (Homography degenerate or corners too close.)";
+      }
+      // Fallback to bounding-box using the axis-aligned bounding box of the corners.
+      const bb = cornersToBoundingBox(corners);
+      const fbAreaW = Math.round(bb.width * W);
+      const fbAreaH = Math.round(bb.height * H);
+      const fbLeft = Math.round(bb.x * W);
+      const fbTop = Math.round(bb.y * H);
+      if (fbAreaW <= 0 || fbAreaH <= 0) {
+        throw new Error(`Invalid fallback placement area: ${fbAreaW}x${fbAreaH}`);
+      }
+      const preparedPoster = await preparePosterForBbox(adjustedPosterBuf, fbAreaW, fbAreaH, {
+        fitMode: fitStr,
+        borderRadius,
+      });
+      workingBuf = await sharp(baseBuf)
+        .composite([{ input: preparedPoster, left: fbLeft, top: fbTop, blend: "over" }])
+        .png()
+        .toBuffer();
+    } else {
+      workingBuf = await sharp(baseBuf)
+        .composite([{ input: warpedPng, blend: "over" }])
+        .png()
+        .toBuffer();
+    }
+  } else {
+    // Bounding-box placement
+    const { posterX, posterY, posterWidth, posterHeight, rotation, borderRadius, fitMode } =
+      opts.surface;
+    const areaLeft = Math.round((posterX / 100) * W);
+    const areaTop = Math.round((posterY / 100) * H);
+    const areaW = Math.round((posterWidth / 100) * W);
+    const areaH = Math.round((posterHeight / 100) * H);
+
+    if (areaW <= 0 || areaH <= 0) {
+      throw new Error(`Invalid placement area: ${areaW}x${areaH}`);
+    }
+
+    const preparedPoster = await preparePosterForBbox(adjustedPosterBuf, areaW, areaH, {
+      rotation,
+      borderRadius,
+      fitMode,
+    });
+
+    workingBuf = await sharp(baseBuf)
+      .composite([{ input: preparedPoster, left: areaLeft, top: areaTop, blend: "over" }])
       .png()
       .toBuffer();
   }
 
-  const modulations: { brightness?: number; saturation?: number } = {};
-  if (config.brightness != null && config.brightness !== 1) modulations.brightness = config.brightness;
-  if (config.saturation != null && config.saturation !== 1) modulations.saturation = config.saturation;
-
-  let compositeSharp = sharp(baseBuf).composite([
-    { input: posterBuf, left: areaLeft, top: areaTop, blend: "over" },
-  ]);
-
-  if (Object.keys(modulations).length > 0) compositeSharp = compositeSharp.modulate(modulations);
-
-  if (config.contrast != null && config.contrast !== 1) {
-    const linear = config.contrast;
-    const offset = Math.round(128 * (1 - linear));
-    compositeSharp = compositeSharp.linear(linear, offset);
+  // ── 6. Effects overlay ──────────────────────────────────────────────────────
+  //
+  // A layer is considered "active" when its use flag is not explicitly false AND
+  // its URL is set. A missing URL for a non-active layer is never an error.
+  const applyEffects = opts.useLightingOverlay !== false && !!opts.effectsOverlayUrl;
+  if (applyEffects) {
+    try {
+      const blendMode = normalizeBlendMode(opts.effectsBlendMode);
+      const opacity = Math.max(0, Math.min(1, opts.effectsOpacity ?? 0.8));
+      const overlayBuf = await fetchAndPrepareOverlay(opts.effectsOverlayUrl!, W, H, opacity);
+      workingBuf = await sharp(workingBuf)
+        .composite([{ input: overlayBuf, blend: blendMode }])
+        .png()
+        .toBuffer();
+    } catch (err) {
+      throw new Error(
+        `Failed to load effects overlay: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
   }
 
-  return compositeSharp.jpeg({ quality: 88, mozjpeg: true }).toBuffer();
+  // ── 7. Foreground layer ─────────────────────────────────────────────────────
+  const applyForeground = opts.useForeground !== false && !!opts.foregroundImageUrl;
+  if (applyForeground) {
+    try {
+      const opacity = Math.max(0, Math.min(1, opts.foregroundOpacity ?? 1.0));
+      const fgBuf = await fetchAndPrepareOverlay(opts.foregroundImageUrl!, W, H, opacity);
+      workingBuf = await sharp(workingBuf)
+        .composite([{ input: fgBuf, blend: "over" }])
+        .png()
+        .toBuffer();
+    } catch (err) {
+      throw new Error(
+        `Failed to composite foreground layer: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+
+  // ── 8. Single final JPEG encode ─────────────────────────────────────────────
+  const buffer = await encodeResultAsJpeg(workingBuf);
+  return { buffer, surfaceWarning };
 }
 
+// ─── Backwards-compatible wrapper functions ───────────────────────────────────
+//
+// These preserve the original call signatures so existing consumers compile
+// without changes. They are thin adapters over renderMockup.
+
 /**
- * Composite a poster image into a mockup template image using the given
- * bounding-box placement config. Returns a JPEG Buffer of the composited result.
+ * Composite a poster image into a mockup template image using bounding-box
+ * placement. Returns a JPEG Buffer of the composited result.
  *
- * Placement values (posterX, posterY, posterWidth, posterHeight) are
- * percentages of the template image's dimensions (0–100).
+ * @deprecated Prefer renderMockup({ surface: { mode: "bbox", ... } }).
  */
 export async function compositePosterIntoTemplate(
   templateImageUrl: string,
   posterImageUrl: string,
   config: CompositorConfig
 ): Promise<Buffer> {
-  const [templateBuffer, posterBuffer] = await Promise.all([
-    fetchImageBuffer(templateImageUrl),
-    fetchImageBuffer(posterImageUrl),
-  ]);
-
-  const { width: W = 1000, height: H = 1000 } = await sharp(templateBuffer).metadata();
-  return applyPosterToCanvas(templateBuffer, posterBuffer, W, H, config);
+  const result = await renderMockup({
+    templateImageUrl,
+    posterImageUrl,
+    surface: {
+      mode: "bbox",
+      posterX: config.posterX,
+      posterY: config.posterY,
+      posterWidth: config.posterWidth,
+      posterHeight: config.posterHeight,
+      rotation: config.rotation,
+      borderRadius: config.borderRadius,
+      fitMode: config.fitMode,
+    },
+    adjustments: {
+      brightness: config.brightness,
+      contrast: config.contrast,
+      saturation: config.saturation,
+    },
+  });
+  return result.buffer;
 }
 
 /**
- * Composite a poster into a template using a four-corner perspective surface.
+ * Composite a poster into a template using four-corner perspective placement.
+ * Falls back to bounding-box if the homography cannot be computed.
  *
- * When corners define a non-rectangular quad, performs a full homographic
- * perspective warp so the poster conforms to angled/tilted surfaces (e.g. a
- * poster on a table or leaning against a wall).
- *
- * Falls back to bounding-box rendering and sets `surfaceWarning` in the result
- * if the homography cannot be computed.
- *
- * Template is capped at 2000 px on the longest edge to bound memory use.
+ * @deprecated Prefer renderMockup({ surface: { mode: "corners", ... } }).
  */
 export async function compositePosterWithCorners(
   templateImageUrl: string,
   posterImageUrl: string,
   config: PerspectiveCompositorConfig
 ): Promise<PerspectiveCompositorResult> {
-  const [templateBuffer, posterBuffer] = await Promise.all([
-    fetchImageBuffer(templateImageUrl),
-    fetchImageBuffer(posterImageUrl),
-  ]);
-
-  const rawMeta = await sharp(templateBuffer).metadata();
-  const rawW = rawMeta.width ?? 1000;
-  const rawH = rawMeta.height ?? 1000;
-
-  const MAX_DIM = 2000;
-  const scale = Math.min(1, MAX_DIM / Math.max(rawW, rawH));
-  const processW = Math.round(rawW * scale);
-  const processH = Math.round(rawH * scale);
-
-  const templateBuf =
-    scale < 1
-      ? await sharp(templateBuffer).resize(processW, processH).toBuffer()
-      : templateBuffer;
-
-  const fitStr = config.fitMode ?? "cover";
-  const fitMode = (["cover", "contain", "stretch"].includes(fitStr) ? fitStr : "cover") as
-    | "cover"
-    | "contain"
-    | "stretch";
-
-  let surfaceWarning: string | undefined;
-  let warpedPng: Buffer | null = null;
-
-  try {
-    warpedPng = await perspectiveWarpPoster(
-      posterBuffer,
-      config.corners,
-      processW,
-      processH,
-      fitMode
-    );
-  } catch (err) {
-    surfaceWarning = `Perspective warp error (${err instanceof Error ? err.message : "unknown"}) — falling back to bounding-box render`;
-  }
-
-  if (!warpedPng) {
-    if (!surfaceWarning) {
-      surfaceWarning =
-        "Perspective surface configured, but renderer fell back to rectangle. (Homography degenerate or corners too close.)";
-    }
-    const bb = cornersToBoundingBox(config.corners);
-    const fallback = await compositePosterIntoTemplate(templateImageUrl, posterImageUrl, {
-      posterX: bb.x * 100,
-      posterY: bb.y * 100,
-      posterWidth: bb.width * 100,
-      posterHeight: bb.height * 100,
-      fitMode: config.fitMode,
+  const result = await renderMockup({
+    templateImageUrl,
+    posterImageUrl,
+    surface: {
+      mode: "corners",
+      corners: config.corners,
       borderRadius: config.borderRadius,
+      fitMode: config.fitMode,
+    },
+    adjustments: {
       brightness: config.brightness,
       contrast: config.contrast,
       saturation: config.saturation,
-    });
-    return { buffer: fallback, surfaceWarning };
-  }
-
-  let compositeSharp = sharp(templateBuf).composite([{ input: warpedPng, blend: "over" }]);
-
-  const modulations: { brightness?: number; saturation?: number } = {};
-  if (config.brightness != null && config.brightness !== 1) modulations.brightness = config.brightness;
-  if (config.saturation != null && config.saturation !== 1) modulations.saturation = config.saturation;
-  if (Object.keys(modulations).length > 0) compositeSharp = compositeSharp.modulate(modulations);
-
-  if (config.contrast != null && config.contrast !== 1) {
-    const linear = config.contrast;
-    const offset = Math.round(128 * (1 - linear));
-    compositeSharp = compositeSharp.linear(linear, offset);
-  }
-
-  const buffer = await compositeSharp.jpeg({ quality: 88, mozjpeg: true }).toBuffer();
-  return { buffer, surfaceWarning };
-}
-
-// ─── Layered compositor ────────────────────────────────────────────────────────
-
-export interface LayeredCompositorConfig extends CompositorConfig {
-  lightingOverlayUrl?: string | null;
-  foregroundImageUrl?: string | null;
-  lightingBlendMode?: string | null;
-  lightingOpacity?: number | null;
-  foregroundOpacity?: number | null;
-  useBase?: boolean;
-  useLightingOverlay?: boolean;
-  useForeground?: boolean;
+    },
+  });
+  return { buffer: result.buffer, surfaceWarning: result.surfaceWarning };
 }
 
 /**
- * Composite a poster into a template with optional layered overlays.
+ * Composite a poster into a template with optional layered overlays using
+ * bounding-box placement.
  *
- * Render order:
- *  1. Base image (or plain white canvas when useBase=false) with poster artwork
- *     composited into the placement area via applyPosterToCanvas.
- *  2. Lighting / shadow / reflection overlay (optional, blend mode + opacity).
- *  3. Foreground image (optional, "over" blend).
- *
- * Layers with missing assets or use*=false are silently skipped.
- * Non-layered templates should use compositePosterIntoTemplate directly.
- *
- * Template image is fetched once for both dimension lookup and rendering —
- * no double-fetch regardless of useBase setting.
+ * @deprecated Prefer renderMockup({ surface: { mode: "bbox", ... }, effectsOverlayUrl, ... }).
  */
 export async function compositeLayeredMockup(
   templateImageUrl: string,
   posterImageUrl: string,
   config: LayeredCompositorConfig
 ): Promise<Buffer> {
-  // Fetch both images upfront — dimensions are always needed for overlay sizing
-  // and the poster must always be placed regardless of useBase.
-  const [templateBuf, posterBuffer] = await Promise.all([
-    fetchImageBuffer(templateImageUrl),
-    fetchImageBuffer(posterImageUrl),
-  ]);
-
-  const { width: W = 1000, height: H = 1000 } = await sharp(templateBuf).metadata();
-
-  // ── Step 1+2: base canvas + poster placement ─────────────────────────────
-  let currentBuffer: Buffer;
-
-  if (config.useBase === false) {
-    // No background: composite poster onto a plain white canvas.
-    // Template is still fetched above (needed for W/H); its pixels are not used.
-    const whiteBuf = await sharp({
-      create: { width: W, height: H, channels: 3, background: { r: 255, g: 255, b: 255 } },
-    })
-      .jpeg({ quality: 95 })
-      .toBuffer();
-    currentBuffer = await applyPosterToCanvas(whiteBuf, posterBuffer, W, H, config);
-  } else {
-    // Standard path: composite poster onto the background image.
-    currentBuffer = await applyPosterToCanvas(templateBuf, posterBuffer, W, H, config);
-  }
-
-  // ── Step 3: lighting / shadow overlay ────────────────────────────────────
-  const hasLighting = config.useLightingOverlay !== false && !!config.lightingOverlayUrl;
-  const hasForeground = config.useForeground !== false && !!config.foregroundImageUrl;
-
-  if (!hasLighting && !hasForeground) return currentBuffer;
-
-  if (hasLighting) {
-    try {
-      const blendMode = normalizeBlendMode(config.lightingBlendMode);
-      const opacity = Math.max(0, Math.min(1, config.lightingOpacity ?? 0.8));
-      const overlayBuf = await fetchAndPrepareOverlay(config.lightingOverlayUrl!, W, H, opacity);
-      currentBuffer = await sharp(currentBuffer)
-        .composite([{ input: overlayBuf, blend: blendMode }])
-        .jpeg({ quality: 88, mozjpeg: true })
-        .toBuffer();
-    } catch {
-      // skip layer on error
-    }
-  }
-
-  // ── Step 4: foreground overlay ────────────────────────────────────────────
-  if (hasForeground) {
-    try {
-      const opacity = Math.max(0, Math.min(1, config.foregroundOpacity ?? 1.0));
-      const fgBuf = await fetchAndPrepareOverlay(config.foregroundImageUrl!, W, H, opacity);
-      currentBuffer = await sharp(currentBuffer)
-        .composite([{ input: fgBuf, blend: "over" }])
-        .jpeg({ quality: 88, mozjpeg: true })
-        .toBuffer();
-    } catch {
-      // skip layer on error
-    }
-  }
-
-  return currentBuffer;
+  const result = await renderMockup({
+    templateImageUrl,
+    posterImageUrl,
+    surface: {
+      mode: "bbox",
+      posterX: config.posterX,
+      posterY: config.posterY,
+      posterWidth: config.posterWidth,
+      posterHeight: config.posterHeight,
+      rotation: config.rotation,
+      borderRadius: config.borderRadius,
+      fitMode: config.fitMode,
+    },
+    adjustments: {
+      brightness: config.brightness,
+      contrast: config.contrast,
+      saturation: config.saturation,
+    },
+    effectsOverlayUrl: config.lightingOverlayUrl,
+    foregroundImageUrl: config.foregroundImageUrl,
+    effectsBlendMode: config.lightingBlendMode,
+    effectsOpacity: config.lightingOpacity,
+    foregroundOpacity: config.foregroundOpacity,
+    useBase: config.useBase,
+    useLightingOverlay: config.useLightingOverlay,
+    useForeground: config.useForeground,
+  });
+  return result.buffer;
 }
