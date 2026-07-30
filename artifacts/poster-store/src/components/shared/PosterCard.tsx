@@ -190,17 +190,7 @@ export const PosterCard = ({ poster, favoritedIds, priority = false, returnTo }:
               onError={(e) => {
                 (e.target as HTMLImageElement).src = poster.imageUrl;
               }}
-            />
-
-            {/* Hover label — desktop only */}
-            <div
-              className="absolute inset-x-0 bottom-0 hidden sm:flex items-end justify-center pb-4 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-200 pointer-events-none"
-              aria-hidden="true"
-            >
-              <span className="bg-background/85 backdrop-blur-sm text-foreground text-xs font-medium px-4 py-1.5 rounded-full shadow-sm border border-border/40 tracking-wide">
-                View poster
-              </span>
-            </div>
+            />            
           </div>
 
           {/* Info area */}

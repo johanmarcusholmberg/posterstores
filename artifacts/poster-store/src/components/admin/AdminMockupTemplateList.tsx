@@ -41,12 +41,8 @@ import {
   Star,
   Search,
   ImageIcon,
-  Sparkles,
-  Hand,
-  Shuffle,
   CheckCircle2,
   AlertCircle,
-  PenLine,
   ArrowUp,
   ArrowDown,
   ListOrdered,
@@ -59,58 +55,6 @@ interface AdminMockupTemplateListProps {
 
 const CATEGORIES = ["All", "Wall", "Interior", "Café/Table", "Frame", "Lifestyle", "Minimal", "Decorative"];
 
-function DetectionBadge({ source, confidence, manuallyAdjusted }: {
-  source: string | null | undefined;
-  confidence: number | null | undefined;
-  manuallyAdjusted: boolean | null | undefined;
-}) {
-  if (!source) return null;
-
-  const pct = confidence != null ? Math.round(confidence * 100) : null;
-
-  let icon: React.ReactNode;
-  let label: string;
-  let className: string;
-
-  if (source === "ai") {
-    icon = <Sparkles className="w-2.5 h-2.5" />;
-    label = pct != null ? `AI ${pct}%` : "AI";
-    className =
-      pct != null && pct >= 80
-        ? "bg-emerald-100 text-emerald-800 border-emerald-300"
-        : pct != null && pct >= 50
-        ? "bg-yellow-100 text-yellow-800 border-yellow-300"
-        : "bg-orange-100 text-orange-800 border-orange-300";
-  } else if (source === "fallback") {
-    icon = <Shuffle className="w-2.5 h-2.5" />;
-    label = "Fallback";
-    className = "bg-muted text-muted-foreground border-border";
-  } else {
-    icon = <Hand className="w-2.5 h-2.5" />;
-    label = "Manual";
-    className = "bg-blue-100 text-blue-800 border-blue-300";
-  }
-
-  return (
-    <div className="flex items-center gap-1 flex-wrap">
-      <span
-        className={cn(
-          "inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded border",
-          className
-        )}
-      >
-        {icon}
-        {label}
-      </span>
-      {manuallyAdjusted && (
-        <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded border bg-violet-100 text-violet-800 border-violet-300">
-          <PenLine className="w-2.5 h-2.5" />
-          Adjusted
-        </span>
-      )}
-    </div>
-  );
-}
 
 export const AdminMockupTemplateList = ({
   storeKey,
@@ -622,12 +566,6 @@ function TemplateCard({
             {template.posterWidth ?? "?"}×{template.posterHeight ?? "?"}%
           </p>
         )}
-
-        <DetectionBadge
-          source={template.detectionSource}
-          confidence={template.detectionConfidence}
-          manuallyAdjusted={template.placementWasManuallyAdjusted}
-        />
 
         <div className="flex items-center justify-between pt-1 border-t border-border/50">
           <span className="text-[10px] text-muted-foreground font-mono tabular-nums">

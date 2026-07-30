@@ -1,36 +1,7 @@
 const BASE = "/api";
 
-export interface DetectedPlacementConfig {
-  surfaceType: "poster" | "frame" | "paper" | "unknown";
-  confidence: number;
-  coordinateSystem: "normalized";
-  corners: {
-    topLeft: { x: number; y: number };
-    topRight: { x: number; y: number };
-    bottomRight: { x: number; y: number };
-    bottomLeft: { x: number; y: number };
-  };
-  boundingBox: { x: number; y: number; width: number; height: number };
-  rotation: number;
-  recommendedFitMode: "cover" | "contain" | "stretch";
-  recommendedRender: {
-    shadowOpacity: number;
-    shadowBlur: number;
-    highlightOpacity: number;
-    overlayOpacity: number;
-    borderRadius: number;
-  };
-  warnings: string[];
-  /**
-   * @deprecated Use `placementConfig` (separate column) for manual surfaces.
-   * Only "ai" is valid going forward; "manual_surface" is legacy from old saves.
-   */
-  source?: "ai" | "manual_surface";
-}
-
 /**
  * Admin-defined manual poster surface stored in the `placement_config` column.
- * Separate from `detectedPlacementConfig` which holds AI candidate data only.
  */
 export interface ManualSurfaceConfig {
   mode: "corners" | "bounding_box";
@@ -45,9 +16,6 @@ export interface ManualSurfaceConfig {
   boundingBox?: { x: number; y: number; width: number; height: number };
   fitMode?: string;
 }
-
-export type PlacementMode = "manual" | "auto_detected" | "auto_detected_needs_review";
-export type DetectedPlacementStatus = "not_analyzed" | "detected" | "needs_review" | "failed";
 
 export interface MockupTemplate {
   id: number;
@@ -92,27 +60,9 @@ export interface MockupTemplate {
   contrast: number | null;
   saturation: number | null;
   compositeBlur: number | null;
-  // AI detection (legacy per-session)
-  detectionConfidence: number | null;
-  detectionDescription: string | null;
-  detectionSource: string | null;
-  detectionModel: string | null;
-  detectedAt: string | null;
-  placementWasManuallyAdjusted: boolean | null;
-  sourceImageWidth: number | null;
-  sourceImageHeight: number | null;
-  // Smart placement
-  placementMode: PlacementMode | null;
-  detectedPlacementConfig: DetectedPlacementConfig | null;
-  /** Admin-defined manual surface. Separate from AI detection. */
+  // Manual placement surface (corners or bbox)
+  /** Admin-defined manual surface. */
   placementConfig: ManualSurfaceConfig | null;
-  detectedPlacementStatus: DetectedPlacementStatus | null;
-  detectedPlacementError: string | null;
-  analyzedAt: string | null;
-  // AI render mode
-  renderMode: "deterministic" | "ai_rendered";
-  aiRenderPrompt: string | null;
-  aiRenderRequiresReview: boolean;
   // Layered image fields
   lightingOverlayUrl: string | null;
   foregroundImageUrl: string | null;
@@ -178,13 +128,8 @@ export interface PosterMockup {
   status: string;
   generatedAt: string | null;
   errorMessage: string | null;
-  // AI render mode tracking
-  renderMode: "deterministic" | "ai_rendered";
-  needsReview: boolean;
-  aiRenderWarning: string | null;
   sourcePosterImageUrl: string | null;
   sourceTemplateImageUrl: string | null;
-  approvedForPublic: boolean;
   // Layer toggles per-assignment
   useBase: boolean;
   useLightingOverlay: boolean;
@@ -489,31 +434,6 @@ export async function adminDeletePosterMockup(
   if (!res.ok) await handleError(res);
 }
 
-export interface PlacementAnalysis {
-  detected: boolean;
-  confidence: number;
-  description: string;
-  model: string;
-  x: number | null;
-  y: number | null;
-  width: number | null;
-  height: number | null;
-  rotation: number;
-}
-
-export async function analyzeMockupPlacement(
-  imageUrl: string
-): Promise<PlacementAnalysis> {
-  const res = await fetch(`${BASE}/mockup-templates/analyze-placement`, {
-    method: "POST",
-    headers: jsonHeaders(),
-    credentials: "include",
-    body: JSON.stringify({ imageUrl }),
-  });
-  if (!res.ok) await handleError(res);
-  return res.json();
-}
-
 export async function requestMockupImageUploadUrl(
   file: { name: string; size: number; contentType: string }
 ): Promise<{ uploadURL: string; objectPath: string }> {
@@ -587,15 +507,10 @@ export interface SyncResult {
   reason?: string;
   mockupId?: number;
   imageUrl?: string;
-  placementSource?: "auto_detected" | "manual";
+  placementSource?: "manual";
   placementWarnings?: string[];
-  surfaceSource?: "auto_detected_corners" | "auto_detected_bbox" | "manual_corners" | "manual_bbox" | "fallback";
+  surfaceSource?: "manual_corners" | "manual_bbox" | "fallback";
   surfaceWarning?: string;
-  renderMode?: "deterministic" | "ai_rendered";
-  needsReview?: boolean;
-  aiRenderWarning?: string;
-  /** Human-readable cost label, e.g. "Paid AI render". Present for AI-rendered combinations. */
-  estimatedCostLabel?: string;
 }
 
 export interface SyncResponse {
@@ -603,16 +518,9 @@ export interface SyncResponse {
   skipped: number;
   failed: number;
   plannedCount?: number;
-  /** Combinations destined for the deterministic Sharp compositor. */
-  deterministicPlannedCount?: number;
-  /** Combinations destined for the paid AI renderer. */
-  aiRenderedPlannedCount?: number;
   dryRun: boolean;
-  needsReviewCount?: number;
   results: SyncResult[];
   note?: string;
-  /** Set when server blocked the request due to AI render limit. */
-  aiRenderLimit?: number;
 }
 
 export async function adminRunMockupSync(params: {
@@ -628,64 +536,6 @@ export async function adminRunMockupSync(params: {
     headers: jsonHeaders(),
     credentials: "include",
     body: JSON.stringify(params),
-  });
-  if (!res.ok) await handleError(res);
-  return res.json();
-}
-
-// ─── AI Template Generation API ───────────────────────────────────────────────
-
-export interface GenerateTemplateResponse {
-  template: MockupTemplate;
-  note: string;
-  placementAnalysis?: {
-    status: string;
-    confidence: number;
-    warnings: string[];
-    error?: string;
-  };
-}
-
-export async function adminGenerateMockupTemplate(params: {
-  prompt: string;
-  name?: string;
-  category?: string;
-  storeKey?: string | null;
-  size?: "1024x1024" | "512x512" | "256x256";
-}): Promise<GenerateTemplateResponse> {
-  const res = await fetch(`${BASE}/mockup-templates/generate`, {
-    method: "POST",
-    headers: jsonHeaders(),
-    credentials: "include",
-    body: JSON.stringify(params),
-  });
-  if (!res.ok) await handleError(res);
-  return res.json();
-}
-
-// ─── Smart Placement API ──────────────────────────────────────────────────────
-
-export interface SmartPlacementAnalysisResponse {
-  templateId: number;
-  detectedConfig: DetectedPlacementConfig | null;
-  confidence: number;
-  status: "detected" | "needs_review" | "failed";
-  warnings: string[];
-  error?: string;
-  template: MockupTemplate;
-}
-
-/**
- * Run server-side smart placement analysis for an existing template.
- * Saves the result to the DB and returns the updated template.
- */
-export async function adminAnalyzeMockupTemplatePlacement(
-  templateId: number
-): Promise<SmartPlacementAnalysisResponse> {
-  const res = await fetch(`${BASE}/admin/mockup-templates/${templateId}/analyze-placement`, {
-    method: "POST",
-    headers: jsonHeaders(),
-    credentials: "include",
   });
   if (!res.ok) await handleError(res);
   return res.json();

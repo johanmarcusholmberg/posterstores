@@ -18,22 +18,14 @@ import {
   resolveEffectiveMockupSurface,
   getSurfaceSourceLabel,
   type SurfaceSource,
-} from "../lib/mockupPlacementAnalyzer";
-import { renderAiMockup } from "../lib/aiMockupRenderer";
+} from "../lib/mockupSurfaceResolver";
 import { randomUUID } from "crypto";
 
 const router = Router();
 const storage = new ObjectStorageService();
 
-/** Maximum poster × template combinations allowed per non-dry-run request (all renderers). */
+/** Maximum poster × template combinations allowed per non-dry-run request. */
 const SYNC_HARD_LIMIT = 100;
-
-/**
- * Maximum AI-rendered poster × template combinations allowed per request.
- * AI renders are paid calls (~seconds each) — keep this low to prevent
- * accidental large bills. Dry-run is exempt from this limit.
- */
-const AI_RENDER_HARD_LIMIT = 5;
 
 /**
  * If the old imageUrl is a generated mockup-composite stored in our object
@@ -64,16 +56,10 @@ interface SyncResult {
   reason?: string;
   mockupId?: number;
   imageUrl?: string;
-  /** Kept for backwards compat — prefer surfaceSource. */
-  placementSource?: "auto_detected" | "manual";
+  placementSource?: "manual";
   placementWarnings?: string[];
   surfaceSource?: SurfaceSource;
   surfaceWarning?: string;
-  renderMode?: "deterministic" | "ai_rendered";
-  needsReview?: boolean;
-  aiRenderWarning?: string;
-  /** Human-readable cost label shown in admin sync results. */
-  estimatedCostLabel?: string;
 }
 
 interface SyncBody {
@@ -113,18 +99,19 @@ router.post(
     if (scope === "missing") {
       filterConditions.push(isNull(posterMockupsTable.mockupImageUrl));
     }
-    if (posterIds && posterIds.length > 0) {
-      filterConditions.push(inArray(posterMockupsTable.posterId, posterIds));
-    }
-    if (templateIds && templateIds.length > 0) {
-      filterConditions.push(inArray(posterMockupsTable.mockupTemplateId as any, templateIds));
+
+    if (scope === "selected") {
+      if (posterIds && posterIds.length > 0) {
+        filterConditions.push(inArray(posterMockupsTable.posterId, posterIds));
+      }
+      if (templateIds && templateIds.length > 0) {
+        filterConditions.push(inArray(posterMockupsTable.mockupTemplateId, templateIds));
+      }
+    } else if (templateIds && templateIds.length > 0) {
+      filterConditions.push(inArray(posterMockupsTable.mockupTemplateId, templateIds));
     }
 
-    // ── 2. Load existing selected poster_mockup rows ──────────────────────────
-    //
-    // These rows represent the posters × templates that the admin has explicitly
-    // selected. Sync only renders this set.
-
+    // ── 2. Fetch rows with poster + template ──────────────────────────────────
     const mockupRows = await db
       .select({
         mockup: posterMockupsTable,
@@ -132,43 +119,34 @@ router.post(
         template: mockupTemplatesTable,
       })
       .from(posterMockupsTable)
-      .innerJoin(postersTable, eq(posterMockupsTable.posterId, postersTable.id))
-      .innerJoin(
-        mockupTemplatesTable,
-        eq(posterMockupsTable.mockupTemplateId as any, mockupTemplatesTable.id)
-      )
-      .where(
-        and(
-          eq(postersTable.storeKey, storeKey),
-          eq(postersTable.status, "published"),
-          eq(mockupTemplatesTable.active, true),
-          isNotNull(mockupTemplatesTable.backgroundImageUrl),
-          ...filterConditions
-        )
-      );
+      .innerJoin(postersTable, and(
+        eq(posterMockupsTable.posterId, postersTable.id),
+        eq(postersTable.storeKey, storeKey),
+        eq(postersTable.status, "published"),
+      ))
+      .innerJoin(mockupTemplatesTable, eq(posterMockupsTable.mockupTemplateId, mockupTemplatesTable.id))
+      .where(and(...filterConditions));
 
     if (mockupRows.length === 0) {
-      const hint = scope === "selected" && posterIds?.length === 0 && templateIds?.length === 0
-        ? "No poster or template IDs specified."
-        : "No selected poster/mockup pairs found for the given filters.";
+      const hint = scope === "selected"
+        ? "No matching poster × template combinations found for the given selection."
+        : scope === "missing"
+        ? "All published poster × template combinations already have images."
+        : "No poster × template combinations found for this store.";
       return res.json({
         generated: 0,
         skipped: 0,
         failed: 0,
         plannedCount: 0,
+        dryRun,
         results: [],
         note: hint + " Sync only updates mockups that have already been selected for a poster.",
       });
     }
 
     // ── 3. Filter eligible rows ───────────────────────────────────────────────
-    //
-    // Deterministic templates need a valid poster surface; AI templates need
-    // only a background image (already guaranteed by the query above).
-
     const eligibleRows = mockupRows.filter(({ template, mockup }) => {
       if (!template.backgroundImageUrl) return false;
-      if (template.renderMode === "ai_rendered") return true;
       const surface = resolveEffectiveMockupSurface(template);
       if (surface.surfaceSource === "fallback") return false;
       // Skip already-generated unless overwrite is set
@@ -176,43 +154,20 @@ router.post(
       return true;
     });
 
-    // Count by renderer type
-    const deterministicRows = eligibleRows.filter(
-      ({ template }) => (template.renderMode ?? "deterministic") !== "ai_rendered"
-    );
-    const aiRows = eligibleRows.filter(
-      ({ template }) => (template.renderMode ?? "deterministic") === "ai_rendered"
-    );
-
     const plannedCount = eligibleRows.length;
-    const deterministicPlannedCount = deterministicRows.length;
-    const aiRenderedPlannedCount = aiRows.length;
 
     // Overall hard limit
     if (!dryRun && plannedCount > SYNC_HARD_LIMIT) {
       return res.status(400).json({
         error: `Sync would update ${plannedCount} selected mockup${plannedCount !== 1 ? "s" : ""}, which exceeds the safe limit of ${SYNC_HARD_LIMIT} per request. Narrow your selection and try again.`,
         plannedCount,
-        deterministicPlannedCount,
-        aiRenderedPlannedCount,
         limit: SYNC_HARD_LIMIT,
-      });
-    }
-
-    // AI-specific hard limit
-    if (!dryRun && aiRenderedPlannedCount > AI_RENDER_HARD_LIMIT) {
-      return res.status(400).json({
-        error: `Sync would generate ${aiRenderedPlannedCount} AI-rendered mockup${aiRenderedPlannedCount !== 1 ? "s" : ""}, which exceeds the AI render limit of ${AI_RENDER_HARD_LIMIT} per request. Reduce the selection and try again.`,
-        plannedCount,
-        deterministicPlannedCount,
-        aiRenderedPlannedCount,
-        aiRenderLimit: AI_RENDER_HARD_LIMIT,
       });
     }
 
     // ── 4. Report skipped rows (already has image, overwrite = false) ─────────
     const skippedRows = mockupRows.filter(({ mockup }) => {
-      if (scope === "missing") return false; // query already filtered
+      if (scope === "missing") return false;
       return !overwrite && !!mockup.mockupImageUrl;
     });
 
@@ -225,7 +180,6 @@ router.post(
     // Report pre-skipped rows
     for (const { mockup, poster, template } of skippedRows) {
       skipped++;
-      const templateRenderMode = (template.renderMode ?? "deterministic") as "deterministic" | "ai_rendered";
       results.push({
         posterId: poster.id,
         posterTitle: poster.title,
@@ -235,13 +189,10 @@ router.post(
         reason: "Mockup already generated (use overwrite to regenerate)",
         mockupId: mockup.id,
         imageUrl: mockup.mockupImageUrl ?? undefined,
-        renderMode: templateRenderMode,
       });
     }
 
     for (const { mockup, poster, template } of eligibleRows) {
-      const templateRenderMode = (template.renderMode ?? "deterministic") as "deterministic" | "ai_rendered";
-
       // Resolve the effective poster surface for this template
       const surface = resolveEffectiveMockupSurface(template);
       const {
@@ -256,9 +207,7 @@ router.post(
         warnings: surfaceWarnings,
       } = surface;
 
-      const placementSource: "auto_detected" | "manual" = surfaceSource.startsWith("auto")
-        ? "auto_detected"
-        : "manual";
+      const placementSource = "manual" as const;
       const placementWarnings = surfaceWarnings;
       const surfaceWarning = surfaceWarnings.length > 0 ? surfaceWarnings[0] : undefined;
 
@@ -270,15 +219,12 @@ router.post(
           templateId: template.id,
           templateName: template.name,
           action: "generated",
-          reason: `dry-run (renderer: ${templateRenderMode}, surface: ${getSurfaceSourceLabel(surfaceSource)})`,
+          reason: `dry-run (surface: ${getSurfaceSourceLabel(surfaceSource)})`,
           mockupId: mockup.id,
           placementSource,
           placementWarnings,
           surfaceSource,
           surfaceWarning,
-          renderMode: templateRenderMode,
-          needsReview: templateRenderMode === "ai_rendered",
-          estimatedCostLabel: templateRenderMode === "ai_rendered" ? "Paid AI render" : undefined,
         });
         continue;
       }
@@ -293,15 +239,11 @@ router.post(
           action: "failed",
           reason: "Poster has no imageUrl",
           mockupId: mockup.id,
-          renderMode: templateRenderMode,
         });
         continue;
       }
 
-      if (
-        templateRenderMode === "deterministic" &&
-        surfaceSource === "fallback"
-      ) {
+      if (surfaceSource === "fallback") {
         failed++;
         results.push({
           posterId: poster.id,
@@ -309,50 +251,18 @@ router.post(
           templateId: template.id,
           templateName: template.name,
           action: "failed",
-          reason: "Deterministic template has no valid poster surface defined",
+          reason: "Template has no valid poster surface defined",
           mockupId: mockup.id,
           surfaceSource,
-          renderMode: templateRenderMode,
         });
         continue;
       }
 
       try {
         let imageBuffer: Buffer;
-        let aiRenderWarning: string | undefined;
         let finalSurfaceWarning: string | undefined = surfaceWarning;
 
-        if (templateRenderMode === "ai_rendered") {
-          const aiResult = await renderAiMockup({
-            posterImageUrl: poster.imageUrl,
-            templateImageUrl: template.backgroundImageUrl!,
-            detectedPlacement:
-              surfaceSource.startsWith("auto") && template.detectedPlacementConfig
-                ? (template.detectedPlacementConfig as any)
-                : null,
-            renderPrompt: template.aiRenderPrompt,
-            templateCategory: template.category,
-            templateName: template.name,
-          });
-
-          if (aiResult.status === "failed") {
-            failed++;
-            results.push({
-              posterId: poster.id,
-              posterTitle: poster.title,
-              templateId: template.id,
-              templateName: template.name,
-              action: "failed",
-              reason: `AI render failed: ${aiResult.error}`,
-              mockupId: mockup.id,
-              renderMode: templateRenderMode,
-            });
-            continue;
-          }
-
-          imageBuffer = aiResult.imageBuffer!;
-          aiRenderWarning = aiResult.warning;
-        } else if (surfaceGeometryMode === "corners" && corners != null) {
+        if (surfaceGeometryMode === "corners" && corners != null) {
           const result = await compositePosterWithCorners(
             template.backgroundImageUrl!,
             poster.imageUrl,
@@ -381,10 +291,10 @@ router.post(
               reason: `No valid placement found (surface: ${getSurfaceSourceLabel(surfaceSource)})`,
               mockupId: mockup.id,
               surfaceSource,
-              renderMode: templateRenderMode,
             });
             continue;
           }
+
           const hasLayeredAssets = !!(template.lightingOverlayUrl || template.foregroundImageUrl);
           if (hasLayeredAssets) {
             imageBuffer = await compositeLayeredMockup(
@@ -431,31 +341,22 @@ router.post(
           }
         }
 
-        // ── Upload result ──────────────────────────────────────────────
+        // Delete the old composite if it was generated by us
         await tryDeleteOldComposite(mockup.mockupImageUrl, req.log);
 
-        const subPath = `mockup-composites/${storeKey}/${poster.id}/${template.id}-${randomUUID().slice(0, 8)}.jpg`;
-        const objectPath = await storage.uploadBuffer(subPath, imageBuffer, "image/jpeg");
-        const imageUrl = `/api/storage${objectPath}`;
+        // Upload new composite
+        const objectPath = `mockup-composites/${poster.id}/${template.id}-${randomUUID()}.jpg`;
+        await storage.uploadBuffer(objectPath, imageBuffer, "image/jpeg");
+        const imageUrl = `/api/storage/objects/${objectPath}`;
 
-        const now = new Date();
-        const isAiRendered = templateRenderMode === "ai_rendered";
-        const needsReview = isAiRendered;
-
-        // ── Always UPDATE the existing row — never INSERT ──────────────
         await db
           .update(posterMockupsTable)
           .set({
             mockupImageUrl: imageUrl,
             status: "generated",
-            generatedAt: now,
+            generatedAt: new Date(),
             errorMessage: null,
-            renderMode: templateRenderMode,
-            needsReview,
-            aiRenderWarning: aiRenderWarning ?? null,
-            sourcePosterImageUrl: poster.imageUrl,
-            sourceTemplateImageUrl: template.backgroundImageUrl ?? null,
-            updatedAt: now,
+            updatedAt: new Date(),
           })
           .where(eq(posterMockupsTable.id, mockup.id));
 
@@ -472,10 +373,6 @@ router.post(
           placementWarnings,
           surfaceSource,
           surfaceWarning: finalSurfaceWarning,
-          renderMode: templateRenderMode,
-          needsReview,
-          aiRenderWarning,
-          estimatedCostLabel: isAiRendered ? "Paid AI render" : undefined,
         });
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "Unknown error";
@@ -495,22 +392,16 @@ router.post(
           action: "failed",
           reason: msg,
           mockupId: mockup.id,
-          renderMode: templateRenderMode,
         });
       }
     }
-
-    const needsReviewCount = results.filter((r) => r.action === "generated" && r.needsReview).length;
 
     return res.json({
       generated,
       skipped,
       failed,
       plannedCount,
-      deterministicPlannedCount,
-      aiRenderedPlannedCount,
       dryRun,
-      needsReviewCount,
       results,
     });
   }

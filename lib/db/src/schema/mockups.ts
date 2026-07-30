@@ -77,27 +77,8 @@ export const mockupTemplatesTable = pgTable("mockup_templates", {
   contrast: real("contrast").default(0.97),
   saturation: real("saturation").default(0.92),
   compositeBlur: real("composite_blur").default(0),
-  // AI detection metadata (legacy per-session fields)
-  detectionConfidence: real("detection_confidence"),
-  detectionDescription: text("detection_description"),
-  detectionSource: text("detection_source"),
-  detectionModel: text("detection_model"),
-  detectedAt: timestamp("detected_at", { withTimezone: true }),
-  placementWasManuallyAdjusted: boolean("placement_was_manually_adjusted").default(false),
-  sourceImageWidth: integer("source_image_width"),
-  sourceImageHeight: integer("source_image_height"),
-  // Smart placement fields
-  placementMode: text("placement_mode").default("manual").notNull(),
-  detectedPlacementConfig: jsonb("detected_placement_config"),
-  /** Admin-defined manual surface (corners or bbox). Separate from AI detection. */
+  /** Admin-defined manual surface (corners or bbox). */
   placementConfig: jsonb("placement_config"),
-  detectedPlacementStatus: text("detected_placement_status").default("not_analyzed").notNull(),
-  detectedPlacementError: text("detected_placement_error"),
-  analyzedAt: timestamp("analyzed_at", { withTimezone: true }),
-  // AI render mode fields
-  renderMode: text("render_mode").default("deterministic").notNull(),
-  aiRenderPrompt: text("ai_render_prompt"),
-  aiRenderRequiresReview: boolean("ai_render_requires_review").default(true).notNull(),
   // Layered image fields
   lightingOverlayUrl: text("lighting_overlay_url"),
   foregroundImageUrl: text("foreground_image_url"),
@@ -126,13 +107,8 @@ export const posterMockupsTable = pgTable("poster_mockups", {
   status: text("status").default("manual").notNull(),
   generatedAt: timestamp("generated_at", { withTimezone: true }),
   errorMessage: text("error_message"),
-  // AI render mode tracking
-  renderMode: text("render_mode").default("deterministic").notNull(),
-  needsReview: boolean("needs_review").default(false).notNull(),
-  aiRenderWarning: text("ai_render_warning"),
   sourcePosterImageUrl: text("source_poster_image_url"),
   sourceTemplateImageUrl: text("source_template_image_url"),
-  approvedForPublic: boolean("approved_for_public").default(false).notNull(),
   // Per-assignment layer toggles
   useBase: boolean("use_base").default(true).notNull(),
   useLightingOverlay: boolean("use_lighting_overlay").default(true).notNull(),

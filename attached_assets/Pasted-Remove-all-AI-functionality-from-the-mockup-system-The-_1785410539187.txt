@@ -1,0 +1,182 @@
+Remove all AI functionality from the mockup system.
+
+The database contains only test mockup data. Existing mockup templates, assignments and generated mockup images do not need to be preserved.
+
+Do not modify unrelated AI functionality elsewhere in the repository. Do not delete posters, original poster artwork, stores, orders or other product data.
+
+Delete all existing mockup data
+
+Delete all rows from:
+
+- "poster_mockups"
+- "mockup_templates"
+
+It is acceptable to leave old unreferenced test image files in object storage if deleting them would add complexity. Do not delete entire shared storage directories.
+
+Remove mockup AI backend functionality
+
+Delete:
+
+- "artifacts/api-server/src/routes/generateMockupTemplate.ts"
+- "artifacts/api-server/src/routes/analyzePlacement.ts"
+- "artifacts/api-server/src/lib/aiMockupRenderer.ts"
+
+Remove their imports and route registrations.
+
+Remove any additional AI placement-analysis endpoints from:
+
+- "artifacts/api-server/src/routes/mockups.ts"
+
+Refactor:
+
+- "artifacts/api-server/src/lib/mockupPlacementAnalyzer.ts"
+
+into a non-AI surface resolver, preferably named:
+
+- "artifacts/api-server/src/lib/mockupSurfaceResolver.ts"
+
+Keep only:
+
+- Manual four-corner placement
+- Manual bounding-box placement
+- Corner validation
+- Coordinate conversion
+- Perspective detection
+- "ManualSurfaceConfig"
+- "EffectiveMockupSurface"
+- "resolveEffectiveMockupSurface"
+
+Remove:
+
+- OpenAI imports
+- AI prompts
+- GPT model references
+- Placement analysis
+- Confidence scoring
+- AI response parsing
+- AI detection states and types
+
+Make sync deterministic only
+
+Update:
+
+- "artifacts/api-server/src/routes/mockupSync.ts"
+
+Remove:
+
+- AI renderer imports and calls
+- "ai_rendered" logic
+- AI generation limits
+- AI cost labels
+- AI warnings
+- AI review requirements
+- AI-specific result counts
+
+Every mockup must use deterministic rendering only.
+
+Keep:
+
+- Base image
+- Exact poster artwork
+- Manual perspective
+- Lighting/shadow/reflection overlay
+- Foreground layer
+- Dry run
+- Overwrite
+- Generated, skipped and failed statuses
+
+Remove mockup AI frontend functionality
+
+Update at least:
+
+- "artifacts/poster-store/src/components/admin/MockupTemplateForm.tsx"
+- "artifacts/poster-store/src/components/admin/AdminMockupSyncPanel.tsx"
+- "artifacts/poster-store/src/lib/mockupApi.ts"
+- "artifacts/poster-store/src/components/public/MockupGallery.tsx"
+
+Remove:
+
+- Analyze Placement
+- AI analysis requests
+- Confidence badges
+- AI placement results
+- Approve and retry AI controls
+- Render-mode selector
+- AI-rendered option
+- AI render prompt
+- AI review settings
+- AI cost confirmation
+- AI sync counts
+- AI approval rules
+- AI warnings and unused AI icons
+
+Keep:
+
+- Base-image upload
+- Manual four-corner editor
+- Manual bounding-box controls
+- Deterministic preview
+- Lighting/reflection overlay
+- Optional foreground
+- Primary, hover and gallery settings
+- Normal mockup sync
+
+Call the manual placement section:
+
+"Poster surface"
+
+Use this description:
+
+"Position the four corners around the area where the poster should appear."
+
+Remove AI database fields
+
+Keep:
+
+- "placement_config"
+
+Remove mockup-specific AI fields from "mockup_templates", including:
+
+- Detection metadata fields
+- "placement_mode"
+- "detected_placement_config"
+- "detected_placement_status"
+- "detected_placement_error"
+- "analyzed_at"
+- "render_mode"
+- "ai_render_prompt"
+- "ai_render_requires_review"
+
+Remove from "poster_mockups":
+
+- "render_mode"
+- "needs_review"
+- "ai_render_warning"
+- "approved_for_public"
+
+Remove the startup migrations and files for:
+
+- "migrateSmartPlacement"
+- "migrateAiRenderMode"
+
+Create the required database migration to drop the obsolete columns.
+
+Do not spend time preserving or converting existing mockup records because they are test data and may be deleted.
+
+Verification
+
+Run:
+
+- TypeScript checks
+- Relevant tests
+- Production build
+
+Fix compilation errors caused by removed AI fields or imports.
+
+At the end, report only:
+
+1. Files deleted
+2. Files changed
+3. Database columns removed
+4. Test and build results
+5. Any remaining mockup-related AI reference that could not be removed

@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import {
   Select,
@@ -37,15 +36,9 @@ import {
   SkipForward,
   Loader2,
   Info,
-  Wand2,
   AlertTriangle,
-  DollarSign,
-  ShieldAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-/** Server-side AI_RENDER_HARD_LIMIT — must be kept in sync with mockupSync.ts */
-const AI_RENDER_HARD_LIMIT = 5;
 
 interface AdminMockupSyncPanelProps {
   storeKey: string;
@@ -58,9 +51,6 @@ interface SyncSummary {
   skipped: number;
   failed: number;
   plannedCount?: number;
-  deterministicPlannedCount?: number;
-  aiRenderedPlannedCount?: number;
-  needsReviewCount?: number;
 }
 
 export function AdminMockupSyncPanel({ storeKey }: AdminMockupSyncPanelProps) {
@@ -74,7 +64,6 @@ export function AdminMockupSyncPanel({ storeKey }: AdminMockupSyncPanelProps) {
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<number[]>([]);
   const [overwrite, setOverwrite] = useState(false);
   const [dryRun, setDryRun] = useState(false);
-  const [paidAiConfirmed, setPaidAiConfirmed] = useState(false);
 
   const [status, setStatus] = useState<SyncStatus>("idle");
   const [results, setResults] = useState<SyncResult[] | null>(null);
@@ -86,25 +75,16 @@ export function AdminMockupSyncPanel({ storeKey }: AdminMockupSyncPanelProps) {
   // ── Template filtering ────────────────────────────────────────────────────
   const syncableTemplates = templates.filter((t) => {
     if (!t.active || !t.backgroundImageUrl) return false;
-    if (t.renderMode === "ai_rendered") return true;
+    // Eligible if it has a manual placement surface (placementConfig) or legacy bbox fields
+    if (t.placementConfig) return true;
     return t.posterX != null && t.posterY != null && t.posterWidth != null && t.posterHeight != null;
   });
-
-  const deterministicTemplates = syncableTemplates.filter((t) => t.renderMode !== "ai_rendered");
-  const aiTemplates = syncableTemplates.filter((t) => t.renderMode === "ai_rendered");
 
   // Which templates will actually be used in the next sync (none selected = all syncable)
   const effectiveTemplates =
     selectedTemplateIds.length > 0
       ? syncableTemplates.filter((t) => selectedTemplateIds.includes(t.id))
       : syncableTemplates;
-
-  const effectiveAiTemplates = effectiveTemplates.filter((t) => t.renderMode === "ai_rendered");
-  const hasAiTemplatesInScope = effectiveAiTemplates.length > 0;
-
-  // Estimated AI combinations (upper bound — server may skip existing ones)
-  // We don't know poster count here, so we show the per-template warning
-  const aiRendersBulkRisk = scope === "all" && hasAiTemplatesInScope;
 
   useEffect(() => {
     setLoadingTemplates(true);
@@ -115,11 +95,6 @@ export function AdminMockupSyncPanel({ storeKey }: AdminMockupSyncPanelProps) {
       )
       .finally(() => setLoadingTemplates(false));
   }, [storeKey]);
-
-  // Reset paidAiConfirmed when the AI scope changes
-  useEffect(() => {
-    setPaidAiConfirmed(false);
-  }, [hasAiTemplatesInScope, scope, selectedTemplateIds.join(",")]);
 
   const toggleTemplate = (id: number) => {
     setSelectedTemplateIds((prev) =>
@@ -152,9 +127,6 @@ export function AdminMockupSyncPanel({ storeKey }: AdminMockupSyncPanelProps) {
         skipped: resp.skipped,
         failed: resp.failed,
         plannedCount: resp.plannedCount,
-        deterministicPlannedCount: resp.deterministicPlannedCount,
-        aiRenderedPlannedCount: resp.aiRenderedPlannedCount,
-        needsReviewCount: resp.needsReviewCount,
       });
       setResults(resp.results);
       setSyncNote(resp.note ?? null);
@@ -179,18 +151,11 @@ export function AdminMockupSyncPanel({ storeKey }: AdminMockupSyncPanelProps) {
     }
   }, [storeKey, scope, selectedTemplateIds, overwrite, dryRun]);
 
-  const needsConfirm = scope === "all" && !dryRun && !hasAiTemplatesInScope;
-  const requiresAiConfirm = hasAiTemplatesInScope && !dryRun;
+  const needsConfirm = scope === "all" && !dryRun;
 
-  // Run button is disabled when:
-  // - sync is already running
-  // - no syncable templates
-  // - AI templates are in scope AND not dryRun AND admin hasn't checked the paid-AI checkbox
-  // - "all posters + AI" scope (strong risk) AND not dryRun AND hasn't confirmed
   const runDisabled =
     status === "running" ||
-    syncableTemplates.length === 0 ||
-    (requiresAiConfirm && !paidAiConfirmed);
+    syncableTemplates.length === 0;
 
   const actionLabel = dryRun
     ? "Preview (dry run)"
@@ -216,52 +181,11 @@ export function AdminMockupSyncPanel({ storeKey }: AdminMockupSyncPanelProps) {
         <div>
           <p className="font-medium text-foreground mb-0.5">About mockup sync</p>
           <p>
-            Composites poster artwork into template backgrounds and stores the result in object
-            storage. <strong>Deterministic</strong> (Sharp) rendering is free and fast.{" "}
-            <strong>AI-rendered</strong> templates use paid image generation via gpt-image-1 — use
-            sparingly for lifestyle/marketing images only.
+            Composites poster artwork into template backgrounds using the Sharp renderer and stores the result in object storage.
+            Templates must have a poster surface defined (corner points or bounding box) before they can be synced.
           </p>
         </div>
       </div>
-
-      {/* AI cost warning — shown whenever any AI templates are in effective scope */}
-      {hasAiTemplatesInScope && (
-        <div className={cn(
-          "rounded-md border px-4 py-3 flex gap-3 text-sm",
-          aiRendersBulkRisk
-            ? "border-red-300 bg-red-50/80 text-red-900 dark:border-red-700 dark:bg-red-950/30 dark:text-red-300"
-            : "border-amber-300 bg-amber-50/80 text-amber-900 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-300"
-        )}>
-          {aiRendersBulkRisk ? (
-            <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
-          ) : (
-            <DollarSign className="w-4 h-4 shrink-0 mt-0.5" />
-          )}
-          <div className="space-y-1">
-            {aiRendersBulkRisk ? (
-              <>
-                <p className="font-semibold">Bulk AI sync — high cost risk</p>
-                <p>
-                  "All posters" scope with AI-rendered templates will generate a paid AI render for
-                  every published poster. The server will block requests over {AI_RENDER_HARD_LIMIT} AI
-                  renders. Use <strong>dry run</strong> first to see the planned count, then switch to{" "}
-                  <strong>Selected posters</strong> scope to process a few at a time.
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="font-semibold">AI-rendered mockups use paid image generation</p>
-                <p>
-                  {effectiveAiTemplates.length} AI-rendered template{effectiveAiTemplates.length !== 1 ? "s" : ""} selected (
-                  {effectiveAiTemplates.map((t) => t.name).join(", ")}). Each poster × AI template
-                  combination is a paid call. Maximum {AI_RENDER_HARD_LIMIT} AI renders per request.
-                  Use only for selected posters/templates, not bulk production runs.
-                </p>
-              </>
-            )}
-          </div>
-        </div>
-      )}
 
       <div className="grid gap-6 sm:grid-cols-2">
         {/* Scope */}
@@ -310,7 +234,7 @@ export function AdminMockupSyncPanel({ storeKey }: AdminMockupSyncPanelProps) {
               <Label htmlFor="dryRun" className="font-normal cursor-pointer">
                 Dry run (preview only)
                 <span className="block text-xs text-muted-foreground font-normal">
-                  Count what would be generated without running or spending credits
+                  Count what would be generated without running
                 </span>
               </Label>
             </div>
@@ -330,86 +254,38 @@ export function AdminMockupSyncPanel({ storeKey }: AdminMockupSyncPanelProps) {
           <div className="text-sm text-muted-foreground">Loading templates…</div>
         ) : syncableTemplates.length === 0 ? (
           <div className="rounded border border-dashed px-4 py-3 text-sm text-muted-foreground">
-            No active templates with placement data and background image found. Add placement coordinates to a template first.
+            No active templates with a poster surface and background image found. Define the poster surface on a template first.
           </div>
         ) : (
-          <div className="space-y-2">
-            {/* Deterministic templates */}
-            {deterministicTemplates.length > 0 && (
-              <div className="space-y-1">
-                {aiTemplates.length > 0 && (
-                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
-                    Deterministic (free)
-                  </p>
-                )}
-                <div className="flex flex-wrap gap-2">
-                  {deterministicTemplates.map((t) => {
-                    const selected = selectedTemplateIds.includes(t.id);
-                    return (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => toggleTemplate(t.id)}
-                        className={cn(
-                          "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-colors",
-                          selected
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "border-border text-muted-foreground hover:border-primary/50 bg-background"
-                        )}
-                      >
-                        {t.name}
-                        {t.category && (
-                          <span className={cn("opacity-70", selected && "opacity-80")}>
-                            · {t.category}
-                          </span>
-                        )}
-                        <span className="flex gap-0.5 ml-0.5">
-                          {t.canBePrimary && <span title="Can be primary" className="text-[9px]">P</span>}
-                          {t.canBeHover && <span title="Can be hover" className="text-[9px]">H</span>}
-                          {t.canBeGallery && <span title="Can be gallery" className="text-[9px]">G</span>}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* AI-rendered templates */}
-            {aiTemplates.length > 0 && (
-              <div className="space-y-1">
-                <p className="text-[10px] font-medium text-amber-700 dark:text-amber-400 uppercase tracking-wide flex items-center gap-1">
-                  <DollarSign className="w-3 h-3" />
-                  AI-rendered (paid per render)
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {aiTemplates.map((t) => {
-                    const selected = selectedTemplateIds.includes(t.id);
-                    return (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => toggleTemplate(t.id)}
-                        className={cn(
-                          "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-colors",
-                          selected
-                            ? "bg-violet-600 text-white border-violet-600"
-                            : "border-violet-300 text-violet-700 hover:border-violet-500 bg-violet-50/60 dark:text-violet-400 dark:border-violet-700 dark:bg-violet-950/20"
-                        )}
-                      >
-                        <Wand2 className="w-3 h-3" />
-                        {t.name}
-                        {t.category && (
-                          <span className={cn("opacity-70", selected && "opacity-80")}>
-                            · {t.category}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+          <div className="flex flex-wrap gap-2">
+            {syncableTemplates.map((t) => {
+              const selected = selectedTemplateIds.includes(t.id);
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => toggleTemplate(t.id)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-colors",
+                    selected
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-border text-muted-foreground hover:border-primary/50 bg-background"
+                  )}
+                >
+                  {t.name}
+                  {t.category && (
+                    <span className={cn("opacity-70", selected && "opacity-80")}>
+                      · {t.category}
+                    </span>
+                  )}
+                  <span className="flex gap-0.5 ml-0.5">
+                    {t.canBePrimary && <span title="Can be primary" className="text-[9px]">P</span>}
+                    {t.canBeHover && <span title="Can be hover" className="text-[9px]">H</span>}
+                    {t.canBeGallery && <span title="Can be gallery" className="text-[9px]">G</span>}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
         {selectedTemplateIds.length > 0 && (
@@ -418,58 +294,23 @@ export function AdminMockupSyncPanel({ storeKey }: AdminMockupSyncPanelProps) {
             onClick={() => setSelectedTemplateIds([])}
             className="text-xs text-muted-foreground hover:text-foreground underline"
           >
-            Clear selection
+            Clear selection ({effectiveTemplates.length} selected)
           </button>
         )}
       </div>
-
-      {/* Paid AI confirmation — required for live sync with any AI templates */}
-      {hasAiTemplatesInScope && !dryRun && (
-        <div className="rounded-md border border-amber-300 bg-amber-50/60 dark:border-amber-700 dark:bg-amber-950/20 px-4 py-3 space-y-2">
-          <p className="text-sm font-medium text-amber-900 dark:text-amber-300">
-            Confirm paid AI generation
-          </p>
-          <div className="flex items-start gap-3">
-            <Checkbox
-              id="paidAiConfirmed"
-              checked={paidAiConfirmed}
-              onCheckedChange={(v) => setPaidAiConfirmed(!!v)}
-              className="mt-0.5 border-amber-500 data-[state=checked]:bg-amber-600 data-[state=checked]:border-amber-600"
-              data-testid="paid-ai-confirm-checkbox"
-            />
-            <Label
-              htmlFor="paidAiConfirmed"
-              className="text-sm font-normal cursor-pointer text-amber-800 dark:text-amber-300"
-            >
-              I understand AI-rendered mockups use paid image generation. I have reviewed the
-              selected templates and poster count, and I'm ready to proceed.
-            </Label>
-          </div>
-        </div>
-      )}
 
       {/* Run button */}
       <div className="flex flex-wrap items-center gap-3">
         <Button
           onClick={handleRunOrConfirm}
           disabled={runDisabled}
-          className={cn(
-            "gap-2",
-            hasAiTemplatesInScope && !dryRun && paidAiConfirmed
-              ? "bg-amber-600 hover:bg-amber-700 text-white"
-              : ""
-          )}
+          className="gap-2"
           data-testid="run-sync-btn"
         >
           {status === "running" ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
               Syncing…
-            </>
-          ) : dryRun ? (
-            <>
-              <Wand2 className="w-4 h-4" />
-              {actionLabel}
             </>
           ) : (
             <>
@@ -479,28 +320,11 @@ export function AdminMockupSyncPanel({ storeKey }: AdminMockupSyncPanelProps) {
           )}
         </Button>
 
-        {requiresAiConfirm && !paidAiConfirmed && (
-          <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1">
-            <AlertTriangle className="w-3.5 h-3.5" />
-            Check the confirmation box above to enable
-          </p>
-        )}
-
         {status === "done" && summary && (
           <div className="flex flex-wrap items-center gap-2 text-sm">
-            {/* Split planned counts */}
             {summary.plannedCount != null && (
               <>
                 <span className="text-muted-foreground">{summary.plannedCount} planned</span>
-                {(summary.deterministicPlannedCount != null || summary.aiRenderedPlannedCount != null) && (
-                  <span className="text-muted-foreground text-xs">
-                    ({summary.deterministicPlannedCount ?? 0} Sharp
-                    {(summary.aiRenderedPlannedCount ?? 0) > 0 && (
-                      <span className="text-amber-600 ml-1">+ {summary.aiRenderedPlannedCount} AI paid</span>
-                    )}
-                    )
-                  </span>
-                )}
                 <span className="text-muted-foreground">·</span>
               </>
             )}
@@ -516,15 +340,6 @@ export function AdminMockupSyncPanel({ storeKey }: AdminMockupSyncPanelProps) {
                 <span className="flex items-center gap-1 text-destructive font-medium">
                   <XCircle className="w-4 h-4" />
                   {summary.failed} failed
-                </span>
-              </>
-            )}
-            {(summary.needsReviewCount ?? 0) > 0 && (
-              <>
-                <span className="text-muted-foreground">·</span>
-                <span className="flex items-center gap-1 text-amber-600 font-medium">
-                  <AlertTriangle className="w-4 h-4" />
-                  {summary.needsReviewCount} need review
                 </span>
               </>
             )}
@@ -545,12 +360,6 @@ export function AdminMockupSyncPanel({ storeKey }: AdminMockupSyncPanelProps) {
           <div>
             <p className="font-medium mb-0.5">Sync blocked</p>
             <p>{syncError}</p>
-            {syncError.includes("AI render limit") && (
-              <p className="mt-1 text-xs opacity-80">
-                Tip: reduce the number of AI-rendered templates selected, switch to "selected" scope
-                to target fewer posters, or use dry run to preview counts first.
-              </p>
-            )}
           </div>
         </div>
       )}
@@ -573,7 +382,6 @@ export function AdminMockupSyncPanel({ storeKey }: AdminMockupSyncPanelProps) {
                     <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Poster</th>
                     <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Template</th>
                     <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Result</th>
-                    <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Renderer</th>
                     <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Detail</th>
                   </tr>
                 </thead>
@@ -581,25 +389,16 @@ export function AdminMockupSyncPanel({ storeKey }: AdminMockupSyncPanelProps) {
                   {results.map((r, i) => (
                     <tr key={i} className={cn(
                       r.action === "failed" && "bg-destructive/5",
-                      r.needsReview && r.action === "generated" && "bg-amber-50/60 dark:bg-amber-950/20",
-                      r.action === "generated" && !r.needsReview && dryRun && "bg-muted/30"
+                      r.action === "generated" && dryRun && "bg-muted/30"
                     )}>
                       <td className="px-3 py-2 text-xs">{r.posterTitle}</td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">{r.templateName}</td>
                       <td className="px-3 py-2">
                         {r.action === "generated" ? (
-                          <div className="flex flex-col gap-0.5">
-                            <span className="flex items-center gap-1 text-xs font-medium text-emerald-600">
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              {dryRun ? "Would generate" : "Generated"}
-                            </span>
-                            {r.needsReview && !dryRun && (
-                              <span className="flex items-center gap-1 text-[10px] text-amber-600">
-                                <AlertTriangle className="w-3 h-3" />
-                                Needs review
-                              </span>
-                            )}
-                          </div>
+                          <span className="flex items-center gap-1 text-xs font-medium text-emerald-600">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            {dryRun ? "Would generate" : "Generated"}
+                          </span>
                         ) : r.action === "skipped" ? (
                           <span className="flex items-center gap-1 text-xs text-muted-foreground">
                             <SkipForward className="w-3.5 h-3.5" />
@@ -612,26 +411,8 @@ export function AdminMockupSyncPanel({ storeKey }: AdminMockupSyncPanelProps) {
                           </span>
                         )}
                       </td>
-                      <td className="px-3 py-2">
-                        {r.renderMode === "ai_rendered" ? (
-                          <div className="flex flex-col gap-0.5">
-                            <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded border bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/30 dark:text-violet-400">
-                              <Wand2 className="w-2.5 h-2.5" />
-                              AI
-                            </span>
-                            {r.estimatedCostLabel && (
-                              <span className="text-[10px] text-amber-600 flex items-center gap-0.5">
-                                <DollarSign className="w-2.5 h-2.5" />
-                                {r.estimatedCostLabel}
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-[10px] text-muted-foreground">Sharp</span>
-                        )}
-                      </td>
                       <td className="px-3 py-2 text-xs text-muted-foreground max-w-xs truncate">
-                        {r.aiRenderWarning ?? r.reason ?? (r.imageUrl ? "Stored" : "—")}
+                        {r.reason ?? (r.imageUrl ? "Stored" : "—")}
                       </td>
                     </tr>
                   ))}
@@ -642,7 +423,7 @@ export function AdminMockupSyncPanel({ storeKey }: AdminMockupSyncPanelProps) {
         </div>
       )}
 
-      {/* Confirm dialog for "sync all" (deterministic-only path) */}
+      {/* Confirm dialog for "sync all" */}
       <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,19 +14,14 @@ import {
 } from "@/components/ui/select";
 import {
   type MockupTemplate,
-  type DetectedPlacementConfig,
   type ManualSurfaceConfig,
-  type PlacementMode,
-  type DetectedPlacementStatus,
   adminCreateMockupTemplate,
   adminUpdateMockupTemplate,
   requestMockupImageUploadUrl,
   uploadMockupImageFile,
   getStorageUrl,
-  analyzeMockupPlacement,
-  adminAnalyzeMockupTemplatePlacement,
 } from "@/lib/mockupApi";
-import { Upload, Loader2, Sparkles, CheckCircle2, AlertCircle, Info, RotateCcw, Pencil, RefreshCw, ChevronDown, ChevronRight } from "lucide-react";
+import { Upload, Loader2, CheckCircle2, Info, RotateCcw, Pencil, RefreshCw, ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MockupSurfaceEditor, { type SurfaceCorners } from "./MockupSurfaceEditor";
 
@@ -67,19 +62,6 @@ function generateKey(name: string): string {
     .replace(/[^a-z0-9\s-]/g, "")
     .trim()
     .replace(/\s+/g, "-");
-}
-
-type AnalysisState = "idle" | "analyzing" | "detected" | "fallback" | "not-detected" | "error";
-
-interface DetectedValues {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  rotation: number;
-  confidence: number;
-  description: string;
-  model: string;
 }
 
 interface PlacementError {
@@ -136,29 +118,6 @@ function pxToPct(px: string, dim: number | null): string {
   const p = parseInt(px, 10);
   if (isNaN(p)) return "";
   return round2((p / dim) * 100).toString();
-}
-
-function getConfidenceBadge(confidence: number): {
-  label: string;
-  className: string;
-} {
-  const pct = Math.round(confidence * 100);
-  if (pct >= 80) {
-    return {
-      label: `Detected (${pct}% confidence)`,
-      className: "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-700",
-    };
-  }
-  if (pct >= 50) {
-    return {
-      label: `Check placement (${pct}% confidence)`,
-      className: "bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-950/40 dark:text-yellow-300 dark:border-yellow-700",
-    };
-  }
-  return {
-    label: `Low confidence — adjust manually (${pct}%)`,
-    className: "bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-700",
-  };
 }
 
 interface MockupTemplateFormProps {
@@ -219,48 +178,8 @@ export function MockupTemplateForm({
   const [saturation, setSaturation] = useState<string>((template?.saturation ?? 0.92).toString());
   const [compositeBlur, setCompositeBlur] = useState<string>((template?.compositeBlur ?? 0).toString());
 
-  const [analysisState, setAnalysisState] = useState<AnalysisState>("idle");
-  const [analysisDescription, setAnalysisDescription] = useState<string>("");
-
-  const [detectedValues, setDetectedValues] = useState<DetectedValues | null>(null);
-  const [detectionMetadata, setDetectionMetadata] = useState<{
-    confidence: number;
-    description: string;
-    model: string;
-    source: string;
-    detectedAt: string;
-  } | null>(
-    template?.detectionConfidence != null
-      ? {
-          confidence: template.detectionConfidence,
-          description: template.detectionDescription ?? "",
-          model: template.detectionModel ?? "",
-          source: template.detectionSource ?? "ai",
-          detectedAt: template.detectedAt ?? new Date().toISOString(),
-        }
-      : null
-  );
-
-  const [placementWasManuallyAdjusted, setPlacementWasManuallyAdjusted] = useState(
-    template?.placementWasManuallyAdjusted ?? false
-  );
-  const [hadDetectionBeforeEdit, setHadDetectionBeforeEdit] = useState(false);
-
-  const [imgNaturalWidth, setImgNaturalWidth] = useState<number | null>(
-    template?.sourceImageWidth ?? null
-  );
-  const [imgNaturalHeight, setImgNaturalHeight] = useState<number | null>(
-    template?.sourceImageHeight ?? null
-  );
-
-  // AI render mode state
-  const [renderMode, setRenderMode] = useState<"deterministic" | "ai_rendered">(
-    (template?.renderMode as "deterministic" | "ai_rendered" | null | undefined) ?? "deterministic"
-  );
-  const [aiRenderPrompt, setAiRenderPrompt] = useState(template?.aiRenderPrompt ?? "");
-  const [aiRenderRequiresReview, setAiRenderRequiresReview] = useState(
-    template?.aiRenderRequiresReview ?? true
-  );
+  const [imgNaturalWidth, setImgNaturalWidth] = useState<number | null>(null);
+  const [imgNaturalHeight, setImgNaturalHeight] = useState<number | null>(null);
 
   // Layered image state
   const [lightingOverlayUrl, setLightingOverlayUrl] = useState(template?.lightingOverlayUrl ?? "");
@@ -280,34 +199,20 @@ export function MockupTemplateForm({
   const lightingFileInputRef = useRef<HTMLInputElement>(null);
   const foregroundFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Smart placement state (DB-persisted)
-  const [placementMode, setPlacementMode] = useState<PlacementMode>(
-    (template?.placementMode as PlacementMode | null | undefined) ?? "manual"
-  );
-  const [detectedStatus, setDetectedStatus] = useState<DetectedPlacementStatus>(
-    (template?.detectedPlacementStatus as DetectedPlacementStatus | null | undefined) ?? "not_analyzed"
-  );
-  const [storedDetectedConfig, setStoredDetectedConfig] = useState<DetectedPlacementConfig | null>(
-    template?.detectedPlacementConfig ?? null
-  );
-  /** Admin-defined manual surface stored in placement_config column. Separate from AI detection. */
+  /** Admin-defined manual surface stored in placement_config column. */
   const [storedManualSurface, setStoredManualSurface] = useState<ManualSurfaceConfig | null>(
     template?.placementConfig ?? null
   );
-  const [analyzingTemplate, setAnalyzingTemplate] = useState(false);
   const [showSurfaceEditor, setShowSurfaceEditor] = useState(false);
   const [surfaceEditorSaving, setSurfaceEditorSaving] = useState(false);
   const [surfaceChanged, setSurfaceChanged] = useState(false);
 
-  const lastAnalyzedUrlRef = useRef<string>("");
-  // Collapsible section state (Part 6)
+  // Collapsible section state
   const [showPosterSurface, setShowPosterSurface] = useState(() => {
-    // Default open when no valid surface exists
     if (!template) return true;
     const hasManual = !!(template.placementConfig as ManualSurfaceConfig | null | undefined)?.corners ||
       (template.posterX != null && template.posterY != null);
-    const hasDetected = template.detectedPlacementStatus === "detected";
-    return !(hasManual || hasDetected);
+    return !hasManual;
   });
   const [showCompositing, setShowCompositing] = useState(false);
 
@@ -337,13 +242,6 @@ export function MockupTemplateForm({
     }
   }, [name, isEdit]);
 
-  const handlePlacementFieldChange = (setter: (v: string) => void, value: string) => {
-    setter(value);
-    if (analysisState === "detected" || hadDetectionBeforeEdit) {
-      setPlacementWasManuallyAdjusted(true);
-    }
-  };
-
   const handleImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.currentTarget;
     if (img.naturalWidth > 0 && img.naturalHeight > 0) {
@@ -357,16 +255,12 @@ export function MockupTemplateForm({
       value: string,
       dim: number | null,
       setPct: (v: string) => void,
-      axisMax: number,
-      currentOther: string,
-      otherLabel?: string
     ) => {
       if (!dim) return;
       const pct = pxToPct(value, dim);
-      handlePlacementFieldChange(setPct, pct);
+      setPct(pct);
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [analysisState, hadDetectionBeforeEdit]
+    []
   );
 
   const startDrag = useCallback(
@@ -430,7 +324,6 @@ export function MockupTemplateForm({
       setPosterY(round2(ny).toString());
       setPosterWidth(round2(nw).toString());
       setPosterHeight(round2(nh).toString());
-      setPlacementWasManuallyAdjusted(true);
     };
 
     const onMouseUp = () => {
@@ -481,7 +374,6 @@ export function MockupTemplateForm({
 
       setPosterX(round2(nx).toString());
       setPosterY(round2(ny).toString());
-      setPlacementWasManuallyAdjusted(true);
     },
     [posterX, posterY, posterWidth, posterHeight, imgNaturalWidth, imgNaturalHeight]
   );
@@ -492,15 +384,6 @@ export function MockupTemplateForm({
     );
   };
 
-  const applyDetectedValues = (result: DetectedValues) => {
-    setPosterX(result.x.toString());
-    setPosterY(result.y.toString());
-    setPosterWidth(result.width.toString());
-    setPosterHeight(result.height.toString());
-    setRotation(result.rotation.toString());
-    setPlacementWasManuallyAdjusted(false);
-  };
-
   const applyFallbackPlacement = useCallback(
     (orient: string) => {
       const fb = getFallbackPlacement(orient);
@@ -509,91 +392,8 @@ export function MockupTemplateForm({
       setPosterWidth(fb.width.toString());
       setPosterHeight(fb.height.toString());
       setRotation("0");
-      setAnalysisState("fallback");
-      setAnalysisDescription(
-        `AI could not detect a placement area. These are safe fallback values for a ${orient} mockup — please check and adjust.`
-      );
-      setDetectionMetadata({
-        confidence: 0,
-        description: "Fallback placement applied",
-        model: "",
-        source: "fallback",
-        detectedAt: new Date().toISOString(),
-      });
-      setPlacementWasManuallyAdjusted(false);
     },
     []
-  );
-
-  const runPlacementAnalysis = useCallback(
-    async (imageUrl: string) => {
-      if (imageUrl === lastAnalyzedUrlRef.current) return;
-      lastAnalyzedUrlRef.current = imageUrl;
-
-      setAnalysisState("analyzing");
-      setAnalysisDescription("");
-      setHadDetectionBeforeEdit(false);
-
-      // Capture whether there is already a placement set BEFORE the async call.
-      // We use the setter form below to read the latest state from the closure
-      // at call time rather than relying on stale snapshot variables.
-      let hadExistingPlacement = false;
-      setPosterX((prev) => { hadExistingPlacement = prev !== ""; return prev; });
-
-      try {
-        const result = await analyzeMockupPlacement(imageUrl);
-        if (
-          result.detected &&
-          result.x != null &&
-          result.y != null &&
-          result.width != null &&
-          result.height != null
-        ) {
-          const detected: DetectedValues = {
-            x: result.x,
-            y: result.y,
-            width: result.width,
-            height: result.height,
-            rotation: result.rotation ?? 0,
-            confidence: result.confidence,
-            description: result.description,
-            model: result.model,
-          };
-          setDetectedValues(detected);
-          setDetectionMetadata({
-            confidence: result.confidence,
-            description: result.description,
-            model: result.model,
-            source: "ai",
-            detectedAt: new Date().toISOString(),
-          });
-          // Store as candidate only — never auto-apply. Admin must click
-          // "Apply detected values" to activate the detected placement.
-          // This keeps existing manual placements intact.
-          setAnalysisState("detected");
-          setAnalysisDescription(result.description);
-          setHadDetectionBeforeEdit(true);
-        } else {
-          setAnalysisState("not-detected");
-          setAnalysisDescription(result.description ?? "No placement area found.");
-          // Only apply fallback when there is truly no placement set — never
-          // overwrite an existing selection just because detection failed.
-          if (!hadExistingPlacement) {
-            applyFallbackPlacement(orientation);
-          }
-        }
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Analysis failed";
-        setAnalysisState("error");
-        setAnalysisDescription(msg);
-        lastAnalyzedUrlRef.current = "";
-        // Only apply fallback when there is truly no placement set.
-        if (!hadExistingPlacement) {
-          applyFallbackPlacement(orientation);
-        }
-      }
-    },
-    [orientation, applyFallbackPlacement]
   );
 
   const handleFileUpload = async (file: File) => {
@@ -608,8 +408,6 @@ export function MockupTemplateForm({
     }
 
     setUploadProgress("uploading");
-    setAnalysisState("idle");
-    lastAnalyzedUrlRef.current = "";
     try {
       const { uploadURL, objectPath } = await requestMockupImageUploadUrl({
         name: file.name,
@@ -663,76 +461,8 @@ export function MockupTemplateForm({
   };
 
   const handleUrlChange = (url: string) => {
-    // A manually entered URL is not connected to an uploaded object.
     setStoragePath("");
     setBackgroundImageUrl(url);
-    setAnalysisState("idle");
-    setAnalysisDescription("");
-    lastAnalyzedUrlRef.current = "";
-  };
-
-  const handleManualDetect = () => {
-    if (!backgroundImageUrl || analysisState === "analyzing") return;
-    lastAnalyzedUrlRef.current = "";
-    runPlacementAnalysis(backgroundImageUrl);
-  };
-
-  const handleResetToDetected = () => {
-    if (!detectedValues) return;
-    applyDetectedValues(detectedValues);
-    setPlacementWasManuallyAdjusted(false);
-    toast({ title: "Placement reset to AI-detected values" });
-  };
-
-  const handleResetToFallback = () => {
-    applyFallbackPlacement(orientation);
-    toast({ title: "Placement reset to default fallback" });
-  };
-
-  const handleAnalyzeAndSave = async () => {
-    if (!template?.id || analyzingTemplate) return;
-    setAnalyzingTemplate(true);
-    try {
-      const result = await adminAnalyzeMockupTemplatePlacement(template.id);
-      setStoredDetectedConfig(result.detectedConfig);
-      setDetectedStatus(result.status === "failed" ? "failed" : result.template.detectedPlacementStatus ?? "not_analyzed");
-      setPlacementMode(result.template.placementMode ?? "manual");
-      if (result.status === "failed") {
-        toast({ variant: "destructive", title: "Analysis failed", description: result.error ?? "Could not detect placement" });
-      } else {
-        const pct = Math.round(result.confidence * 100);
-        toast({ title: `Placement analyzed — ${pct}% confidence`, description: result.warnings.length > 0 ? result.warnings[0] : "Review detected placement below." });
-      }
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Analysis failed";
-      toast({ variant: "destructive", title: "Analysis failed", description: msg });
-    } finally {
-      setAnalyzingTemplate(false);
-    }
-  };
-
-  const handleApproveDetected = async () => {
-    if (!template?.id) return;
-    try {
-      await adminUpdateMockupTemplate(template.id, { placementMode: "auto_detected" } as any);
-      setPlacementMode("auto_detected");
-      toast({ title: "Approved — sync will use detected placement" });
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Update failed";
-      toast({ variant: "destructive", title: "Failed to approve", description: msg });
-    }
-  };
-
-  const handleUseManual = async () => {
-    if (!template?.id) return;
-    try {
-      await adminUpdateMockupTemplate(template.id, { placementMode: "manual" } as any);
-      setPlacementMode("manual");
-      toast({ title: "Switched to manual surface" });
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Update failed";
-      toast({ variant: "destructive", title: "Failed to update", description: msg });
-    }
   };
 
   const handleSaveSurface = async (corners: SurfaceCorners) => {
@@ -746,7 +476,6 @@ export function MockupTemplateForm({
       const bbW = Math.max(...xs) - bbX;
       const bbH = Math.max(...ys) - bbY;
 
-      // Write to placement_config column (manual surface), NOT detectedPlacementConfig (AI only).
       const manualConfig: ManualSurfaceConfig = {
         mode: "corners",
         coordinateSystem: "normalized",
@@ -757,17 +486,13 @@ export function MockupTemplateForm({
       };
 
       await adminUpdateMockupTemplate(template.id, {
-        // Keep placementMode as "manual" — this is admin-defined, not AI-detected.
-        placementMode: "manual",
         placementConfig: manualConfig,
-      } as any);
+      });
 
       setStoredManualSurface(manualConfig);
-      // Do NOT change placementMode to "auto_detected" — manual surface stays "manual".
-      setPlacementMode("manual");
       setShowSurfaceEditor(false);
       setSurfaceChanged(true);
-      toast({ title: "Manual surface saved", description: "Run Sync mockups to regenerate public images." });
+      toast({ title: "Surface saved", description: "Run Sync mockups to regenerate public images." });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Save failed";
       toast({ variant: "destructive", title: "Failed to save surface", description: msg });
@@ -829,22 +554,6 @@ export function MockupTemplateForm({
         contrast: contrast !== "" ? parseFloat(contrast) : undefined,
         saturation: saturation !== "" ? parseFloat(saturation) : undefined,
         compositeBlur: compositeBlur !== "" ? parseFloat(compositeBlur) : undefined,
-        sourceImageWidth: imgNaturalWidth ?? undefined,
-        sourceImageHeight: imgNaturalHeight ?? undefined,
-        ...(detectionMetadata
-          ? {
-              detectionConfidence: detectionMetadata.confidence,
-              detectionDescription: detectionMetadata.description,
-              detectionSource: detectionMetadata.source,
-              detectionModel: detectionMetadata.model || undefined,
-              detectedAt: detectionMetadata.detectedAt || undefined,
-            }
-          : {}),
-        placementWasManuallyAdjusted,
-        // AI render mode
-        renderMode,
-        aiRenderPrompt: aiRenderPrompt.trim() || undefined,
-        aiRenderRequiresReview,
         // Layered images
         lightingOverlayUrl: lightingOverlayUrl || undefined,
         foregroundImageUrl: foregroundImageUrl || undefined,
@@ -860,9 +569,6 @@ export function MockupTemplateForm({
         saved = await adminCreateMockupTemplate(payload);
       }
 
-      console.log("Saved mockup template:", saved);
-      console.log("Saved storagePath:", saved.storagePath);
-      
       toast({ title: isEdit ? "Template updated" : "Template created" });
       onSaved(saved);
     } catch (e: unknown) {
@@ -874,9 +580,6 @@ export function MockupTemplateForm({
   };
 
   const displayImageUrl = backgroundImageUrl || template?.previewThumbnailUrl || "";
-  const confidenceBadge = detectionMetadata && detectionMetadata.confidence > 0
-    ? getConfidenceBadge(detectionMetadata.confidence)
-    : null;
 
   return (
     <div className="space-y-6">
@@ -1039,7 +742,7 @@ export function MockupTemplateForm({
           <div className="space-y-1.5">
             <Label className="text-sm font-medium">Sort order</Label>
             <p className="text-xs text-muted-foreground">
-              Template order is managed in the mockup template list using the Up / Down buttons. Changes here are overwritten when you reorder there.
+              Template order is managed in the mockup template list using the Up / Down buttons.
             </p>
             <div className="text-sm text-muted-foreground font-mono border rounded px-2.5 py-1.5 bg-muted/40 w-24 select-none">
               #{sortOrder}
@@ -1149,38 +852,7 @@ export function MockupTemplateForm({
                       </div>
                     </div>
                   )}
-                  {/* Detected placement overlay (blue/indigo) — DB-persisted detection */}
-                  {storedDetectedConfig?.boundingBox && (
-                    <div
-                      className="absolute border-2 border-indigo-400/80 bg-indigo-400/10 pointer-events-none"
-                      style={{
-                        left: `${storedDetectedConfig.boundingBox.x * 100}%`,
-                        top: `${storedDetectedConfig.boundingBox.y * 100}%`,
-                        width: `${storedDetectedConfig.boundingBox.width * 100}%`,
-                        height: `${storedDetectedConfig.boundingBox.height * 100}%`,
-                        transform: storedDetectedConfig.rotation ? `rotate(${storedDetectedConfig.rotation}deg)` : undefined,
-                      }}
-                    >
-                      <div className="absolute top-1 left-1 flex items-center gap-1">
-                        <span className={cn(
-                          "text-[9px] font-semibold px-1 py-0.5 rounded leading-tight",
-                          placementMode === "auto_detected"
-                            ? "bg-indigo-600/90 text-white"
-                            : "bg-indigo-400/80 text-white"
-                        )}>
-                          {placementMode === "auto_detected" ? "✓ auto" : "detected"}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                  {analysisState === "fallback" && hasPosterArea && (
-                    <div className="absolute top-2 left-2 bg-orange-500/90 text-white text-[10px] font-medium px-1.5 py-0.5 rounded shadow">
-                      Fallback values
-                    </div>
-                  )}
-                  <div
-                    className="absolute inset-0 bg-black/0 hover:bg-black/25 transition-colors flex items-center justify-center opacity-0 hover:opacity-100 pointer-events-none"
-                  >
+                  <div className="absolute inset-0 bg-black/0 hover:bg-black/25 transition-colors flex items-center justify-center opacity-0 hover:opacity-100 pointer-events-none">
                     <div className="bg-white/90 rounded-md px-3 py-1.5 text-sm font-medium text-foreground flex items-center gap-1.5">
                       <Upload className="w-3.5 h-3.5" />
                       Replace image
@@ -1214,335 +886,17 @@ export function MockupTemplateForm({
             />
             <div className="space-y-1.5">
               <Label htmlFor="mt-img-url" className="text-xs">Or paste image URL</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="mt-img-url"
-                  value={backgroundImageUrl}
-                  onChange={(e) => handleUrlChange(e.target.value)}
-                  placeholder="https://..."
-                  className="text-xs h-8 flex-1"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 gap-1.5 text-xs shrink-0"
-                  disabled={!backgroundImageUrl || analysisState === "analyzing"}
-                  onClick={handleManualDetect}
-                >
-                  {analysisState === "analyzing" ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <Sparkles className="w-3 h-3" />
-                  )}
-                  Analyze poster surface
-                </Button>
-              </div>
-              <p className="text-[11px] text-muted-foreground flex items-center gap-1">
-                <Info className="w-3 h-3 shrink-0" />
-                Analyze the template image to suggest a poster surface. Uses AI — may have a small cost.
-              </p>
+              <Input
+                id="mt-img-url"
+                value={backgroundImageUrl}
+                onChange={(e) => handleUrlChange(e.target.value)}
+                placeholder="https://..."
+                className="text-xs h-8"
+              />
             </div>
           </div>
 
-          {/* AI analysis status banner */}
-          {analysisState !== "idle" && (
-            <div
-              className={cn(
-                "rounded-md border px-3 py-2.5 flex items-start gap-2.5 text-sm",
-                analysisState === "analyzing" && "bg-muted/50 border-border",
-                analysisState === "detected" && "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800",
-                analysisState === "not-detected" && "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800",
-                analysisState === "fallback" && "bg-orange-50 border-orange-200 dark:bg-orange-950/30 dark:border-orange-800",
-                analysisState === "error" && "bg-destructive/10 border-destructive/30"
-              )}
-            >
-              {analysisState === "analyzing" && (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin mt-0.5 shrink-0 text-primary" />
-                  <div>
-                    <p className="font-medium text-foreground">Detecting surface area…</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">AI is analyzing the image to find the poster surface</p>
-                  </div>
-                </>
-              )}
-              {analysisState === "detected" && detectionMetadata && (
-                <>
-                  <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-emerald-600" />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className={cn("font-medium text-xs px-1.5 py-0.5 rounded border", confidenceBadge?.className)}>
-                        {confidenceBadge?.label}
-                      </p>
-                      {placementWasManuallyAdjusted && (
-                        <span className="text-xs text-muted-foreground italic">adjusted</span>
-                      )}
-                    </div>
-                    <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1">{analysisDescription}</p>
-                    <p className="text-xs text-emerald-600/70 dark:text-emerald-500 mt-0.5">
-                      Surface detected — click <strong>Apply detected surface</strong> below to use it. Your current values are unchanged until you do.
-                    </p>
-                  </div>
-                </>
-              )}
-              {analysisState === "fallback" && (
-                <>
-                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-orange-600" />
-                  <div>
-                    <p className="font-medium text-orange-800 dark:text-orange-300">Fallback placement applied</p>
-                    <p className="text-xs text-orange-700 dark:text-orange-400 mt-0.5">{analysisDescription}</p>
-                  </div>
-                </>
-              )}
-              {analysisState === "not-detected" && (
-                <>
-                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-amber-600" />
-                  <div>
-                    <p className="font-medium text-amber-800 dark:text-amber-300">No placement area detected</p>
-                    <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">{analysisDescription}</p>
-                    <p className="text-xs text-amber-600/70 dark:text-amber-500 mt-1">
-                      {hasPosterArea
-                        ? "Your existing placement was preserved — detection did not change anything."
-                        : "Safe fallback values applied — adjust as needed"}
-                    </p>
-                  </div>
-                </>
-              )}
-              {analysisState === "error" && (
-                <>
-                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-destructive" />
-                  <div>
-                    <p className="font-medium text-destructive">Detection failed</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{analysisDescription}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {hasPosterArea
-                        ? "Your existing placement was preserved — detection did not change anything."
-                        : "Safe fallback values applied — adjust as needed"}
-                    </p>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Render mode section */}
-          <div className={cn(
-            "space-y-2.5 rounded-md border p-3",
-            renderMode === "ai_rendered" ? "border-violet-300 bg-violet-50/50 dark:border-violet-700 dark:bg-violet-950/20" : "border-border bg-muted/20"
-          )}>
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <p className="text-sm font-medium">Render mode</p>
-              <span className={cn(
-                "text-[10px] font-semibold px-1.5 py-0.5 rounded-full border",
-                renderMode === "ai_rendered"
-                  ? "bg-violet-100 text-violet-800 border-violet-300 dark:bg-violet-950/40 dark:text-violet-300"
-                  : "bg-muted text-muted-foreground border-border"
-              )}>
-                {renderMode === "ai_rendered" ? "AI rendered" : "Deterministic"}
-              </span>
-            </div>
-            <div className="grid sm:grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setRenderMode("deterministic")}
-                className={cn(
-                  "flex flex-col gap-1 rounded border px-3 py-2.5 text-left text-sm transition-colors",
-                  renderMode === "deterministic"
-                    ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-                    : "border-border hover:border-primary/40"
-                )}
-              >
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium">Deterministic compositor</span>
-                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-700">
-                    Best for product images
-                  </span>
-                </div>
-                <span className="text-xs text-muted-foreground">Fast, repeatable, and preserves the poster artwork exactly. Uses the selected poster surface to generate a final rendered mockup image. Recommended for product gallery, primary, and hover mockups.</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setRenderMode("ai_rendered")}
-                className={cn(
-                  "flex flex-col gap-1 rounded border px-3 py-2.5 text-left text-sm transition-colors",
-                  renderMode === "ai_rendered"
-                    ? "border-violet-500 bg-violet-50/60 ring-1 ring-violet-400/40 dark:bg-violet-950/30"
-                    : "border-border hover:border-violet-300"
-                )}
-              >
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium flex items-center gap-1.5">
-                    <Sparkles className="w-3 h-3" />
-                    AI-rendered mockup
-                  </span>
-                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-800 border border-violet-300 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-700">
-                    Experimental / paid / review required
-                  </span>
-                </div>
-                <span className="text-xs text-muted-foreground">Uses paid AI image editing for a more realistic lifestyle result. May slightly alter poster artwork, so generated images require admin review before they can appear publicly.</span>
-              </button>
-            </div>
-            {renderMode === "ai_rendered" && (
-              <div className="space-y-2 pt-1">
-                <div className="rounded-md border border-amber-200 bg-amber-50/80 dark:border-amber-700 dark:bg-amber-950/20 px-3 py-2 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-1.5">
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                  <span>AI-rendered mockups may slightly alter poster artwork. Use for marketing and lifestyle images only. Review carefully before publishing.</span>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Style / scene guidance prompt <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                  <Textarea
-                    value={aiRenderPrompt}
-                    onChange={(e) => setAiRenderPrompt(e.target.value)}
-                    placeholder="e.g. 'Warm natural lighting, slight shadow under frame, linen wall texture visible around edges.'"
-                    rows={3}
-                    className="text-sm resize-none"
-                  />
-                  <p className="text-[10px] text-muted-foreground">Supplements the base prompt. The poster artwork instructions are always enforced.</p>
-                </div>
-                <div className="flex items-center gap-2 pt-0.5">
-                  <Switch
-                    id="aiRenderRequiresReview"
-                    checked={aiRenderRequiresReview}
-                    onCheckedChange={setAiRenderRequiresReview}
-                    className="scale-90"
-                  />
-                  <Label htmlFor="aiRenderRequiresReview" className="text-xs font-normal cursor-pointer">
-                    Require admin review before publishing
-                    <span className="text-muted-foreground ml-1">(recommended)</span>
-                  </Label>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Auto placement mode — persisted in DB, only for existing templates */}
-          {isEdit && (
-            <div className={cn(
-              "space-y-2.5 rounded-md border p-3",
-              placementMode === "auto_detected" && "border-indigo-300 bg-indigo-50/50 dark:border-indigo-700 dark:bg-indigo-950/20",
-              placementMode === "auto_detected_needs_review" && "border-amber-300 bg-amber-50/50 dark:border-amber-700 dark:bg-amber-950/20",
-              placementMode === "manual" && "border-border bg-muted/20"
-            )}>
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium">Detected surface</p>
-                  <span className={cn(
-                    "text-[10px] font-semibold px-1.5 py-0.5 rounded-full border",
-                    placementMode === "auto_detected" && "bg-indigo-100 text-indigo-800 border-indigo-300 dark:bg-indigo-950/40 dark:text-indigo-300",
-                    placementMode === "auto_detected_needs_review" && "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300",
-                    placementMode === "manual" && "bg-muted text-muted-foreground border-border"
-                  )}>
-                    {placementMode === "auto_detected"
-                      ? "✓ Detected (active)"
-                      : placementMode === "auto_detected_needs_review"
-                      ? "Detected (needs review)"
-                      : storedManualSurface?.mode === "corners"
-                      ? "Manual corners (active)"
-                      : hasPosterArea
-                      ? "Manual bbox (active)"
-                      : "No surface"}
-                  </span>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 gap-1.5 text-xs"
-                  disabled={analyzingTemplate || !backgroundImageUrl}
-                  onClick={handleAnalyzeAndSave}
-                >
-                  {analyzingTemplate ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                  {analyzingTemplate ? "Analyzing…" : (storedDetectedConfig ? "Re-analyze surface" : "Analyze poster surface")}
-                </Button>
-              </div>
-
-              {detectedStatus === "not_analyzed" && !storedDetectedConfig && (
-                <p className="text-xs text-muted-foreground">No analysis saved yet. Click "Analyze poster surface" to run AI placement detection. The result is stored as a candidate — you must approve it before it becomes active.</p>
-              )}
-              {detectedStatus === "failed" && (
-                <p className="text-xs text-destructive">Last analysis failed. Try re-analyzing or set placement manually.</p>
-              )}
-
-              {storedDetectedConfig && detectedStatus !== "failed" && (
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs text-muted-foreground">
-                      Surface: <span className="font-medium text-foreground">{storedDetectedConfig.surfaceType}</span>
-                    </span>
-                    <span className={cn(
-                      "text-xs font-semibold px-1.5 py-0.5 rounded border",
-                      storedDetectedConfig.confidence >= 0.75 ? "bg-emerald-100 text-emerald-800 border-emerald-300" : storedDetectedConfig.confidence >= 0.5 ? "bg-yellow-100 text-yellow-800 border-yellow-300" : "bg-orange-100 text-orange-800 border-orange-300"
-                    )}>
-                      {Math.round(storedDetectedConfig.confidence * 100)}% confidence
-                    </span>
-                    <span className={cn(
-                      "text-xs px-1.5 py-0.5 rounded border",
-                      detectedStatus === "detected" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"
-                    )}>
-                      {detectedStatus === "detected" ? "Detected" : "Needs review"}
-                    </span>
-                  </div>
-
-                  {storedDetectedConfig.warnings.length > 0 && (
-                    <div className="space-y-0.5">
-                      {storedDetectedConfig.warnings.map((w, i) => (
-                        <p key={i} className="text-xs text-amber-700 dark:text-amber-400 flex items-start gap-1">
-                          <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
-                          {w}
-                        </p>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-2 flex-wrap pt-0.5">
-                    {placementMode !== "auto_detected" && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="h-7 gap-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
-                        onClick={handleApproveDetected}
-                      >
-                        <CheckCircle2 className="w-3 h-3" />
-                        Approve detected surface
-                      </Button>
-                    )}
-                    {placementMode === "auto_detected" && (
-                      <>
-                        <span className="text-xs text-indigo-700 dark:text-indigo-400 flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" />
-                          Sync will use auto-detected surface
-                        </span>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-7 gap-1.5 text-xs"
-                          onClick={handleUseManual}
-                        >
-                          <RotateCcw className="w-3 h-3" />
-                          Switch to manual
-                        </Button>
-                      </>
-                    )}
-                    {placementMode === "auto_detected_needs_review" && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-7 gap-1.5 text-xs"
-                        onClick={handleUseManual}
-                      >
-                        Use manual instead
-                      </Button>
-                    )}
-                  </div>
-                  <p className="text-[10px] text-muted-foreground">Blue overlay shows the AI-detected surface. Use the corner editor below to define it manually.</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Placement area inputs */}
+          {/* Poster surface section */}
           <div className="space-y-0 rounded-md border overflow-hidden">
             <button
               type="button"
@@ -1552,11 +906,9 @@ export function MockupTemplateForm({
               <div className="flex items-center gap-2 flex-wrap">
                 <p className="text-sm font-medium">Poster surface</p>
                 {storedManualSurface?.mode === "corners" ? (
-                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-300 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-700">Manual corners active</span>
-                ) : placementMode === "auto_detected" ? (
-                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-300 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-700">Detected surface approved</span>
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-300 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-700">Corner surface active</span>
                 ) : hasPosterArea ? (
-                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">Manual bbox active</span>
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">Bounding box active</span>
                 ) : (
                   <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-700">No surface</span>
                 )}
@@ -1566,269 +918,212 @@ export function MockupTemplateForm({
               </div>
               {showPosterSurface ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
             </button>
-            {showPosterSurface && <div className="space-y-3 px-4 pb-4 pt-1 border-t">
-            <div className="flex items-center justify-between flex-wrap gap-2 mt-2">
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-muted-foreground">Shows the currently active poster surface on the template.</p>
-                <div title="Define the bounding box (%) for the poster surface, or use the corner editor for perspective-correct compositing.">
-                  <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+            {showPosterSurface && (
+              <div className="space-y-3 px-4 pb-4 pt-1 border-t">
+                <div className="flex items-center justify-between flex-wrap gap-2 mt-2">
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      Position the four corners around the area where the poster should appear.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {backgroundImageUrl && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 gap-1 text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() => applyFallbackPlacement(orientation)}
+                        title="Apply safe default values based on orientation"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        Apply defaults
+                      </Button>
+                    )}
+                    {isEdit && backgroundImageUrl && (
+                      <Button
+                        type="button"
+                        variant={showSurfaceEditor ? "secondary" : "outline"}
+                        size="sm"
+                        className="h-7 gap-1 text-xs"
+                        onClick={() => setShowSurfaceEditor((v) => !v)}
+                        title="Open the 4-corner surface editor for perspective-correct compositing"
+                      >
+                        <Pencil className="w-3 h-3" />
+                        {showSurfaceEditor ? "Close editor" : "Edit corners"}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {surfaceChanged && (
+                  <div className="flex items-center gap-2 rounded-md border border-indigo-300 bg-indigo-50 dark:bg-indigo-950/30 px-3 py-2">
+                    <RefreshCw className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                    <p className="text-xs text-indigo-700 dark:text-indigo-400">
+                      Surface saved — run <strong>Sync mockups</strong> to regenerate public images.
+                    </p>
+                  </div>
+                )}
+
+                <p className="text-xs text-muted-foreground">
+                  Percentage values (0–100) for the bounding box, or use <strong>Edit corners</strong> for a 4-corner perspective surface.
+                  Leave empty if using the full image as a mockup photo (no compositing).
+                </p>
+
+                {/* Header row */}
+                <div className="grid grid-cols-[auto_1fr_1fr] gap-x-2 gap-y-1 items-end">
+                  <div className="text-[10px] text-muted-foreground font-medium pb-1 pr-1" />
+                  <div className="text-[10px] text-muted-foreground font-medium text-center">Left / X</div>
+                  <div className="text-[10px] text-muted-foreground font-medium text-center">Top / Y</div>
+
+                  <div className="text-[10px] text-muted-foreground self-center">%</div>
+                  <div className="space-y-1">
+                    <Input
+                      type="number"
+                      value={posterX}
+                      onChange={(e) => setPosterX(e.target.value)}
+                      placeholder="e.g. 20"
+                      className={cn("h-8 text-sm", placementErrors.x && "border-destructive")}
+                      min={0} max={100}
+                    />
+                    {placementErrors.x && <p className="text-[11px] text-destructive">{placementErrors.x}</p>}
+                  </div>
+                  <div className="space-y-1">
+                    <Input
+                      type="number"
+                      value={posterY}
+                      onChange={(e) => setPosterY(e.target.value)}
+                      placeholder="e.g. 15"
+                      className={cn("h-8 text-sm", placementErrors.y && "border-destructive")}
+                      min={0} max={100}
+                    />
+                    {placementErrors.y && <p className="text-[11px] text-destructive">{placementErrors.y}</p>}
+                  </div>
+
+                  <div className="text-[10px] text-muted-foreground self-center">px</div>
+                  <Input
+                    type="number"
+                    value={pctToPx(posterX, imgNaturalWidth)}
+                    onChange={(e) => handlePxChange(e.target.value, imgNaturalWidth, setPosterX)}
+                    placeholder={imgNaturalWidth ? "—" : "load image"}
+                    disabled={!imgNaturalWidth}
+                    className="h-8 text-sm"
+                    min={0}
+                  />
+                  <Input
+                    type="number"
+                    value={pctToPx(posterY, imgNaturalHeight)}
+                    onChange={(e) => handlePxChange(e.target.value, imgNaturalHeight, setPosterY)}
+                    placeholder={imgNaturalHeight ? "—" : "load image"}
+                    disabled={!imgNaturalHeight}
+                    className="h-8 text-sm"
+                    min={0}
+                  />
+                </div>
+
+                <div className="grid grid-cols-[auto_1fr_1fr] gap-x-2 gap-y-1 items-end mt-1">
+                  <div className="text-[10px] text-muted-foreground font-medium pb-1 pr-1" />
+                  <div className="text-[10px] text-muted-foreground font-medium text-center">Width</div>
+                  <div className="text-[10px] text-muted-foreground font-medium text-center">Height</div>
+
+                  <div className="text-[10px] text-muted-foreground self-center">%</div>
+                  <div className="space-y-1">
+                    <Input
+                      type="number"
+                      value={posterWidth}
+                      onChange={(e) => setPosterWidth(e.target.value)}
+                      placeholder="e.g. 60"
+                      className={cn("h-8 text-sm", placementErrors.width && "border-destructive")}
+                      min={1} max={100}
+                    />
+                    {placementErrors.width && <p className="text-[11px] text-destructive">{placementErrors.width}</p>}
+                  </div>
+                  <div className="space-y-1">
+                    <Input
+                      type="number"
+                      value={posterHeight}
+                      onChange={(e) => setPosterHeight(e.target.value)}
+                      placeholder="e.g. 70"
+                      className={cn("h-8 text-sm", placementErrors.height && "border-destructive")}
+                      min={1} max={100}
+                    />
+                    {placementErrors.height && <p className="text-[11px] text-destructive">{placementErrors.height}</p>}
+                  </div>
+
+                  <div className="text-[10px] text-muted-foreground self-center">px</div>
+                  <Input
+                    type="number"
+                    value={pctToPx(posterWidth, imgNaturalWidth)}
+                    onChange={(e) => handlePxChange(e.target.value, imgNaturalWidth, setPosterWidth)}
+                    placeholder={imgNaturalWidth ? "—" : "load image"}
+                    disabled={!imgNaturalWidth}
+                    className="h-8 text-sm"
+                    min={1}
+                  />
+                  <Input
+                    type="number"
+                    value={pctToPx(posterHeight, imgNaturalHeight)}
+                    onChange={(e) => handlePxChange(e.target.value, imgNaturalHeight, setPosterHeight)}
+                    placeholder={imgNaturalHeight ? "—" : "load image"}
+                    disabled={!imgNaturalHeight}
+                    className="h-8 text-sm"
+                    min={1}
+                  />
+                </div>
+
+                <p className="text-[11px] text-muted-foreground flex items-start gap-1 mt-1">
+                  <Info className="w-3 h-3 shrink-0 mt-0.5" />
+                  Percent values are used for responsive rendering. Pixel values are calculated from the original mockup image size for precision.
+                  {imgNaturalWidth && imgNaturalHeight ? (
+                    <span className="text-muted-foreground/70 ml-auto shrink-0">
+                      {imgNaturalWidth}×{imgNaturalHeight}px
+                    </span>
+                  ) : null}
+                </p>
+
+                <p className="text-[11px] text-muted-foreground/70 flex items-center gap-1">
+                  <Info className="w-3 h-3 shrink-0" />
+                  Drag the overlay to move · drag corners to resize · arrow keys to nudge (Shift = 10px, Alt = 0.1%)
+                </p>
+
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Rotation (°)</Label>
+                    <Input
+                      type="number"
+                      value={rotation}
+                      onChange={(e) => setRotation(e.target.value)}
+                      placeholder="0"
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Border radius (px)</Label>
+                    <Input
+                      type="number"
+                      value={borderRadius}
+                      onChange={(e) => setBorderRadius(e.target.value)}
+                      placeholder="0"
+                      className="h-8 text-sm"
+                      min={0}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Shadow strength (0–1, legacy)</Label>
+                  <Input
+                    type="number"
+                    value={shadowStrength}
+                    onChange={(e) => setShadowStrength(e.target.value)}
+                    placeholder="0"
+                    className="h-8 text-sm"
+                    min={0} max={1} step={0.1}
+                  />
+                  <p className="text-[10px] text-muted-foreground/60">Legacy field — use Compositing section below for full control</p>
                 </div>
               </div>
-              <div className="flex items-center gap-1.5">
-                {detectedValues && (
-                  <Button
-                    type="button"
-                    variant={analysisState === "detected" ? "default" : "ghost"}
-                    size="sm"
-                    className={cn(
-                      "h-7 gap-1 text-xs",
-                      analysisState === "detected" && "bg-emerald-600 hover:bg-emerald-700 text-white"
-                    )}
-                    onClick={handleResetToDetected}
-                    title={
-                      analysisState === "detected"
-                        ? "Apply the AI-detected placement to the form fields"
-                        : "Restore the AI-detected placement values"
-                    }
-                  >
-                    <RotateCcw className="w-3 h-3" />
-                    {analysisState === "detected" ? "Apply detected surface" : "Reset to detected"}
-                  </Button>
-                )}
-                {backgroundImageUrl && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 gap-1 text-xs text-muted-foreground hover:text-foreground"
-                    onClick={handleResetToFallback}
-                    title="Apply safe default fallback values based on orientation"
-                  >
-                    <RotateCcw className="w-3 h-3" />
-                    Fallback
-                  </Button>
-                )}
-                {backgroundImageUrl && analysisState !== "analyzing" && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 gap-1 text-xs text-primary hover:text-primary"
-                    onClick={handleManualDetect}
-                  >
-                    <Sparkles className="w-3 h-3" />
-                    Auto-detect
-                  </Button>
-                )}
-                {analysisState === "analyzing" && (
-                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    Detecting…
-                  </span>
-                )}
-                {isEdit && backgroundImageUrl && (
-                  <Button
-                    type="button"
-                    variant={showSurfaceEditor ? "secondary" : "outline"}
-                    size="sm"
-                    className="h-7 gap-1 text-xs"
-                    onClick={() => setShowSurfaceEditor((v) => !v)}
-                    title="Open the 4-corner surface editor for perspective-correct compositing"
-                  >
-                    <Pencil className="w-3 h-3" />
-                    {showSurfaceEditor ? "Close editor" : "Edit corners"}
-                  </Button>
-                )}
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Percentage values (0–100) for the bounding box, or use <strong>Edit corners</strong> below for a 4-corner perspective surface.
-              Leave empty if using the full image as a mockup photo (no compositing).
-            </p>
-            {surfaceChanged && (
-              <div className="flex items-center gap-2 rounded-md border border-indigo-300 bg-indigo-50 dark:bg-indigo-950/30 px-3 py-2">
-                <RefreshCw className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                <p className="text-xs text-indigo-700 dark:text-indigo-400">
-                  Manual surface saved — run <strong>Sync mockups</strong> to regenerate public images.
-                </p>
-              </div>
             )}
-
-            {placementWasManuallyAdjusted && detectedValues && (
-              <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1">
-                <Info className="w-3 h-3 shrink-0" />
-                Surface was manually adjusted after detection
-              </p>
-            )}
-
-            {/* Header row */}
-            <div className="grid grid-cols-[auto_1fr_1fr] gap-x-2 gap-y-1 items-end">
-              <div className="text-[10px] text-muted-foreground font-medium pb-1 pr-1" />
-              <div className="text-[10px] text-muted-foreground font-medium text-center">Left / X</div>
-              <div className="text-[10px] text-muted-foreground font-medium text-center">Top / Y</div>
-
-              <div className="text-[10px] text-muted-foreground self-center">%</div>
-              <div className="space-y-1">
-                <Input
-                  type="number"
-                  value={posterX}
-                  onChange={(e) => handlePlacementFieldChange(setPosterX, e.target.value)}
-                  placeholder="e.g. 20"
-                  className={cn(
-                    "h-8 text-sm",
-                    placementErrors.x && "border-destructive",
-                    !placementErrors.x && analysisState === "detected" && posterX !== "" && "border-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/20"
-                  )}
-                  min={0} max={100}
-                />
-                {placementErrors.x && <p className="text-[11px] text-destructive">{placementErrors.x}</p>}
-              </div>
-              <div className="space-y-1">
-                <Input
-                  type="number"
-                  value={posterY}
-                  onChange={(e) => handlePlacementFieldChange(setPosterY, e.target.value)}
-                  placeholder="e.g. 15"
-                  className={cn(
-                    "h-8 text-sm",
-                    placementErrors.y && "border-destructive",
-                    !placementErrors.y && analysisState === "detected" && posterY !== "" && "border-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/20"
-                  )}
-                  min={0} max={100}
-                />
-                {placementErrors.y && <p className="text-[11px] text-destructive">{placementErrors.y}</p>}
-              </div>
-
-              <div className="text-[10px] text-muted-foreground self-center">px</div>
-              <Input
-                type="number"
-                value={pctToPx(posterX, imgNaturalWidth)}
-                onChange={(e) => handlePxChange(e.target.value, imgNaturalWidth, setPosterX, 100, posterWidth)}
-                placeholder={imgNaturalWidth ? "—" : "load image"}
-                disabled={!imgNaturalWidth}
-                className="h-8 text-sm"
-                min={0}
-              />
-              <Input
-                type="number"
-                value={pctToPx(posterY, imgNaturalHeight)}
-                onChange={(e) => handlePxChange(e.target.value, imgNaturalHeight, setPosterY, 100, posterHeight)}
-                placeholder={imgNaturalHeight ? "—" : "load image"}
-                disabled={!imgNaturalHeight}
-                className="h-8 text-sm"
-                min={0}
-              />
-            </div>
-
-            <div className="grid grid-cols-[auto_1fr_1fr] gap-x-2 gap-y-1 items-end mt-1">
-              <div className="text-[10px] text-muted-foreground font-medium pb-1 pr-1" />
-              <div className="text-[10px] text-muted-foreground font-medium text-center">Width</div>
-              <div className="text-[10px] text-muted-foreground font-medium text-center">Height</div>
-
-              <div className="text-[10px] text-muted-foreground self-center">%</div>
-              <div className="space-y-1">
-                <Input
-                  type="number"
-                  value={posterWidth}
-                  onChange={(e) => handlePlacementFieldChange(setPosterWidth, e.target.value)}
-                  placeholder="e.g. 60"
-                  className={cn(
-                    "h-8 text-sm",
-                    placementErrors.width && "border-destructive",
-                    !placementErrors.width && analysisState === "detected" && posterWidth !== "" && "border-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/20"
-                  )}
-                  min={1} max={100}
-                />
-                {placementErrors.width && <p className="text-[11px] text-destructive">{placementErrors.width}</p>}
-              </div>
-              <div className="space-y-1">
-                <Input
-                  type="number"
-                  value={posterHeight}
-                  onChange={(e) => handlePlacementFieldChange(setPosterHeight, e.target.value)}
-                  placeholder="e.g. 70"
-                  className={cn(
-                    "h-8 text-sm",
-                    placementErrors.height && "border-destructive",
-                    !placementErrors.height && analysisState === "detected" && posterHeight !== "" && "border-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/20"
-                  )}
-                  min={1} max={100}
-                />
-                {placementErrors.height && <p className="text-[11px] text-destructive">{placementErrors.height}</p>}
-              </div>
-
-              <div className="text-[10px] text-muted-foreground self-center">px</div>
-              <Input
-                type="number"
-                value={pctToPx(posterWidth, imgNaturalWidth)}
-                onChange={(e) => handlePxChange(e.target.value, imgNaturalWidth, setPosterWidth, 100, posterX)}
-                placeholder={imgNaturalWidth ? "—" : "load image"}
-                disabled={!imgNaturalWidth}
-                className="h-8 text-sm"
-                min={1}
-              />
-              <Input
-                type="number"
-                value={pctToPx(posterHeight, imgNaturalHeight)}
-                onChange={(e) => handlePxChange(e.target.value, imgNaturalHeight, setPosterHeight, 100, posterY)}
-                placeholder={imgNaturalHeight ? "—" : "load image"}
-                disabled={!imgNaturalHeight}
-                className="h-8 text-sm"
-                min={1}
-              />
-            </div>
-
-            <p className="text-[11px] text-muted-foreground flex items-start gap-1 mt-1">
-              <Info className="w-3 h-3 shrink-0 mt-0.5" />
-              Percent values are used for responsive rendering. Pixel values are calculated from the original mockup image size for precision.
-              {imgNaturalWidth && imgNaturalHeight ? (
-                <span className="text-muted-foreground/70 ml-auto shrink-0">
-                  {imgNaturalWidth}×{imgNaturalHeight}px
-                </span>
-              ) : null}
-            </p>
-
-            <p className="text-[11px] text-muted-foreground/70 flex items-center gap-1">
-              <Info className="w-3 h-3 shrink-0" />
-              Drag the overlay to move · drag corners to resize · arrow keys to nudge (Shift = 10px, Alt = 0.1%)
-            </p>
-
-            <div className="grid grid-cols-2 gap-2 mt-1">
-              <div className="space-y-1">
-                <Label className="text-xs">Rotation (°)</Label>
-                <Input
-                  type="number"
-                  value={rotation}
-                  onChange={(e) => setRotation(e.target.value)}
-                  placeholder="0"
-                  className="h-8 text-sm"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Border radius (px)</Label>
-                <Input
-                  type="number"
-                  value={borderRadius}
-                  onChange={(e) => setBorderRadius(e.target.value)}
-                  placeholder="0"
-                  className="h-8 text-sm"
-                  min={0}
-                />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Shadow strength (0–1, legacy)</Label>
-              <Input
-                type="number"
-                value={shadowStrength}
-                onChange={(e) => setShadowStrength(e.target.value)}
-                placeholder="0"
-                className="h-8 text-sm"
-                min={0} max={1} step={0.1}
-              />
-              <p className="text-[10px] text-muted-foreground/60">Legacy field — use Compositing section below for full control</p>
-            </div>
-          </div>}
+          </div>
 
           {/* 4-corner surface editor panel */}
           {showSurfaceEditor && backgroundImageUrl && (
@@ -1837,7 +1132,7 @@ export function MockupTemplateForm({
                 <div>
                   <p className="text-sm font-medium text-indigo-900 dark:text-indigo-200">Precision surface editor</p>
                   <p className="text-xs text-indigo-700/70 dark:text-indigo-400/70 mt-0.5">
-                    Use this to adjust the exact four corners used when rendering mockups. Drag handles to match the poster area; save to enable perspective-correct compositing.
+                    Drag handles to position the four corners of the poster area. Save to enable perspective-correct compositing.
                   </p>
                 </div>
                 <Button
@@ -1859,18 +1154,13 @@ export function MockupTemplateForm({
                     ? (storedManualSurface.corners as SurfaceCorners)
                     : null
                 }
-                detectedCorners={
-                  storedDetectedConfig?.corners
-                    ? (storedDetectedConfig.corners as SurfaceCorners)
-                    : null
-                }
+                detectedCorners={null}
                 onSave={handleSaveSurface}
                 onCancel={() => setShowSurfaceEditor(false)}
                 saving={surfaceEditorSaving}
               />
             </div>
           )}
-          </div>
 
           {/* Compositing section */}
           <div className="space-y-0 rounded-md border overflow-hidden">
@@ -1890,118 +1180,120 @@ export function MockupTemplateForm({
               </div>
               {showCompositing ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
             </button>
-            {showCompositing && <div className="space-y-3 px-4 pb-4 pt-1 border-t">
-            <div className="flex items-center justify-between mt-2">
-              <p className="text-xs text-muted-foreground">Poster surface controls where the poster goes. Compositing controls how the inserted poster blends into the mockup.</p>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs gap-1 shrink-0 ml-2"
-                onClick={() => {
-                  setFitMode("cover");
-                  setShadowEnabled(true);
-                  setShadowOpacity("0.4");
-                  setShadowBlur("20");
-                  setShadowOffsetX("2");
-                  setShadowOffsetY("6");
-                  setInnerShadowEnabled(true);
-                  setInnerShadowOpacity("0.25");
-                  setBrightness("0.94");
-                  setContrast("0.97");
-                  setSaturation("0.92");
-                  setCompositeBlur("0");
-                }}
-              >
-                <RotateCcw className="w-3 h-3" />
-                Reset to defaults
-              </Button>
-            </div>
-            <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1">
-              <Info className="w-3 h-3 shrink-0" />
-              Applied when mockups are synced/rendered. Run Sync mockups after changing these settings.
-            </p>
-
-            <div className="space-y-1">
-              <Label className="text-xs">Fit mode</Label>
-              <p className="text-[10px] text-muted-foreground">How the poster fills the selected surface.</p>
-              <Select value={fitMode} onValueChange={setFitMode}>
-                <SelectTrigger className="h-8 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cover">Cover (fill area, crop if needed)</SelectItem>
-                  <SelectItem value="contain">Contain (show full poster)</SelectItem>
-                  <SelectItem value="stretch">Stretch (exact fill, debug only)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div className="flex items-center justify-between rounded border px-2.5 py-2 col-span-2">
-                <div>
-                  <Label className="text-xs font-medium">Drop shadow</Label>
-                  <p className="text-[10px] text-muted-foreground">Shadow behind the inserted poster.</p>
+            {showCompositing && (
+              <div className="space-y-3 px-4 pb-4 pt-1 border-t">
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-xs text-muted-foreground">Poster surface controls where the poster goes. Compositing controls how the inserted poster blends into the mockup.</p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs gap-1 shrink-0 ml-2"
+                    onClick={() => {
+                      setFitMode("cover");
+                      setShadowEnabled(true);
+                      setShadowOpacity("0.4");
+                      setShadowBlur("20");
+                      setShadowOffsetX("2");
+                      setShadowOffsetY("6");
+                      setInnerShadowEnabled(true);
+                      setInnerShadowOpacity("0.25");
+                      setBrightness("0.94");
+                      setContrast("0.97");
+                      setSaturation("0.92");
+                      setCompositeBlur("0");
+                    }}
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    Reset to defaults
+                  </Button>
                 </div>
-                <Switch checked={shadowEnabled} onCheckedChange={setShadowEnabled} />
-              </div>
-              {shadowEnabled && (
-                <>
-                  <div className="space-y-1">
-                    <Label className="text-[11px] text-muted-foreground">Opacity</Label>
-                    <Input type="number" value={shadowOpacity} onChange={(e) => setShadowOpacity(e.target.value)} className="h-7 text-xs" min={0} max={1} step={0.05} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[11px] text-muted-foreground">Blur (px)</Label>
-                    <Input type="number" value={shadowBlur} onChange={(e) => setShadowBlur(e.target.value)} className="h-7 text-xs" min={0} max={80} step={1} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[11px] text-muted-foreground">Offset X (px)</Label>
-                    <Input type="number" value={shadowOffsetX} onChange={(e) => setShadowOffsetX(e.target.value)} className="h-7 text-xs" min={-50} max={50} step={1} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[11px] text-muted-foreground">Offset Y (px)</Label>
-                    <Input type="number" value={shadowOffsetY} onChange={(e) => setShadowOffsetY(e.target.value)} className="h-7 text-xs" min={-50} max={50} step={1} />
-                  </div>
-                </>
-              )}
+                <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                  <Info className="w-3 h-3 shrink-0" />
+                  Applied when mockups are synced/rendered. Run Sync mockups after changing these settings.
+                </p>
 
-              <div className="flex items-center justify-between rounded border px-2.5 py-2 col-span-2">
-                <Label className="text-xs font-medium">Inner shadow</Label>
-                <Switch checked={innerShadowEnabled} onCheckedChange={setInnerShadowEnabled} />
-              </div>
-              {innerShadowEnabled && (
-                <div className="space-y-1 col-span-2">
-                  <Label className="text-[11px] text-muted-foreground">Inner opacity</Label>
-                  <Input type="number" value={innerShadowOpacity} onChange={(e) => setInnerShadowOpacity(e.target.value)} className="h-7 text-xs" min={0} max={1} step={0.05} />
+                <div className="space-y-1">
+                  <Label className="text-xs">Fit mode</Label>
+                  <p className="text-[10px] text-muted-foreground">How the poster fills the selected surface.</p>
+                  <Select value={fitMode} onValueChange={setFitMode}>
+                    <SelectTrigger className="h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cover">Cover (fill area, crop if needed)</SelectItem>
+                      <SelectItem value="contain">Contain (show full poster)</SelectItem>
+                      <SelectItem value="stretch">Stretch (exact fill, debug only)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              )}
-            </div>
 
-            <div className="grid grid-cols-3 gap-2">
-              <div className="space-y-1">
-                <Label className="text-[11px] text-muted-foreground">Brightness</Label>
-                <Input type="number" value={brightness} onChange={(e) => setBrightness(e.target.value)} className="h-7 text-xs" min={0.5} max={1.5} step={0.01} />
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex items-center justify-between rounded border px-2.5 py-2 col-span-2">
+                    <div>
+                      <Label className="text-xs font-medium">Drop shadow</Label>
+                      <p className="text-[10px] text-muted-foreground">Shadow behind the inserted poster.</p>
+                    </div>
+                    <Switch checked={shadowEnabled} onCheckedChange={setShadowEnabled} />
+                  </div>
+                  {shadowEnabled && (
+                    <>
+                      <div className="space-y-1">
+                        <Label className="text-[11px] text-muted-foreground">Opacity</Label>
+                        <Input type="number" value={shadowOpacity} onChange={(e) => setShadowOpacity(e.target.value)} className="h-7 text-xs" min={0} max={1} step={0.05} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[11px] text-muted-foreground">Blur (px)</Label>
+                        <Input type="number" value={shadowBlur} onChange={(e) => setShadowBlur(e.target.value)} className="h-7 text-xs" min={0} max={80} step={1} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[11px] text-muted-foreground">Offset X (px)</Label>
+                        <Input type="number" value={shadowOffsetX} onChange={(e) => setShadowOffsetX(e.target.value)} className="h-7 text-xs" min={-50} max={50} step={1} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[11px] text-muted-foreground">Offset Y (px)</Label>
+                        <Input type="number" value={shadowOffsetY} onChange={(e) => setShadowOffsetY(e.target.value)} className="h-7 text-xs" min={-50} max={50} step={1} />
+                      </div>
+                    </>
+                  )}
+
+                  <div className="flex items-center justify-between rounded border px-2.5 py-2 col-span-2">
+                    <Label className="text-xs font-medium">Inner shadow</Label>
+                    <Switch checked={innerShadowEnabled} onCheckedChange={setInnerShadowEnabled} />
+                  </div>
+                  {innerShadowEnabled && (
+                    <div className="space-y-1 col-span-2">
+                      <Label className="text-[11px] text-muted-foreground">Inner opacity</Label>
+                      <Input type="number" value={innerShadowOpacity} onChange={(e) => setInnerShadowOpacity(e.target.value)} className="h-7 text-xs" min={0} max={1} step={0.05} />
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-muted-foreground">Brightness</Label>
+                    <Input type="number" value={brightness} onChange={(e) => setBrightness(e.target.value)} className="h-7 text-xs" min={0.5} max={1.5} step={0.01} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-muted-foreground">Contrast</Label>
+                    <Input type="number" value={contrast} onChange={(e) => setContrast(e.target.value)} className="h-7 text-xs" min={0.5} max={1.5} step={0.01} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-muted-foreground">Saturation</Label>
+                    <Input type="number" value={saturation} onChange={(e) => setSaturation(e.target.value)} className="h-7 text-xs" min={0} max={2} step={0.01} />
+                  </div>
+                  <div className="space-y-1 col-span-3">
+                    <Label className="text-[11px] text-muted-foreground">Blur (px, subtle softening)</Label>
+                    <Input type="number" value={compositeBlur} onChange={(e) => setCompositeBlur(e.target.value)} className="h-7 text-xs" min={0} max={3} step={0.1} />
+                  </div>
+                </div>
               </div>
-              <div className="space-y-1">
-                <Label className="text-[11px] text-muted-foreground">Contrast</Label>
-                <Input type="number" value={contrast} onChange={(e) => setContrast(e.target.value)} className="h-7 text-xs" min={0.5} max={1.5} step={0.01} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-[11px] text-muted-foreground">Saturation</Label>
-                <Input type="number" value={saturation} onChange={(e) => setSaturation(e.target.value)} className="h-7 text-xs" min={0} max={2} step={0.01} />
-              </div>
-              <div className="space-y-1 col-span-3">
-                <Label className="text-[11px] text-muted-foreground">Blur (px, subtle softening)</Label>
-                <Input type="number" value={compositeBlur} onChange={(e) => setCompositeBlur(e.target.value)} className="h-7 text-xs" min={0} max={3} step={0.1} />
-              </div>
-            </div>
-            </div>}
+            )}
           </div>
         </div>
       </div>
 
-      {/* Layered images section — lighting overlay + foreground */}
+      {/* Layered images section */}
       <div className="rounded-md border overflow-hidden">
         <button
           type="button"
@@ -2058,7 +1350,7 @@ export function MockupTemplateForm({
                   Upload
                 </Button>
                 {lightingOverlayUrl && (
-                  <Button type="button" variant="ghost" size="sm" className="h-8 text-xs text-destructive hover:text-destructive" onClick={() => { setLightingOverlayUrl(""); }}>
+                  <Button type="button" variant="ghost" size="sm" className="h-8 text-xs text-destructive hover:text-destructive" onClick={() => setLightingOverlayUrl("")}>
                     Clear
                   </Button>
                 )}
@@ -2120,7 +1412,7 @@ export function MockupTemplateForm({
                   Upload
                 </Button>
                 {foregroundImageUrl && (
-                  <Button type="button" variant="ghost" size="sm" className="h-8 text-xs text-destructive hover:text-destructive" onClick={() => { setForegroundImageUrl(""); }}>
+                  <Button type="button" variant="ghost" size="sm" className="h-8 text-xs text-destructive hover:text-destructive" onClick={() => setForegroundImageUrl("")}>
                     Clear
                   </Button>
                 )}
@@ -2147,7 +1439,7 @@ export function MockupTemplateForm({
         </Button>
         <Button
           onClick={handleSave}
-          disabled={saving || uploadProgress === "uploading" || analysisState === "analyzing" || hasPlacementErrors}
+          disabled={saving || uploadProgress === "uploading" || hasPlacementErrors}
           className="gap-1.5"
         >
           {saving && <Loader2 className="w-4 h-4 animate-spin" />}

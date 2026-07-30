@@ -19,9 +19,7 @@ export async function migrateMockupPlacement(): Promise<void> {
       }
     };
 
-    await addColumnIfMissing("mockup_templates", "source_image_width", "INTEGER");
-    await addColumnIfMissing("mockup_templates", "source_image_height", "INTEGER");
-    // Admin-defined manual surface (corners or bbox), separate from AI detection column
+    // Admin-defined manual surface (corners or bbox)
     await addColumnIfMissing("mockup_templates", "placement_config", "JSONB");
 
     logger.info("Mockup placement migration completed");

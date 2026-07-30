@@ -20,8 +20,6 @@ import { migrateTypographyConfig } from "./lib/migrateTypographyConfig";
 import { migrateDisplayTitle } from "./lib/migrateDisplayTitle";
 import { migrateCollectionBanner } from "./lib/migrateCollectionBanner";
 import { migrateMockupSync } from "./lib/migrateMockupSync";
-import { migrateSmartPlacement } from "./lib/migrateSmartPlacement";
-import { migrateAiRenderMode } from "./lib/migrateAiRenderMode";
 import { migrateMockupLayers } from "./lib/migrateMockupLayers";
 import { seedPostsofSpain } from "./lib/seedPostsofSpain";
 
@@ -116,8 +114,6 @@ migrateSlugField()
   .then(() => migrateDisplayTitle())
   .then(() => migrateCollectionBanner())
   .then(() => migrateMockupSync())
-  .then(() => migrateSmartPlacement())
-  .then(() => migrateAiRenderMode())
   .then(() => migrateMockupLayers())
   .then(() => seedMockupTemplates())
   .catch((err) =>

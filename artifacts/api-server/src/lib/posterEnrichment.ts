@@ -19,7 +19,6 @@ export function serializePosterSize(s: typeof posterSizesTable.$inferSelect) {
  * A mockup row is public-eligible for display URLs only when:
  *   • mockupImageUrl is present (the flat generated render exists)
  *   • status is not "failed"
- *   • if renderMode is "ai_rendered", approvedForPublic must be true
  *   • the template is active (or the row has no template)
  *
  * If none of these conditions are met, return null so callers fall back to
@@ -38,8 +37,6 @@ export async function attachPrimaryDisplayImages(
       posterId: posterMockupsTable.posterId,
       mockupImageUrl: posterMockupsTable.mockupImageUrl,
       status: posterMockupsTable.status,
-      renderMode: posterMockupsTable.renderMode,
-      approvedForPublic: posterMockupsTable.approvedForPublic,
       templateId: posterMockupsTable.mockupTemplateId,
       templateActive: mockupTemplatesTable.active,
     })
@@ -62,8 +59,6 @@ export async function attachPrimaryDisplayImages(
     if (!m.mockupImageUrl) continue;
     // Rule 3: failed renders are not customer-ready
     if (m.status === "failed") continue;
-    // Rule 4: AI-rendered mockups require explicit approval
-    if (m.renderMode === "ai_rendered" && !m.approvedForPublic) continue;
     imageMap.set(m.posterId, m.mockupImageUrl);
   }
 
@@ -83,8 +78,6 @@ export async function attachHoverDisplayImages(
       posterId: posterMockupsTable.posterId,
       mockupImageUrl: posterMockupsTable.mockupImageUrl,
       status: posterMockupsTable.status,
-      renderMode: posterMockupsTable.renderMode,
-      approvedForPublic: posterMockupsTable.approvedForPublic,
       templateId: posterMockupsTable.mockupTemplateId,
       templateActive: mockupTemplatesTable.active,
     })
@@ -107,8 +100,6 @@ export async function attachHoverDisplayImages(
     if (!m.mockupImageUrl) continue;
     // Rule 3: failed renders are not customer-ready
     if (m.status === "failed") continue;
-    // Rule 4: AI-rendered mockups require explicit approval
-    if (m.renderMode === "ai_rendered" && !m.approvedForPublic) continue;
     imageMap.set(m.posterId, m.mockupImageUrl);
   }
 

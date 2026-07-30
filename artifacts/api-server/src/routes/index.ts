@@ -16,9 +16,7 @@ import launchChecklistRouter from "./launchChecklist";
 import stripeRouter from "./stripe";
 import contentPagesRouter from "./contentPages";
 import storageRouter from "./storage";
-import analyzePlacementRouter from "./analyzePlacement";
 import mockupSyncRouter from "./mockupSync";
-import generateMockupTemplateRouter from "./generateMockupTemplate";
 
 const router: IRouter = Router();
 
@@ -39,8 +37,6 @@ router.use(launchChecklistRouter);
 router.use(stripeRouter);
 router.use(contentPagesRouter);
 router.use(storageRouter);
-router.use(analyzePlacementRouter);
 router.use(mockupSyncRouter);
-router.use(generateMockupTemplateRouter);
 
 export default router;

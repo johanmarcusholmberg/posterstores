@@ -512,7 +512,7 @@ export default function PosterBySlug() {
       </nav>
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,11fr)_minmax(0,10fr)] gap-8 lg:gap-12 xl:gap-14 mb-10 md:mb-14 items-start">
-        <div>
+        <div className="min-w-0 overflow-hidden">
           <MockupGallery
             mockups={mockups ?? []}
             fallbackImageUrl={poster.imageUrl}
@@ -521,7 +521,7 @@ export default function PosterBySlug() {
           />
         </div>
 
-        <div className="flex flex-col w-full max-w-[560px] lg:sticky lg:top-24">
+        <div className="flex flex-col w-full max-w-[560px]">
           {poster.region && (
             <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-primary/80">
               {poster.region}

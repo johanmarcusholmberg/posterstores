@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { type PosterMockup, type PosterMockupTemplate } from "@/lib/mockupApi";
 import { cn } from "@/lib/utils";
-import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from "lucide-react";
 
 interface MockupGalleryProps {
   mockups: PosterMockup[];
@@ -42,9 +42,8 @@ function hasPlacementData(t: PosterMockupTemplate | null): boolean {
  *  1. isGallery=false  → hidden (admin explicitly excluded it from gallery)
  *  2. No mockupImageUrl → hidden (live CSS composites / unsynced rows are admin-only)
  *  3. status=failed    → hidden (broken render, no usable image)
- *  4. ai_rendered without approvedForPublic → hidden (awaiting admin approval)
- *  5. Inactive template → hidden
- *  6. Everything else  → visible
+ *  4. Inactive template → hidden
+ *  5. Everything else  → visible
  *
  * Note: CompositedMockup (live CSS overlay) is intentionally excluded from the
  * public gallery. It is admin-preview-only. Only generated flat images (mockupImageUrl)
@@ -57,9 +56,7 @@ function isVisible(m: PosterMockup): boolean {
   if (!m.mockupImageUrl) return false;
   // 3. Failed renders are not customer-ready
   if (m.status === "failed") return false;
-  // 4. AI-rendered mockups require explicit admin approval before going public
-  if (m.renderMode === "ai_rendered" && !m.approvedForPublic) return false;
-  // 5. Template must be active (orphaned rows without a template are fine if they have an image)
+  // 4. Template must be active (orphaned rows without a template are fine if they have an image)
   if (!m.mockupTemplateId) return true;
   if (m.template) return m.template.active !== false;
   return false;
@@ -224,6 +221,108 @@ export const MockupGallery = ({
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIdx, setLightboxIdx] = useState(activeIdx);
 
+  const thumbnailRailRef = useRef<HTMLDivElement>(null);
+
+  const thumbnailButtonRefs = useRef<
+    Array<HTMLButtonElement | null>
+  >([]);
+
+  const [canScrollThumbnailsUp, setCanScrollThumbnailsUp] =
+    useState(false);
+
+  const [canScrollThumbnailsDown, setCanScrollThumbnailsDown] =
+    useState(false);
+
+  const updateThumbnailScrollState = useCallback(() => {
+    const rail = thumbnailRailRef.current;
+
+    if (!rail) return;
+
+    setCanScrollThumbnailsUp(rail.scrollTop > 2);
+
+    setCanScrollThumbnailsDown(
+      rail.scrollTop + rail.clientHeight <
+        rail.scrollHeight - 2
+    );
+  }, []);
+
+  const scrollThumbnails = useCallback(
+    (direction: "up" | "down") => {
+      const rail = thumbnailRailRef.current;
+
+      if (!rail) return;
+
+      const amount = Math.max(
+        rail.clientHeight * 0.75,
+        160
+      );
+
+      rail.scrollBy({
+        top: direction === "down" ? amount : -amount,
+        behavior: "smooth",
+      });
+    },
+    []
+  );
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(
+      updateThumbnailScrollState
+    );
+
+    window.addEventListener(
+      "resize",
+      updateThumbnailScrollState
+    );
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+
+      window.removeEventListener(
+        "resize",
+        updateThumbnailScrollState
+      );
+    };
+  }, [allImages.length, updateThumbnailScrollState]);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const rail = thumbnailRailRef.current;
+      const selectedButton =
+        thumbnailButtonRefs.current[activeIdx];
+
+      if (
+        !rail ||
+        !selectedButton ||
+        rail.clientHeight === 0
+      ) {
+        return;
+      }
+
+      const buttonTop = selectedButton.offsetTop;
+      const buttonBottom =
+        buttonTop + selectedButton.offsetHeight;
+
+      const visibleTop = rail.scrollTop;
+      const visibleBottom =
+        visibleTop + rail.clientHeight;
+
+      if (buttonTop < visibleTop) {
+        rail.scrollTo({
+          top: buttonTop,
+          behavior: "smooth",
+        });
+      } else if (buttonBottom > visibleBottom) {
+        rail.scrollTo({
+          top: buttonBottom - rail.clientHeight,
+          behavior: "smooth",
+        });
+      }
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeIdx]);
+  
   // Touch/swipe state for the main carousel
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
@@ -404,28 +503,35 @@ export const MockupGallery = ({
 
   return (
     <>
-      <div
-        className="flex w-full flex-col-reverse gap-2.5 md:max-w-[500px] md:flex-row md:items-start md:gap-3.5 lg:max-w-none xl:gap-4"
-        data-testid="mockup-gallery"
-      >
-        {/* Thumbnail strip — below main image on mobile, left column on desktop */}
-        {allImages.length > 1 && (
         <div
           className="
-            flex flex-row gap-2
-            overflow-x-auto pb-0.5
-            scrollbar-hide
-
-            md:w-[96px] md:shrink-0 md:flex-col
-            md:overflow-x-visible md:overflow-y-auto md:pb-0
-            md:max-h-[680px]
-
-            lg:max-h-[720px]
-            xl:w-[112px]
+            flex w-full min-w-0 flex-col-reverse gap-2.5
+            overflow-hidden
+            md:max-w-[500px]
+            md:flex-row
+            md:items-stretch
+            md:gap-3.5
+            lg:max-w-none
+            xl:gap-4
           "
+          data-testid="mockup-gallery"
         >
+
+        {/* Mobile thumbnail carousel */}
+        {allImages.length > 1 && (
+          <div
+            className="
+              flex gap-2 overflow-x-auto pb-0.5
+              md:hidden
+              overscroll-x-contain
+              scroll-smooth
+              [scrollbar-width:none]
+              [&::-webkit-scrollbar]:hidden
+            "
+          >
             {allImages.map((img, idx) => {
               const isActive = idx === activeIdx;
+
               return (
                 <button
                   key={idx}
@@ -436,16 +542,16 @@ export const MockupGallery = ({
                   }}
                   aria-label={img.label}
                   aria-pressed={isActive}
-                  className={cn(                    `
+                  className={cn(
+                    `
                       relative h-[68px] w-[68px] shrink-0
-                      overflow-hidden border-2 bg-[#faf8f3]
+                      overflow-hidden border-2
+                      bg-[#faf8f3]
                       transition-all
                       focus-visible:outline-none
                       focus-visible:ring-2
                       focus-visible:ring-primary
-
-                      md:h-auto md:w-[92px] md:aspect-[5/7]
-                      xl:w-[108px]`,
+                    `,
                     isActive
                       ? "border-primary"
                       : "border-transparent hover:opacity-80"
@@ -456,15 +562,158 @@ export const MockupGallery = ({
                     alt={alt}
                     className={cn(
                       "block h-full w-full",
-                      img.isPosterArtwork ? "object-contain" : "object-cover"
+                      img.isPosterArtwork
+                        ? "object-contain"
+                        : "object-cover"
                     )}
                     onError={(e) => {
-                      (e.target as HTMLImageElement).src = fallbackImageUrl;
+                      (
+                        e.target as HTMLImageElement
+                      ).src = fallbackImageUrl;
                     }}
                   />
                 </button>
               );
             })}
+          </div>
+        )}
+
+        {/* Desktop vertical thumbnail carousel */}
+        {allImages.length > 1 && (
+          <div
+            className="
+              relative hidden shrink-0 self-stretch
+              md:block md:w-[96px]
+              xl:w-[112px]
+            "
+          >
+            <button
+              type="button"
+              onClick={() => scrollThumbnails("up")}
+              disabled={!canScrollThumbnailsUp}
+              aria-label="Show previous images"
+              className="
+                absolute left-1/2 top-2 z-20
+                flex h-8 w-8 -translate-x-1/2
+                items-center justify-center
+                rounded-full border border-border
+                bg-background/90 shadow-md backdrop-blur-sm
+                transition-all
+                hover:bg-muted
+                focus-visible:outline-none
+                focus-visible:ring-2
+                focus-visible:ring-primary
+                disabled:pointer-events-none
+                disabled:opacity-0
+              "
+            >
+              <ChevronUp className="h-4 w-4" />
+            </button>
+
+              <div
+                ref={thumbnailRailRef}
+                onScroll={updateThumbnailScrollState}
+                className="
+                  absolute inset-0
+                  overflow-y-auto overflow-x-hidden
+                  overscroll-contain scroll-smooth
+                  snap-y snap-proximity
+                  [scrollbar-width:none]
+                  [&::-webkit-scrollbar]:hidden
+                "
+              >
+              <div className="flex flex-col items-center gap-2">
+                {allImages.map((img, idx) => {
+                  const isActive = idx === activeIdx;
+
+                  return (
+                    <button
+                      key={idx}
+                      ref={(element) => {
+                        thumbnailButtonRefs.current[idx] =
+                          element;
+                      }}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveIdx(idx);
+                      }}
+                      aria-label={img.label}
+                      aria-pressed={isActive}
+                      className={cn(
+                        "relative aspect-[5/7] w-[92px] shrink-0 snap-start overflow-hidden border-2 bg-[#faf8f3] transition-[border-color,box-shadow,opacity] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary xl:w-[108px]",
+                        isActive
+                          ? "border-primary opacity-100 ring-1 ring-primary/20 shadow-[0_2px_8px_rgba(0,0,0,0.10)]"
+                          : "border-border/50 opacity-85 hover:border-primary/40 hover:opacity-100"
+                      )}
+                    >
+                      <img
+                        src={img.url}
+                        alt={alt}
+                        className={cn(
+                          "block h-full w-full",
+                          img.isPosterArtwork
+                            ? "object-contain"
+                            : "object-cover"
+                        )}
+                        onError={(e) => {
+                          (
+                            e.target as HTMLImageElement
+                          ).src = fallbackImageUrl;
+                        }}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {canScrollThumbnailsUp && (
+              <div
+                className="
+                  pointer-events-none absolute
+                  inset-x-0 top-0 z-10 h-14
+                  bg-gradient-to-b
+                  from-background/90 to-transparent
+                "
+                aria-hidden="true"
+              />
+            )}
+
+            {canScrollThumbnailsDown && (
+              <div
+                className="
+                  pointer-events-none absolute
+                  inset-x-0 bottom-0 z-10 h-14
+                  bg-gradient-to-t
+                  from-background/90 to-transparent
+                "
+                aria-hidden="true"
+              />
+            )}
+
+            <button
+              type="button"
+              onClick={() => scrollThumbnails("down")}
+              disabled={!canScrollThumbnailsDown}
+              aria-label="Show more images"
+              className="
+                absolute bottom-0 left-1/2 z-20
+                flex h-8 w-8 -translate-x-1/2
+                items-center justify-center
+                rounded-full border border-border
+              bg-background/90 shadow-md backdrop-blur-sm
+                transition-all
+                hover:bg-muted
+                focus-visible:outline-none
+                focus-visible:ring-2
+                focus-visible:ring-primary
+                disabled:pointer-events-none
+                disabled:opacity-0
+              "
+            >
+              <ChevronDown className="h-4 w-4" />
+            </button>
           </div>
         )}
 
@@ -477,7 +726,7 @@ export const MockupGallery = ({
         <div
           ref={mainImageRef}
           className={cn(
-            "relative aspect-[5/7] w-full overflow-hidden cursor-zoom-in group select-none md:w-auto md:min-w-0 md:flex-1",
+            "relative aspect-[5/7] w-full min-w-0 overflow-hidden cursor-zoom-in group select-none md:w-auto md:flex-1",
             !activeItem.isPosterArtwork && "bg-[#faf8f3] shadow-[0_1px_4px_rgba(0,0,0,0.06)]"
           )}
           onClick={openLightbox}
@@ -599,7 +848,8 @@ export const MockupGallery = ({
                       `
                         relative h-[72px] w-[72px] shrink-0
                         overflow-hidden border-2
-                        transition-all
+                        transition-[border-color,box-shadow,opacity]
+                        duration-200 ease-out
                         focus-visible:outline-none
                         focus-visible:ring-2
                         focus-visible:ring-white
@@ -607,8 +857,17 @@ export const MockupGallery = ({
                         sm:h-[88px] sm:w-[88px]
                       `,
                       lightboxIdx === idx
-                        ? "border-white opacity-100"
-                        : "border-transparent opacity-40 hover:opacity-70"
+                        ? `
+                            border-white
+                            opacity-100
+                            ring-2 ring-white/20
+                            shadow-[0_3px_10px_rgba(0,0,0,0.25)]
+                          `
+                        : `
+                            border-transparent
+                            opacity-40
+                            hover:opacity-70
+                          `
                     )}
                   >
                     <img
@@ -804,7 +1063,12 @@ function MainImage({
   const hasRatio = naturalRatio !== null;
 
   return (
-    <div className={cn("relative w-full h-full flex items-center justify-center", className)}>
+    <div
+      className={cn(
+        "relative w-full h-full flex items-start justify-center",
+        className
+      )}
+    >
       {!loaded && <div className="absolute inset-0 bg-muted animate-pulse" />}
       <div
         className={cn(hasRatio && "ring-1 ring-inset ring-black/[0.14] shadow-[0_1px_4px_rgba(0,0,0,0.06)]")}

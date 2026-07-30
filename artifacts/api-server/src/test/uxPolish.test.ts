@@ -255,6 +255,12 @@ describe("POLISH 9 — Public mockup gallery placeholder safety", () => {
   });
 
   it("poster mockup with custom mockupImageUrl is never a placeholder", async () => {
+    // Clean up any row from previous tests sharing the same (poster, template) pair
+    await db
+      .delete(posterMockupsTable)
+      .where(
+        eq(posterMockupsTable.posterId, testPosterId)
+      );
     const [mockupWithImage] = await db
       .insert(posterMockupsTable)
       .values({
