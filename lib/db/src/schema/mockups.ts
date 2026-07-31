@@ -63,20 +63,11 @@ export const mockupTemplatesTable = pgTable("mockup_templates", {
   posterHeight: real("poster_height"),
   rotation: real("rotation"),
   borderRadius: real("border_radius"),
-  shadowStrength: real("shadow_strength"),
-  fitMode: text("fit_mode").default("cover"),
-  // Compositing settings
-  shadowEnabled: boolean("shadow_enabled").default(true),
-  shadowOpacity: real("shadow_opacity").default(0.4),
-  shadowBlur: real("shadow_blur").default(20),
-  shadowOffsetX: real("shadow_offset_x").default(2),
-  shadowOffsetY: real("shadow_offset_y").default(6),
-  innerShadowEnabled: boolean("inner_shadow_enabled").default(true),
-  innerShadowOpacity: real("inner_shadow_opacity").default(0.25),
-  brightness: real("brightness").default(0.94),
-  contrast: real("contrast").default(0.97),
-  saturation: real("saturation").default(0.92),
-  compositeBlur: real("composite_blur").default(0),
+  fitMode: text("fit_mode").default("contain"),
+  // Poster appearance adjustments (applied to poster only during Sync)
+  brightness: real("brightness").default(1.0),
+  contrast: real("contrast").default(1.0),
+  saturation: real("saturation").default(1.0),
   /** Admin-defined manual surface (corners or bbox). */
   placementConfig: jsonb("placement_config"),
   // Layered image fields
@@ -109,12 +100,6 @@ export const posterMockupsTable = pgTable("poster_mockups", {
   errorMessage: text("error_message"),
   sourcePosterImageUrl: text("source_poster_image_url"),
   sourceTemplateImageUrl: text("source_template_image_url"),
-  // Per-assignment layer toggles
-  useBase: boolean("use_base").default(true).notNull(),
-  useLightingOverlay: boolean("use_lighting_overlay").default(true).notNull(),
-  useForeground: boolean("use_foreground").default(true).notNull(),
-  lightingOpacityOverride: real("lighting_opacity_override"),
-  foregroundOpacityOverride: real("foreground_opacity_override"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

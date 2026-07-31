@@ -313,11 +313,8 @@ router.post(
           effectsOverlayUrl: template.lightingOverlayUrl,
           foregroundImageUrl: template.foregroundImageUrl,
           effectsBlendMode: template.defaultLightingBlendMode,
-          effectsOpacity: mockup.lightingOpacityOverride ?? template.defaultLightingOpacity,
-          foregroundOpacity: mockup.foregroundOpacityOverride ?? template.defaultForegroundOpacity,
-          useBase: mockup.useBase,
-          useLightingOverlay: mockup.useLightingOverlay,
-          useForeground: mockup.useForeground,
+          effectsOpacity: template.defaultLightingOpacity,
+          foregroundOpacity: template.defaultForegroundOpacity,
         });
 
         if (renderResult.surfaceWarning) {

@@ -71,15 +71,13 @@ interface CompositedMockupProps {
 }
 
 function buildPosterFilter(t: PosterMockupTemplate): string | undefined {
-  const brightness = t.brightness ?? 0.94;
-  const contrast = t.contrast ?? 0.97;
-  const saturation = t.saturation ?? 0.92;
-  const blur = t.compositeBlur ?? 0;
+  const brightness = t.brightness ?? 1;
+  const contrast = t.contrast ?? 1;
+  const saturation = t.saturation ?? 1;
   const parts: string[] = [];
   if (brightness !== 1) parts.push(`brightness(${brightness})`);
   if (contrast !== 1) parts.push(`contrast(${contrast})`);
   if (saturation !== 1) parts.push(`saturate(${saturation})`);
-  if (blur > 0) parts.push(`blur(${blur}px)`);
   return parts.length > 0 ? parts.join(" ") : undefined;
 }
 
@@ -92,25 +90,11 @@ function CompositedMockup({ backgroundUrl, posterImageUrl, template, alt, classN
   const rot = template.rotation ?? 0;
   const br = template.borderRadius ?? 0;
 
-  const fitMode = template.fitMode ?? "cover";
+  const fitMode = template.fitMode ?? "contain";
   const objectFit: React.CSSProperties["objectFit"] =
-    fitMode === "contain" ? "contain" : fitMode === "stretch" ? "fill" : "cover";
-
-  const shadowEnabled = template.shadowEnabled ?? true;
-  const shadowOpacity = template.shadowOpacity ?? 0.4;
-  const shadowBlur = template.shadowBlur ?? 20;
-  const shadowOffsetX = template.shadowOffsetX ?? 2;
-  const shadowOffsetY = template.shadowOffsetY ?? 6;
-
-  const innerShadowEnabled = template.innerShadowEnabled ?? true;
-  const innerShadowOpacity = template.innerShadowOpacity ?? 0.25;
-  const innerShadowBlur = Math.max(shadowBlur * 0.6, 8);
+    fitMode === "contain" ? "contain" : "cover";
 
   const posterFilter = buildPosterFilter(template);
-
-  const dropShadow = shadowEnabled
-    ? `drop-shadow(${shadowOffsetX}px ${shadowOffsetY}px ${shadowBlur}px rgba(0,0,0,${shadowOpacity}))`
-    : undefined;
 
   return (
     <div className={cn("relative w-full h-full", className)}>
@@ -137,7 +121,6 @@ function CompositedMockup({ backgroundUrl, posterImageUrl, template, alt, classN
             width: `${w}%`,
             height: `${h}%`,
             transform: rot ? `rotate(${rot}deg)` : undefined,
-            filter: dropShadow,
           }}
         >
           <div
@@ -153,15 +136,6 @@ function CompositedMockup({ backgroundUrl, posterImageUrl, template, alt, classN
               style={{ objectFit, filter: posterFilter, display: "block" }}
               onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
             />
-            {innerShadowEnabled && (
-              <div
-                className="absolute inset-0 pointer-events-none"
-                style={{
-                  borderRadius: br ? `${br}px` : undefined,
-                  boxShadow: `inset 0 0 ${innerShadowBlur}px rgba(0,0,0,${innerShadowOpacity})`,
-                }}
-              />
-            )}
           </div>
         </div>
       )}

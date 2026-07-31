@@ -163,20 +163,10 @@ export function MockupTemplateForm({
   const [posterHeight, setPosterHeight] = useState<string>(template?.posterHeight?.toString() ?? "");
   const [rotation, setRotation] = useState<string>(template?.rotation?.toString() ?? "0");
   const [borderRadius, setBorderRadius] = useState<string>(template?.borderRadius?.toString() ?? "0");
-  const [shadowStrength, setShadowStrength] = useState<string>(template?.shadowStrength?.toString() ?? "0");
-
-  const [fitMode, setFitMode] = useState<string>(template?.fitMode ?? "cover");
-  const [shadowEnabled, setShadowEnabled] = useState<boolean>(template?.shadowEnabled ?? true);
-  const [shadowOpacity, setShadowOpacity] = useState<string>((template?.shadowOpacity ?? 0.4).toString());
-  const [shadowBlur, setShadowBlur] = useState<string>((template?.shadowBlur ?? 20).toString());
-  const [shadowOffsetX, setShadowOffsetX] = useState<string>((template?.shadowOffsetX ?? 2).toString());
-  const [shadowOffsetY, setShadowOffsetY] = useState<string>((template?.shadowOffsetY ?? 6).toString());
-  const [innerShadowEnabled, setInnerShadowEnabled] = useState<boolean>(template?.innerShadowEnabled ?? true);
-  const [innerShadowOpacity, setInnerShadowOpacity] = useState<string>((template?.innerShadowOpacity ?? 0.25).toString());
-  const [brightness, setBrightness] = useState<string>((template?.brightness ?? 0.94).toString());
-  const [contrast, setContrast] = useState<string>((template?.contrast ?? 0.97).toString());
-  const [saturation, setSaturation] = useState<string>((template?.saturation ?? 0.92).toString());
-  const [compositeBlur, setCompositeBlur] = useState<string>((template?.compositeBlur ?? 0).toString());
+  const [fitMode, setFitMode] = useState<string>(template?.fitMode ?? "contain");
+  const [brightness, setBrightness] = useState<string>((template?.brightness ?? 1.0).toString());
+  const [contrast, setContrast] = useState<string>((template?.contrast ?? 1.0).toString());
+  const [saturation, setSaturation] = useState<string>((template?.saturation ?? 1.0).toString());
 
   const [imgNaturalWidth, setImgNaturalWidth] = useState<number | null>(null);
   const [imgNaturalHeight, setImgNaturalHeight] = useState<number | null>(null);
@@ -541,19 +531,10 @@ export function MockupTemplateForm({
         posterHeight: posterHeight !== "" ? parseFloat(posterHeight) : undefined,
         rotation: rotation !== "" ? parseFloat(rotation) : undefined,
         borderRadius: borderRadius !== "" ? parseFloat(borderRadius) : undefined,
-        shadowStrength: shadowStrength !== "" ? parseFloat(shadowStrength) : undefined,
         fitMode,
-        shadowEnabled,
-        shadowOpacity: shadowOpacity !== "" ? parseFloat(shadowOpacity) : undefined,
-        shadowBlur: shadowBlur !== "" ? parseFloat(shadowBlur) : undefined,
-        shadowOffsetX: shadowOffsetX !== "" ? parseFloat(shadowOffsetX) : undefined,
-        shadowOffsetY: shadowOffsetY !== "" ? parseFloat(shadowOffsetY) : undefined,
-        innerShadowEnabled,
-        innerShadowOpacity: innerShadowOpacity !== "" ? parseFloat(innerShadowOpacity) : undefined,
         brightness: brightness !== "" ? parseFloat(brightness) : undefined,
         contrast: contrast !== "" ? parseFloat(contrast) : undefined,
         saturation: saturation !== "" ? parseFloat(saturation) : undefined,
-        compositeBlur: compositeBlur !== "" ? parseFloat(compositeBlur) : undefined,
         // Layered images
         lightingOverlayUrl: lightingOverlayUrl || undefined,
         foregroundImageUrl: foregroundImageUrl || undefined,
@@ -755,9 +736,9 @@ export function MockupTemplateForm({
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
               <div>
-                <Label>Template image</Label>
+                <Label>Base image</Label>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  This is the empty mockup background. Posters are inserted later when you run Sync mockups.
+                  The scene, wall, or room. The poster is composited in when you run Sync mockups.
                 </p>
               </div>
               <Button
@@ -967,7 +948,7 @@ export function MockupTemplateForm({
 
                 <p className="text-xs text-muted-foreground">
                   Percentage values (0–100) for the bounding box, or use <strong>Edit corners</strong> for a 4-corner perspective surface.
-                  Leave empty if using the full image as a mockup photo (no compositing).
+                  Define the poster surface before running Sync mockups.
                 </p>
 
                 {/* Header row */}
@@ -1109,18 +1090,6 @@ export function MockupTemplateForm({
                     />
                   </div>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Shadow strength (0–1, legacy)</Label>
-                  <Input
-                    type="number"
-                    value={shadowStrength}
-                    onChange={(e) => setShadowStrength(e.target.value)}
-                    placeholder="0"
-                    className="h-8 text-sm"
-                    min={0} max={1} step={0.1}
-                  />
-                  <p className="text-[10px] text-muted-foreground/60">Legacy field — use Compositing section below for full control</p>
-                </div>
               </div>
             )}
           </div>
@@ -1162,7 +1131,7 @@ export function MockupTemplateForm({
             </div>
           )}
 
-          {/* Compositing section */}
+          {/* Poster appearance section */}
           <div className="space-y-0 rounded-md border overflow-hidden">
             <button
               type="button"
@@ -1170,12 +1139,11 @@ export function MockupTemplateForm({
               onClick={() => setShowCompositing((v) => !v)}
             >
               <div className="flex items-center gap-2">
-                <p className="text-sm font-medium">Compositing</p>
-                {(brightness !== "0.94" || contrast !== "0.97" || saturation !== "0.92" ||
-                  compositeBlur !== "0" || !shadowEnabled || !innerShadowEnabled) ? (
+                <p className="text-sm font-medium">Poster appearance</p>
+                {(brightness !== "1" || contrast !== "1" || saturation !== "1") ? (
                   <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-300 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-700">Custom settings</span>
                 ) : (
-                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">Default settings</span>
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">Neutral</span>
                 )}
               </div>
               {showCompositing ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
@@ -1183,29 +1151,21 @@ export function MockupTemplateForm({
             {showCompositing && (
               <div className="space-y-3 px-4 pb-4 pt-1 border-t">
                 <div className="flex items-center justify-between mt-2">
-                  <p className="text-xs text-muted-foreground">Poster surface controls where the poster goes. Compositing controls how the inserted poster blends into the mockup.</p>
+                  <p className="text-xs text-muted-foreground">Adjustments applied to the inserted poster only during Sync. Does not affect the background or overlay layers.</p>
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
                     className="h-7 text-xs gap-1 shrink-0 ml-2"
                     onClick={() => {
-                      setFitMode("cover");
-                      setShadowEnabled(true);
-                      setShadowOpacity("0.4");
-                      setShadowBlur("20");
-                      setShadowOffsetX("2");
-                      setShadowOffsetY("6");
-                      setInnerShadowEnabled(true);
-                      setInnerShadowOpacity("0.25");
-                      setBrightness("0.94");
-                      setContrast("0.97");
-                      setSaturation("0.92");
-                      setCompositeBlur("0");
+                      setFitMode("contain");
+                      setBrightness("1");
+                      setContrast("1");
+                      setSaturation("1");
                     }}
                   >
                     <RotateCcw className="w-3 h-3" />
-                    Reset to defaults
+                    Reset to neutral
                   </Button>
                 </div>
                 <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-1">
@@ -1223,50 +1183,8 @@ export function MockupTemplateForm({
                     <SelectContent>
                       <SelectItem value="cover">Cover (fill area, crop if needed)</SelectItem>
                       <SelectItem value="contain">Contain (show full poster)</SelectItem>
-                      <SelectItem value="stretch">Stretch (exact fill, debug only)</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="flex items-center justify-between rounded border px-2.5 py-2 col-span-2">
-                    <div>
-                      <Label className="text-xs font-medium">Drop shadow</Label>
-                      <p className="text-[10px] text-muted-foreground">Shadow behind the inserted poster.</p>
-                    </div>
-                    <Switch checked={shadowEnabled} onCheckedChange={setShadowEnabled} />
-                  </div>
-                  {shadowEnabled && (
-                    <>
-                      <div className="space-y-1">
-                        <Label className="text-[11px] text-muted-foreground">Opacity</Label>
-                        <Input type="number" value={shadowOpacity} onChange={(e) => setShadowOpacity(e.target.value)} className="h-7 text-xs" min={0} max={1} step={0.05} />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-[11px] text-muted-foreground">Blur (px)</Label>
-                        <Input type="number" value={shadowBlur} onChange={(e) => setShadowBlur(e.target.value)} className="h-7 text-xs" min={0} max={80} step={1} />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-[11px] text-muted-foreground">Offset X (px)</Label>
-                        <Input type="number" value={shadowOffsetX} onChange={(e) => setShadowOffsetX(e.target.value)} className="h-7 text-xs" min={-50} max={50} step={1} />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-[11px] text-muted-foreground">Offset Y (px)</Label>
-                        <Input type="number" value={shadowOffsetY} onChange={(e) => setShadowOffsetY(e.target.value)} className="h-7 text-xs" min={-50} max={50} step={1} />
-                      </div>
-                    </>
-                  )}
-
-                  <div className="flex items-center justify-between rounded border px-2.5 py-2 col-span-2">
-                    <Label className="text-xs font-medium">Inner shadow</Label>
-                    <Switch checked={innerShadowEnabled} onCheckedChange={setInnerShadowEnabled} />
-                  </div>
-                  {innerShadowEnabled && (
-                    <div className="space-y-1 col-span-2">
-                      <Label className="text-[11px] text-muted-foreground">Inner opacity</Label>
-                      <Input type="number" value={innerShadowOpacity} onChange={(e) => setInnerShadowOpacity(e.target.value)} className="h-7 text-xs" min={0} max={1} step={0.05} />
-                    </div>
-                  )}
                 </div>
 
                 <div className="grid grid-cols-3 gap-2">
@@ -1281,10 +1199,6 @@ export function MockupTemplateForm({
                   <div className="space-y-1">
                     <Label className="text-[11px] text-muted-foreground">Saturation</Label>
                     <Input type="number" value={saturation} onChange={(e) => setSaturation(e.target.value)} className="h-7 text-xs" min={0} max={2} step={0.01} />
-                  </div>
-                  <div className="space-y-1 col-span-3">
-                    <Label className="text-[11px] text-muted-foreground">Blur (px, subtle softening)</Label>
-                    <Input type="number" value={compositeBlur} onChange={(e) => setCompositeBlur(e.target.value)} className="h-7 text-xs" min={0} max={3} step={0.1} />
                   </div>
                 </div>
               </div>
@@ -1301,10 +1215,10 @@ export function MockupTemplateForm({
           onClick={() => setShowLayeredImages((v) => !v)}
         >
           <div className="flex items-center gap-2">
-            <p className="text-sm font-medium">Layered images</p>
+            <p className="text-sm font-medium">Overlay layers</p>
             {(lightingOverlayUrl || foregroundImageUrl) ? (
               <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-800 border border-violet-300 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-700">
-                {[lightingOverlayUrl && "Lighting", foregroundImageUrl && "Foreground"].filter(Boolean).join(" + ")} configured
+                {[lightingOverlayUrl && "Effects", foregroundImageUrl && "Foreground"].filter(Boolean).join(" + ")} configured
               </span>
             ) : (
               <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">None configured</span>
@@ -1323,12 +1237,12 @@ export function MockupTemplateForm({
               Applied during Sync mockups. Run Sync after changing these images.
             </p>
 
-            {/* Lighting / shadow / reflection overlay */}
+            {/* Effects overlay */}
             <div className="space-y-3">
               <div>
-                <Label className="text-sm font-medium">Lighting / shadow overlay</Label>
+                <Label className="text-sm font-medium">Effects overlay</Label>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Full-size image composited over the poster. Use PNG with transparency for realistic lighting, glare, or shadow effects.
+                  Transparent full-size layer placed above the poster for shadows, reflections, glare, or lighting. Use PNG with transparency.
                 </p>
               </div>
               <div className="flex gap-2">

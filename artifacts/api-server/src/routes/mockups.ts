@@ -242,19 +242,10 @@ const ALLOWED_TEMPLATE_FIELDS = [
   "posterHeight",
   "rotation",
   "borderRadius",
-  "shadowStrength",
   "fitMode",
-  "shadowEnabled",
-  "shadowOpacity",
-  "shadowBlur",
-  "shadowOffsetX",
-  "shadowOffsetY",
-  "innerShadowEnabled",
-  "innerShadowOpacity",
   "brightness",
   "contrast",
   "saturation",
-  "compositeBlur",
   // Manual placement surface (corners or bbox)
   "placementConfig",
   // Layered image fields
@@ -501,24 +492,15 @@ router.post("/mockup-templates", requireAdmin, async (req, res) => {
       posterHeight: coercePlacementField(rest.posterHeight, "posterHeight") ?? null,
       rotation: coercePlacementField(rest.rotation, "rotation") ?? null,
       borderRadius: coercePlacementField(rest.borderRadius, "borderRadius") ?? null,
-      shadowStrength: coercePlacementField(rest.shadowStrength, "shadowStrength") ?? null,
       fitMode: (() => {
         const v = rest.fitMode;
-        if (v == null) return "cover";
-        if (!["cover", "contain", "stretch"].includes(v)) throw new Error(`fitMode must be 'cover', 'contain', or 'stretch', got: ${v}`);
+        if (v == null) return "contain";
+        if (!["cover", "contain"].includes(v)) throw new Error(`fitMode must be 'cover' or 'contain', got: ${v}`);
         return v;
       })(),
-      shadowEnabled: rest.shadowEnabled ?? true,
-      shadowOpacity: coerceRanged(rest.shadowOpacity, "shadowOpacity", 0, 1) ?? 0.4,
-      shadowBlur: coerceRanged(rest.shadowBlur, "shadowBlur", 0, 80) ?? 20,
-      shadowOffsetX: coerceRanged(rest.shadowOffsetX, "shadowOffsetX", -50, 50) ?? 2,
-      shadowOffsetY: coerceRanged(rest.shadowOffsetY, "shadowOffsetY", -50, 50) ?? 6,
-      innerShadowEnabled: rest.innerShadowEnabled ?? true,
-      innerShadowOpacity: coerceRanged(rest.innerShadowOpacity, "innerShadowOpacity", 0, 1) ?? 0.25,
-      brightness: coerceRanged(rest.brightness, "brightness", 0.5, 1.5) ?? 0.94,
-      contrast: coerceRanged(rest.contrast, "contrast", 0.5, 1.5) ?? 0.97,
-      saturation: coerceRanged(rest.saturation, "saturation", 0, 2) ?? 0.92,
-      compositeBlur: coerceRanged(rest.compositeBlur, "compositeBlur", 0, 3) ?? 0,
+      brightness: coerceRanged(rest.brightness, "brightness", 0.5, 1.5) ?? 1.0,
+      contrast: coerceRanged(rest.contrast, "contrast", 0.5, 1.5) ?? 1.0,
+      saturation: coerceRanged(rest.saturation, "saturation", 0, 2) ?? 1.0,
       // Layered image fields
       lightingOverlayUrl: rest.lightingOverlayUrl ?? null,
       foregroundImageUrl: rest.foregroundImageUrl ?? null,
@@ -562,29 +544,22 @@ router.put("/mockup-templates/:id", requireAdmin, async (req, res) => {
         key === "posterWidth" ||
         key === "posterHeight" ||
         key === "rotation" ||
-        key === "borderRadius" ||
-        key === "shadowStrength"
+        key === "borderRadius"
       ) {
         const coerced = coercePlacementField(req.body[key], key);
         if (coerced !== undefined) (updates as any)[key] = coerced;
         continue;
       }
 
-      if (key === "shadowOpacity") { const c = coerceRanged(req.body[key], key, 0, 1); if (c !== undefined) (updates as any)[key] = c; continue; }
-      if (key === "shadowBlur") { const c = coerceRanged(req.body[key], key, 0, 80); if (c !== undefined) (updates as any)[key] = c; continue; }
-      if (key === "shadowOffsetX") { const c = coerceRanged(req.body[key], key, -50, 50); if (c !== undefined) (updates as any)[key] = c; continue; }
-      if (key === "shadowOffsetY") { const c = coerceRanged(req.body[key], key, -50, 50); if (c !== undefined) (updates as any)[key] = c; continue; }
-      if (key === "innerShadowOpacity") { const c = coerceRanged(req.body[key], key, 0, 1); if (c !== undefined) (updates as any)[key] = c; continue; }
       if (key === "brightness") { const c = coerceRanged(req.body[key], key, 0.5, 1.5); if (c !== undefined) (updates as any)[key] = c; continue; }
       if (key === "contrast") { const c = coerceRanged(req.body[key], key, 0.5, 1.5); if (c !== undefined) (updates as any)[key] = c; continue; }
       if (key === "saturation") { const c = coerceRanged(req.body[key], key, 0, 2); if (c !== undefined) (updates as any)[key] = c; continue; }
-      if (key === "compositeBlur") { const c = coerceRanged(req.body[key], key, 0, 3); if (c !== undefined) (updates as any)[key] = c; continue; }
 
       if (key === "fitMode") {
         const v = req.body[key];
         if (v !== undefined) {
-          if (v !== null && !["cover", "contain", "stretch"].includes(v)) {
-            return res.status(400).json({ error: `fitMode must be 'cover', 'contain', or 'stretch', got: ${v}` });
+          if (v !== null && !["cover", "contain"].includes(v)) {
+            return res.status(400).json({ error: `fitMode must be 'cover' or 'contain', got: ${v}` });
           }
           (updates as any)[key] = v;
         }
@@ -656,12 +631,6 @@ router.get("/posters/:id/mockups", async (req, res) => {
       generatedAt: posterMockupsTable.generatedAt,
       errorMessage: posterMockupsTable.errorMessage,
       createdAt: posterMockupsTable.createdAt,
-      // Per-assignment layer toggles
-      useBase: posterMockupsTable.useBase,
-      useLightingOverlay: posterMockupsTable.useLightingOverlay,
-      useForeground: posterMockupsTable.useForeground,
-      lightingOpacityOverride: posterMockupsTable.lightingOpacityOverride,
-      foregroundOpacityOverride: posterMockupsTable.foregroundOpacityOverride,
       template: {
         id: mockupTemplatesTable.id,
         name: mockupTemplatesTable.name,
@@ -681,19 +650,10 @@ router.get("/posters/:id/mockups", async (req, res) => {
         posterHeight: mockupTemplatesTable.posterHeight,
         rotation: mockupTemplatesTable.rotation,
         borderRadius: mockupTemplatesTable.borderRadius,
-        shadowStrength: mockupTemplatesTable.shadowStrength,
         fitMode: mockupTemplatesTable.fitMode,
-        shadowEnabled: mockupTemplatesTable.shadowEnabled,
-        shadowOpacity: mockupTemplatesTable.shadowOpacity,
-        shadowBlur: mockupTemplatesTable.shadowBlur,
-        shadowOffsetX: mockupTemplatesTable.shadowOffsetX,
-        shadowOffsetY: mockupTemplatesTable.shadowOffsetY,
-        innerShadowEnabled: mockupTemplatesTable.innerShadowEnabled,
-        innerShadowOpacity: mockupTemplatesTable.innerShadowOpacity,
         brightness: mockupTemplatesTable.brightness,
         contrast: mockupTemplatesTable.contrast,
         saturation: mockupTemplatesTable.saturation,
-        compositeBlur: mockupTemplatesTable.compositeBlur,
         // Layered image fields
         lightingOverlayUrl: mockupTemplatesTable.lightingOverlayUrl,
         foregroundImageUrl: mockupTemplatesTable.foregroundImageUrl,
@@ -750,11 +710,6 @@ router.post("/posters/:id/mockups", requireAdmin, async (req, res) => {
       sortOrder: sortOrder ?? 0,
       isPrimary: isPrimary ?? false,
       isHoverMockup: isHoverMockup ?? false,
-      useBase: req.body.useBase ?? true,
-      useLightingOverlay: req.body.useLightingOverlay ?? true,
-      useForeground: req.body.useForeground ?? true,
-      lightingOpacityOverride: req.body.lightingOpacityOverride ?? null,
-      foregroundOpacityOverride: req.body.foregroundOpacityOverride ?? null,
     })
     .returning();
 
@@ -789,11 +744,6 @@ router.put("/posters/:id/mockups/batch", requireAdmin, async (req, res) => {
       sortOrder: m.sortOrder ?? idx,
       isPrimary: m.isPrimary ?? false,
       isHoverMockup: m.isHoverMockup ?? false,
-      useBase: m.useBase ?? true,
-      useLightingOverlay: m.useLightingOverlay ?? true,
-      useForeground: m.useForeground ?? true,
-      lightingOpacityOverride: m.lightingOpacityOverride ?? null,
-      foregroundOpacityOverride: m.foregroundOpacityOverride ?? null,
     }));
 
     await db.insert(posterMockupsTable).values(toInsert);
@@ -827,7 +777,6 @@ router.put("/posters/:id/mockups/batch", requireAdmin, async (req, res) => {
         posterHeight: mockupTemplatesTable.posterHeight,
         rotation: mockupTemplatesTable.rotation,
         borderRadius: mockupTemplatesTable.borderRadius,
-        shadowStrength: mockupTemplatesTable.shadowStrength,
       },
     })
     .from(posterMockupsTable)
@@ -836,41 +785,6 @@ router.put("/posters/:id/mockups/batch", requireAdmin, async (req, res) => {
     .orderBy(asc(posterMockupsTable.sortOrder), asc(posterMockupsTable.id));
 
   return res.json(result);
-});
-
-router.patch("/posters/:id/mockups/:mockupId/layers", requireAdmin, async (req, res) => {
-  const posterId = Number(req.params.id);
-  const mockupId = Number(req.params.mockupId);
-  if (isNaN(posterId) || isNaN(mockupId)) return res.status(400).json({ error: "Invalid id" });
-
-  const storeKey =
-    typeof req.query.storeKey === "string" ? req.query.storeKey : undefined;
-  if (!storeKey) return res.status(400).json({ error: "storeKey is required" });
-
-  const [poster] = await db
-    .select()
-    .from(postersTable)
-    .where(and(eq(postersTable.id, posterId), eq(postersTable.storeKey, storeKey)));
-
-  if (!poster) return res.status(404).json({ error: "Poster not found" });
-
-  const { useBase, useLightingOverlay, useForeground, lightingOpacityOverride, foregroundOpacityOverride } = req.body;
-
-  const updates: Record<string, unknown> = { updatedAt: new Date() };
-  if (useBase !== undefined) updates.useBase = Boolean(useBase);
-  if (useLightingOverlay !== undefined) updates.useLightingOverlay = Boolean(useLightingOverlay);
-  if (useForeground !== undefined) updates.useForeground = Boolean(useForeground);
-  if (lightingOpacityOverride !== undefined) updates.lightingOpacityOverride = lightingOpacityOverride === null ? null : Number(lightingOpacityOverride);
-  if (foregroundOpacityOverride !== undefined) updates.foregroundOpacityOverride = foregroundOpacityOverride === null ? null : Number(foregroundOpacityOverride);
-
-  const [updated] = await db
-    .update(posterMockupsTable)
-    .set(updates as any)
-    .where(and(eq(posterMockupsTable.id, mockupId), eq(posterMockupsTable.posterId, posterId)))
-    .returning();
-
-  if (!updated) return res.status(404).json({ error: "Mockup assignment not found" });
-  return res.json(updated);
 });
 
 router.patch("/posters/:id/mockups/:mockupId/hover", requireAdmin, async (req, res) => {
