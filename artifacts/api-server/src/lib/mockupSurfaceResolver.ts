@@ -14,7 +14,7 @@ import type { CornerPoints } from "./mockupCompositor";
 //
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type FitMode = "cover" | "contain" | "stretch";
+export type FitMode = "cover" | "contain";
 
 export interface NormalizedPoint {
   x: number;
@@ -61,9 +61,18 @@ export interface EffectiveMockupSurface {
   posterWidth: number | null;
   posterHeight: number | null;
   rotation: number;
-  fitMode: string | null;
+  fitMode: "cover" | "contain";
   surfaceSource: SurfaceSource;
   warnings: string[];
+}
+
+/**
+ * Normalize an unknown fit-mode value to the two allowed production values.
+ * Any value that is not exactly "cover" becomes "contain".
+ * This eliminates legacy "stretch" values and any garbage from placementConfig JSON.
+ */
+export function normalizeSurfaceFitMode(value: unknown): "cover" | "contain" {
+  return value === "cover" ? "cover" : "contain";
 }
 
 function round3(n: number): number {
@@ -226,7 +235,7 @@ export function resolveEffectiveMockupSurface(template: {
               posterWidth: round3(bb.width * 100),
               posterHeight: round3(bb.height * 100),
               rotation: 0,
-              fitMode: mc.fitMode ?? template.fitMode ?? null,
+              fitMode: normalizeSurfaceFitMode(mc.fitMode ?? template.fitMode),
               surfaceSource: geometryMode === "corners" ? "manual_corners" : "manual_bbox",
               warnings: [],
             };
@@ -243,7 +252,7 @@ export function resolveEffectiveMockupSurface(template: {
               posterWidth: round3(bb.width * 100),
               posterHeight: round3(bb.height * 100),
               rotation: 0,
-              fitMode: mc.fitMode ?? template.fitMode ?? null,
+              fitMode: normalizeSurfaceFitMode(mc.fitMode ?? template.fitMode),
               surfaceSource: "manual_bbox",
               warnings: [],
             };
@@ -270,7 +279,7 @@ export function resolveEffectiveMockupSurface(template: {
       posterWidth: template.posterWidth,
       posterHeight: template.posterHeight,
       rotation: template.rotation ?? 0,
-      fitMode: template.fitMode ?? null,
+      fitMode: normalizeSurfaceFitMode(template.fitMode),
       surfaceSource: "manual_bbox",
       warnings: [],
     };
@@ -285,7 +294,7 @@ export function resolveEffectiveMockupSurface(template: {
     posterWidth: null,
     posterHeight: null,
     rotation: template.rotation ?? 0,
-    fitMode: template.fitMode ?? null,
+    fitMode: normalizeSurfaceFitMode(template.fitMode),
     surfaceSource: "fallback",
     warnings: ["No poster surface defined — skipping sync for this template"],
   };

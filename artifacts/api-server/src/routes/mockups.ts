@@ -257,6 +257,25 @@ const ALLOWED_TEMPLATE_FIELDS = [
 ] as const;
 
 /**
+ * Validate and normalize a placementConfig value from the request body.
+ * - null → stored as null
+ * - non-object → throws 400-eligible error
+ * - object with fitMode → fitMode is normalized to "cover" | "contain"
+ * - other object properties are preserved as-is (corners, boundingBox, etc.)
+ */
+function normalizePlacementConfig(raw: unknown): unknown {
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error("placementConfig must be an object or null");
+  }
+  const config = { ...(raw as Record<string, unknown>) };
+  if ("fitMode" in config) {
+    config.fitMode = config.fitMode === "cover" ? "cover" : "contain";
+  }
+  return config;
+}
+
+/**
  * Coerce and validate placement fields from request body.
  * Returns null if the values look invalid, otherwise the cleaned numeric values.
  */
@@ -507,6 +526,7 @@ router.post("/mockup-templates", requireAdmin, async (req, res) => {
       defaultLightingBlendMode: rest.defaultLightingBlendMode ?? "multiply",
       defaultLightingOpacity: coerceRanged(rest.defaultLightingOpacity, "defaultLightingOpacity", 0, 1) ?? 0.8,
       defaultForegroundOpacity: coerceRanged(rest.defaultForegroundOpacity, "defaultForegroundOpacity", 0, 1) ?? 1.0,
+      placementConfig: normalizePlacementConfig(rest.placementConfig ?? null),
     };
 
     const [template] = await db
@@ -562,6 +582,14 @@ router.put("/mockup-templates/:id", requireAdmin, async (req, res) => {
             return res.status(400).json({ error: `fitMode must be 'cover' or 'contain', got: ${v}` });
           }
           (updates as any)[key] = v;
+        }
+        continue;
+      }
+
+      if (key === "placementConfig") {
+        const raw = req.body[key];
+        if (raw !== undefined) {
+          (updates as any)[key] = normalizePlacementConfig(raw);
         }
         continue;
       }

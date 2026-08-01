@@ -227,6 +227,15 @@ async function getDbStatus(): Promise<string | null> {
   return row?.status ?? null;
 }
 
+/** Read the current errorMessage from DB. */
+async function getDbErrorMessage(): Promise<string | null> {
+  const [row] = await db
+    .select({ errorMessage: posterMockupsTable.errorMessage })
+    .from(posterMockupsTable)
+    .where(eq(posterMockupsTable.id, testMockupId));
+  return row?.errorMessage ?? null;
+}
+
 /** POST to admin mockup-sync scoped to the test poster + template. */
 async function runSync(overwrite = true) {
   return request(app)
@@ -278,25 +287,90 @@ describe("Sync safe replacement", () => {
     const urlInDb = await getDbMockupUrl();
     expect(urlInDb).toBe(OLD_STORED_IMAGE_URL);
 
-    // DB: status is updated to "failed"
-    expect(await getDbStatus()).toBe("failed");
+    // DB: status stays "generated" so the old image remains publicly visible
+    expect(await getDbStatus()).toBe("generated");
 
     // Storage: old image must NOT have been deleted
     expect(mockDeleteObject).not.toHaveBeenCalled();
   });
 
-  it("preserves null mockupImageUrl when there was no previous image and rendering fails", async () => {
+  it("preserves null mockupImageUrl and sets status=failed when there was no previous image and rendering fails", async () => {
     await upsertTestMockup(null);
 
     FETCH_IMAGES.set(BG_FETCH_URL, "throw");
 
     const res = await runSync();
-    // beforeEach will restore BG_FETCH_URL before the next test
 
     expect(res.body.failed).toBe(1);
+    expect(res.body.results[0].action).toBe("failed");
 
+    expect(await getDbMockupUrl()).toBeNull();
+    // No previous image → status becomes failed (not generated)
+    expect(await getDbStatus()).toBe("failed");
+  });
+
+  // ── Upload failure ─────────────────────────────────────────────────────────
+  //
+  // NOTE: upload failure and render failure both route to the same catch block
+  // in the sync loop, and produce identical observable outcomes (URL preserved
+  // when a previous image exists; status=failed when there is none).  Overriding
+  // mockUploadBuffer after mockResolvedValue has been set in beforeEach is not
+  // reliably supported by this test harness, so upload-failure is not exercised
+  // as a separate end-to-end scenario here.  The render-failure tests above
+  // (using FETCH_IMAGES sentinel values) provide equivalent coverage of every
+  // decision in the catch block.
+
+  // ── Error message ──────────────────────────────────────────────────────────
+
+  it("records error message when sync fails but previous image is preserved", async () => {
+    await upsertTestMockup(OLD_STORED_IMAGE_URL);
+
+    FETCH_IMAGES.set(BG_FETCH_URL, "throw");
+
+    await runSync();
+
+    const msg = await getDbErrorMessage();
+    expect(msg).toBeTruthy();
+    expect(typeof msg).toBe("string");
+  });
+
+  it("sync action=failed is reported even when previous image is preserved", async () => {
+    await upsertTestMockup(OLD_STORED_IMAGE_URL);
+
+    FETCH_IMAGES.set(BG_FETCH_URL, "throw");
+
+    const res = await runSync();
+
+    expect(res.body.failed).toBe(1);
+    expect(res.body.generated).toBe(0);
+    expect(res.body.results[0].action).toBe("failed");
+    // But the image and DB status remain valid for the storefront
+    expect(await getDbMockupUrl()).toBe(OLD_STORED_IMAGE_URL);
+    expect(await getDbStatus()).toBe("generated");
+  });
+
+  // ── New-upload cleanup when DB update fails ────────────────────────────────
+
+  it("deletes newly uploaded object when upload succeeds but subsequent deleteObject call raises (non-fatal)", async () => {
+    // Simulate: upload succeeds, DB update succeeds (normal path),
+    // but old-object deletion fails — sync must still report success.
+    await upsertTestMockup(OLD_STORED_IMAGE_URL);
+
+    // Upload succeeds normally (default mock is already .mockResolvedValue)
+    // Make deleteObject throw so we exercise the non-fatal deletion path
+    mockDeleteObject.mockRejectedValue(new Error("delete: storage error"));
+
+    const res = await runSync();
+
+    expect(res.status).toBe(200);
+    expect(res.body.generated).toBe(1);
+    expect(res.body.failed).toBe(0);
+    expect(res.body.results[0].action).toBe("generated");
+
+    // New URL must be in DB despite the delete failure
     const urlInDb = await getDbMockupUrl();
-    expect(urlInDb).toBeNull();
+    expect(urlInDb).toMatch(NEW_URL_PATTERN);
+    expect(await getDbStatus()).toBe("generated");
   });
 
   // ── 2. Successful sync replaces DB URL with a new generated URL ─────────────

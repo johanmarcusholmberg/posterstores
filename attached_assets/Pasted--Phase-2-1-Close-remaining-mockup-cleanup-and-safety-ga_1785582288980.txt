@@ -1,0 +1,570 @@
+# Phase 2.1 — Close remaining mockup cleanup and safety gaps
+
+Complete the remaining cleanup after Phase 2.
+
+This is a focused corrective phase. Do not add new preview functionality, layer-dimension validation, render fingerprints, sync-state redesign, or unrelated storefront changes. Those belong to later phases.
+
+The current Phase 2 commit is:
+
+```text
+93d8c697e4d0efd209bcb5d181178b7caed24238
+```
+
+Inspect the current repository state before editing.
+
+## Primary goals
+
+1. Preserve an existing public mockup when regeneration fails.
+2. Clean up newly uploaded files when the database update fails.
+3. Eliminate all remaining `stretch` fit-mode paths.
+4. Remove the dead browser-side mockup compositor.
+5. Add the Phase 2 and safe-replacement tests that are currently missing.
+6. Keep the unified Phase 1 server renderer intact.
+
+---
+
+# 1. Preserve the previous public image after failed regeneration
+
+Current problem:
+
+* Mockup Sync preserves the old `mockupImageUrl`.
+* It then sets the assignment status to `failed`.
+* Public storefront selectors hide assignments with `status === "failed"`.
+* The previous image therefore remains stored but disappears from the website.
+
+Update:
+
+```text
+artifacts/api-server/src/routes/mockupSync.ts
+```
+
+When rendering, uploading, or saving a regenerated mockup fails:
+
+## When an existing valid image already exists
+
+Keep:
+
+```text
+mockupImageUrl = previous value
+status = generated
+```
+
+Also update:
+
+```text
+errorMessage = latest error
+updatedAt = current timestamp
+```
+
+The sync response must still report:
+
+```text
+action = failed
+```
+
+This means:
+
+* The failed attempt is visible in the admin sync results.
+* The latest error is stored.
+* The previously generated customer image remains publicly eligible.
+
+## When no previous image exists
+
+Use:
+
+```text
+mockupImageUrl = null
+status = failed
+errorMessage = latest error
+```
+
+Do not clear a valid previous image.
+
+Do not modify storefront visibility rules to work around this. Correct the backend state instead.
+
+---
+
+# 2. Clean up a newly uploaded file when the DB update fails
+
+Current safe-replacement sequence is:
+
+```text
+render
+→ upload new image
+→ update database
+→ delete old image
+```
+
+That sequence is correct, but if upload succeeds and the DB update fails, the newly uploaded file is orphaned.
+
+Track whether the new file was uploaded.
+
+Required behavior:
+
+```text
+Render fails
+→ no storage cleanup required
+→ preserve old image
+
+Upload fails
+→ preserve old image
+
+Upload succeeds but DB update fails
+→ delete the newly uploaded file
+→ preserve old image
+
+DB update succeeds
+→ delete the previous generated image
+```
+
+The cleanup of the newly uploaded file should be best-effort:
+
+* Log cleanup failures.
+* Do not replace the original sync error with the cleanup error.
+* Never delete the previous valid image in this failure path.
+
+Use a clearly scoped variable such as:
+
+```ts
+let uploadedObjectPath: string | null = null;
+```
+
+After the DB update succeeds, clear or otherwise mark that the new object is now authoritative.
+
+---
+
+# 3. Verify that the DB update actually succeeded
+
+The database update that replaces the URL should use `.returning()`.
+
+Verify that the expected assignment row was updated.
+
+If no row is returned:
+
+* Treat the operation as a DB update failure.
+* Delete the newly uploaded file.
+* Preserve the previous mockup URL and public status.
+
+Do not delete the old file until the successful update has been confirmed.
+
+---
+
+# 4. Remove all remaining Stretch fit-mode paths
+
+Phase 2 removed `stretch` from the top-level form and template API, but manual surface JSON can still contain:
+
+```text
+placementConfig.fitMode = "stretch"
+```
+
+The surface resolver currently gives this nested value priority.
+
+Update:
+
+```text
+artifacts/api-server/src/lib/mockupSurfaceResolver.ts
+```
+
+## Allowed production fit modes
+
+```text
+cover
+contain
+```
+
+Change the relevant types from:
+
+```ts
+"cover" | "contain" | "stretch"
+```
+
+to:
+
+```ts
+"cover" | "contain"
+```
+
+Where legacy or unknown values are encountered, normalize them to:
+
+```text
+contain
+```
+
+Create one normalization helper and use it consistently:
+
+```ts
+function normalizeSurfaceFitMode(
+  value: unknown
+): "cover" | "contain" {
+  return value === "cover" ? "cover" : "contain";
+}
+```
+
+Apply this to:
+
+* `placementConfig.fitMode`
+* top-level template `fitMode`
+* fallback surface resolution
+* manual corners
+* manual bounding boxes
+* legacy scalar bounding boxes
+
+Do not pass `stretch` to `renderMockup` from Sync.
+
+The low-level compositor may retain temporary support for `stretch` only if backwards-compatible wrapper tests still need it, but no active admin or sync path may produce it.
+
+---
+
+# 5. Normalize existing database records
+
+Update the Phase 2 migration or add a separate idempotent Phase 2.1 migration.
+
+Recommended file:
+
+```text
+artifacts/api-server/migrations/phase2-1-mockup-cleanup.sql
+```
+
+The migration must be idempotent.
+
+Normalize top-level fit modes:
+
+```sql
+UPDATE mockup_templates
+SET fit_mode = 'contain'
+WHERE fit_mode IS NULL
+   OR fit_mode NOT IN ('cover', 'contain');
+```
+
+Normalize nested manual-surface fit mode when `placement_config` is a JSON object:
+
+```sql
+UPDATE mockup_templates
+SET placement_config =
+  jsonb_set(placement_config, '{fitMode}', '"contain"'::jsonb, true)
+WHERE placement_config IS NOT NULL
+  AND jsonb_typeof(placement_config) = 'object'
+  AND (
+    placement_config->>'fitMode' IS NULL
+    OR placement_config->>'fitMode' NOT IN ('cover', 'contain')
+  );
+```
+
+Do not modify corner coordinates, bounding boxes, URLs, generated images, assignments, posters, or unrelated data.
+
+Run the migration twice against the development database and confirm the second execution succeeds.
+
+---
+
+# 6. Validate placementConfig writes
+
+Update:
+
+```text
+artifacts/api-server/src/routes/mockups.ts
+```
+
+When POST or PUT receives `placementConfig`:
+
+* Validate that it is an object when non-null.
+* Normalize or reject its `fitMode`.
+* Prefer normalization to `contain` for unknown legacy values.
+* Do not allow `stretch` to remain stored.
+
+Preserve valid:
+
+* Manual corner data
+* Bounding-box data
+* Coordinate system
+* Manual source marker
+
+Do not redesign the placement schema in this phase.
+
+---
+
+# 7. Remove the dead public browser compositor
+
+Update:
+
+```text
+artifacts/poster-store/src/components/public/MockupGallery.tsx
+```
+
+The public gallery already displays only flattened `mockupImageUrl` images.
+
+Remove dead code that is no longer called:
+
+* `hasPlacementData`
+* `CompositedMockupProps`
+* `buildPosterFilter`
+* `CompositedMockup`
+* `isComposited`
+* Any imports or state used only by those functions
+* Comments implying that live CSS composition is still available in this public component
+
+The public gallery should contain only:
+
+```text
+raw poster fallback
+generated flattened mockup images
+gallery navigation
+lightbox behavior
+thumbnail behavior
+visibility filtering
+```
+
+Do not change:
+
+* Gallery layout
+* Thumbnail carousel
+* Lightbox
+* Primary image selection
+* Friendly labels
+* Image ordering
+* Existing public styling
+
+---
+
+# 8. Correct remaining visible terminology
+
+In the mockup admin form:
+
+```text
+artifacts/poster-store/src/components/admin/MockupTemplateForm.tsx
+```
+
+Change visible wording:
+
+```text
+Click to upload background image
+```
+
+to:
+
+```text
+Click to upload base image
+```
+
+Change preview alt text:
+
+```text
+Lighting overlay preview
+```
+
+to:
+
+```text
+Effects overlay preview
+```
+
+Internal state and database field names containing `lighting` may remain because the database column is intentionally not being renamed.
+
+---
+
+# 9. Add backend tests
+
+Add or update tests under:
+
+```text
+artifacts/api-server/src/test/
+```
+
+## Safe replacement
+
+Test:
+
+1. Render failure with previous image:
+
+   * Sync reports failed.
+   * Previous URL remains.
+   * Status remains `generated`.
+   * Error message is updated.
+   * Old file is not deleted.
+
+2. Render failure without previous image:
+
+   * URL remains null.
+   * Status becomes `failed`.
+
+3. Upload failure with previous image:
+
+   * Previous URL remains.
+   * Status remains `generated`.
+   * No deletion of previous image.
+
+4. Upload succeeds but DB replacement update fails:
+
+   * Newly uploaded object is deleted.
+   * Previous URL remains.
+   * Previous URL remains publicly eligible.
+   * Original DB error is reported.
+
+5. Successful DB update:
+
+   * New URL is stored.
+   * Status is `generated`.
+   * Old generated object is deleted only afterward.
+
+6. Old-object deletion failure:
+
+   * Sync still reports success.
+   * New URL remains stored.
+   * Warning is logged.
+
+7. External previous URLs:
+
+   * Are never deleted.
+
+8. Update returning no row:
+
+   * Treated as failure.
+   * New upload is cleaned up.
+   * Previous image remains.
+
+## Fit-mode cleanup
+
+Test:
+
+1. Top-level `stretch` on POST returns 400.
+2. Top-level `stretch` on PUT returns 400.
+3. `placementConfig.fitMode = "stretch"` is normalized to `contain`.
+4. Missing nested fit mode resolves to the valid top-level fit mode.
+5. Unknown nested fit mode resolves to `contain`.
+6. Sync never passes `stretch` to the renderer.
+7. Existing valid `cover` and `contain` values are preserved.
+
+## Phase 2 defaults
+
+Keep or add tests verifying:
+
+```text
+brightness = 1
+contrast = 1
+saturation = 1
+fitMode = contain
+```
+
+New tests must verify behavior, not merely that functions exist.
+
+---
+
+# 10. Add frontend tests
+
+Use the existing frontend test framework if available.
+
+Test:
+
+## MockupTemplateForm
+
+* Shows `Effects overlay`.
+* Shows `Base image`.
+* Does not show shadow or blur controls.
+* Does not show Stretch.
+* Reset to neutral sets:
+
+  * fit mode to contain
+  * brightness to 1
+  * contrast to 1
+  * saturation to 1
+* Saving does not include removed shadow fields.
+
+## AdminPosterMockupManager
+
+* Does not show Base, Effects, or Foreground assignment toggles.
+* Batch payload does not include removed assignment-layer fields.
+* Primary, hover, removal, and ordering still work.
+
+## MockupGallery
+
+* Uses generated `mockupImageUrl`.
+* Does not attempt CSS composition from template placement data.
+* Failed rows without a usable public state remain hidden.
+* A preserved previous image with `status = generated` remains visible.
+
+---
+
+# 11. Preserve Phase 1 and Phase 2 architecture
+
+Do not reintroduce:
+
+* Procedural shadows
+* Inner shadows
+* Composite blur
+* Per-assignment layer controls
+* `useBase`
+* Stretch selection
+* Browser-side public mockup compositing
+* AI mockup generation
+* AI placement
+* Automatic mockup regeneration
+
+Do not change:
+
+* Unified `renderMockup` pipeline
+* Effects blend modes
+* Template-level effects opacity
+* Template-level foreground opacity
+* Four-corner editing
+* Bounding-box placement
+* Sync scopes
+* Dry run
+* Overwrite behavior
+* Hard sync limit
+* Gallery UI
+
+---
+
+# 12. Verification
+
+Run:
+
+```bash
+pnpm --filter @workspace/api-server run typecheck
+pnpm --filter @workspace/poster-store run typecheck
+pnpm --filter @workspace/api-server run test
+```
+
+Also run the frontend test suite if one is configured.
+
+Run the migration twice against the development database.
+
+Perform repository-wide searches for:
+
+```text
+useBase
+useLightingOverlay
+useForeground
+lightingOpacityOverride
+foregroundOpacityOverride
+shadowStrength
+shadowEnabled
+shadowOpacity
+shadowBlur
+shadowOffsetX
+shadowOffsetY
+innerShadowEnabled
+innerShadowOpacity
+compositeBlur
+"stretch"
+CompositedMockup
+```
+
+Expected results:
+
+* Removed mockup fields must not remain in active source code.
+* `stretch` may remain only in historical migrations, explicit rejection tests, or low-level backward-compatibility code with a documented reason.
+* `CompositedMockup` must not remain in the public gallery.
+
+At completion, report:
+
+1. Files changed
+2. Safe-replacement behavior before and after
+3. New-upload cleanup behavior
+4. Fit-mode normalization behavior
+5. Migration results from first and second execution
+6. Dead public compositor code removed
+7. Backend tests added
+8. Frontend tests added
+9. Typecheck and test totals
+10. Repository-search results
+11. Any remaining limitation before Phase 3

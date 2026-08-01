@@ -848,7 +848,7 @@ export function MockupTemplateForm({
                     <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground/40" />
                   )}
                   <p className="text-sm text-muted-foreground">
-                    {uploadProgress === "uploading" ? "Uploading..." : "Click to upload background image"}
+                    {uploadProgress === "uploading" ? "Uploading..." : "Click to upload base image"}
                   </p>
                   <p className="text-xs text-muted-foreground/60 mt-1">JPG, PNG, WebP • Max 10MB</p>
                 </div>
@@ -1273,7 +1273,7 @@ export function MockupTemplateForm({
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLayerFileUpload(f, setLightingOverlayUrl, setLightingUploadProgress); e.target.value = ""; }} />
               {lightingOverlayUrl && (
                 <div className="w-24 h-24 rounded border overflow-hidden bg-checkerboard">
-                  <img src={lightingOverlayUrl} alt="Lighting overlay preview" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                  <img src={lightingOverlayUrl} alt="Effects overlay preview" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                 </div>
               )}
               <div className="grid grid-cols-2 gap-2">

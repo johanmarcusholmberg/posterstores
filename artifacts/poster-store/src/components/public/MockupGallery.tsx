@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { type PosterMockup, type PosterMockupTemplate } from "@/lib/mockupApi";
+import { type PosterMockup } from "@/lib/mockupApi";
 import { cn } from "@/lib/utils";
 import { X, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from "lucide-react";
 
@@ -25,34 +25,20 @@ function getFriendlyLabel(m: PosterMockup): string {
   return "Lifestyle";
 }
 
-function hasPlacementData(t: PosterMockupTemplate | null): boolean {
-  return (
-    t != null &&
-    t.posterX != null &&
-    t.posterY != null &&
-    t.posterWidth != null &&
-    t.posterHeight != null
-  );
-}
-
 /**
  * Returns true when a mockup should be shown to customers on the public storefront.
  *
  * Public visibility rules (in order):
  *  1. isGallery=false  → hidden (admin explicitly excluded it from gallery)
- *  2. No mockupImageUrl → hidden (live CSS composites / unsynced rows are admin-only)
+ *  2. No mockupImageUrl → hidden (unsynced rows are admin-only)
  *  3. status=failed    → hidden (broken render, no usable image)
  *  4. Inactive template → hidden
  *  5. Everything else  → visible
- *
- * Note: CompositedMockup (live CSS overlay) is intentionally excluded from the
- * public gallery. It is admin-preview-only. Only generated flat images (mockupImageUrl)
- * are shown to customers.
  */
 function isVisible(m: PosterMockup): boolean {
   // 1. Respect gallery flag
   if (m.isGallery === false) return false;
-  // 2. Must have a generated final image — unsynced/live-composite rows are admin-only
+  // 2. Must have a generated final image
   if (!m.mockupImageUrl) return false;
   // 3. Failed renders are not customer-ready
   if (m.status === "failed") return false;
@@ -62,92 +48,9 @@ function isVisible(m: PosterMockup): boolean {
   return false;
 }
 
-interface CompositedMockupProps {
-  backgroundUrl: string;
-  posterImageUrl: string;
-  template: PosterMockupTemplate;
-  alt: string;
-  className?: string;
-}
-
-function buildPosterFilter(t: PosterMockupTemplate): string | undefined {
-  const brightness = t.brightness ?? 1;
-  const contrast = t.contrast ?? 1;
-  const saturation = t.saturation ?? 1;
-  const parts: string[] = [];
-  if (brightness !== 1) parts.push(`brightness(${brightness})`);
-  if (contrast !== 1) parts.push(`contrast(${contrast})`);
-  if (saturation !== 1) parts.push(`saturate(${saturation})`);
-  return parts.length > 0 ? parts.join(" ") : undefined;
-}
-
-function CompositedMockup({ backgroundUrl, posterImageUrl, template, alt, className }: CompositedMockupProps) {
-  const [bgLoaded, setBgLoaded] = useState(false);
-  const x = template.posterX!;
-  const y = template.posterY!;
-  const w = template.posterWidth!;
-  const h = template.posterHeight!;
-  const rot = template.rotation ?? 0;
-  const br = template.borderRadius ?? 0;
-
-  const fitMode = template.fitMode ?? "contain";
-  const objectFit: React.CSSProperties["objectFit"] =
-    fitMode === "contain" ? "contain" : "cover";
-
-  const posterFilter = buildPosterFilter(template);
-
-  return (
-    <div className={cn("relative w-full h-full", className)}>
-      {!bgLoaded && (
-        <div className="absolute inset-0 bg-muted animate-pulse" />
-      )}
-      <img
-        src={backgroundUrl}
-        alt={alt}
-        decoding="async"
-        className={cn("w-full h-full object-cover transition-opacity duration-300", bgLoaded ? "opacity-100" : "opacity-0")}
-        onLoad={() => setBgLoaded(true)}
-        onError={(e) => {
-          (e.target as HTMLImageElement).src = posterImageUrl;
-          setBgLoaded(true);
-        }}
-      />
-      {bgLoaded && (
-        <div
-          className="absolute"
-          style={{
-            left: `${x}%`,
-            top: `${y}%`,
-            width: `${w}%`,
-            height: `${h}%`,
-            transform: rot ? `rotate(${rot}deg)` : undefined,
-          }}
-        >
-          <div
-            className="relative w-full h-full overflow-hidden"
-            style={{
-              borderRadius: br ? `${br}px` : undefined,
-            }}
-          >
-            <img
-              src={posterImageUrl}
-              alt={alt}
-              className="w-full h-full"
-              style={{ objectFit, filter: posterFilter, display: "block" }}
-              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-            />
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 interface DisplayImage {
   url: string;
   label: string;
-  mockup?: PosterMockup;
-  isComposited?: boolean;
   /** True for the raw poster artwork — use object-contain so no cropping occurs. */
   isPosterArtwork?: boolean;
 }
@@ -161,15 +64,11 @@ export const MockupGallery = ({
   const visibleMockups = mockups.filter(isVisible);
 
   // isVisible() guarantees every entry in visibleMockups has a mockupImageUrl.
-  // Live CSS composites (no generated image) are filtered out before reaching here —
-  // they are admin-preview-only and never shown to public customers.
   const allImages: DisplayImage[] = [
     { url: fallbackImageUrl, label: "Poster", isPosterArtwork: true },
     ...visibleMockups.map((m) => ({
       url: m.mockupImageUrl!,   // always present after isVisible() filter
       label: getFriendlyLabel(m),
-      mockup: m,
-      isComposited: false,      // public gallery never does live CSS compositing
     } as DisplayImage)),
   ].filter((img, idx, arr) =>
     arr.findIndex((x) => x.url === img.url && x.label === img.label) === idx
@@ -186,9 +85,7 @@ export const MockupGallery = ({
   const primaryDisplayUrl = primaryMockup?.mockupImageUrl ?? null;
 
   const primaryIdx = primaryDisplayUrl
-    ? allImages.findIndex(
-        (i) => i.url === primaryDisplayUrl || i.mockup === primaryMockup
-      )
+    ? allImages.findIndex((i) => i.url === primaryDisplayUrl)
     : 0;
 
   const [activeIdx, setActiveIdx] = useState(primaryIdx >= 0 ? primaryIdx : 0);
@@ -445,25 +342,6 @@ export const MockupGallery = ({
   const activeItem = allImages[activeIdx] ?? { url: fallbackImageUrl, label: "Poster", isPosterArtwork: true };
 
   function renderMainImage(item: DisplayImage, className?: string) {
-    // isComposited is always false in the public gallery (isVisible() requires mockupImageUrl).
-    // The CompositedMockup branch below is retained as a safety net but will not execute
-    // for public storefront users. Live CSS compositing is admin-preview-only.
-    if (
-      item.isComposited &&
-      item.mockup?.template &&
-      hasPlacementData(item.mockup.template) &&
-      item.mockup.template.backgroundImageUrl
-    ) {
-      return (
-        <CompositedMockup
-          backgroundUrl={item.mockup.template.backgroundImageUrl!}
-          posterImageUrl={fallbackImageUrl}
-          template={item.mockup.template}
-          alt={alt}
-          className={className}
-        />
-      );
-    }
     return (
       <MainImage
         src={item.url}
@@ -867,10 +745,7 @@ export const MockupGallery = ({
 
 /**
  * Lightbox image renderer.
- *
- * Public gallery: isComposited is always false (isVisible() requires mockupImageUrl),
- * so all items render as a plain <img> with object-contain. The CompositedMockup path
- * is gone — live CSS compositing is admin-preview-only and never reaches the lightbox.
+ * All public gallery items are flattened generated images, rendered as a plain <img>.
  */
 
 function LightboxImage({

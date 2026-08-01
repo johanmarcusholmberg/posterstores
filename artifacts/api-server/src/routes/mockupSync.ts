@@ -257,6 +257,9 @@ router.post(
         continue;
       }
 
+      // Track any newly uploaded object so we can clean it up if the DB update fails.
+      let uploadedObjectPath: string | null = null;
+
       try {
         // ── Build surface config for unified renderer ─────────────────────────
         let renderSurface: RenderSurface;
@@ -298,8 +301,8 @@ router.post(
 
         // ── Unified render call ───────────────────────────────────────────────
         //
-        // Both bounding-box and perspective templates now go through the same
-        // layer pipeline: base → adjusted poster → effects overlay → foreground.
+        // Both bounding-box and perspective templates go through the same layer
+        // pipeline: base → adjusted poster → effects overlay → foreground.
         // Brightness / contrast / saturation are applied to the poster only.
         const renderResult = await renderMockup({
           templateImageUrl: template.backgroundImageUrl!,
@@ -321,27 +324,21 @@ router.post(
           finalSurfaceWarning = renderResult.surfaceWarning;
         }
 
-        // ── Safe replacement: upload → update DB → delete old ─────────────────
+        // ── Safe replacement: render → upload → verify DB update → delete old ─
         //
-        // The old composite is deleted ONLY after the database has been updated
-        // with the new URL.  This ensures the customer always sees a valid image:
-        //
-        //   1. Upload new image to object storage.
-        //   2. Update DB with new URL (status = generated).
-        //   3. Delete old image from storage (non-fatal if this fails).
-        //
-        // If rendering, upload, or DB update fails, the catch block marks the
-        // mockup as "failed" without clearing mockupImageUrl so the previously
-        // generated image remains visible.
+        //   1. Upload new image. Track the path so we can delete it if DB fails.
+        //   2. Update DB with new URL using .returning() to confirm the row exists.
+        //   3. Clear the upload tracker — the new object is now authoritative.
+        //   4. Delete old image from storage (non-fatal if this fails).
 
         const objectPath = `mockup-composites/${poster.id}/${template.id}-${randomUUID()}.jpg`;
         await storage.uploadBuffer(objectPath, renderResult.buffer, "image/jpeg");
+        uploadedObjectPath = objectPath;
         const imageUrl = `/api/storage/objects/${objectPath}`;
 
-        // Snapshot the previous URL before overwriting it in the DB.
         const previousUrl = mockup.mockupImageUrl;
 
-        await db
+        const [updatedRow] = await db
           .update(posterMockupsTable)
           .set({
             mockupImageUrl: imageUrl,
@@ -350,10 +347,18 @@ router.post(
             errorMessage: null,
             updatedAt: new Date(),
           })
-          .where(eq(posterMockupsTable.id, mockup.id));
+          .where(eq(posterMockupsTable.id, mockup.id))
+          .returning({ id: posterMockupsTable.id });
 
-        // Delete the old composite only after the DB update succeeds.
-        // Failure to delete is non-fatal — we log a warning and continue.
+        if (!updatedRow) {
+          throw new Error("DB update returned no row — assignment may have been deleted");
+        }
+
+        // New object is now authoritative — clear the cleanup tracker.
+        uploadedObjectPath = null;
+
+        // Delete the old composite only after the DB update is confirmed.
+        // Failure to delete is non-fatal — log a warning and continue.
         await tryDeleteOldComposite(previousUrl, req.log);
 
         generated++;
@@ -372,15 +377,42 @@ router.post(
         });
       } catch (err: unknown) {
         // ── Render / upload / DB update failed ────────────────────────────────
-        //
-        // Mark the mockup as failed but do NOT clear mockupImageUrl.
-        // The previously generated customer image remains intact.
         const msg = err instanceof Error ? err.message : "Unknown error";
         req.log.error({ err, posterId: poster.id, templateId: template.id }, "Sync failed");
 
+        // ── Clean up newly uploaded file if DB update failed ──────────────────
+        //
+        // If upload succeeded but the DB update threw, uploadedObjectPath is still
+        // set. Delete the orphaned object (best-effort, non-fatal).
+        if (uploadedObjectPath !== null) {
+          const pathToClean = uploadedObjectPath;
+          uploadedObjectPath = null;
+          try {
+            await storage.deleteObject(pathToClean);
+          } catch (cleanErr) {
+            req.log.warn(
+              { err: cleanErr, pathToClean },
+              "Failed to clean up orphaned upload after DB failure (non-fatal)"
+            );
+          }
+        }
+
+        // ── Preserve/fail DB state based on whether a previous image exists ───
+        //
+        // When a previous valid image exists, keep it public (status = generated)
+        // and only record the latest error. The customer-facing image remains intact.
+        //
+        // When there is no previous image, mark as failed so the admin knows
+        // this assignment has no usable image.
+        const hasPreviousImage = !!mockup.mockupImageUrl;
+
         await db
           .update(posterMockupsTable)
-          .set({ status: "failed", errorMessage: msg, updatedAt: new Date() })
+          .set(
+            hasPreviousImage
+              ? { status: "generated", errorMessage: msg, updatedAt: new Date() }
+              : { status: "failed",    errorMessage: msg, updatedAt: new Date() }
+          )
           .where(eq(posterMockupsTable.id, mockup.id));
 
         failed++;
