@@ -1,0 +1,1058 @@
+# Phase 3 — Mockup Template Validation and Exact Server Preview
+
+Build a reliable mockup-template preparation workflow before bulk Sync.
+
+Phase 1 established the unified backend renderer.
+
+Phase 2 simplified the admin model to:
+
+```text
+Base image
+→ Poster
+→ Effects overlay
+→ Foreground
+```
+
+Phase 2.1 fixed safe replacement, removed legacy browser compositing, and normalized fit modes.
+
+Phase 3 must now make templates verifiably ready before they are used for production Sync.
+
+## Primary goals
+
+1. Validate Base, Effects, Foreground, and poster-surface configuration.
+2. Detect dimension and transparency problems before Sync.
+3. Add an exact server-rendered preview using the same `renderMockup` pipeline as production Sync.
+4. Clearly show whether a template is a draft, invalid, previewable, or ready for Sync.
+5. Prevent avoidable bulk-generation mistakes.
+6. Add the focused DB-update-failure cleanup test deferred from Phase 2.1.
+
+Do not redesign the storefront, assignment workflow, checkout, poster cards, gallery layout, navigation, or unrelated admin functionality.
+
+---
+
+# 1. Preserve the existing architecture
+
+Keep these existing principles:
+
+* Public mockups are flattened generated images.
+* The backend renderer is authoritative.
+* Base image is always used.
+* Effects and Foreground settings come from the template.
+* Effects and Foreground are optional.
+* Poster brightness, contrast, and saturation affect only the poster.
+* Fit modes are only `cover` and `contain`.
+* Four-corner surfaces and bounding-box surfaces remain supported.
+* Preview and Sync must use the same rendering function.
+* Preview must not create or modify poster assignments.
+* Preview must not replace public mockup images.
+* Preview must not trigger automatic bulk regeneration.
+
+Do not reintroduce:
+
+* Browser-side public compositing
+* Procedural shadows
+* Inner shadows
+* Composite blur
+* Per-assignment layer controls
+* Stretch mode
+* AI placement
+* AI mockup generation
+
+---
+
+# 2. Define template readiness
+
+Create one shared backend validation model for mockup templates.
+
+Recommended result shape:
+
+```ts
+type MockupTemplateValidationSeverity = "error" | "warning" | "info";
+
+interface MockupTemplateValidationIssue {
+  code: string;
+  severity: MockupTemplateValidationSeverity;
+  field:
+    | "backgroundImageUrl"
+    | "placementConfig"
+    | "posterSurface"
+    | "lightingOverlayUrl"
+    | "foregroundImageUrl"
+    | "dimensions"
+    | "transparency"
+    | "preview";
+  message: string;
+}
+
+interface MockupTemplateValidationResult {
+  valid: boolean;
+  previewable: boolean;
+  readyForSync: boolean;
+  issues: MockupTemplateValidationIssue[];
+  images: {
+    base: MockupImageMetadata | null;
+    effects: MockupImageMetadata | null;
+    foreground: MockupImageMetadata | null;
+  };
+  surface: {
+    valid: boolean;
+    source: string | null;
+    geometryMode: "corners" | "bounding_box" | null;
+  };
+}
+```
+
+Recommended image metadata:
+
+```ts
+interface MockupImageMetadata {
+  width: number;
+  height: number;
+  format: string | null;
+  hasAlpha: boolean;
+  isOpaque: boolean;
+  channels: number | null;
+  sizeBytes?: number | null;
+}
+```
+
+Use consistent machine-readable issue codes such as:
+
+```text
+BASE_MISSING
+BASE_FETCH_FAILED
+BASE_INVALID_IMAGE
+BASE_RESOLUTION_LOW
+SURFACE_MISSING
+SURFACE_INVALID
+EFFECTS_FETCH_FAILED
+EFFECTS_DIMENSION_MISMATCH
+EFFECTS_NO_ALPHA
+EFFECTS_FULLY_OPAQUE
+FOREGROUND_FETCH_FAILED
+FOREGROUND_DIMENSION_MISMATCH
+FOREGROUND_NO_ALPHA
+FOREGROUND_FULLY_OPAQUE
+PREVIEW_POSTER_MISSING
+PREVIEW_RENDER_FAILED
+```
+
+Do not store localized UI text in the database.
+
+---
+
+# 3. Add a shared validation service
+
+Create a focused backend module, for example:
+
+```text
+artifacts/api-server/src/lib/mockupTemplateValidation.ts
+```
+
+The service should:
+
+1. Fetch the Base image.
+2. Read image metadata with Sharp.
+3. Resolve and validate the effective poster surface.
+4. Fetch optional Effects and Foreground images.
+5. Compare optional layer dimensions to the Base image.
+6. Inspect alpha/transparency information.
+7. Return structured validation results.
+
+Reuse existing URL-fetching or image-loading helpers where practical.
+
+Do not duplicate renderer logic unnecessarily.
+
+## Fetch safety
+
+Apply the repository’s existing URL and storage-access safeguards.
+
+The validation service must:
+
+* Handle internal `/api/storage/objects/...` URLs.
+* Handle supported external URLs if currently allowed.
+* Use bounded download sizes.
+* Use reasonable timeouts if existing infrastructure supports them.
+* Return validation errors rather than crashing the route.
+* Avoid logging full signed URLs or secrets.
+
+Do not add unrestricted SSRF behavior.
+
+---
+
+# 4. Base-image validation
+
+The Base image is required before a template can be previewed or synced.
+
+Validate:
+
+* URL exists.
+* Image can be fetched.
+* Data is a valid supported image.
+* Width and height are available.
+* Resolution is usable.
+* Poster surface is valid.
+
+Supported formats should remain consistent with the existing upload workflow:
+
+```text
+JPEG
+PNG
+WebP
+```
+
+## Resolution threshold
+
+Introduce a conservative configurable minimum, not an arbitrary production-hardcoded assumption.
+
+Recommended default:
+
+```text
+Minimum short side: 1200 px
+```
+
+Behavior:
+
+* Below the threshold: warning by default.
+* Missing, unreadable, or zero dimensions: error.
+* Do not reject a valid template solely because it is below the recommended resolution unless the project already has a stricter rule.
+
+Expose the threshold as a named constant.
+
+Example:
+
+```ts
+const RECOMMENDED_BASE_MIN_SHORT_SIDE = 1200;
+```
+
+The validation message should clearly distinguish:
+
+```text
+Valid but low resolution
+```
+
+from:
+
+```text
+Invalid or unreadable image
+```
+
+---
+
+# 5. Poster-surface validation
+
+Use the existing:
+
+```text
+resolveEffectiveMockupSurface
+```
+
+and existing corner-validation helpers.
+
+A valid production template must have:
+
+* Base image
+* Valid manual corner surface or valid bounding-box surface
+* Coordinates within the image
+* Non-degenerate width and height
+* Fit mode normalized to `cover` or `contain`
+
+Validation should report:
+
+* Surface source
+* Geometry mode
+* Any existing resolver warnings
+
+A missing surface is an error for preview and Sync readiness.
+
+Do not silently apply a new default placement during validation.
+
+Do not mutate the template during validation.
+
+---
+
+# 6. Effects-overlay validation
+
+Effects overlay remains optional.
+
+When no Effects URL exists:
+
+```text
+No error
+No warning
+Layer metadata = null
+```
+
+When an Effects URL exists, validate:
+
+* Fetch succeeds.
+* File is a valid image.
+* Width matches Base width exactly.
+* Height matches Base height exactly.
+* Image has an alpha channel.
+* Image contains at least some transparency.
+
+The Effects layer must not be stretched or resized to hide mismatches.
+
+Dimension mismatch must be an error:
+
+```text
+Effects overlay is 1800×2400 px, but Base image is 2000×2800 px.
+Upload an overlay with exactly the same dimensions.
+```
+
+Transparency behavior:
+
+* No alpha channel: error.
+* Alpha channel but all pixels opaque: warning or error.
+
+Recommended policy:
+
+```text
+No alpha channel → error
+Alpha exists but image is fully opaque → warning
+```
+
+The warning is useful because an intentionally full-size blend layer may sometimes be opaque, but administrators should be informed.
+
+Use Sharp metadata and channel statistics where practical.
+
+Do not perform expensive full-resolution pixel analysis more than necessary.
+
+---
+
+# 7. Foreground validation
+
+Foreground remains optional.
+
+When a Foreground URL exists, validate:
+
+* Fetch succeeds.
+* File is a valid image.
+* Dimensions match the Base image exactly.
+* Image has an alpha channel.
+* Image contains at least some transparency.
+
+Recommended policy:
+
+```text
+No alpha channel → error
+Fully opaque foreground → error
+```
+
+A fully opaque Foreground would cover everything below it and is therefore generally invalid.
+
+The validation message should explain:
+
+> Foreground must contain transparency so the Base image and inserted poster remain visible.
+
+---
+
+# 8. Reject layer mismatch during rendering
+
+The current renderer may resize overlays to the Base canvas.
+
+Change the production path so mismatched Effects or Foreground dimensions are not silently stretched.
+
+Implement a shared dimension assertion used by both:
+
+* Preview
+* Production Sync
+
+Required behavior:
+
+```text
+Base:       2000×2800
+Effects:    1800×2400
+Result:     render rejected with descriptive validation error
+```
+
+Do not depend only on the admin UI. Backend rendering must enforce the rule.
+
+Suggested error messages:
+
+```text
+Effects overlay dimensions must match Base image dimensions exactly.
+Foreground dimensions must match Base image dimensions exactly.
+```
+
+If dimension information is already loaded during rendering, avoid unnecessary duplicate downloads.
+
+A reasonable refactor may introduce a prepared-image or validated-layer helper, but keep the unified renderer understandable.
+
+---
+
+# 9. Add validation API endpoints
+
+Add admin-only endpoints.
+
+Recommended endpoints:
+
+```text
+POST /api/admin/mockup-templates/:id/validate
+POST /api/admin/mockup-templates/validate-draft
+```
+
+## Saved template validation
+
+```text
+POST /api/admin/mockup-templates/:id/validate
+```
+
+* Load the saved template.
+* Confirm the administrator can access its store scope.
+* Run validation.
+* Return the structured validation result.
+* Do not mutate the template.
+
+## Unsaved draft validation
+
+```text
+POST /api/admin/mockup-templates/validate-draft
+```
+
+Accept only the fields required for validation:
+
+* Base URL
+* Placement config
+* Bounding-box fields
+* Fit mode
+* Effects URL
+* Foreground URL
+* Appearance and layer settings where relevant
+
+This allows validation before creating the template.
+
+Validate and normalize request input using the existing conventions.
+
+Apply admin authentication and appropriate rate limiting.
+
+Do not expose these endpoints publicly.
+
+---
+
+# 10. Add exact preview endpoint
+
+Add:
+
+```text
+POST /api/admin/mockup-templates/:id/preview
+```
+
+Request body:
+
+```ts
+interface MockupPreviewRequest {
+  posterId: number;
+}
+```
+
+Optional support for an explicit poster URL may be added only if needed for unsaved drafts, but prefer selecting an existing poster.
+
+The endpoint must:
+
+1. Authenticate the administrator.
+2. Load the template.
+3. Load the selected poster.
+4. Confirm the poster belongs to the requested or permitted store.
+5. Validate the template.
+6. Reject preview when blocking validation errors exist.
+7. Call the existing production `renderMockup`.
+8. Return or store a temporary preview result.
+
+The preview output must use the exact same:
+
+* Surface resolution
+* Poster adjustments
+* Effects layer
+* Effects blend mode
+* Effects opacity
+* Foreground
+* Foreground opacity
+* Output encoding
+
+as Sync.
+
+## Preview response strategy
+
+Prefer one of these approaches:
+
+### Preferred
+
+Upload to a temporary admin-only preview path:
+
+```text
+mockup-previews/{user-or-session}/{templateId}/{uuid}.jpg
+```
+
+Return:
+
+```ts
+{
+  previewUrl: string;
+  expiresAt?: string;
+  validation: MockupTemplateValidationResult;
+  width: number;
+  height: number;
+}
+```
+
+Ensure preview paths are not treated as public poster mockups.
+
+### Alternative
+
+Return the rendered JPEG directly from the endpoint.
+
+Use this only if it integrates cleanly with the frontend and avoids memory or browser limitations.
+
+Do not write the preview URL to:
+
+```text
+poster_mockups.mockup_image_url
+```
+
+Do not update assignment status.
+
+Do not delete or replace any production mockup.
+
+---
+
+# 11. Preview storage cleanup
+
+Prevent permanent accumulation of previews.
+
+Use one of:
+
+* Short-lived signed URLs
+* Temporary object paths with cleanup
+* Reuse and replace the latest preview per template and admin session
+* Existing temporary-object infrastructure
+
+Document the chosen cleanup strategy.
+
+At minimum:
+
+* Preview files must use a separate path from production composites.
+* Production deletion helpers must not confuse preview images with public mockups.
+* Preview generation failure must clean up partial uploads where relevant.
+
+Do not build a large background cleanup system in this phase.
+
+---
+
+# 12. Admin template form — validation interface
+
+Update:
+
+```text
+artifacts/poster-store/src/components/admin/MockupTemplateForm.tsx
+```
+
+Add a clear readiness panel.
+
+Suggested title:
+
+```text
+Template readiness
+```
+
+Suggested statuses:
+
+```text
+Draft
+Needs attention
+Ready for preview
+Ready for Sync
+```
+
+Display validation issues grouped by:
+
+* Base image
+* Poster surface
+* Effects overlay
+* Foreground
+* Preview
+
+Use distinct visual severity:
+
+* Error
+* Warning
+* Information
+
+Do not rely only on color. Include icons and text labels.
+
+## Validation actions
+
+Add:
+
+```text
+Validate template
+```
+
+For existing templates, call the saved-template validation endpoint.
+
+For unsaved templates, call the draft-validation endpoint.
+
+Disable validation while uploads are still running.
+
+Show:
+
+* Base dimensions
+* Effects dimensions
+* Foreground dimensions
+* Alpha/transparency status
+* Surface source
+* Geometry mode
+* Resolution warning where applicable
+
+Do not automatically validate on every keystroke.
+
+Reasonable automatic revalidation is allowed after:
+
+* Successful image upload
+* Surface save
+* Explicit Save
+
+But avoid excessive network requests.
+
+---
+
+# 13. Exact preview interface
+
+Add a preview section to the template form.
+
+Recommended flow:
+
+1. Select a poster from the current store.
+2. Click `Generate preview`.
+3. Show progress.
+4. Display the rendered result.
+5. Display validation issues alongside it.
+6. Allow preview regeneration after changes.
+
+Do not use CSS compositing.
+
+The preview image must be the server-rendered JPEG.
+
+## Poster selector
+
+Use an existing admin poster-search endpoint where available.
+
+Requirements:
+
+* Search by poster title.
+* Show thumbnail and title.
+* Use published or administratively valid posters.
+* Keep the selector lightweight.
+* Do not load the entire poster catalogue unnecessarily.
+
+If no suitable reusable endpoint exists, add a narrowly scoped admin poster search endpoint.
+
+Do not create poster assignments from the preview selector.
+
+---
+
+# 14. Readiness policy
+
+Use a clear policy.
+
+Recommended:
+
+```text
+previewable =
+  Base valid
+  AND surface valid
+  AND no blocking layer errors
+
+readyForSync =
+  previewable
+  AND latest preview successfully generated
+```
+
+However, do not persist `readyForSync` as a database boolean in this phase unless there is a strong existing need.
+
+Prefer deriving readiness from:
+
+* Current validation result
+* Current preview result in the admin session
+
+Reason:
+
+Template files or configuration may change after a stored boolean is set.
+
+Persistent render fingerprints and stale-state tracking belong to Phase 4.
+
+The UI may say:
+
+```text
+Ready for Sync in this session
+```
+
+or:
+
+```text
+Preview generated successfully
+```
+
+Do not imply permanent approval if no persistent fingerprint exists.
+
+---
+
+# 15. Sync integration
+
+Before rendering each template in production Sync, enforce critical validation:
+
+* Base readable
+* Surface valid
+* Effects dimensions match Base
+* Foreground dimensions match Base
+* Required transparency rules
+
+Do not necessarily run the entire admin validation service from scratch for every poster if it would repeatedly download the same template layers.
+
+Optimize within a single Sync request:
+
+```text
+Validate and fetch shared template assets once
+→ reuse for all posters using that template
+```
+
+A simple in-request cache keyed by template ID is acceptable.
+
+Do not implement cross-request caching or render fingerprints yet.
+
+Sync failure should return a clear template-level reason such as:
+
+```text
+Template validation failed: Effects overlay dimensions do not match Base image.
+```
+
+Do not mark each poster assignment as having a poster-specific renderer defect when the template itself is invalid without including the shared cause.
+
+Preserve Phase 2.1 safe-replacement behavior:
+
+* Existing generated image stays public.
+* Failed attempt is reported.
+* Newly uploaded orphan is cleaned up.
+* Old image is deleted only after confirmed replacement.
+
+---
+
+# 16. Focused Phase 2.1 DB-failure test
+
+Add the deferred regression test.
+
+Test scenario:
+
+```text
+Existing valid generated mockup exists
+→ render succeeds
+→ upload succeeds
+→ DB update throws or returns no row
+→ newly uploaded object is deleted
+→ previous URL remains unchanged
+→ previous status remains generated
+→ old object is not deleted
+→ sync response reports failed
+```
+
+Test both where practical:
+
+1. DB update throws.
+2. DB update returns no row.
+
+Do not replace this with a render-failure test.
+
+The test must distinguish:
+
+* Newly uploaded object cleanup
+* Old production object preservation
+
+Also test:
+
+```text
+orphan cleanup deletion fails
+→ original DB error remains the reported failure
+→ cleanup error is only logged
+```
+
+---
+
+# 17. Backend validation tests
+
+Add tests for the shared validation service.
+
+## Base
+
+* Missing Base is an error.
+* Invalid Base is an error.
+* Valid Base returns dimensions.
+* Low-resolution Base returns warning.
+* Valid JPEG, PNG, and WebP metadata is handled.
+
+## Surface
+
+* Valid corner surface passes.
+* Valid bounding box passes.
+* Missing surface fails.
+* Degenerate surface fails.
+* Invalid coordinates fail.
+* Stretch or unknown fit mode resolves to contain.
+
+## Effects
+
+* Missing Effects passes.
+* Matching transparent Effects passes.
+* Dimension mismatch fails.
+* No alpha fails.
+* Fully opaque alpha image warns.
+
+## Foreground
+
+* Missing Foreground passes.
+* Matching transparent Foreground passes.
+* Dimension mismatch fails.
+* No alpha fails.
+* Fully opaque Foreground fails.
+
+## Preview
+
+* Blocking validation issue prevents rendering.
+* Valid template calls `renderMockup`.
+* Preview uses template-level blend mode and opacity.
+* Preview does not modify `poster_mockups`.
+* Preview failure does not affect public assignments.
+* Preview output is JPEG.
+* Preview uses the selected poster.
+
+---
+
+# 18. API route tests
+
+Add route-level tests for:
+
+```text
+POST /api/admin/mockup-templates/:id/validate
+POST /api/admin/mockup-templates/validate-draft
+POST /api/admin/mockup-templates/:id/preview
+```
+
+Test:
+
+* Admin authentication required.
+* Missing template returns 404.
+* Missing poster returns 404.
+* Cross-store poster access is rejected.
+* Invalid template returns structured validation issues.
+* Valid template returns metadata.
+* Preview returns a usable preview result.
+* Preview does not alter assignment count or production URLs.
+* Rate limiting follows existing admin conventions.
+
+---
+
+# 19. Frontend tests
+
+Use the existing frontend test setup.
+
+Test:
+
+## Template readiness
+
+* Readiness section renders.
+* Errors and warnings have visible labels.
+* Base, Effects, and Foreground dimensions display.
+* Validate button calls the correct endpoint.
+* Unsaved template uses draft validation.
+* Existing template uses saved validation.
+* Validation does not create an assignment.
+
+## Preview
+
+* Poster can be selected.
+* Generate preview button is disabled without a poster.
+* Blocking errors prevent preview generation.
+* Successful preview displays the returned image.
+* Preview loading and error states are visible.
+* Preview does not replace the template’s Base image.
+* Preview does not update public mockup fields.
+
+## Existing behavior
+
+* Base upload still works.
+* Surface editor still works.
+* Effects and Foreground upload still work.
+* Save template still works.
+* Reset to neutral still works.
+* Assignment manager remains unchanged.
+
+---
+
+# 20. Migration and schema
+
+Avoid adding schema columns unless clearly necessary.
+
+Do not add:
+
+* `is_ready`
+* `preview_approved`
+* `validation_status`
+* `render_fingerprint`
+* `stale`
+* `last_preview_hash`
+
+These would become stale without Phase 4 fingerprint logic.
+
+A small schema addition for temporary preview ownership is allowed only if existing object-storage mechanisms cannot support previews without it.
+
+Prefer no schema migration in Phase 3.
+
+---
+
+# 21. Performance safeguards
+
+Validation and preview involve image downloads and processing.
+
+Add reasonable safeguards:
+
+* Maximum image download size.
+* Maximum decoded pixel count if Sharp exposes a safe limit.
+* Request timeout where supported.
+* One preview render per request.
+* Existing admin rate limiter.
+* No unlimited concurrency.
+* Reuse template assets within one Sync request.
+* Avoid repeated transparency scans for the same image in one request.
+
+Do not prematurely build a distributed cache.
+
+---
+
+# 22. Error handling and logging
+
+Return clear admin-facing messages.
+
+Good:
+
+```text
+Effects overlay dimensions are 1800×2400 px. Base image dimensions are 2000×2800 px.
+```
+
+Bad:
+
+```text
+Sharp composite error
+```
+
+Log technical details server-side.
+
+Do not expose:
+
+* Storage credentials
+* Signed upload tokens
+* Stack traces
+* Internal filesystem paths
+* Full authentication headers
+
+Preview errors must not affect production mockups.
+
+---
+
+# 23. Manual verification
+
+After implementation, perform these tests.
+
+## Base only
+
+1. Create template with Base and valid surface.
+2. Validate.
+3. Generate preview.
+4. Confirm poster is placed correctly.
+
+## Base plus Effects
+
+1. Upload matching transparent Effects layer.
+2. Validate dimensions and transparency.
+3. Generate preview.
+4. Confirm effects appear above the poster.
+
+## Base plus Foreground
+
+1. Upload matching transparent Foreground.
+2. Generate preview.
+3. Confirm foreground appears above everything.
+
+## All layers
+
+1. Base
+2. Poster
+3. Effects
+4. Foreground
+
+Confirm exact layer order visually.
+
+## Mismatch
+
+1. Upload Effects with different dimensions.
+2. Confirm readiness error.
+3. Confirm preview is blocked.
+4. Confirm production Sync is blocked for that template.
+5. Confirm no layer is stretched.
+
+## Opaque foreground
+
+1. Upload an opaque Foreground.
+2. Confirm validation error.
+
+## Failed regeneration safety
+
+1. Start with a valid public generated mockup.
+2. Make template validation fail.
+3. Run overwrite Sync.
+4. Confirm old public image remains visible.
+5. Confirm failed attempt is shown in admin.
+
+---
+
+# 24. Verification commands
+
+Run:
+
+```bash
+pnpm --filter @workspace/api-server run typecheck
+pnpm --filter @workspace/poster-store run typecheck
+pnpm --filter @workspace/api-server run test
+```
+
+Run the frontend test suite if configured.
+
+Run production builds if repository scripts are available.
+
+Do not bypass test failures.
+
+---
+
+# 25. Completion report
+
+At completion, report:
+
+1. Files added and changed
+2. Validation architecture
+3. Readiness rules
+4. Base-image validation behavior
+5. Effects validation behavior
+6. Foreground validation behavior
+7. Transparency-detection method
+8. Dimension-enforcement behavior
+9. Preview endpoint and storage strategy
+10. Confirmation that preview uses production `renderMockup`
+11. Confirmation that preview does not modify assignments or public URLs
+12. Sync integration and in-request caching
+13. Focused DB-failure cleanup test result
+14. Backend tests added
+15. Frontend tests added
+16. Typecheck and test totals
+17. Manual verification results
+18. Any limitation deferred to Phase 4
+
+Do not start Phase 4 work in this phase.

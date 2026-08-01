@@ -485,3 +485,128 @@ export async function adminRunMockupSync(params: {
   if (!res.ok) await handleError(res);
   return res.json();
 }
+
+// ─── Phase 3: Validation & Preview ────────────────────────────────────────────
+
+export type MockupTemplateValidationSeverity = "error" | "warning" | "info";
+export type MockupTemplateValidationField =
+  | "backgroundImageUrl"
+  | "placementConfig"
+  | "posterSurface"
+  | "lightingOverlayUrl"
+  | "foregroundImageUrl"
+  | "dimensions"
+  | "transparency"
+  | "preview";
+
+export interface MockupTemplateValidationIssue {
+  code: string;
+  severity: MockupTemplateValidationSeverity;
+  field: MockupTemplateValidationField;
+  message: string;
+}
+
+export interface MockupImageMetadata {
+  width: number;
+  height: number;
+  format: string | null;
+  hasAlpha: boolean;
+  isOpaque: boolean;
+  channels: number | null;
+  sizeBytes: number | null;
+}
+
+export interface MockupTemplateValidationResult {
+  valid: boolean;
+  previewable: boolean;
+  readyForSync: boolean;
+  issues: MockupTemplateValidationIssue[];
+  images: {
+    base: MockupImageMetadata | null;
+    effects: MockupImageMetadata | null;
+    foreground: MockupImageMetadata | null;
+  };
+  surface: {
+    valid: boolean;
+    source: string | null;
+    geometryMode: "corners" | "bounding_box" | null;
+    warnings: string[];
+  };
+}
+
+export interface AdminPosterSearchResult {
+  id: number;
+  title: string | null;
+  slug: string | null;
+  imageUrl: string | null;
+  previewImageUrl: string | null;
+}
+
+export interface MockupPreviewResult {
+  previewUrl: string;
+  validation: MockupTemplateValidationResult;
+  width: number;
+  height: number;
+}
+
+/** Validate a saved mockup template by ID (no mutation). */
+export async function adminValidateMockupTemplate(
+  id: number
+): Promise<MockupTemplateValidationResult> {
+  const res = await fetch(`${BASE}/admin/mockup-templates/${id}/validate`, {
+    method: "POST",
+    headers: jsonHeaders(),
+    credentials: "include",
+  });
+  if (!res.ok) await handleError(res);
+  return res.json();
+}
+
+/** Validate a draft template from arbitrary field values (no save, no mutation). */
+export async function adminValidateMockupTemplateDraft(
+  data: Partial<MockupTemplate>
+): Promise<MockupTemplateValidationResult> {
+  const res = await fetch(`${BASE}/admin/mockup-templates/validate-draft`, {
+    method: "POST",
+    headers: jsonHeaders(),
+    credentials: "include",
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) await handleError(res);
+  return res.json();
+}
+
+/**
+ * Generate a server-rendered preview JPEG for a saved template + selected poster.
+ * Uploads to `mockup-previews/{templateId}/latest.jpg` (does NOT write to poster_mockups).
+ */
+export async function adminPreviewMockupTemplate(
+  templateId: number,
+  posterId: number
+): Promise<MockupPreviewResult> {
+  const res = await fetch(
+    `${BASE}/admin/mockup-templates/${templateId}/preview`,
+    {
+      method: "POST",
+      headers: jsonHeaders(),
+      credentials: "include",
+      body: JSON.stringify({ posterId }),
+    }
+  );
+  if (!res.ok) await handleError(res);
+  return res.json();
+}
+
+/** Search admin-accessible posters for use in the preview poster selector. */
+export async function adminSearchPosters(
+  storeKey: string,
+  q: string,
+  limit = 12
+): Promise<AdminPosterSearchResult[]> {
+  const params = new URLSearchParams({ storeKey, q, limit: String(limit) });
+  const res = await fetch(`${BASE}/admin/posters/search?${params}`, {
+    credentials: "include",
+  });
+  if (!res.ok) await handleError(res);
+  return res.json();
+}

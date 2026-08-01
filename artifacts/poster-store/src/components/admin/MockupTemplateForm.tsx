@@ -15,13 +15,20 @@ import {
 import {
   type MockupTemplate,
   type ManualSurfaceConfig,
+  type MockupTemplateValidationResult,
+  type AdminPosterSearchResult,
+  type MockupPreviewResult,
   adminCreateMockupTemplate,
   adminUpdateMockupTemplate,
   requestMockupImageUploadUrl,
   uploadMockupImageFile,
   getStorageUrl,
+  adminValidateMockupTemplate,
+  adminValidateMockupTemplateDraft,
+  adminPreviewMockupTemplate,
+  adminSearchPosters,
 } from "@/lib/mockupApi";
-import { Upload, Loader2, CheckCircle2, Info, RotateCcw, Pencil, RefreshCw, ChevronDown, ChevronRight } from "lucide-react";
+import { Upload, Loader2, CheckCircle2, Info, RotateCcw, Pencil, RefreshCw, ChevronDown, ChevronRight, XCircle, AlertTriangle, CheckCircle, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MockupSurfaceEditor, { type SurfaceCorners } from "./MockupSurfaceEditor";
 
@@ -207,6 +214,19 @@ export function MockupTemplateForm({
   const [showCompositing, setShowCompositing] = useState(false);
 
   const [saving, setSaving] = useState(false);
+
+  // ── Phase 3: Validation & Preview state ────────────────────────────────────
+  const [validationResult, setValidationResult] = useState<MockupTemplateValidationResult | null>(null);
+  const [validating, setValidating] = useState(false);
+  const [showReadiness, setShowReadiness] = useState(false);
+
+  const [showPreviewPanel, setShowPreviewPanel] = useState(false);
+  const [posterSearchQuery, setPosterSearchQuery] = useState("");
+  const [posterSearchResults, setPosterSearchResults] = useState<AdminPosterSearchResult[]>([]);
+  const [selectedPosterId, setSelectedPosterId] = useState<number | null>(null);
+  const [previewResult, setPreviewResult] = useState<MockupPreviewResult | null>(null);
+  const [generating, setGenerating] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -559,6 +579,56 @@ export function MockupTemplateForm({
       setSaving(false);
     }
   };
+
+  // ── Phase 3: Validation & Preview handlers ─────────────────────────────────
+
+  const handleValidate = useCallback(async () => {
+    setValidating(true);
+    try {
+      let result: MockupTemplateValidationResult;
+      if (isEdit && template) {
+        result = await adminValidateMockupTemplate(template.id);
+      } else {
+        result = await adminValidateMockupTemplateDraft({
+          backgroundImageUrl: backgroundImageUrl || null,
+          lightingOverlayUrl: lightingOverlayUrl || null,
+          foregroundImageUrl: foregroundImageUrl || null,
+          posterX: posterX ? parseFloat(posterX) : null,
+          posterY: posterY ? parseFloat(posterY) : null,
+          posterWidth: posterWidth ? parseFloat(posterWidth) : null,
+          posterHeight: posterHeight ? parseFloat(posterHeight) : null,
+          rotation: rotation ? parseFloat(rotation) : null,
+          fitMode: fitMode || null,
+          placementConfig: storedManualSurface,
+        } as Partial<MockupTemplate>);
+      }
+      setValidationResult(result);
+    } catch (e: unknown) {
+      toast({ variant: "destructive", title: "Validation failed", description: e instanceof Error ? e.message : "Unknown error" });
+    } finally {
+      setValidating(false);
+    }
+  }, [isEdit, template, backgroundImageUrl, lightingOverlayUrl, foregroundImageUrl, posterX, posterY, posterWidth, posterHeight, rotation, fitMode, storedManualSurface, toast]);
+
+  const handlePosterSearch = useCallback(async (q: string) => {
+    try {
+      const results = await adminSearchPosters(storeKey, q, 12);
+      setPosterSearchResults(results);
+    } catch { /* silent — search is best-effort */ }
+  }, [storeKey]);
+
+  const handleGeneratePreview = useCallback(async () => {
+    if (!selectedPosterId || !isEdit || !template) return;
+    setGenerating(true);
+    try {
+      const result = await adminPreviewMockupTemplate(template.id, selectedPosterId);
+      setPreviewResult(result);
+    } catch (e: unknown) {
+      toast({ variant: "destructive", title: "Preview failed", description: e instanceof Error ? e.message : "Unknown error" });
+    } finally {
+      setGenerating(false);
+    }
+  }, [selectedPosterId, isEdit, template, toast]);
 
   const displayImageUrl = backgroundImageUrl || template?.previewThumbnailUrl || "";
 
@@ -1343,6 +1413,207 @@ export function MockupTemplateForm({
                 <Input type="number" value={defaultForegroundOpacity} onChange={(e) => setDefaultForegroundOpacity(e.target.value)} className="h-8 text-xs" min={0} max={1} step={0.05} />
               </div>
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Template readiness ─────────────────────────────────────────────── */}
+      {(() => {
+        const hasErrors = validationResult && !validationResult.valid;
+        const isReady = validationResult?.readyForSync;
+        const readinessBadge = !validationResult
+          ? <span className="ml-auto mr-1 text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">Draft</span>
+          : hasErrors
+          ? <span className="ml-auto mr-1 text-[10px] px-1.5 py-0.5 rounded bg-destructive/15 text-destructive font-medium">Needs attention</span>
+          : isReady
+          ? <span className="ml-auto mr-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 font-medium">Ready for sync</span>
+          : <span className="ml-auto mr-1 text-[10px] px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300 font-medium">Ready for preview</span>;
+        return (
+          <div className="border rounded-lg overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowReadiness(!showReadiness)}
+              className="w-full flex items-center gap-2 px-4 py-3 text-sm font-medium hover:bg-accent/50 transition-colors"
+            >
+              {!validationResult ? <Info className="w-4 h-4 text-muted-foreground shrink-0" /> :
+               hasErrors ? <XCircle className="w-4 h-4 text-destructive shrink-0" /> :
+               <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />}
+              Template readiness
+              {readinessBadge}
+              {showReadiness ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+            </button>
+            {showReadiness && (
+              <div className="p-4 space-y-4 border-t">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleValidate}
+                  disabled={validating}
+                  className="gap-1.5 text-xs h-8"
+                >
+                  {validating ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                  {validationResult ? "Re-validate template" : "Validate template"}
+                </Button>
+
+                {validationResult && (
+                  <div className="space-y-3 text-xs">
+                    {validationResult.issues.length === 0 ? (
+                      <p className="text-muted-foreground">No issues found.</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {validationResult.issues.map((issue, i) => (
+                          <div
+                            key={i}
+                            className={cn("flex gap-2 p-2 rounded",
+                              issue.severity === "error"
+                                ? "bg-destructive/10 text-destructive"
+                                : issue.severity === "warning"
+                                ? "bg-yellow-50 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-300"
+                                : "bg-accent text-muted-foreground"
+                            )}
+                          >
+                            {issue.severity === "error" ? <XCircle className="w-3 h-3 shrink-0 mt-0.5" /> :
+                             issue.severity === "warning" ? <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" /> :
+                             <Info className="w-3 h-3 shrink-0 mt-0.5" />}
+                            <span>{issue.message}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Image metadata */}
+                    <div className="grid grid-cols-1 gap-2 pt-1 border-t">
+                      {validationResult.images.base && (
+                        <div className="space-y-0.5">
+                          <p className="font-medium text-foreground">Base image</p>
+                          <p className="text-muted-foreground">{validationResult.images.base.width}×{validationResult.images.base.height} px · {validationResult.images.base.format?.toUpperCase()} · {validationResult.images.base.hasAlpha ? "has alpha" : "no alpha"}</p>
+                        </div>
+                      )}
+                      {validationResult.images.effects && (
+                        <div className="space-y-0.5">
+                          <p className="font-medium text-foreground">Effects overlay</p>
+                          <p className="text-muted-foreground">{validationResult.images.effects.width}×{validationResult.images.effects.height} px · {validationResult.images.effects.format?.toUpperCase()} · {validationResult.images.effects.hasAlpha ? "has alpha" : "no alpha"}{validationResult.images.effects.isOpaque ? " (fully opaque)" : ""}</p>
+                        </div>
+                      )}
+                      {validationResult.images.foreground && (
+                        <div className="space-y-0.5">
+                          <p className="font-medium text-foreground">Foreground</p>
+                          <p className="text-muted-foreground">{validationResult.images.foreground.width}×{validationResult.images.foreground.height} px · {validationResult.images.foreground.format?.toUpperCase()} · {validationResult.images.foreground.hasAlpha ? "has alpha" : "no alpha"}{validationResult.images.foreground.isOpaque ? " (fully opaque ⚠)" : ""}</p>
+                        </div>
+                      )}
+                      {validationResult.surface.source && validationResult.surface.source !== "fallback" && (
+                        <div className="space-y-0.5">
+                          <p className="font-medium text-foreground">Poster surface</p>
+                          <p className="text-muted-foreground">Source: {validationResult.surface.source} · Mode: {validationResult.surface.geometryMode}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* ── Exact preview ──────────────────────────────────────────────────── */}
+      <div className="border rounded-lg overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setShowPreviewPanel(!showPreviewPanel)}
+          className="w-full flex items-center gap-2 px-4 py-3 text-sm font-medium hover:bg-accent/50 transition-colors"
+        >
+          <Eye className="w-4 h-4 text-muted-foreground shrink-0" />
+          Exact preview
+          {previewResult && <span className="ml-auto mr-1 text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">Generated</span>}
+          {showPreviewPanel ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+        </button>
+        {showPreviewPanel && (
+          <div className="p-4 space-y-4 border-t">
+            {!isEdit ? (
+              <p className="text-xs text-muted-foreground">Save the template first to enable server-rendered previews.</p>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label className="text-xs">Select a test poster</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={posterSearchQuery}
+                      onChange={(e) => {
+                        setPosterSearchQuery(e.target.value);
+                        handlePosterSearch(e.target.value);
+                      }}
+                      onFocus={() => { if (posterSearchResults.length === 0) handlePosterSearch(""); }}
+                      placeholder="Search by poster title…"
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  {posterSearchResults.length > 0 && (
+                    <div className="grid grid-cols-4 gap-2 max-h-52 overflow-y-auto">
+                      {posterSearchResults.map((poster) => (
+                        <button
+                          key={poster.id}
+                          type="button"
+                          onClick={() => setSelectedPosterId(poster.id)}
+                          className={cn(
+                            "flex flex-col items-center gap-1 p-1.5 rounded border text-center transition-colors",
+                            selectedPosterId === poster.id
+                              ? "border-primary bg-primary/5 ring-1 ring-primary"
+                              : "border-border hover:border-muted-foreground"
+                          )}
+                        >
+                          <div className="w-full aspect-[3/4] bg-muted rounded overflow-hidden">
+                            {(poster.previewImageUrl || poster.imageUrl) && (
+                              <img
+                                src={poster.previewImageUrl || poster.imageUrl || ""}
+                                alt={poster.title || ""}
+                                className="w-full h-full object-cover"
+                              />
+                            )}
+                          </div>
+                          <span className="text-[10px] leading-tight line-clamp-2 w-full">{poster.title}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleGeneratePreview}
+                    disabled={generating || !selectedPosterId || (validationResult != null && !validationResult.previewable)}
+                    className="gap-1.5 text-xs h-8"
+                  >
+                    {generating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Eye className="w-3 h-3" />}
+                    Generate preview
+                  </Button>
+                  {!selectedPosterId && (
+                    <p className="text-xs text-muted-foreground">Select a poster above first.</p>
+                  )}
+                  {validationResult && !validationResult.previewable && (
+                    <p className="text-xs text-destructive">Fix validation errors before generating a preview.</p>
+                  )}
+                </div>
+
+                {previewResult && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      Server-rendered JPEG · {previewResult.width}×{previewResult.height} px
+                    </p>
+                    <img
+                      src={previewResult.previewUrl}
+                      alt="Template preview"
+                      className="max-w-full rounded border shadow-sm"
+                      style={{ maxHeight: "480px", objectFit: "contain" }}
+                    />
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
       </div>

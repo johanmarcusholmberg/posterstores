@@ -78,6 +78,40 @@ async function resolveUniqueSlug(storeKey: string, baseSlug: string, excludeId?:
   }
 }
 
+// ─── Admin poster search ─────────────────────────────────────────────────────
+// Used by the mockup template preview panel to select a test poster.
+//
+// GET /api/admin/posters/search?storeKey=X&q=title&limit=10
+//
+// Returns an array of lightweight poster objects (id, title, slug, imageUrl,
+// thumbnailUrl) that match the query. Requires admin auth.
+
+router.get("/admin/posters/search", requireAdmin, async (req, res) => {
+  const storeKey = typeof req.query.storeKey === "string" ? req.query.storeKey : undefined;
+  const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  const limit = Math.min(Math.max(Number(req.query.limit ?? 12), 1), 50);
+
+  if (!storeKey) return res.status(400).json({ error: "storeKey is required" });
+
+  const conditions = [eq(postersTable.storeKey, storeKey)];
+  if (q) conditions.push(ilike(postersTable.title, `%${q}%`));
+
+  const rows = await db
+    .select({
+      id: postersTable.id,
+      title: postersTable.title,
+      slug: postersTable.slug,
+      imageUrl: postersTable.imageUrl,
+      previewImageUrl: postersTable.previewImageUrl,
+    })
+    .from(postersTable)
+    .where(and(...conditions))
+    .orderBy(asc(postersTable.title))
+    .limit(limit);
+
+  return res.json(rows);
+});
+
 router.get("/admin/poster-meta", requireAdmin, async (req, res) => {
   const storeKey = typeof req.query.storeKey === "string" ? req.query.storeKey : undefined;
   if (!storeKey) return res.status(400).json({ error: "storeKey is required" });

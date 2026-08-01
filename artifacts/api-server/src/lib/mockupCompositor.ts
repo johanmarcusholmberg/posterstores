@@ -127,7 +127,13 @@ function getInternalObjectPath(source: string): string | null {
   return null;
 }
 
-async function fetchImageBuffer(source: string): Promise<Buffer> {
+/**
+ * Fetch an image from a storage object path or external URL.
+ *
+ * @param source - Internal `/api/storage/objects/…` path or an https URL.
+ * @param maxBytes - Optional hard limit on the response size. Throws if exceeded.
+ */
+export async function fetchImageBuffer(source: string, maxBytes?: number): Promise<Buffer> {
   const trimmed = source.trim();
   const internalObjectPath = getInternalObjectPath(trimmed);
 
@@ -156,7 +162,14 @@ async function fetchImageBuffer(source: string): Promise<Buffer> {
     throw new Error(`Failed to fetch image (${response.status}): ${parsedUrl.toString()}`);
   }
 
-  return Buffer.from(await response.arrayBuffer());
+  const buf = Buffer.from(await response.arrayBuffer());
+  if (maxBytes !== undefined && buf.byteLength > maxBytes) {
+    throw new Error(
+      `Image is too large (${Math.round(buf.byteLength / 1024 / 1024)} MB). ` +
+      `Maximum allowed size is ${Math.round(maxBytes / 1024 / 1024)} MB.`
+    );
+  }
+  return buf;
 }
 
 // ─── Utility helpers ──────────────────────────────────────────────────────────
@@ -445,14 +458,37 @@ async function preparePosterForBbox(
 
 // ─── Layer overlay helper ─────────────────────────────────────────────────────
 
-/** Fetch an overlay image, scale it to the canvas dimensions, and apply opacity. */
+/**
+ * Fetch an overlay image, assert its dimensions match the raw base image,
+ * resize to canvas dimensions (which may be scaled for corners mode), and apply opacity.
+ *
+ * @param rawBaseW - Raw base image width (before any canvas scaling). Used for dimension check.
+ * @param rawBaseH - Raw base image height. Used for dimension check.
+ * @param layerName - Human-readable layer name for error messages ("Effects overlay" / "Foreground").
+ */
 async function fetchAndPrepareOverlay(
   url: string,
   targetW: number,
   targetH: number,
-  opacity: number
+  opacity: number,
+  rawBaseW: number,
+  rawBaseH: number,
+  layerName: string
 ): Promise<Buffer> {
   const raw = await fetchImageBuffer(url);
+
+  // ── Dimension enforcement ────────────────────────────────────────────────────
+  // The overlay must exactly match the raw base image dimensions.
+  // (The canvas may be scaled down for corners mode, but the ratio is preserved,
+  //  so the resize below is safe.)
+  const overlayMeta = await sharp(raw).metadata();
+  if (overlayMeta.width !== rawBaseW || overlayMeta.height !== rawBaseH) {
+    throw new Error(
+      `${layerName} dimensions must match Base image dimensions exactly. ` +
+      `Overlay is ${overlayMeta.width}×${overlayMeta.height} px, ` +
+      `but Base image is ${rawBaseW}×${rawBaseH} px.`
+    );
+  }
 
   const { data, info } = await sharp(raw)
     .resize(targetW, targetH, { fit: "fill" })
@@ -631,7 +667,7 @@ export async function renderMockup(opts: RenderMockupOptions): Promise<RenderMoc
     try {
       const blendMode = normalizeBlendMode(opts.effectsBlendMode);
       const opacity = Math.max(0, Math.min(1, opts.effectsOpacity ?? 0.8));
-      const overlayBuf = await fetchAndPrepareOverlay(opts.effectsOverlayUrl!, W, H, opacity);
+      const overlayBuf = await fetchAndPrepareOverlay(opts.effectsOverlayUrl!, W, H, opacity, rawW, rawH, "Effects overlay");
       workingBuf = await sharp(workingBuf)
         .composite([{ input: overlayBuf, blend: blendMode }])
         .png()
@@ -648,7 +684,7 @@ export async function renderMockup(opts: RenderMockupOptions): Promise<RenderMoc
   if (applyForeground) {
     try {
       const opacity = Math.max(0, Math.min(1, opts.foregroundOpacity ?? 1.0));
-      const fgBuf = await fetchAndPrepareOverlay(opts.foregroundImageUrl!, W, H, opacity);
+      const fgBuf = await fetchAndPrepareOverlay(opts.foregroundImageUrl!, W, H, opacity, rawW, rawH, "Foreground");
       workingBuf = await sharp(workingBuf)
         .composite([{ input: fgBuf, blend: "over" }])
         .png()

@@ -16,6 +16,10 @@ import {
   type SurfaceSource,
 } from "../lib/mockupSurfaceResolver";
 import { randomUUID } from "crypto";
+import {
+  validateMockupTemplate,
+  type MockupTemplateValidationResult,
+} from "../lib/mockupTemplateValidation";
 
 const router = Router();
 const storage = new ObjectStorageService();
@@ -170,11 +174,105 @@ router.post(
       return !overwrite && !!mockup.mockupImageUrl;
     });
 
-    // ── 5. Main sync loop ─────────────────────────────────────────────────────
+    // ── 5. Per-request template validation cache ──────────────────────────────
+    //
+    // Validate each unique template ONCE before rendering any posters.
+    // This avoids downloading the same template images N times for N posters,
+    // and surfaces template-level configuration errors early.
+    //
+    // Rows whose template fails validation are moved to templateFailedRows and
+    // reported as failed without attempting a render.
+
+    const templateValidationCache = new Map<number, MockupTemplateValidationResult>();
+
+    // Collect unique templates from eligibleRows.
+    const seenTemplateIds = new Set<number>();
+    for (const { template } of eligibleRows) {
+      if (!seenTemplateIds.has(template.id)) {
+        seenTemplateIds.add(template.id);
+        // Run validation in parallel for all unique templates.
+      }
+    }
+
+    if (!dryRun && seenTemplateIds.size > 0) {
+      const uniqueTemplates = [
+        ...new Map(
+          eligibleRows.map(({ template }) => [template.id, template])
+        ).values(),
+      ];
+
+      await Promise.all(
+        uniqueTemplates.map(async (template) => {
+          try {
+            const result = await validateMockupTemplate(template);
+            templateValidationCache.set(template.id, result);
+          } catch (err) {
+            // Treat an unexpected validation error as a blocking failure.
+            const msg = err instanceof Error ? err.message : "Template validation threw unexpectedly";
+            req.log.error({ err, templateId: template.id }, "Template validation error during sync");
+            templateValidationCache.set(template.id, {
+              valid: false,
+              previewable: false,
+              readyForSync: false,
+              issues: [{ code: "VALIDATION_ERROR", severity: "error", field: "backgroundImageUrl", message: msg }],
+              images: { base: null, effects: null, foreground: null },
+              surface: { valid: false, source: null, geometryMode: null, warnings: [] },
+            });
+          }
+        })
+      );
+    }
+
+    // Partition: rows whose template failed validation vs rows to actually render.
+    const templateFailedRows = dryRun
+      ? []
+      : eligibleRows.filter(({ template }) => {
+          const cached = templateValidationCache.get(template.id);
+          return cached !== undefined && !cached.valid;
+        });
+
+    const renderableRows = dryRun
+      ? eligibleRows
+      : eligibleRows.filter(({ template }) => {
+          const cached = templateValidationCache.get(template.id);
+          return cached === undefined || cached.valid;
+        });
+
+    // ── 6. Main sync loop ─────────────────────────────────────────────────────
     const results: SyncResult[] = [];
     let generated = 0;
     let skipped = 0;
     let failed = 0;
+
+    // Report template-validation failures upfront.
+    for (const { mockup, poster, template } of templateFailedRows) {
+      const cached = templateValidationCache.get(template.id);
+      const firstError = cached?.issues.find((i) => i.severity === "error");
+      const reason = firstError
+        ? `Template validation failed: ${firstError.message}`
+        : "Template validation failed";
+
+      const hasPreviousImage = !!mockup.mockupImageUrl;
+      await db
+        .update(posterMockupsTable)
+        .set(
+          hasPreviousImage
+            ? { status: "generated", errorMessage: reason, updatedAt: new Date() }
+            : { status: "failed",    errorMessage: reason, updatedAt: new Date() }
+        )
+        .where(eq(posterMockupsTable.id, mockup.id));
+
+      failed++;
+      results.push({
+        posterId: poster.id,
+        posterTitle: poster.title,
+        templateId: template.id,
+        templateName: template.name,
+        action: "failed",
+        reason,
+        mockupId: mockup.id,
+      });
+    }
 
     // Report pre-skipped rows
     for (const { mockup, poster, template } of skippedRows) {
@@ -191,7 +289,7 @@ router.post(
       });
     }
 
-    for (const { mockup, poster, template } of eligibleRows) {
+    for (const { mockup, poster, template } of renderableRows) {
       // Resolve the effective poster surface for this template
       const surface = resolveEffectiveMockupSurface(template);
       const {
