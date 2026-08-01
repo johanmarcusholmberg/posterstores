@@ -147,19 +147,28 @@ router.post(
       });
     }
 
-    // ── 3. Filter eligible rows ───────────────────────────────────────────────
-    const eligibleRows = mockupRows.filter(({ template, mockup }) => {
-      if (!template.backgroundImageUrl) return false;
-      const surface = resolveEffectiveMockupSurface(template);
-      if (surface.surfaceSource === "fallback") return false;
-      // Skip already-generated unless overwrite is set
-      if (scope !== "missing" && !overwrite && mockup.mockupImageUrl) return false;
-      return true;
+    // ── 3. Separate already-generated rows that will be skipped ──────────────
+    //
+    // These are rows that already have a mockup image and we are NOT overwriting.
+    // scope=missing rows always have null imageUrl (enforced by the DB filter above).
+    const skippedRows = mockupRows.filter(({ mockup }) => {
+      if (scope === "missing") return false;
+      return !overwrite && !!mockup.mockupImageUrl;
     });
 
-    const plannedCount = eligibleRows.length;
+    // ── 4. Candidate rows = everything except already-skipped ─────────────────
+    //
+    // Critically: we do NOT pre-filter by whether backgroundImageUrl is set or
+    // whether a surface is defined. Those conditions are template configuration
+    // problems that validation must surface explicitly as failed assignments.
+    const candidateRows = mockupRows.filter(({ mockup }) => {
+      if (scope === "missing") return true;
+      return overwrite || !mockup.mockupImageUrl;
+    });
 
-    // Overall hard limit
+    const plannedCount = candidateRows.length;
+
+    // Overall hard limit (non-dry-run only)
     if (!dryRun && plannedCount > SYNC_HARD_LIMIT) {
       return res.status(400).json({
         error: `Sync would update ${plannedCount} selected mockup${plannedCount !== 1 ? "s" : ""}, which exceeds the safe limit of ${SYNC_HARD_LIMIT} per request. Narrow your selection and try again.`,
@@ -168,36 +177,22 @@ router.post(
       });
     }
 
-    // ── 4. Report skipped rows (already has image, overwrite = false) ─────────
-    const skippedRows = mockupRows.filter(({ mockup }) => {
-      if (scope === "missing") return false;
-      return !overwrite && !!mockup.mockupImageUrl;
-    });
-
     // ── 5. Per-request template validation cache ──────────────────────────────
     //
-    // Validate each unique template ONCE before rendering any posters.
-    // This avoids downloading the same template images N times for N posters,
-    // and surfaces template-level configuration errors early.
+    // Validate each unique template ONCE from candidateRows, including dry runs.
     //
-    // Rows whose template fails validation are moved to templateFailedRows and
-    // reported as failed without attempting a render.
+    // This ensures:
+    //  - Invalid templates (missing base, missing surface, dimension mismatches,
+    //    etc.) are reported as failed rather than silently pre-filtered.
+    //  - The same template images are not downloaded N times for N posters.
+    //  - Dry runs produce accurate failure predictions without rendering.
 
     const templateValidationCache = new Map<number, MockupTemplateValidationResult>();
 
-    // Collect unique templates from eligibleRows.
-    const seenTemplateIds = new Set<number>();
-    for (const { template } of eligibleRows) {
-      if (!seenTemplateIds.has(template.id)) {
-        seenTemplateIds.add(template.id);
-        // Run validation in parallel for all unique templates.
-      }
-    }
-
-    if (!dryRun && seenTemplateIds.size > 0) {
+    if (candidateRows.length > 0) {
       const uniqueTemplates = [
         ...new Map(
-          eligibleRows.map(({ template }) => [template.id, template])
+          candidateRows.map(({ template }) => [template.id, template])
         ).values(),
       ];
 
@@ -223,20 +218,17 @@ router.post(
       );
     }
 
-    // Partition: rows whose template failed validation vs rows to actually render.
-    const templateFailedRows = dryRun
-      ? []
-      : eligibleRows.filter(({ template }) => {
-          const cached = templateValidationCache.get(template.id);
-          return cached !== undefined && !cached.valid;
-        });
+    // Partition candidates into validation-failed vs renderable
+    const templateFailedRows = candidateRows.filter(({ template }) => {
+      const cached = templateValidationCache.get(template.id);
+      return cached !== undefined && !cached.valid;
+    });
 
-    const renderableRows = dryRun
-      ? eligibleRows
-      : eligibleRows.filter(({ template }) => {
-          const cached = templateValidationCache.get(template.id);
-          return cached === undefined || cached.valid;
-        });
+    const renderableRows = candidateRows.filter(({ template }) => {
+      const cached = templateValidationCache.get(template.id);
+      // If somehow no cache entry exists, skip (safety net — should not occur)
+      return cached !== undefined && cached.valid;
+    });
 
     // ── 6. Main sync loop ─────────────────────────────────────────────────────
     const results: SyncResult[] = [];
@@ -244,7 +236,7 @@ router.post(
     let skipped = 0;
     let failed = 0;
 
-    // Report template-validation failures upfront.
+    // Report template-validation failures
     for (const { mockup, poster, template } of templateFailedRows) {
       const cached = templateValidationCache.get(template.id);
       const firstError = cached?.issues.find((i) => i.severity === "error");
@@ -252,15 +244,19 @@ router.post(
         ? `Template validation failed: ${firstError.message}`
         : "Template validation failed";
 
-      const hasPreviousImage = !!mockup.mockupImageUrl;
-      await db
-        .update(posterMockupsTable)
-        .set(
-          hasPreviousImage
-            ? { status: "generated", errorMessage: reason, updatedAt: new Date() }
-            : { status: "failed",    errorMessage: reason, updatedAt: new Date() }
-        )
-        .where(eq(posterMockupsTable.id, mockup.id));
+      if (!dryRun) {
+        // Preserve existing image when present (keep public, record the error).
+        // When no image exists, mark as failed so admin knows it needs attention.
+        const hasPreviousImage = !!mockup.mockupImageUrl;
+        await db
+          .update(posterMockupsTable)
+          .set(
+            hasPreviousImage
+              ? { status: "generated", errorMessage: reason, updatedAt: new Date() }
+              : { status: "failed",    errorMessage: reason, updatedAt: new Date() }
+          )
+          .where(eq(posterMockupsTable.id, mockup.id));
+      }
 
       failed++;
       results.push({
@@ -274,7 +270,7 @@ router.post(
       });
     }
 
-    // Report pre-skipped rows
+    // Report pre-skipped rows (overwrite=false, already has image)
     for (const { mockup, poster, template } of skippedRows) {
       skipped++;
       results.push({
@@ -309,6 +305,8 @@ router.post(
       const surfaceWarning = surfaceWarnings.length > 0 ? surfaceWarnings[0] : undefined;
 
       if (dryRun) {
+        // Dry run: report the predicted action without rendering, uploading, or
+        // writing to the database.
         generated++;
         results.push({
           posterId: poster.id,
@@ -341,6 +339,7 @@ router.post(
       }
 
       if (surfaceSource === "fallback") {
+        // Safety net: validation should have caught this.
         failed++;
         results.push({
           posterId: poster.id,

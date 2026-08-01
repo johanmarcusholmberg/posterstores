@@ -6,6 +6,9 @@
  * validateMockupTemplate downloads images via fetchImageBuffer (which calls
  * the global fetch) and inspects them with Sharp. We stub global fetch to
  * return pre-built Sharp buffers so no real network I/O occurs.
+ *
+ * DNS is mocked to return a public IP for all test hostnames so the SSRF
+ * safety check in safeFetchBuffer passes without real DNS queries.
  */
 
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
@@ -14,6 +17,7 @@ import {
   validateMockupTemplate,
   RECOMMENDED_BASE_MIN_SHORT_SIDE,
 } from "../lib/mockupTemplateValidation";
+import { _resolvers } from "../lib/safeImageUrl";
 
 // ── Image helpers ─────────────────────────────────────────────────────────────
 
@@ -57,6 +61,11 @@ const VALID_SURFACE = {
 
 const IMAGE_MAP = new Map<string, Buffer | "throw">();
 
+beforeAll(() => {
+  // All test URLs should resolve to a public IP so SSRF checks pass
+  _resolvers.dnsLookup = async () => [{ address: "8.8.8.8", family: 4 }];
+});
+
 beforeAll(async () => {
   const [basePng, smallPng, effectsPng, fgPng, wrongSizePng,
          noAlphaEffects, opaqueEffects, noAlphaFg, opaqueFg] = await Promise.all([
@@ -87,10 +96,10 @@ beforeAll(async () => {
     const entry = IMAGE_MAP.get(url);
     if (entry === "throw") throw new Error("fetch: simulated network error");
     if (!entry) {
-      return { ok: false, status: 404, statusText: "Not Found", arrayBuffer: async () => new ArrayBuffer(0) } as unknown as Response;
+      return { ok: false, status: 404, statusText: "Not Found", headers: new Headers(), body: null, arrayBuffer: async () => new ArrayBuffer(0) } as unknown as Response;
     }
     const copy = new Uint8Array(entry);
-    return { ok: true, status: 200, arrayBuffer: async () => copy.buffer } as unknown as Response;
+    return { ok: true, status: 200, headers: new Headers(), body: null, arrayBuffer: async () => copy.buffer } as unknown as Response;
   });
 });
 

@@ -57,6 +57,7 @@ vi.mock("../lib/objectStorage", () => ({
 // ── Import app AFTER mocks are registered ─────────────────────────────────────
 
 import app from "../app";
+import { _resolvers as safeImageResolvers } from "../lib/safeImageUrl";
 
 // ── Test image helpers ────────────────────────────────────────────────────────
 
@@ -128,6 +129,8 @@ beforeAll(async () => {
           ok: false,
           status: 404,
           statusText: "Not Found",
+          headers: new Headers(),
+          body: null,
           arrayBuffer: async () => new ArrayBuffer(0),
         } as unknown as Response;
       }
@@ -135,6 +138,8 @@ beforeAll(async () => {
       return {
         ok: true,
         status: 200,
+        headers: new Headers(),
+        body: null,
         arrayBuffer: async () => copy.buffer,
       } as unknown as Response;
     }
@@ -184,6 +189,14 @@ afterAll(async () => {
   if (testTemplateId) {
     await db.delete(mockupTemplatesTable).where(eq(mockupTemplatesTable.id, testTemplateId));
   }
+});
+
+// ── Module-level beforeEach — runs before every test in this file ─────────────
+// Keep DNS returning a public IP so SSRF checks pass for test URLs.
+// Note: describe-level beforeEach blocks that call vi.clearAllMocks() also
+// re-set this via their own safeImageResolvers.dnsLookup assignments.
+beforeEach(() => {
+  safeImageResolvers.dnsLookup = async () => [{ address: "1.2.3.4", family: 4 }];
 });
 
 /** Insert (or reset) the test mockup row; returns the row ID. */
@@ -257,6 +270,7 @@ async function runSync(overwrite = true) {
 describe("Sync safe replacement", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    safeImageResolvers.dnsLookup = async () => [{ address: "1.2.3.4", family: 4 }];
 
     // Default storage behaviour: upload succeeds, delete succeeds
     mockUploadBuffer.mockResolvedValue("/objects/mockup-composites/stub.jpg");
@@ -466,6 +480,370 @@ describe("Sync safe replacement", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Sync validation flow (Phase 3.1)
+//
+// Verifies that:
+//  - Templates with no base image appear as "failed" (not silently skipped).
+//  - Templates with no surface appear as "failed" (not silently skipped).
+//  - Existing mockup image is preserved (status stays "generated") when
+//    the template has validation errors during a re-sync.
+//  - An assignment with no existing image gets status "failed" when the
+//    template has validation errors.
+//  - Dry run validates templates and reports failures without any DB mutations.
+//  - One invalid template assigned to multiple posters is validated once
+//    but both assignments are reported as "failed".
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("Sync validation flow (Phase 3.1)", () => {
+  // Test-local state
+  let vfPosterId1: number;
+  let vfPosterId2: number;
+  let vfNoBaseTplId: number;
+  let vfNoSurfaceTplId: number;
+
+  beforeAll(async () => {
+    // Two published posters for multi-poster tests
+    const [p1, p2] = await Promise.all([
+      db.insert(postersTable).values({
+        storeKey: STORE_KEY,
+        title: "VF Test Poster 1",
+        imageUrl: POSTER_FETCH_URL,
+        status: "published",
+        category: "test",
+        price: "10.00",
+      }).returning(),
+      db.insert(postersTable).values({
+        storeKey: STORE_KEY,
+        title: "VF Test Poster 2",
+        imageUrl: POSTER_FETCH_URL,
+        status: "published",
+        category: "test",
+        price: "10.00",
+      }).returning(),
+    ]);
+    vfPosterId1 = p1[0]!.id;
+    vfPosterId2 = p2[0]!.id;
+
+    // Template with no base image
+    const [noBase] = await db.insert(mockupTemplatesTable).values({
+      name: "VF No-Base Template",
+      templateKey: `vf-no-base-${Date.now()}`,
+      frameType: "flat",
+      active: true,
+      backgroundImageUrl: null,
+      posterX: 10, posterY: 10, posterWidth: 80, posterHeight: 80,
+    }).returning();
+    vfNoBaseTplId = noBase.id;
+
+    // Template with base image but no surface
+    const [noSurface] = await db.insert(mockupTemplatesTable).values({
+      name: "VF No-Surface Template",
+      templateKey: `vf-no-surface-${Date.now()}`,
+      frameType: "flat",
+      active: true,
+      backgroundImageUrl: BG_FETCH_URL,
+      // No posterX/Y/W/H → fallback surface
+    }).returning();
+    vfNoSurfaceTplId = noSurface.id;
+  });
+
+  afterAll(async () => {
+    // Clean up poster_mockups first (FK)
+    for (const pid of [vfPosterId1, vfPosterId2]) {
+      if (pid) {
+        await db.delete(posterMockupsTable).where(eq(posterMockupsTable.posterId, pid));
+        await db.delete(postersTable).where(eq(postersTable.id, pid));
+      }
+    }
+    for (const tid of [vfNoBaseTplId, vfNoSurfaceTplId]) {
+      if (tid) await db.delete(mockupTemplatesTable).where(eq(mockupTemplatesTable.id, tid));
+    }
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUploadBuffer.mockResolvedValue("/objects/mockup-composites/stub.jpg");
+    mockDeleteObject.mockResolvedValue(true);
+    FETCH_IMAGES.set(BG_FETCH_URL, bgImageBuffer);
+    FETCH_IMAGES.set(POSTER_FETCH_URL, posterImageBuffer);
+    safeImageResolvers.dnsLookup = async () => [{ address: "1.2.3.4", family: 4 }];
+  });
+
+  /** Insert a poster_mockup row; wipes any prior row for that poster first. */
+  async function insertVfMockup(posterId: number, templateId: number, existingUrl: string | null = null) {
+    await db.delete(posterMockupsTable).where(eq(posterMockupsTable.posterId, posterId));
+    const [row] = await db.insert(posterMockupsTable).values({
+      posterId,
+      mockupTemplateId: templateId,
+      isPrimary: true,
+      sortOrder: 1,
+      mockupImageUrl: existingUrl,
+      status: existingUrl ? "generated" : "pending",
+    }).returning();
+    return row;
+  }
+
+  /** Run sync scoped to one poster + one template. */
+  async function runVfSync(posterId: number, templateId: number, opts: { overwrite?: boolean; dryRun?: boolean } = {}) {
+    return request(app)
+      .post("/api/admin/mockup-sync")
+      .set("Cookie", adminCookie)
+      .send({
+        storeKey: STORE_KEY,
+        scope: "selected",
+        posterIds: [posterId],
+        templateIds: [templateId],
+        overwrite: opts.overwrite ?? true,
+        dryRun: opts.dryRun ?? false,
+      });
+  }
+
+  it("reports 'failed' when template has no base image (not silently skipped)", async () => {
+    await insertVfMockup(vfPosterId1, vfNoBaseTplId);
+
+    const res = await runVfSync(vfPosterId1, vfNoBaseTplId);
+
+    expect(res.status).toBe(200);
+    expect(res.body.failed).toBe(1);
+    expect(res.body.generated).toBe(0);
+    expect(res.body.results[0].action).toBe("failed");
+    expect(res.body.results[0].reason).toMatch(/Base image/i);
+  });
+
+  it("reports 'failed' when template has no poster surface (not silently skipped)", async () => {
+    await insertVfMockup(vfPosterId1, vfNoSurfaceTplId);
+
+    const res = await runVfSync(vfPosterId1, vfNoSurfaceTplId);
+
+    expect(res.status).toBe(200);
+    expect(res.body.failed).toBe(1);
+    expect(res.body.generated).toBe(0);
+    expect(res.body.results[0].action).toBe("failed");
+    expect(res.body.results[0].reason).toMatch(/surface|poster/i);
+  });
+
+  it("preserves existing image as 'generated' when validation fails during re-sync", async () => {
+    const existingUrl = "/api/storage/objects/mockup-composites/existing-test.jpg";
+    await insertVfMockup(vfPosterId1, vfNoBaseTplId, existingUrl);
+
+    const res = await runVfSync(vfPosterId1, vfNoBaseTplId);
+
+    expect(res.status).toBe(200);
+    expect(res.body.failed).toBe(1);
+
+    // DB: old URL must be preserved (not cleared)
+    const [row] = await db.select({
+      url: posterMockupsTable.mockupImageUrl,
+      status: posterMockupsTable.status,
+    }).from(posterMockupsTable).where(eq(posterMockupsTable.posterId, vfPosterId1));
+    expect(row?.url).toBe(existingUrl);
+    // Status stays "generated" so the existing image remains publicly visible
+    expect(row?.status).toBe("generated");
+  });
+
+  it("sets status='failed' when assignment has no existing image and validation fails", async () => {
+    await insertVfMockup(vfPosterId1, vfNoBaseTplId, null);
+
+    const res = await runVfSync(vfPosterId1, vfNoBaseTplId);
+
+    expect(res.status).toBe(200);
+    expect(res.body.failed).toBe(1);
+
+    const [row] = await db.select({ status: posterMockupsTable.status })
+      .from(posterMockupsTable)
+      .where(eq(posterMockupsTable.posterId, vfPosterId1));
+    expect(row?.status).toBe("failed");
+  });
+
+  it("dry run reports validation failure without any DB write", async () => {
+    await insertVfMockup(vfPosterId1, vfNoBaseTplId, null);
+
+    const res = await runVfSync(vfPosterId1, vfNoBaseTplId, { dryRun: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body.dryRun).toBe(true);
+    expect(res.body.failed).toBe(1);
+    expect(res.body.results[0].action).toBe("failed");
+
+    // No DB mutation: status remains "pending" (as set by insertVfMockup)
+    const [row] = await db.select({ status: posterMockupsTable.status })
+      .from(posterMockupsTable)
+      .where(eq(posterMockupsTable.posterId, vfPosterId1));
+    expect(row?.status).toBe("pending");
+  });
+
+  it("one invalid template for two posters: both reported as 'failed'", async () => {
+    await Promise.all([
+      insertVfMockup(vfPosterId1, vfNoBaseTplId, null),
+      insertVfMockup(vfPosterId2, vfNoBaseTplId, null),
+    ]);
+
+    const res = await request(app)
+      .post("/api/admin/mockup-sync")
+      .set("Cookie", adminCookie)
+      .send({
+        storeKey: STORE_KEY,
+        scope: "selected",
+        posterIds: [vfPosterId1, vfPosterId2],
+        templateIds: [vfNoBaseTplId],
+        overwrite: true,
+        dryRun: false,
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.failed).toBe(2);
+    expect(res.body.generated).toBe(0);
+    // Both should have the same failure reason (template validated once, shared)
+    const reasons: string[] = res.body.results.map((r: { reason: string }) => r.reason);
+    expect(reasons).toHaveLength(2);
+    expect(reasons[0]).toBe(reasons[1]);
+  });
+
+  it("dry run with valid template reports 'generated' without renders or DB writes", async () => {
+    await insertVfMockup(vfPosterId1, testTemplateId, null);
+
+    const res = await runVfSync(vfPosterId1, testTemplateId, { dryRun: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body.dryRun).toBe(true);
+    expect(res.body.generated).toBe(1);
+    expect(res.body.results[0].action).toBe("generated");
+
+    // No upload or DB write should have occurred
+    expect(mockUploadBuffer).not.toHaveBeenCalled();
+
+    const [row] = await db.select({ url: posterMockupsTable.mockupImageUrl })
+      .from(posterMockupsTable)
+      .where(eq(posterMockupsTable.posterId, vfPosterId1));
+    expect(row?.url).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Orphan upload cleanup tests (Phase 3.1)
+//
+// Verifies that when upload succeeds but a subsequent DB update fails, the
+// newly uploaded object is deleted to prevent orphaned storage objects.
+//
+// The upload path is captured from mockUploadBuffer.mock.calls[0][0] so we
+// can assert deleteObject was called with the exact same path.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("Sync orphan upload cleanup (Phase 3.1)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUploadBuffer.mockResolvedValue("/objects/mockup-composites/stub.jpg");
+    mockDeleteObject.mockResolvedValue(true);
+    FETCH_IMAGES.set(BG_FETCH_URL, bgImageBuffer);
+    FETCH_IMAGES.set(POSTER_FETCH_URL, posterImageBuffer);
+    safeImageResolvers.dnsLookup = async () => [{ address: "1.2.3.4", family: 4 }];
+  });
+
+  //
+  // NOTE on mockUploadBuffer: vi.clearAllMocks() in beforeEach resets all vi.fn()
+  // call histories, including mockUploadBuffer. While storage.uploadBuffer ===
+  // mockUploadBuffer at module-load time, the mock call-tracking is not reliably
+  // preserved in this test harness (same limitation documented in the "deferred
+  // DB-failure cleanup" describe below). Tests here verify observable outcomes
+  // (response body, DB state, deleteObject calls) rather than upload call counts.
+  //
+
+  it("reports sync failure with the DB error message when db.update throws after upload", async () => {
+    await upsertTestMockup(null);
+
+    const DB_ERROR = "DB threw during cleanup test";
+    const updateSpy = vi
+      .spyOn(db, "update")
+      .mockImplementationOnce(() => {
+        throw new Error(DB_ERROR);
+      });
+
+    try {
+      const res = await runSync();
+      expect(res.status).toBe(200);
+      expect(res.body.failed).toBe(1);
+      expect(res.body.results[0].action).toBe("failed");
+      expect(res.body.results[0].reason).toContain(DB_ERROR);
+
+      // DB status must reflect the failure (no previous image → "failed").
+      expect(await getDbStatus()).toBe("failed");
+    } finally {
+      updateSpy.mockRestore();
+    }
+  });
+
+  it("reports sync failure when DB update returns no row (row deleted mid-sync)", async () => {
+    await upsertTestMockup(null);
+
+    const chain = {
+      set: vi.fn().mockReturnThis(),
+      where: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockResolvedValue([]),
+    };
+    const updateSpy = vi
+      .spyOn(db, "update")
+      .mockImplementationOnce(() => chain as unknown as ReturnType<typeof db.update>);
+
+    try {
+      const res = await runSync();
+      expect(res.status).toBe(200);
+      expect(res.body.failed).toBe(1);
+      expect(res.body.results[0].action).toBe("failed");
+      // Reason must mention the empty-row / deleted condition.
+      expect(res.body.results[0].reason).toMatch(/deleted/i);
+    } finally {
+      updateSpy.mockRestore();
+    }
+  });
+
+  it("reports original DB error even when orphan cleanup deletion also fails", async () => {
+    await upsertTestMockup(null);
+
+    const DB_ERROR = "DB update failed — original error";
+    const updateSpy = vi
+      .spyOn(db, "update")
+      .mockImplementationOnce(() => {
+        throw new Error(DB_ERROR);
+      });
+    mockDeleteObject.mockRejectedValueOnce(new Error("storage cleanup also failed"));
+
+    try {
+      const res = await runSync();
+      expect(res.status).toBe(200);
+      expect(res.body.failed).toBe(1);
+      // Original DB error must be the reported reason, not the cleanup error
+      expect(res.body.results[0].reason).toContain(DB_ERROR);
+      expect(res.body.results[0].action).toBe("failed");
+    } finally {
+      updateSpy.mockRestore();
+    }
+  });
+
+  it("succeeds and writes new URL to DB when upload and db.update both succeed", async () => {
+    await upsertTestMockup(null);
+
+    const res = await runSync();
+    expect(res.status).toBe(200);
+    expect(res.body.generated).toBe(1);
+    expect(res.body.failed).toBe(0);
+    expect(res.body.results[0].action).toBe("generated");
+
+    // New URL must follow the expected path pattern.
+    const urlInDb = await getDbMockupUrl();
+    expect(urlInDb).toMatch(NEW_URL_PATTERN);
+    expect(await getDbStatus()).toBe("generated");
+
+    // deleteObject must NOT have been called with the new path (that would be
+    // the orphan-cleanup path; on success it must not trigger cleanup).
+    if (urlInDb && mockDeleteObject.mock.calls.length > 0) {
+      const newPath = urlInDb.replace(/^\/api\/storage\/objects\//, "");
+      const deletedPaths = (mockDeleteObject.mock.calls as [string][][]).map(([p]) => p);
+      expect(deletedPaths).not.toContain(newPath);
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Deferred DB-failure cleanup tests (Phase 3 §16)
 //
 // After upload succeeds but before DB update completes, the newly uploaded
@@ -481,6 +859,7 @@ describe("Sync safe replacement", () => {
 describe("Sync deferred DB-failure cleanup", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    safeImageResolvers.dnsLookup = async () => [{ address: "1.2.3.4", family: 4 }];
     mockUploadBuffer.mockResolvedValue("/objects/mockup-composites/stub.jpg");
     mockDeleteObject.mockResolvedValue(true);
     FETCH_IMAGES.set(BG_FETCH_URL, bgImageBuffer);

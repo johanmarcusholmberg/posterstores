@@ -5,14 +5,18 @@
  *  - POST /api/admin/mockup-templates/:id/validate
  *  - POST /api/admin/mockup-templates/validate-draft
  *  - POST /api/admin/mockup-templates/:id/preview   (pre-render check)
- *  - Sync route (once per template per request)
+ *  - Sync route (once per template per request, including dry runs)
  *
  * The validation service intentionally does NOT mutate the template
  * and does NOT trigger side effects (no uploads, no DB writes).
+ *
+ * Image buffers fetched during one validate call are reused within
+ * that call (e.g. the base buffer is fetched once and used for both
+ * metadata inspection and dimension comparisons).
  */
 
 import sharp from "sharp";
-import { fetchImageBuffer } from "./mockupCompositor";
+import { fetchImageBuffer, MAX_IMAGE_DOWNLOAD_BYTES, MAX_DECODED_IMAGE_PIXELS } from "./mockupCompositor";
 import { resolveEffectiveMockupSurface } from "./mockupSurfaceResolver";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -22,9 +26,6 @@ import { resolveEffectiveMockupSurface } from "./mockupSurfaceResolver";
  * Below this threshold validation emits a warning (not an error).
  */
 export const RECOMMENDED_BASE_MIN_SHORT_SIDE = 1200;
-
-/** Maximum image download size accepted by the validation service (50 MB). */
-export const VALIDATION_MAX_IMAGE_BYTES = 50 * 1024 * 1024;
 
 // ─── Shared types ─────────────────────────────────────────────────────────────
 
@@ -110,6 +111,9 @@ const SUPPORTED_FORMATS = ["jpeg", "png", "webp"];
 /**
  * Fetch an image URL and return its Sharp metadata along with the raw buffer.
  * Returns an error string on any failure.
+ *
+ * The returned buffer is reused within the same validation call — do not
+ * re-download the same URL twice.
  */
 async function fetchAndInspectImage(url: string): Promise<
   | { ok: true; buf: Buffer; meta: MockupImageMetadata; width: number; height: number }
@@ -117,13 +121,13 @@ async function fetchAndInspectImage(url: string): Promise<
 > {
   let buf: Buffer;
   try {
-    buf = await fetchImageBuffer(url, VALIDATION_MAX_IMAGE_BYTES);
+    buf = await fetchImageBuffer(url, MAX_IMAGE_DOWNLOAD_BYTES);
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 
   try {
-    const meta = await sharp(buf).metadata();
+    const meta = await sharp(buf, { limitInputPixels: MAX_DECODED_IMAGE_PIXELS }).metadata();
 
     const fmt = meta.format ?? null;
     if (!fmt || !SUPPORTED_FORMATS.includes(fmt)) {
@@ -144,7 +148,7 @@ async function fetchAndInspectImage(url: string): Promise<
 
     if (hasAlpha) {
       try {
-        const stats = await sharp(buf).stats();
+        const stats = await sharp(buf, { limitInputPixels: MAX_DECODED_IMAGE_PIXELS }).stats();
         // The alpha channel is the last channel in the stats array.
         const alphaStats = stats.channels[stats.channels.length - 1];
         // All pixels opaque if minimum alpha value ≥ 254 (nearly full opacity).
@@ -184,6 +188,7 @@ async function fetchAndInspectImage(url: string): Promise<
  * Returns a structured result with per-field issues and image metadata.
  *
  * This function is read-only: it does not mutate the template or write to storage.
+ * Each image URL is fetched at most once within a single call.
  */
 export async function validateMockupTemplate(
   template: MockupTemplateInput
@@ -216,7 +221,9 @@ export async function validateMockupTemplate(
         result.error.includes("fetch") ||
         result.error.includes("Failed to") ||
         result.error.includes("404") ||
-        result.error.includes("timeout");
+        result.error.includes("timeout") ||
+        result.error.includes("resolve") ||
+        result.error.includes("private");
       issues.push({
         code: isFetchError ? "BASE_FETCH_FAILED" : "BASE_INVALID_IMAGE",
         severity: "error",
@@ -313,7 +320,8 @@ export async function validateMockupTemplate(
           severity: "error",
           field: "lightingOverlayUrl",
           message:
-            `Effects overlay is ${result.width}×${result.height} px, but Base image is ` +
+            `Effects overlay dimensions do not match Base image dimensions. ` +
+            `Overlay is ${result.width}×${result.height} px, but Base image is ` +
             `${baseWidth}×${baseHeight} px. Upload an overlay with exactly the same dimensions.`,
         });
       }
@@ -361,6 +369,7 @@ export async function validateMockupTemplate(
           severity: "error",
           field: "foregroundImageUrl",
           message:
+            `Foreground dimensions do not match Base image dimensions. ` +
             `Foreground is ${result.width}×${result.height} px, but Base image is ` +
             `${baseWidth}×${baseHeight} px. Foreground dimensions must match Base image dimensions exactly.`,
         });

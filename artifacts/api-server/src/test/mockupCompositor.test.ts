@@ -9,6 +9,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import sharp from "sharp";
+import { _resolvers as safeImageResolvers } from "../lib/safeImageUrl";
 
 // ── Module mocks (must be declared before any import of the modules they replace)
 
@@ -89,6 +90,12 @@ const SKEWED_CORNERS: CornerPoints = {
 
 // ── Lifecycle: populate TEST_IMAGES and stub global.fetch ─────────────────────
 
+beforeAll(() => {
+  // All test URLs (https://test-compositor.local/…) must pass SSRF checks.
+  // vi.mock("dns/promises") doesn't work in pool:"forks"; inject directly.
+  safeImageResolvers.dnsLookup = async () => [{ address: "1.2.3.4", family: 4 }];
+});
+
 beforeAll(async () => {
   const [blueBase, redPoster, greenOverlay, whiteFg] = await Promise.all([
     makeColorImage(200, 200, 0, 0, 200),
@@ -111,6 +118,8 @@ beforeAll(async () => {
         ok: false,
         status: 404,
         statusText: "Not Found",
+        headers: new Headers(),
+        body: null,
         arrayBuffer: async () => new ArrayBuffer(0),
       } as unknown as Response;
     }
@@ -118,6 +127,8 @@ beforeAll(async () => {
     return {
       ok: true,
       status: 200,
+      headers: new Headers(),
+      body: null,
       arrayBuffer: async () => copy.buffer,
     } as unknown as Response;
   });

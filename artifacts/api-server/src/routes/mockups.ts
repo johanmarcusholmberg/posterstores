@@ -8,8 +8,10 @@ import {
 import { eq, and, or, isNull, asc, inArray, sql } from "drizzle-orm";
 import { requireAdmin } from "../middleware/requireAdmin";
 import { adminLimiter } from "../middleware/rateLimiter";
+import { ObjectStorageService } from "../lib/objectStorage";
 
 const router = Router();
+const storage = new ObjectStorageService();
 
 // ─── Format compatibility helpers ──────────────────────────────────────────
 
@@ -621,6 +623,16 @@ router.put("/mockup-templates/:id", requireAdmin, async (req, res) => {
 router.delete("/mockup-templates/:id", requireAdmin, async (req, res) => {
   const id = Number(req.params.id);
   if (isNaN(id)) return res.status(400).json({ error: "Invalid id" });
+
+  // Best-effort: delete the admin preview object for this template before
+  // removing the template record. Non-fatal — log and continue.
+  const previewObjectPath = `mockup-previews/${id}/latest.jpg`;
+  storage.deleteObject(previewObjectPath).catch((err) => {
+    req.log.warn(
+      { err, previewObjectPath },
+      "Failed to delete template preview on template deletion (non-fatal)"
+    );
+  });
 
   // poster_mockups.mockup_template_id has onDelete: "set null" — safe to hard delete.
   await db.delete(mockupTemplatesTable).where(eq(mockupTemplatesTable.id, id));

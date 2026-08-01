@@ -1,7 +1,20 @@
 import sharp from "sharp";
 import { ObjectStorageService } from "./objectStorage";
+import { safeFetchBuffer } from "./safeImageUrl";
 
 const storage = new ObjectStorageService();
+
+// ─── Size and pixel limits ────────────────────────────────────────────────────
+
+/** Maximum bytes to download for any single image (50 MB). */
+export const MAX_IMAGE_DOWNLOAD_BYTES = 50 * 1024 * 1024;
+
+/**
+ * Maximum decoded pixel count accepted by Sharp (80 MP ≈ 8000×10000).
+ * Passed as `limitInputPixels` to every Sharp instance that decodes
+ * externally-supplied image data.
+ */
+export const MAX_DECODED_IMAGE_PIXELS = 80_000_000;
 
 // ─── Backwards-compatible interface declarations ──────────────────────────────
 //
@@ -130,46 +143,32 @@ function getInternalObjectPath(source: string): string | null {
 /**
  * Fetch an image from a storage object path or external URL.
  *
- * @param source - Internal `/api/storage/objects/…` path or an https URL.
- * @param maxBytes - Optional hard limit on the response size. Throws if exceeded.
+ * Internal paths (/api/storage/objects/… or /objects/…) are fetched directly
+ * from object storage. External URLs are fetched through the SSRF-safe loader
+ * which enforces DNS validation, redirect limits, and streaming byte limits.
+ *
+ * @param source   - Internal path or external http(s) URL.
+ * @param maxBytes - Hard byte limit. Defaults to MAX_IMAGE_DOWNLOAD_BYTES.
  */
 export async function fetchImageBuffer(source: string, maxBytes?: number): Promise<Buffer> {
+  const limit = maxBytes ?? MAX_IMAGE_DOWNLOAD_BYTES;
   const trimmed = source.trim();
   const internalObjectPath = getInternalObjectPath(trimmed);
 
   if (internalObjectPath) {
     const file = await storage.getObjectEntityFile(internalObjectPath);
     const [buffer] = await file.download();
+    if (buffer.byteLength > limit) {
+      throw new Error(
+        `Image is too large (${Math.round(buffer.byteLength / 1024 / 1024)} MB). ` +
+        `Maximum allowed size is ${Math.round(limit / 1024 / 1024)} MB.`
+      );
+    }
     return buffer;
   }
 
-  let parsedUrl: URL;
-  try {
-    parsedUrl = new URL(trimmed);
-  } catch {
-    throw new Error(`Unsupported image source: ${trimmed}`);
-  }
-
-  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
-    throw new Error(`Unsupported image protocol: ${parsedUrl.protocol}`);
-  }
-
-  const response = await fetch(parsedUrl.toString(), {
-    signal: AbortSignal.timeout(30_000),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch image (${response.status}): ${parsedUrl.toString()}`);
-  }
-
-  const buf = Buffer.from(await response.arrayBuffer());
-  if (maxBytes !== undefined && buf.byteLength > maxBytes) {
-    throw new Error(
-      `Image is too large (${Math.round(buf.byteLength / 1024 / 1024)} MB). ` +
-      `Maximum allowed size is ${Math.round(maxBytes / 1024 / 1024)} MB.`
-    );
-  }
-  return buf;
+  // External URL — SSRF-safe streaming fetch with DNS validation and redirect control
+  return safeFetchBuffer(trimmed, limit);
 }
 
 // ─── Utility helpers ──────────────────────────────────────────────────────────
@@ -318,7 +317,7 @@ async function perspectiveWarpPoster(
   const sharpFit: "cover" | "contain" | "fill" =
     fitMode === "stretch" ? "fill" : fitMode === "contain" ? "contain" : "cover";
 
-  const { data: posterRgba, info } = await sharp(adjustedPosterBuf)
+  const { data: posterRgba, info } = await sharp(adjustedPosterBuf, { limitInputPixels: MAX_DECODED_IMAGE_PIXELS })
     .resize(bbW, bbH, { fit: sharpFit, withoutEnlargement: false })
     .ensureAlpha()
     .raw()
@@ -392,7 +391,7 @@ export async function applyAdjustmentsToPoster(
 
   if (!needsMod && !needsLinear) return posterBuf;
 
-  let s = sharp(posterBuf);
+  let s = sharp(posterBuf, { limitInputPixels: MAX_DECODED_IMAGE_PIXELS });
 
   if (needsMod) {
     const mod: { brightness?: number; saturation?: number } = {};
@@ -426,7 +425,7 @@ async function preparePosterForBbox(
   const sharpFit: "cover" | "contain" | "fill" =
     fitMode === "stretch" ? "fill" : fitMode === "contain" ? "contain" : "cover";
 
-  let s = sharp(adjustedPosterBuf).resize(areaW, areaH, {
+  let s = sharp(adjustedPosterBuf, { limitInputPixels: MAX_DECODED_IMAGE_PIXELS }).resize(areaW, areaH, {
     fit: sharpFit,
     withoutEnlargement: false,
   });
@@ -481,7 +480,7 @@ async function fetchAndPrepareOverlay(
   // The overlay must exactly match the raw base image dimensions.
   // (The canvas may be scaled down for corners mode, but the ratio is preserved,
   //  so the resize below is safe.)
-  const overlayMeta = await sharp(raw).metadata();
+  const overlayMeta = await sharp(raw, { limitInputPixels: MAX_DECODED_IMAGE_PIXELS }).metadata();
   if (overlayMeta.width !== rawBaseW || overlayMeta.height !== rawBaseH) {
     throw new Error(
       `${layerName} dimensions must match Base image dimensions exactly. ` +
@@ -558,7 +557,7 @@ export async function renderMockup(opts: RenderMockupOptions): Promise<RenderMoc
   //
   // Corners mode is capped at 2000 px on the longest edge to bound memory use
   // during the O(W×H) perspective warp. Bounding-box mode uses the full size.
-  const rawMeta = await sharp(rawTemplateBuf).metadata();
+  const rawMeta = await sharp(rawTemplateBuf, { limitInputPixels: MAX_DECODED_IMAGE_PIXELS }).metadata();
   const rawW = rawMeta.width ?? 1000;
   const rawH = rawMeta.height ?? 1000;
 
@@ -580,7 +579,7 @@ export async function renderMockup(opts: RenderMockupOptions): Promise<RenderMoc
       .png()
       .toBuffer();
   } else if (scale < 1) {
-    baseBuf = await sharp(rawTemplateBuf).resize(W, H).png().toBuffer();
+    baseBuf = await sharp(rawTemplateBuf, { limitInputPixels: MAX_DECODED_IMAGE_PIXELS }).resize(W, H).png().toBuffer();
   } else {
     baseBuf = rawTemplateBuf;
   }

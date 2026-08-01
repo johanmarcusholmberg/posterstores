@@ -226,10 +226,14 @@ export function MockupTemplateForm({
   const [selectedPosterId, setSelectedPosterId] = useState<number | null>(null);
   const [previewResult, setPreviewResult] = useState<MockupPreviewResult | null>(null);
   const [generating, setGenerating] = useState(false);
+  /** Set to true after a successful preview generation; cleared when any render-relevant value changes. */
+  const [previewVerified, setPreviewVerified] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  /** Tracks whether the component has mounted — used to skip clearing effects on initial mount. */
+  const hasMounted = useRef(false);
 
   type DragType = "move" | "nw" | "ne" | "sw" | "se";
   const dragState = useRef<{
@@ -623,12 +627,38 @@ export function MockupTemplateForm({
     try {
       const result = await adminPreviewMockupTemplate(template.id, selectedPosterId);
       setPreviewResult(result);
+      // Mark preview as verified for this exact render configuration.
+      // Any subsequent change to a render-relevant field clears this.
+      setPreviewVerified(true);
     } catch (e: unknown) {
       toast({ variant: "destructive", title: "Preview failed", description: e instanceof Error ? e.message : "Unknown error" });
     } finally {
       setGenerating(false);
     }
   }, [selectedPosterId, isEdit, template, toast]);
+
+  // ── Clear preview verification when any render-relevant value changes ─────────
+  // Skip the initial mount so the badge doesn't flip on load.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!hasMounted.current) {
+      hasMounted.current = true;
+      return;
+    }
+    setPreviewVerified(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [backgroundImageUrl, posterX, posterY, posterWidth, posterHeight,
+      storedManualSurface, fitMode, brightness, contrast, saturation,
+      lightingOverlayUrl, defaultLightingBlendMode, defaultLightingOpacity,
+      foregroundImageUrl, defaultForegroundOpacity, selectedPosterId]);
+
+  // ── Clear selected preview poster when template store assignment changes ──────
+  // When storeKey changes (global ↔ store-specific), the previously selected
+  // poster may no longer be compatible with the template's new scope.
+  useEffect(() => {
+    setSelectedPosterId(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGlobal]);
 
   const displayImageUrl = backgroundImageUrl || template?.previewThumbnailUrl || "";
 
@@ -1420,14 +1450,13 @@ export function MockupTemplateForm({
       {/* ── Template readiness ─────────────────────────────────────────────── */}
       {(() => {
         const hasErrors = validationResult && !validationResult.valid;
-        const isReady = validationResult?.readyForSync;
         const readinessBadge = !validationResult
           ? <span className="ml-auto mr-1 text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">Draft</span>
           : hasErrors
           ? <span className="ml-auto mr-1 text-[10px] px-1.5 py-0.5 rounded bg-destructive/15 text-destructive font-medium">Needs attention</span>
-          : isReady
-          ? <span className="ml-auto mr-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 font-medium">Ready for sync</span>
-          : <span className="ml-auto mr-1 text-[10px] px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300 font-medium">Ready for preview</span>;
+          : previewVerified
+          ? <span className="ml-auto mr-1 text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 font-medium">Preview verified</span>
+          : <span className="ml-auto mr-1 text-[10px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300 font-medium">Technically valid</span>;
         return (
           <div className="border rounded-lg overflow-hidden">
             <button
