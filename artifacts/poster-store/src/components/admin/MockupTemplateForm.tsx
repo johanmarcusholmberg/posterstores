@@ -559,9 +559,12 @@ export function MockupTemplateForm({
         brightness: brightness !== "" ? parseFloat(brightness) : undefined,
         contrast: contrast !== "" ? parseFloat(contrast) : undefined,
         saturation: saturation !== "" ? parseFloat(saturation) : undefined,
-        // Layered images
-        lightingOverlayUrl: lightingOverlayUrl || undefined,
-        foregroundImageUrl: foregroundImageUrl || undefined,
+        // Layered images — use null (not undefined) when cleared so the API
+        // receives an explicit "set to null" rather than omitting the field.
+        // undefined values are stripped by JSON.stringify and the PUT handler
+        // skips fields it doesn't see, leaving the old value in the database.
+        lightingOverlayUrl: lightingOverlayUrl || null,
+        foregroundImageUrl: foregroundImageUrl || null,
         defaultLightingBlendMode,
         defaultLightingOpacity: defaultLightingOpacity !== "" ? parseFloat(defaultLightingOpacity) : undefined,
         defaultForegroundOpacity: defaultForegroundOpacity !== "" ? parseFloat(defaultForegroundOpacity) : undefined,
